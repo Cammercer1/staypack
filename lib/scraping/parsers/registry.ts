@@ -22,12 +22,13 @@ export const SITE_PARSERS: SiteListingParser[] = [
   {
     name: "harcourts",
     platform: "Harcourts",
-    hosts: [/harcourts[a-z0-9-]*\.com\.au$/i],
+    hosts: [/harcourts\.net$/i, /harcourts[a-z0-9-]*\.com\.au$/i],
     parse: parseHarcourtsListing,
     rolloutStatus: "in_review",
     notes:
-      "WordPress Stepps theme; static fetch only. Images in #listing-single__photos (data-lazy on propertyimages.stepps.net). Agents in .listing-single__agent-card.",
+      "Two platforms: harcourts.net (CloudHI, listings-photos.cloudhi.io) and franchise *.com.au (WordPress Stepps, propertyimages.stepps.net). Static fetch only.",
     qaListingUrls: [
+      "https://harcourts.net/au/office/adelaide-city/listing/l40847935-21-255-hindley-street-adelaide-sa-5000",
       "https://harcourtsnr.com.au/property/house-nsw-goonellabah-l37978463/",
     ],
   },
