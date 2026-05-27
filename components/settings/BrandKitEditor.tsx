@@ -13,20 +13,27 @@ type Props = {
   form: UseFormReturn<AgencyInput>;
   agencyId?: string;
   showPreview?: boolean;
+  numberedSections?: boolean;
 };
 
 export function BrandKitEditor({
   form,
   agencyId,
   showPreview = true,
+  numberedSections = true,
 }: Props) {
   const preview = form.watch();
+  const sectionPrefix = numberedSections
+    ? (index: number) => `Step ${index} · `
+    : () => "";
 
   return (
     <div className="space-y-8">
       <section className="space-y-4">
         <div>
-          <h3 className="font-display text-xl tracking-tight">Step 1 · Logo</h3>
+          <h3 className="font-display text-xl tracking-tight">
+            {sectionPrefix(1)}Logo
+          </h3>
           <p className="mt-1 text-sm text-muted-foreground">
             This appears at the top of every buyer-facing report.
           </p>
@@ -40,7 +47,9 @@ export function BrandKitEditor({
 
       <section className="space-y-4">
         <div>
-          <h3 className="font-display text-xl tracking-tight">Step 2 · Colours</h3>
+          <h3 className="font-display text-xl tracking-tight">
+            {sectionPrefix(2)}Colours
+          </h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Pick the colours buyers will see. You do not need to know hex codes — just
             choose what looks like your agency brand.
@@ -62,7 +71,9 @@ export function BrandKitEditor({
 
       <section className="space-y-4">
         <div>
-          <h3 className="font-display text-xl tracking-tight">Step 3 · Fonts</h3>
+          <h3 className="font-display text-xl tracking-tight">
+            {sectionPrefix(3)}Fonts
+          </h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Choose a heading font and a body font for reports. Browse the full
             Google Fonts library, or upload custom font files if your marketing
@@ -74,7 +85,9 @@ export function BrandKitEditor({
 
       <section className="space-y-4">
         <div>
-          <h3 className="font-display text-xl tracking-tight">Step 4 · Report template</h3>
+          <h3 className="font-display text-xl tracking-tight">
+            {sectionPrefix(4)}Report template
+          </h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Choose the default layout for new reports. Agents can pick a different
             template when generating an individual report.
