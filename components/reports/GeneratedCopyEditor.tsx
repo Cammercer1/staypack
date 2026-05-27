@@ -1,0 +1,362 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { ReportPreview } from "@/components/reports/ReportPreview";
+import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
+import { formatCurrency, formatPercent } from "@/lib/reports/formatters";
+import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
+import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
+import { ReportTemplatePicker } from "@/components/reports/ReportTemplatePicker";
+import type { Agency, AiCopyJson, Report } from "@/lib/types";
+
+type Props = {
+  agency: Agency;
+  report: Report;
+  onComplete: (report: Report) => void;
+  onContinueToPreview?: () => void;
+};
+
+type ApiError = {
+  error?: string;
+  code?: string;
+};
+
+export function GeneratedCopyEditor({
+  agency,
+  report,
+  onComplete,
+  onContinueToPreview,
+}: Props) {
+  const [copy, setCopy] = useState<AiCopyJson | null>(report.ai_copy_json);
+  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(
+    () => report.template_id ?? agency.report_template_id ?? DEFAULT_REPORT_TEMPLATE_ID,
+  );
+
+  const estimate = useMemo(() => resolveReportEstimate(report), [report]);
+  const previewReport = useMemo(() => {
+    if (!copy || !estimate) return null;
+
+    return buildFinalReportJson({
+      agency,
+      report: {
+        ...report,
+        template_id: selectedTemplateId,
+      },
+      estimate,
+      copy,
+      scraped: report.scraped_listing_json,
+    });
+  }, [agency, copy, estimate, report, selectedTemplateId]);
+
+  async function generateCopy() {
+    if (!estimate) {
+      toast.error("Run an STR estimate before generating copy");
+      return;
+    }
+
+    setGenerating(true);
+    const response = await fetch(`/api/reports/${report.id}/generate-copy`, {
+      method: "POST",
+    });
+    const payload = (await response.json()) as ApiError & {
+      copy?: AiCopyJson;
+      report?: Report;
+    };
+
+    if (!response.ok) {
+      toast.error(getErrorMessage(payload));
+      setGenerating(false);
+      return;
+    }
+
+    if (payload.copy) {
+      setCopy(payload.copy);
+    }
+
+    if (payload.report) {
+      onComplete(payload.report);
+    }
+
+    toast.success("Report copy generated");
+    setGenerating(false);
+  }
+
+  async function saveCopy() {
+    if (!copy) return;
+
+    setSaving(true);
+    const response = await fetch(`/api/reports/${report.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ai_copy_json: copy,
+        template_id: selectedTemplateId,
+      }),
+    });
+    const payload = (await response.json()) as ApiError & { report?: Report };
+
+    if (!response.ok) {
+      toast.error(getErrorMessage(payload));
+      setSaving(false);
+      return;
+    }
+
+    if (payload.report) {
+      onComplete(payload.report);
+    }
+
+    toast.success("Copy saved");
+    setSaving(false);
+  }
+
+  function updateField(field: keyof AiCopyJson, value: string | string[]) {
+    setCopy((current) => (current ? { ...current, [field]: value } : current));
+  }
+
+  const addressLine = [
+    report.property_address,
+    report.suburb,
+    report.state,
+    report.postcode,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return (
+    <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="space-y-6">
+        <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm">
+          <p className="font-medium">Report context</p>
+          <p className="mt-1 text-muted-foreground">
+            {addressLine || "No property address saved yet"}
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <ContextMetric
+              label="Bedrooms"
+              value={report.bedrooms != null ? String(report.bedrooms) : "—"}
+            />
+            <ContextMetric
+              label="Bathrooms"
+              value={report.bathrooms != null ? String(report.bathrooms) : "—"}
+            />
+            {estimate ? (
+              <>
+                <ContextMetric
+                  label="Annual revenue"
+                  value={formatCurrency(estimate.annualRevenue)}
+                />
+                <ContextMetric
+                  label="Occupancy"
+                  value={formatPercent(estimate.occupancyRate)}
+                />
+                <ContextMetric
+                  label="Nightly rate"
+                  value={formatCurrency(estimate.nightlyRate)}
+                />
+                <ContextMetric
+                  label="Booked nights"
+                  value={
+                    estimate.bookedNights != null
+                      ? String(estimate.bookedNights)
+                      : "—"
+                  }
+                />
+              </>
+            ) : (
+              <p className="sm:col-span-2 text-muted-foreground">
+                Run an STR estimate first to generate buyer-facing copy.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <Button
+            onClick={generateCopy}
+            disabled={generating || saving || !estimate}
+          >
+            {generating
+              ? "Generating copy..."
+              : copy
+                ? "Regenerate copy"
+                : "Generate report copy"}
+          </Button>
+        </div>
+
+        {!estimate ? (
+          <p className="text-sm text-muted-foreground">
+            Go to the STR estimate tab and run an estimate before generating copy.
+          </p>
+        ) : null}
+
+        {copy ? (
+          <div className="space-y-4">
+            <Field
+              label="Heading"
+              value={copy.sales_pack_heading}
+              onChange={(value) => updateField("sales_pack_heading", value)}
+            />
+            <Field
+              label="Blurb"
+              value={copy.sales_pack_blurb}
+              onChange={(value) => updateField("sales_pack_blurb", value)}
+              textarea
+            />
+            <Field
+              label="Key metrics line"
+              value={copy.key_metrics_line}
+              onChange={(value) => updateField("key_metrics_line", value)}
+            />
+            <Field
+              label="Appeal points"
+              value={copy.property_appeal_points.join("\n")}
+              onChange={(value) =>
+                updateField(
+                  "property_appeal_points",
+                  value.split("\n").filter(Boolean),
+                )
+              }
+              textarea
+            />
+            <Field
+              label="Supporting factors"
+              value={copy.performance_supporting_factors.join("\n")}
+              onChange={(value) =>
+                updateField(
+                  "performance_supporting_factors",
+                  value.split("\n").filter(Boolean),
+                )
+              }
+              textarea
+            />
+            <Field
+              label="Buyer checks"
+              value={copy.buyer_checks.join("\n")}
+              onChange={(value) =>
+                updateField("buyer_checks", value.split("\n").filter(Boolean))
+              }
+              textarea
+            />
+            <Field
+              label="Methodology note"
+              value={copy.methodology_note}
+              onChange={(value) => updateField("methodology_note", value)}
+              textarea
+            />
+            <Field
+              label="Disclaimer"
+              value={copy.disclaimer}
+              onChange={(value) => updateField("disclaimer", value)}
+              textarea
+            />
+            <Field
+              label="Confidence notes (internal)"
+              value={copy.confidence_notes}
+              onChange={(value) => updateField("confidence_notes", value)}
+              textarea
+              hint="Staff-only notes. Not shown on the published report."
+            />
+
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="outline"
+                onClick={saveCopy}
+                disabled={generating || saving}
+              >
+                {saving ? "Saving..." : "Save copy"}
+              </Button>
+              {onContinueToPreview ? (
+                <Button
+                  onClick={onContinueToPreview}
+                  disabled={generating || saving}
+                >
+                  Continue to preview
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="space-y-3 xl:sticky xl:top-6 xl:self-start">
+        <div className="space-y-3">
+          <p className="text-sm font-medium">Report layout</p>
+          <ReportTemplatePicker
+            value={selectedTemplateId}
+            onChange={setSelectedTemplateId}
+            defaultTemplateId={agency.report_template_id ?? DEFAULT_REPORT_TEMPLATE_ID}
+          />
+        </div>
+
+        <p className="text-sm font-medium">Live preview</p>
+        {previewReport ? (
+          <div className="max-h-[calc(100vh-8rem)] overflow-auto rounded-xl border bg-white shadow-sm">
+            <ReportPreview report={previewReport} />
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed p-8 text-sm text-muted-foreground">
+            Generate or edit copy to preview the report layout.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ContextMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="font-medium">{value}</p>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  textarea = false,
+  hint,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  textarea?: boolean;
+  hint?: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      {textarea ? (
+        <Textarea
+          rows={4}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      ) : (
+        <Input value={value} onChange={(event) => onChange(event.target.value)} />
+      )}
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
+}
+
+function getErrorMessage(payload: ApiError) {
+  if (payload.code === "missing_estimate") {
+    return "Run an STR estimate before generating copy.";
+  }
+
+  if (payload.code === "validation_failed") {
+    return "Generated copy did not pass validation. Try again.";
+  }
+
+  return payload.error ?? "Copy generation failed";
+}
