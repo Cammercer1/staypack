@@ -34,12 +34,17 @@ export function ReportTemplatePicker({
                   : "border-border/70 hover:border-border",
               )}
             >
-              <p className="font-medium">{template.label}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-medium">{template.label}</p>
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">
+                  {template.tier}
+                </span>
+              </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 {template.description}
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
-                {template.pages} A4 pages
+                {template.pages} A4 {template.pages === 1 ? "page" : "pages"}
               </p>
             </button>
           );

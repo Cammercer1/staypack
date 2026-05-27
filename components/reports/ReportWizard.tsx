@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrapedListingReviewStep } from "@/components/reports/ScrapedListingReviewStep";
 import { StrEstimateStep } from "@/components/reports/StrEstimateStep";
 import { GeneratedCopyEditor } from "@/components/reports/GeneratedCopyEditor";
-import { ReportPreview } from "@/components/reports/ReportPreview";
+import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
+import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import type { Agency, FinalReportJson, Report } from "@/lib/types";
 
 const steps = [
@@ -25,14 +26,46 @@ export function ReportWizard({
   agency: Agency;
 }) {
   const [report, setReport] = useState(initialReport);
+  const [brandAgency, setBrandAgency] = useState(agency);
   const [step, setStep] = useState(getInitialStep(initialReport));
   const [manualEntry, setManualEntry] = useState(!initialReport.scraped_listing_json);
   const [loading, setLoading] = useState(false);
 
-  const finalReport = useMemo(
-    () => report.final_report_json as FinalReportJson | null,
-    [report.final_report_json],
-  );
+  useEffect(() => {
+    setBrandAgency(agency);
+  }, [agency]);
+
+  useEffect(() => {
+    if (step !== "preview") {
+      return;
+    }
+
+    let cancelled = false;
+
+    fetch("/api/agencies")
+      .then((response) => response.json())
+      .then((payload) => {
+        if (!cancelled && payload.agency) {
+          setBrandAgency(payload.agency);
+        }
+      })
+      .catch(() => {
+        // Keep the last known brand settings if refresh fails.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [step]);
+
+  const finalReport = useMemo(() => {
+    const cached = report.final_report_json as FinalReportJson | null;
+    if (!cached) {
+      return null;
+    }
+
+    return mergeAgencyBrandIntoFinalReport(brandAgency, cached);
+  }, [brandAgency, report.final_report_json]);
 
   async function publishReport() {
     setLoading(true);
@@ -107,7 +140,9 @@ export function ReportWizard({
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-6">
-          {finalReport ? <ReportPreview report={finalReport} /> : (
+          {finalReport ? (
+            <FittedReportPreview report={finalReport} maxHeight="min(80vh, 900px)" />
+          ) : (
             <p className="text-sm text-muted-foreground">
               Generate copy first to preview the report.
             </p>

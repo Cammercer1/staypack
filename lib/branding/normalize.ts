@@ -17,7 +17,7 @@ export function normalizeAgencyBrandPayload(body: AgencyInput) {
     body_font_file_url: body.body_font_file_url || body.font_file_url || null,
     font_file_url: body.body_font_file_url || body.font_file_url || null,
     default_disclaimer: body.default_disclaimer || null,
-    report_template_id: body.report_template_id || "classic",
+    report_template_id: body.report_template_id || "classic-light",
     secondary_colour: body.background_colour,
   };
 }
@@ -34,5 +34,5 @@ export const DEFAULT_BRAND_VALUES: Partial<AgencyInput> = {
   heading_font_file_url: "",
   body_font_file_url: "",
   font_file_url: "",
-  report_template_id: "classic",
+  report_template_id: "classic-light",
 };

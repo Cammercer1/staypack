@@ -4,7 +4,9 @@ type Props = {
   report: FinalReportJson;
 };
 
-function resolveFooterAgents(report: FinalReportJson) {
+type FooterAgent = FinalReportJson["agent"];
+
+function resolveFooterAgents(report: FinalReportJson): FooterAgent[] {
   if (report.agents?.length) {
     return report.agents.filter(
       (agent) => agent.name || agent.photo_url || agent.phone || agent.email,
@@ -23,8 +25,74 @@ function resolveFooterAgents(report: FinalReportJson) {
   return [];
 }
 
+function AgentContactLine({
+  label,
+  value,
+  compact,
+}: {
+  label?: string;
+  value: string;
+  compact: boolean;
+}) {
+  return (
+    <p className={`leading-snug text-neutral-700 ${compact ? "break-all text-xs" : "text-sm"}`}>
+      {label ? `${label} ${value}` : value}
+    </p>
+  );
+}
+
+function AgentBlock({
+  agent,
+  fallbackPhone,
+  fallbackEmail,
+  compact = false,
+}: {
+  agent: FooterAgent;
+  fallbackPhone?: string;
+  fallbackEmail?: string;
+  compact?: boolean;
+}) {
+  const phone = agent.phone || fallbackPhone;
+  const email = agent.email || fallbackEmail;
+
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      {agent.photo_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={agent.photo_url}
+          alt=""
+          className={
+            compact
+              ? "h-20 w-[4.5rem] shrink-0 object-cover object-top"
+              : "h-24 w-20 shrink-0 object-cover object-top"
+          }
+        />
+      ) : null}
+
+      <div className="min-w-0 flex-1 text-left">
+        {agent.name ? (
+          <p className={`font-semibold text-neutral-900 ${compact ? "text-sm" : ""}`}>
+            {agent.name}
+          </p>
+        ) : null}
+        {agent.role_title ? (
+          <p className={`text-neutral-600 ${compact ? "text-xs" : "text-sm"}`}>
+            {agent.role_title}
+          </p>
+        ) : null}
+        {phone ? (
+          <AgentContactLine label={compact ? undefined : "P:"} value={phone} compact={compact} />
+        ) : null}
+        {email ? (
+          <AgentContactLine label={compact ? undefined : "E:"} value={email} compact={compact} />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function ClassicAgentFooter({ report }: Props) {
-  const accent = report.agency.primary_colour;
   const { agency } = report;
   const agents = resolveFooterAgents(report);
   const hasQr = Boolean(report.assets.qr_code_url);
@@ -33,56 +101,32 @@ export function ClassicAgentFooter({ report }: Props) {
     return null;
   }
 
-  const [primaryAgent, ...secondaryAgents] = agents;
-  const primaryPhone = primaryAgent?.phone || agency.phone;
-  const primaryEmail = primaryAgent?.email || agency.email;
+  const multiAgent = agents.length > 1;
 
   return (
-    <footer className="mt-auto border-t border-neutral-200 px-10 py-6">
-      <div className="flex items-end justify-end gap-6">
+    <footer className="shrink-0 border-t border-neutral-200 px-10 py-4">
+      <div className="flex items-center justify-between gap-6">
         {agents.length > 0 ? (
-          <div className="flex flex-col items-end gap-4">
-            <div className="flex items-end gap-3">
-              {agents.map((agent) =>
-                agent.photo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={agent.name}
-                    src={agent.photo_url}
-                    alt=""
-                    className="h-28 w-24 object-cover object-top"
-                  />
-                ) : null,
-              )}
-            </div>
-
-            <div className="text-right">
-              {primaryAgent?.name ? (
-                <p className="font-semibold text-neutral-900">{primaryAgent.name}</p>
-              ) : null}
-              {primaryAgent?.role_title ? (
-                <p className="text-sm text-neutral-600">{primaryAgent.role_title}</p>
-              ) : null}
-              {primaryPhone ? (
-                <p className="text-sm" style={{ color: accent }}>
-                  P: {primaryPhone}
-                </p>
-              ) : null}
-              {primaryEmail ? (
-                <p className="text-sm" style={{ color: accent }}>
-                  E: {primaryEmail}
-                </p>
-              ) : null}
-              {secondaryAgents.map((agent) =>
-                agent.name ? (
-                  <p key={agent.name} className="mt-2 font-semibold text-neutral-900">
-                    {agent.name}
-                  </p>
-                ) : null,
-              )}
-            </div>
+          <div
+            className={
+              multiAgent
+                ? "grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-3"
+                : "flex min-w-0 flex-1 items-center"
+            }
+          >
+            {agents.map((agent) => (
+              <AgentBlock
+                key={agent.name || agent.email || agent.phone}
+                agent={agent}
+                fallbackPhone={agency.phone}
+                fallbackEmail={agency.email}
+                compact={multiAgent}
+              />
+            ))}
           </div>
-        ) : null}
+        ) : (
+          <div className="flex-1" />
+        )}
 
         {hasQr ? (
           // eslint-disable-next-line @next/next/no-img-element

@@ -37,7 +37,7 @@ export function OnboardingForm() {
       default_cta:
         "Speak with the agent for the full buyer pack and property details.",
       default_disclaimer: DEFAULT_DISCLAIMER,
-      report_template_id: "classic",
+      report_template_id: "classic-light",
     } as AgencyInput,
   });
 

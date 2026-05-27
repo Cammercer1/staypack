@@ -10,6 +10,8 @@ import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { formatCurrency, formatPercent } from "@/lib/reports/formatters";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
+import { enforceTemplateCopyLimits } from "@/lib/reports/enforceTemplateCopyLimits";
+import { getTemplateCopyFieldLimit } from "@/lib/reports/getTemplateCopyLimits";
 import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
 import { ReportTemplatePicker } from "@/components/reports/ReportTemplatePicker";
 import type { Agency, AiCopyJson, Report } from "@/lib/types";
@@ -32,7 +34,14 @@ export function GeneratedCopyEditor({
   onComplete,
   onContinueToPreview,
 }: Props) {
-  const [copy, setCopy] = useState<AiCopyJson | null>(report.ai_copy_json);
+  const [copy, setCopy] = useState<AiCopyJson | null>(() =>
+    report.ai_copy_json
+      ? enforceTemplateCopyLimits(
+          report.ai_copy_json,
+          report.template_id ?? agency.report_template_id ?? DEFAULT_REPORT_TEMPLATE_ID,
+        )
+      : null,
+  );
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState(
@@ -77,7 +86,7 @@ export function GeneratedCopyEditor({
     }
 
     if (payload.copy) {
-      setCopy(payload.copy);
+      setCopy(enforceTemplateCopyLimits(payload.copy, selectedTemplateId));
     }
 
     if (payload.report) {
@@ -117,8 +126,26 @@ export function GeneratedCopyEditor({
   }
 
   function updateField(field: keyof AiCopyJson, value: string | string[]) {
-    setCopy((current) => (current ? { ...current, [field]: value } : current));
+    setCopy((current) => {
+      if (!current) return current;
+
+      const next = { ...current, [field]: value };
+      return enforceTemplateCopyLimits(next, selectedTemplateId);
+    });
   }
+
+  const headingLimit = getTemplateCopyFieldLimit(
+    selectedTemplateId,
+    "sales_pack_heading",
+  );
+  const blurbLimit = getTemplateCopyFieldLimit(
+    selectedTemplateId,
+    "sales_pack_blurb",
+  );
+  const metricsLimit = getTemplateCopyFieldLimit(
+    selectedTemplateId,
+    "key_metrics_line",
+  );
 
   const addressLine = [
     report.property_address,
@@ -202,17 +229,20 @@ export function GeneratedCopyEditor({
               label="Heading"
               value={copy.sales_pack_heading}
               onChange={(value) => updateField("sales_pack_heading", value)}
+              limit={headingLimit}
             />
             <Field
               label="Blurb"
               value={copy.sales_pack_blurb}
               onChange={(value) => updateField("sales_pack_blurb", value)}
               textarea
+              limit={blurbLimit}
             />
             <Field
               label="Key metrics line"
               value={copy.key_metrics_line}
               onChange={(value) => updateField("key_metrics_line", value)}
+              limit={metricsLimit}
             />
             <Field
               label="Appeal points"
@@ -323,25 +353,53 @@ function Field({
   onChange,
   textarea = false,
   hint,
+  limit,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   textarea?: boolean;
   hint?: string;
+  limit?: {
+    max: number;
+    hint: string;
+  } | null;
 }) {
+  const atLimit = limit ? value.length >= limit.max : false;
+
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
+      <div className="flex items-baseline justify-between gap-3">
+        <Label>{label}</Label>
+        {limit ? (
+          <span
+            className={
+              atLimit
+                ? "text-xs font-medium text-amber-700"
+                : "text-xs text-muted-foreground"
+            }
+          >
+            {value.length}/{limit.max}
+          </span>
+        ) : null}
+      </div>
       {textarea ? (
         <Textarea
           rows={4}
           value={value}
+          maxLength={limit?.max}
           onChange={(event) => onChange(event.target.value)}
         />
       ) : (
-        <Input value={value} onChange={(event) => onChange(event.target.value)} />
+        <Input
+          value={value}
+          maxLength={limit?.max}
+          onChange={(event) => onChange(event.target.value)}
+        />
       )}
+      {limit ? (
+        <p className="text-xs text-muted-foreground">{limit.hint}</p>
+      ) : null}
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );

@@ -84,7 +84,9 @@ export type StrEnrichmentJson = {
   } | null;
   seasonality: {
     month: string;
+    revenue_low: number | null;
     revenue: number | null;
+    revenue_high: number | null;
     occupancy: number | null;
     adr: number | null;
   }[];
@@ -185,6 +187,7 @@ export type FinalReportJson = {
     qr_code_url: string;
     pdf_url: string;
   };
+  str_enrichment?: StrEnrichmentJson | null;
 };
 
 export type Agency = {

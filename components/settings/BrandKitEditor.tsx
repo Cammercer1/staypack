@@ -81,7 +81,7 @@ export function BrandKitEditor({
           </p>
         </div>
         <ReportTemplatePicker
-          value={preview.report_template_id ?? "classic"}
+          value={preview.report_template_id ?? "classic-light"}
           onChange={(templateId) =>
             form.setValue("report_template_id", templateId, { shouldDirty: true })
           }

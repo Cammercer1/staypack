@@ -35,14 +35,20 @@ export function encodeGoogleFontFamily(family: string) {
   return family.trim().replace(/\s+/g, "+");
 }
 
-function findPreset(fontId: string): FontPreset | undefined {
+export function findFontPreset(fontId: string): FontPreset | undefined {
+  const normalized = fontId.trim().toLowerCase();
+
   return FONT_PRESETS.find(
     (preset) =>
       preset.id === fontId ||
-      preset.googleFont?.replace(/\+/g, " ").toLowerCase() === fontId.toLowerCase() ||
-      preset.family.replace(/"/g, "").split(",")[0]?.trim().toLowerCase() ===
-        fontId.toLowerCase(),
+      preset.id.toLowerCase() === normalized ||
+      preset.googleFont?.replace(/\+/g, " ").toLowerCase() === normalized ||
+      preset.family.replace(/"/g, "").split(",")[0]?.trim().toLowerCase() === normalized,
   );
+}
+
+function findPreset(fontId: string): FontPreset | undefined {
+  return findFontPreset(fontId);
 }
 
 export function getFontDisplayName(fontId: string) {
@@ -93,7 +99,7 @@ export function resolveHeadingFontFamily(
     return "AgencyHeadingFont, Georgia, serif";
   }
 
-  const preset = HEADING_FONT_PRESETS.find((item) => item.id === fontId);
+  const preset = findFontPreset(fontId);
   if (preset) {
     return preset.family;
   }
@@ -109,7 +115,7 @@ export function resolveBodyFontFamily(
     return "AgencyBodyFont, system-ui, sans-serif";
   }
 
-  const preset = BODY_FONT_PRESETS.find((item) => item.id === fontId);
+  const preset = findFontPreset(fontId);
   if (preset) {
     return preset.family;
   }

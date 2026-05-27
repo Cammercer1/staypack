@@ -4,6 +4,7 @@ import { geocodeReportAddress, hasGeocodableAddress } from "@/lib/geocoding";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { loadReportAgentProfile } from "@/lib/reports/loadReportAgent";
 import { normalizeAiCopy } from "@/lib/reports/normalizeAiCopy";
+import { enforceTemplateCopyLimits } from "@/lib/reports/enforceTemplateCopyLimits";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
 import { aiCopySchema, parsedListingSchema, updateReportSchema, type UpdateReportInput } from "@/lib/validation/schemas";
 import type { Agency, AiCopyJson, Report } from "@/lib/types";
@@ -127,13 +128,18 @@ export async function PATCH(
         );
       }
 
-      body.ai_copy_json = parsedCopy.data;
+      const limitedCopy = enforceTemplateCopyLimits(
+        parsedCopy.data,
+        body.template_id ?? report.template_id ?? agency.report_template_id ?? "classic-light",
+      );
+
+      body.ai_copy_json = limitedCopy;
       const rebuildResult = await rebuildFinalReportJson({
         supabase,
         agency,
         report,
         body,
-        copy: parsedCopy.data,
+        copy: limitedCopy,
       });
 
       if (rebuildResult.error) {

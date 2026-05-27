@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
+import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import { ReportPreview } from "@/components/reports/ReportPreview";
-import type { FinalReportJson } from "@/lib/types";
+import type { Agency, FinalReportJson } from "@/lib/types";
 
 export default async function PublicReportPage({
   params,
@@ -24,7 +25,7 @@ export default async function PublicReportPage({
   const admin = createAdminClient();
   const { data: agency } = await admin
     .from("agencies")
-    .select("id")
+    .select("*")
     .eq("slug", agencySlug)
     .maybeSingle();
 
@@ -44,9 +45,14 @@ export default async function PublicReportPage({
     notFound();
   }
 
+  const finalReport = mergeAgencyBrandIntoFinalReport(
+    agency as Agency,
+    report.final_report_json as FinalReportJson,
+  );
+
   return (
     <div className="min-h-screen bg-muted/40 py-10">
-      <ReportPreview report={report.final_report_json as FinalReportJson} />
+      <ReportPreview report={finalReport} />
     </div>
   );
 }

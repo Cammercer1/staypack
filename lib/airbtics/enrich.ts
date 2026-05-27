@@ -15,18 +15,30 @@ function unwrapMessage(raw: Record<string, unknown>) {
 }
 
 function buildSeasonality(
-  monthlyRevenue: Record<string, unknown> | undefined,
+  lowRevenue: Record<string, unknown> | undefined,
+  midRevenue: Record<string, unknown> | undefined,
+  highRevenue: Record<string, unknown> | undefined,
   monthlyOccupancy: Record<string, unknown> | undefined,
   monthlyAdr: Record<string, unknown> | undefined,
 ) {
-  if (!monthlyRevenue) return [];
+  const monthKeys = new Set([
+    ...Object.keys(lowRevenue ?? {}),
+    ...Object.keys(midRevenue ?? {}),
+    ...Object.keys(highRevenue ?? {}),
+  ]);
 
-  return Object.keys(monthlyRevenue)
+  if (monthKeys.size === 0) {
+    return [];
+  }
+
+  return [...monthKeys]
     .sort()
     .slice(-12)
     .map((month) => ({
       month,
-      revenue: numberOrNull(monthlyRevenue[month]),
+      revenue_low: numberOrNull(lowRevenue?.[month]),
+      revenue: numberOrNull(midRevenue?.[month]),
+      revenue_high: numberOrNull(highRevenue?.[month]),
       occupancy: numberOrNull(monthlyOccupancy?.[month]),
       adr: numberOrNull(monthlyAdr?.[month]),
     }));
@@ -68,7 +80,9 @@ export function buildStrEnrichment(
   const kpis = message.kpis as
     | Record<string, Record<string, unknown>>
     | undefined;
+  const p25 = kpis?.["25"];
   const p50 = kpis?.["50"];
+  const p75 = kpis?.["75"];
   const revenueRange = kpis
     ? {
         p25: numberOrNull(kpis["25"]?.ltm_revenue),
@@ -90,10 +104,12 @@ export function buildStrEnrichment(
     radius_m: numberOrNull(message.radius),
     revenue_range: revenueRange,
     seasonality: buildSeasonality(
+      p25?.monthly_revenue as Record<string, unknown> | undefined,
       p50?.monthly_revenue as Record<string, unknown> | undefined,
+      p75?.monthly_revenue as Record<string, unknown> | undefined,
       p50?.monthly_occupancy_rate as Record<string, unknown> | undefined,
       p50?.monthly_adr as Record<string, unknown> | undefined,
     ),
-    comps: sortedComps.slice(0, 6).map(normalizeComp),
+    comps: sortedComps.slice(0, 3).map(normalizeComp),
   };
 }

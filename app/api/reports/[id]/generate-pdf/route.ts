@@ -2,14 +2,16 @@ import { NextResponse } from "next/server";
 import { requireReportAccess } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getReportsUrl } from "@/lib/env";
-import { renderPdfFromUrl } from "@/lib/browserless/pdf";
+import { renderPdfFromUrl, buildPdfImagePath } from "@/lib/browserless/pdf";
+import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
 
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
+
   try {
-    const { id } = await params;
     const { supabase, agency, report } = await requireReportAccess(id);
 
     if (!report.public_slug) {
@@ -20,8 +22,32 @@ export async function POST(
     }
 
     const printUrl = `${getReportsUrl().replace(/\/$/, "")}/${agency.slug}/${report.public_slug}/print`;
-    const pdfBuffer = await renderPdfFromUrl(printUrl);
     const admin = createAdminClient();
+
+    const pdfBuffer = await renderPdfFromUrl(printUrl, {
+      mirrorImage: async (sourceUrl, buffer, contentType) => {
+        const path = buildPdfImagePath(
+          agency.id,
+          report.id,
+          sourceUrl,
+          contentType,
+        );
+
+        const { error } = await admin.storage
+          .from("report-assets")
+          .upload(path, buffer, {
+            contentType,
+            upsert: true,
+          });
+
+        if (error) {
+          return null;
+        }
+
+        return admin.storage.from("report-assets").getPublicUrl(path).data
+          .publicUrl;
+      },
+    });
     const pdfPath = `${agency.id}/${report.id}/report.pdf`;
 
     const { error: uploadError } = await admin.storage
@@ -39,19 +65,22 @@ export async function POST(
       data: { publicUrl },
     } = admin.storage.from("report-pdfs").getPublicUrl(pdfPath);
 
+    const cacheVersion = Date.now();
+    const pdfUrl = cacheBustedPdfUrl(publicUrl, cacheVersion);
+
     const finalReportJson = {
       ...(report.final_report_json as Record<string, unknown>),
       assets: {
         ...((report.final_report_json as { assets?: Record<string, string> })
           ?.assets ?? {}),
-        pdf_url: publicUrl,
+        pdf_url: pdfUrl,
       },
     };
 
     const { data, error } = await supabase
       .from("reports")
       .update({
-        pdf_url: publicUrl,
+        pdf_url: pdfUrl,
         final_report_json: finalReportJson,
       })
       .eq("id", report.id)
@@ -62,7 +91,7 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ pdf_url: publicUrl, report: data });
+    return NextResponse.json({ pdf_url: pdfUrl, report: data });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "PDF generation failed" },

@@ -38,7 +38,7 @@ export function BrandSettingsForm({ agency }: { agency: Agency }) {
       default_report_title: agency.default_report_title,
       default_cta: agency.default_cta,
       default_disclaimer: agency.default_disclaimer ?? "",
-      report_template_id: agency.report_template_id ?? "classic",
+      report_template_id: agency.report_template_id ?? "classic-light",
     },
   });
 

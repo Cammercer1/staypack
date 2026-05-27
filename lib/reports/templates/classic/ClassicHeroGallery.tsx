@@ -33,28 +33,22 @@ export function ClassicHeroGallery({ property }: Props) {
         : "grid-cols-3";
 
   return (
-    <div className="bg-white">
+    <div className="flex h-full min-h-0 flex-col bg-white">
       {hero ? (
-        <div className="w-full overflow-hidden">
+        <div className="min-h-0 flex-[2] overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={hero}
-            alt=""
-            className="aspect-[2.35/1] w-full object-cover"
-          />
+          <img src={hero} alt="" className="h-full w-full object-cover" />
         </div>
       ) : null}
 
       {slots.length > 0 ? (
-        <div className={`mt-[2px] grid gap-[2px] ${secondaryGridClass}`}>
+        <div
+          className={`mt-[2px] grid min-h-0 flex-1 gap-[2px] overflow-hidden ${secondaryGridClass}`}
+        >
           {slots.map((url) => (
-            <div key={url} className="overflow-hidden">
+            <div key={url} className="min-h-0 overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={url}
-                alt=""
-                className="aspect-[4/3] w-full object-cover"
-              />
+              <img src={url} alt="" className="h-full w-full object-cover" />
             </div>
           ))}
         </div>

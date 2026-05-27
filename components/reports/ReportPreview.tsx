@@ -1,53 +1,74 @@
+"use client";
+
 import type { FinalReportJson } from "@/lib/types";
 import {
-  resolveBodyFontFamily,
-  resolveHeadingFontFamily,
-} from "@/lib/branding/google-fonts";
+  getReportBrandColourVars,
+  getReportBrandColours,
+} from "@/lib/reports/brandColours";
 import { BrandFontLoader } from "@/components/settings/BrandFontLoader";
+import {
+  getReportPageFormat,
+  getReportPageFormatStyle,
+  type ReportPageOrientation,
+} from "@/lib/reports/pageFormat";
+import { getReportFontConfig } from "@/lib/reports/reportFonts";
 import { getReportTemplate } from "@/lib/reports/templates/registry";
 import { resolveTemplateIdFromFinalReport } from "@/lib/reports/templates/resolveTemplateId";
 
 export function ReportPreview({
   report,
   printMode = false,
+  orientation = "portrait",
 }: {
   report: FinalReportJson;
   printMode?: boolean;
+  orientation?: ReportPageOrientation;
 }) {
+  const pageFormat = getReportPageFormat(orientation);
   const template = getReportTemplate(resolveTemplateIdFromFinalReport(report));
   const Template = template.Component;
-
-  const fonts = {
-    heading_font_family: report.agency.heading_font_family || report.agency.font_family,
-    body_font_family: report.agency.body_font_family || report.agency.font_family,
-    heading_font_file_url: report.agency.heading_font_file_url,
-    body_font_file_url: report.agency.body_font_file_url || report.agency.font_file_url,
-  };
-
-  const headingFamily = resolveHeadingFontFamily(
-    fonts.heading_font_family,
-    fonts.heading_font_file_url,
-  );
-  const bodyFamily = resolveBodyFontFamily(
-    fonts.body_font_family,
-    fonts.body_font_file_url,
-  );
-  const textColour = report.agency.text_colour || report.agency.primary_colour;
-  const backgroundColour =
-    report.agency.background_colour || report.agency.secondary_colour;
+  const brand = getReportBrandColours(report.agency);
+  const fonts = getReportFontConfig(report.agency);
 
   return (
     <div
       className={printMode ? "report-preview print-mode" : "report-preview"}
+      data-page-orientation={orientation}
+      data-report-root
       style={{
-        color: textColour,
-        backgroundColor: backgroundColour,
-        fontFamily: bodyFamily,
-        ["--report-heading-font" as string]: headingFamily,
-        ["--report-body-font" as string]: bodyFamily,
+        ...getReportPageFormatStyle(pageFormat),
+        ...getReportBrandColourVars(brand),
+        color: brand.text,
+        backgroundColor: brand.pageBackground,
+        ["--report-heading-font" as string]: fonts.headingFontFamily,
+        ["--report-body-font" as string]: fonts.bodyFontFamily,
       }}
     >
-      <BrandFontLoader fonts={fonts} />
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .report-preview[data-report-root] {
+              font-family: ${fonts.bodyFontFamily};
+            }
+            .report-preview[data-report-root] h1,
+            .report-preview[data-report-root] h2,
+            .report-preview[data-report-root] h3,
+            .report-preview[data-report-root] h4 {
+              font-family: ${fonts.headingFontFamily};
+              letter-spacing: normal;
+            }
+          `,
+        }}
+      />
+      <BrandFontLoader
+        fonts={{
+          heading_font_family: fonts.headingFontId,
+          body_font_family: fonts.bodyFontId,
+          heading_font_file_url: report.agency.heading_font_file_url,
+          body_font_file_url:
+            report.agency.body_font_file_url || report.agency.font_file_url,
+        }}
+      />
       <Template report={report} />
     </div>
   );

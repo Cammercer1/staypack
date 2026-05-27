@@ -123,6 +123,7 @@ export function buildFinalReportJson({
       qr_code_url: report.qr_code_url ?? "",
       pdf_url: report.pdf_url ?? "",
     },
+    str_enrichment: report.str_enrichment_json ?? null,
   };
 }
 

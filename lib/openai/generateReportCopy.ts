@@ -6,6 +6,10 @@ import { aiCopySchema } from "@/lib/validation/schemas";
 import { getMockAiCopy } from "@/lib/reports/buildFinalReportJson";
 import { formatCurrency, formatPercent } from "@/lib/reports/formatters";
 import { normalizeAiCopy } from "@/lib/reports/normalizeAiCopy";
+import { enforceTemplateCopyLimits } from "@/lib/reports/enforceTemplateCopyLimits";
+import { getClassicCopyPromptLimits } from "@/lib/reports/templates/classic/copyLimits";
+import { isClassicTemplateId } from "@/lib/reports/templates/ids";
+import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
 import { isDevelopment } from "@/lib/env";
 
 const SYSTEM_PROMPT = `You are a real estate sales pack copywriter for Australian property agents.
@@ -76,10 +80,11 @@ export async function generateReportCopy({
   }
 
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const userPayload = buildUserPayload({ agency, report, estimate });
+  const templateId = resolveReportTemplateId(agency, report);
+  const userPayload = buildUserPayload({ agency, report, estimate, templateId });
 
   const first = await requestCopy(client, userPayload);
-  const parsed = parseCopyResponse(first, agency);
+  const parsed = parseCopyResponse(first, agency, templateId);
 
   if (parsed.success) {
     return parsed.data;
@@ -91,7 +96,7 @@ export async function generateReportCopy({
     invalidJson: first,
     validationErrors: parsed.error.flatten(),
   });
-  const repairedParsed = parseCopyResponse(repaired, agency);
+  const repairedParsed = parseCopyResponse(repaired, agency, templateId);
 
   if (!repairedParsed.success) {
     console.error("Repair copy validation failed:", repairedParsed.error.flatten());
@@ -105,7 +110,8 @@ function buildUserPayload({
   agency,
   report,
   estimate,
-}: GenerateCopyInput) {
+  templateId,
+}: GenerateCopyInput & { templateId: string }) {
   const scraped = report.scraped_listing_json as
     | {
         rentalAppraisal?: {
@@ -155,12 +161,25 @@ function buildUserPayload({
       },
     },
     long_term_rental: scraped?.rentalAppraisal ?? null,
+    template_id: templateId,
+    copy_limits: isClassicTemplateId(templateId)
+      ? getClassicCopyPromptLimits(templateId)
+      : null,
     output_schema: JSON_CONTRACT,
   };
 }
 
-function parseCopyResponse(raw: unknown, agency: Agency) {
-  return aiCopySchema.safeParse(normalizeAiCopy(raw, agency));
+function parseCopyResponse(raw: unknown, agency: Agency, templateId: string) {
+  const parsed = aiCopySchema.safeParse(normalizeAiCopy(raw, agency));
+
+  if (!parsed.success) {
+    return parsed;
+  }
+
+  return {
+    success: true as const,
+    data: enforceTemplateCopyLimits(parsed.data, templateId),
+  };
 }
 
 async function requestCopy(
@@ -172,6 +191,15 @@ async function requestCopy(
   },
 ) {
   try {
+    const payloadObject =
+      payload && typeof payload === "object"
+        ? (payload as Record<string, unknown>)
+        : null;
+    const copyLimits =
+      typeof payloadObject?.copy_limits === "string"
+        ? payloadObject.copy_limits
+        : null;
+
     const response = await client.chat.completions.create({
       model: "gpt-4.1-mini",
       response_format: zodResponseFormat(aiCopySchema, "report_copy"),
@@ -181,7 +209,9 @@ async function requestCopy(
           role: "user",
           content: repair
             ? `Repair the invalid JSON below. Fix only validation issues and return valid JSON matching the schema.\n\nValidation errors:\n${JSON.stringify(repair.validationErrors)}\n\nInvalid JSON:\n${JSON.stringify(repair.invalidJson)}\n\nSource payload:\n${JSON.stringify(payload)}`
-            : `${JSON.stringify(payload)}\n\n${JSON_CONTRACT}`,
+            : `${JSON.stringify(payload)}\n\n${JSON_CONTRACT}${
+                copyLimits ? `\n\n${copyLimits}` : ""
+              }`,
         },
       ],
     });

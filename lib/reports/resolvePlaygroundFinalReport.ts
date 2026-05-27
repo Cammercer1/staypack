@@ -6,6 +6,8 @@ import {
   resolveReportAgents,
 } from "@/lib/reports/resolveReportAgents";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
+import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
+import { normalizeReportTemplateId } from "@/lib/reports/templates/ids";
 import type { Agency, FinalReportJson, Report } from "@/lib/types";
 
 export async function resolvePlaygroundFinalReport(
@@ -20,15 +22,17 @@ export async function resolvePlaygroundFinalReport(
   if (report.final_report_json) {
     const cached = report.final_report_json as FinalReportJson;
 
-    if (agents.length > 0) {
-      return {
-        ...cached,
-        agents,
-        agent: primaryReportAgent(agents),
-      };
-    }
-
-    return cached;
+    return mergeAgencyBrandIntoFinalReport(agency, {
+      ...cached,
+      template_id: normalizeReportTemplateId(cached.template_id),
+      str_enrichment: cached.str_enrichment ?? report.str_enrichment_json ?? null,
+      ...(agents.length > 0
+        ? {
+            agents,
+            agent: primaryReportAgent(agents),
+          }
+        : {}),
+    });
   }
 
   const estimate = resolveReportEstimate(report);

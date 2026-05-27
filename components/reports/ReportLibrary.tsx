@@ -76,7 +76,14 @@ export function ReportLibrary({ reports }: { reports: Report[] }) {
                       </Button>
                     </Link>
                     <CopyLinkButton url={report.public_url} />
-                    <DownloadPdfButton url={report.pdf_url} />
+                    <DownloadPdfButton
+                      url={report.pdf_url}
+                      reportId={report.id}
+                      cacheVersion={report.updated_at}
+                      canGenerate={
+                        report.status === "published" && Boolean(report.public_slug)
+                      }
+                    />
                     <DeleteReportButton
                       reportId={report.id}
                       propertyAddress={report.property_address}

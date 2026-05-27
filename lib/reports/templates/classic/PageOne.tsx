@@ -1,42 +1,33 @@
 import type { FinalReportJson } from "@/lib/types";
 import { ClassicAgentFooter } from "@/lib/reports/templates/classic/ClassicAgentFooter";
 import { ClassicHeroGallery } from "@/lib/reports/templates/classic/ClassicHeroGallery";
+import { ClassicPageHeader } from "@/lib/reports/templates/classic/ClassicPageHeader";
 import { ClassicPropertySection } from "@/lib/reports/templates/classic/ClassicPropertySection";
+import { getReportBrandColours } from "@/lib/reports/brandColours";
 
-export function ClassicPageOne({ report }: { report: FinalReportJson }) {
-  const textColour = report.agency.text_colour || report.agency.primary_colour;
-  const backgroundColour =
-    report.agency.background_colour || report.agency.secondary_colour;
+type Props = {
+  report: FinalReportJson;
+  variant?: "light" | "detailed";
+};
+
+export function ClassicPageOne({ report, variant = "light" }: Props) {
+  const brand = getReportBrandColours(report.agency);
 
   return (
     <section
-      className="report-page mx-auto flex min-h-[297mm] flex-col shadow-sm"
+      className="report-page mx-auto flex flex-col overflow-hidden shadow-sm"
       style={{
-        backgroundColor: backgroundColour,
-        color: textColour,
+        backgroundColor: brand.pageBackground,
+        color: brand.text,
       }}
     >
-      <header className="border-b border-neutral-200 bg-white px-10 py-5">
-        {report.agency.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={report.agency.logo_url}
-            alt={report.agency.name}
-            className="h-10 object-contain object-left"
-          />
-        ) : (
-          <p
-            className="text-lg font-semibold text-neutral-900"
-            style={{ fontFamily: "var(--report-heading-font, inherit)" }}
-          >
-            {report.agency.name}
-          </p>
-        )}
-      </header>
+      <ClassicPageHeader report={report} />
 
-      <ClassicHeroGallery property={report.property} />
+      <div className="min-h-0 flex-1">
+        <ClassicHeroGallery property={report.property} />
+      </div>
 
-      <ClassicPropertySection report={report} />
+      <ClassicPropertySection report={report} variant={variant} />
 
       <ClassicAgentFooter report={report} />
     </section>

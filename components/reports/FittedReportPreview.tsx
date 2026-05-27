@@ -3,49 +3,50 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { ReportPreview } from "@/components/reports/ReportPreview";
 import { cn } from "@/lib/utils";
+import {
+  getReportPageFormat,
+  mmToPx,
+  type ReportPageOrientation,
+} from "@/lib/reports/pageFormat";
+import { getReportTemplate } from "@/lib/reports/templates/registry";
 import type { FinalReportJson } from "@/lib/types";
-
-const MM_TO_PX = 3.7795275591;
-const A4_WIDTH_PX = 210 * MM_TO_PX;
-const A4_HEIGHT_PX = 297 * MM_TO_PX;
 
 type Props = {
   report: FinalReportJson;
   className?: string;
   maxHeight?: string;
+  orientation?: ReportPageOrientation;
 };
 
 export function FittedReportPreview({
   report,
   className,
   maxHeight = "calc(100vh - 12rem)",
+  orientation = "portrait",
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const pageFormat = getReportPageFormat(orientation);
+  const pageWidthPx = mmToPx(pageFormat.widthMm);
+  const pageHeightPx = mmToPx(pageFormat.heightMm);
+  const pageCount = getReportTemplate(report.template_id).pages;
+  const contentHeightPx = pageHeightPx * pageCount;
   const [scale, setScale] = useState(0.5);
-  const [pageSize, setPageSize] = useState({
-    width: A4_WIDTH_PX,
-    height: A4_HEIGHT_PX,
-  });
+  const fitToPanel = maxHeight !== "none";
 
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const measure = () => {
-      const page = container.querySelector(".report-page") as HTMLElement | null;
-      const width = page?.offsetWidth ?? A4_WIDTH_PX;
-      const height = page?.offsetHeight ?? A4_HEIGHT_PX;
-
-      if (!width || !height) return;
-
-      setPageSize({ width, height });
-
       const padding = 16;
       const availableWidth = container.clientWidth - padding;
-      const availableHeight = container.clientHeight - padding;
+      const availableHeight = fitToPanel
+        ? container.clientHeight - padding
+        : contentHeightPx;
+
       const nextScale = Math.min(
-        availableWidth / width,
-        availableHeight / height,
+        availableWidth / pageWidthPx,
+        fitToPanel ? availableHeight / contentHeightPx : availableWidth / pageWidthPx,
         1,
       );
 
@@ -57,14 +58,11 @@ export function FittedReportPreview({
     const observer = new ResizeObserver(measure);
     observer.observe(container);
 
-    const page = container.querySelector(".report-page");
-    if (page) observer.observe(page);
-
     return () => observer.disconnect();
-  }, [report]);
+  }, [report, orientation, contentHeightPx, fitToPanel, pageWidthPx]);
 
-  const scaledWidth = pageSize.width * scale;
-  const scaledHeight = pageSize.height * scale;
+  const scaledWidth = pageWidthPx * scale;
+  const scaledHeight = contentHeightPx * scale;
 
   return (
     <div
@@ -73,9 +71,14 @@ export function FittedReportPreview({
         "overflow-hidden rounded-xl border bg-white shadow-sm",
         className,
       )}
-      style={{ height: maxHeight, maxHeight }}
+      style={fitToPanel ? { height: maxHeight, maxHeight } : undefined}
     >
-      <div className="flex h-full w-full items-start justify-center p-2">
+      <div
+        className={cn(
+          "flex w-full justify-center p-2",
+          fitToPanel ? "h-full items-start" : "items-start py-4",
+        )}
+      >
         <div
           style={{
             width: scaledWidth,
@@ -87,10 +90,11 @@ export function FittedReportPreview({
             style={{
               transform: `scale(${scale})`,
               transformOrigin: "top left",
-              width: pageSize.width,
+              width: pageWidthPx,
+              height: contentHeightPx,
             }}
           >
-            <ReportPreview report={report} />
+            <ReportPreview report={report} printMode orientation={orientation} />
           </div>
         </div>
       </div>
