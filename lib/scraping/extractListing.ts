@@ -3,6 +3,7 @@ import { parseListingFromHtml } from "@/lib/openai/parseListingFromHtml";
 import { fetchRenderedHtml } from "@/lib/scraping/fetchRenderedHtml";
 import { fetchStaticHtml } from "@/lib/scraping/fetchStaticHtml";
 import { mergeParsedListings, parseListing } from "@/lib/scraping/index";
+import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
 
 export type ExtractListingResult = {
   listing: ParsedListing;
@@ -78,6 +79,7 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
 
   listing = {
     ...listing,
+    displayPrice: normalizeDisplayPrice(listing.displayPrice),
     warnings: [...new Set([...warnings, ...listing.warnings])],
   };
 

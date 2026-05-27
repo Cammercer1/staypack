@@ -6,6 +6,7 @@ import {
   buildAiListingPromptPayload,
   prepareHtmlForAi,
 } from "@/lib/scraping/prepareHtmlForAi";
+import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
 
 const SYSTEM_PROMPT = `You extract structured property listing data from Australian real estate listing pages.
 
@@ -36,6 +37,7 @@ Rules:
 - images must be absolute URLs from the supplied image list or page content.
 - Exclude logos, icons, agent headshots, and tiny thumbnails when possible.
 - Keep description concise but faithful (max ~1200 chars).
+- displayPrice must be a concise human-readable price (e.g. "$2,300,000 – $2,500,000" or "Offers over $1,200,000"), not portal labels like "Price Range".
 - If unsure, leave fields null and add a warning.
 - confidence is high when address + at least one image + bed/bath are present, medium when address or major fields present, otherwise low.`;
 
@@ -57,7 +59,7 @@ function normalizeAiListing(raw: ParsedListingInput): ParsedListing {
     bathrooms: raw.bathrooms ?? undefined,
     carSpaces: raw.carSpaces ?? undefined,
     description: raw.description ?? undefined,
-    displayPrice: raw.displayPrice ?? undefined,
+    displayPrice: normalizeDisplayPrice(raw.displayPrice),
     images: [...new Set(raw.images.filter(Boolean))],
     agents: raw.agents
       .filter((agent) => agent.name || agent.email || agent.phone)

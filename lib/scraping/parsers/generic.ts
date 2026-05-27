@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { ParsedListing } from "@/lib/types";
+import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
 import {
   emptyListing,
   extractNumbers,
@@ -37,7 +38,7 @@ export function parseGenericListing(html: string, _url: string): ParsedListing {
     /\$[\d,]+(?:\.\d+)?(?:\s*(?:pw|per week|p\/w|pm|per month))?/i,
   );
   if (priceMatch) {
-    listing.displayPrice = priceMatch[0];
+    listing.displayPrice = normalizeDisplayPrice(priceMatch[0]);
   }
 
   const addressMatch = bodyText.match(

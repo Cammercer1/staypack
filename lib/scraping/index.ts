@@ -1,42 +1,8 @@
 import type { ParsedListing } from "@/lib/types";
-import { parseGenericListing } from "@/lib/scraping/parsers/generic";
-import { parseJsonLdListing } from "@/lib/scraping/parsers/jsonLd";
-import { parseOpenGraphListing } from "@/lib/scraping/parsers/openGraph";
-import { parseRayWhiteListing } from "@/lib/scraping/parsers/rayWhite";
+import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
+import { parsersForUrl } from "@/lib/scraping/parsers/registry";
 
-const PARSERS = [
-  { name: "json_ld", parse: parseJsonLdListing },
-  { name: "ray_white", parse: parseRayWhiteListing },
-  { name: "open_graph", parse: parseOpenGraphListing },
-  { name: "generic", parse: parseGenericListing },
-] as const;
-
-export function mergeParsedListings(base: ParsedListing, next: ParsedListing): ParsedListing {
-  return {
-    title: next.title ?? base.title,
-    address: next.address ?? base.address,
-    suburb: next.suburb ?? base.suburb,
-    state: next.state ?? base.state,
-    postcode: next.postcode ?? base.postcode,
-    propertyType: next.propertyType ?? base.propertyType,
-    bedrooms: next.bedrooms ?? base.bedrooms,
-    bathrooms: next.bathrooms ?? base.bathrooms,
-    carSpaces: next.carSpaces ?? base.carSpaces,
-    description: next.description ?? base.description,
-    displayPrice: next.displayPrice ?? base.displayPrice,
-    images: [...new Set([...next.images, ...base.images])],
-    agents: next.agents.length ? next.agents : base.agents,
-    rentalAppraisal: next.rentalAppraisal ?? base.rentalAppraisal,
-    outgoings: next.outgoings ?? base.outgoings,
-    confidence:
-      next.confidence === "high" || base.confidence === "high"
-        ? "high"
-        : next.confidence === "medium" || base.confidence === "medium"
-          ? "medium"
-          : "low",
-    warnings: [...new Set([...base.warnings, ...next.warnings])],
-  };
-}
+export { mergeParsedListings } from "@/lib/scraping/mergeParsedListings";
 
 function mergeListings(base: ParsedListing, next: ParsedListing): ParsedListing {
   return {
@@ -50,7 +16,7 @@ function mergeListings(base: ParsedListing, next: ParsedListing): ParsedListing 
     bathrooms: base.bathrooms ?? next.bathrooms,
     carSpaces: base.carSpaces ?? next.carSpaces,
     description: base.description ?? next.description,
-    displayPrice: base.displayPrice ?? next.displayPrice,
+    displayPrice: normalizeDisplayPrice(base.displayPrice ?? next.displayPrice),
     images: base.images.length ? base.images : next.images,
     agents: base.agents.length ? base.agents : next.agents,
     rentalAppraisal: base.rentalAppraisal ?? next.rentalAppraisal,
@@ -76,19 +42,22 @@ function scoreListing(listing: ParsedListing) {
 }
 
 export function parseListing(html: string, url: string) {
+  const parsers = parsersForUrl(url);
   let best: ParsedListing = {
     images: [],
     agents: [],
     confidence: "low",
     warnings: [],
   };
-  let parserName: string = "generic";
+  let parserName = parsers[parsers.length - 1]?.name ?? "generic";
 
-  for (const parser of PARSERS) {
+  for (const parser of parsers) {
     const parsed = parser.parse(html, url);
     if (scoreListing(parsed) >= scoreListing(best)) {
       best = mergeListings(best, parsed);
       parserName = parser.name;
+    } else if (scoreListing(parsed) > 0) {
+      best = mergeListings(best, parsed);
     }
   }
 

@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { ParsedListing } from "@/lib/types";
+import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
 import {
   emptyListing,
   extractNumbers,
@@ -75,7 +76,9 @@ export function parseJsonLdListing(html: string, _url: string): ParsedListing {
         }
 
         if (node.offers?.price) {
-          listing.displayPrice = listing.displayPrice ?? String(node.offers.price);
+          listing.displayPrice =
+            listing.displayPrice ??
+            normalizeDisplayPrice(String(node.offers.price));
         }
       }
     } catch {

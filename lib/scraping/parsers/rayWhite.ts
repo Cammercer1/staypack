@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { ParsedListing } from "@/lib/types";
+import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
 import {
   emptyListing,
   extractNumbers,
@@ -70,13 +71,8 @@ function collectPropertyImages(property: Record<string, unknown>) {
   return uniqueStrings([...urls]).filter((url) => !/logo|icon|avatar|sprite/i.test(url));
 }
 
-export function parseRayWhiteListing(html: string, url: string): ParsedListing {
+export function parseRayWhiteListing(html: string, _url: string): ParsedListing {
   const listing = emptyListing();
-
-  if (!/raywhite/i.test(url)) {
-    return listing;
-  }
-
   const $ = cheerio.load(html);
   const nextData = $("#__NEXT_DATA__").text();
 
@@ -123,12 +119,13 @@ export function parseRayWhiteListing(html: string, url: string): ParsedListing {
           (record.carSpaces as number | undefined) ??
           (record.garages as number | undefined) ??
           extractNumbers(String(record.parkingText ?? ""));
-        listing.displayPrice =
+        listing.displayPrice = normalizeDisplayPrice(
           (record.displayPrice as string | undefined) ??
-          (record.priceDisplay as string | undefined) ??
-          ((record.price as Record<string, unknown> | undefined)?.display as
-            | string
-            | undefined);
+            (record.priceDisplay as string | undefined) ??
+            ((record.price as Record<string, unknown> | undefined)?.display as
+              | string
+              | undefined),
+        );
 
         listing.images = collectPropertyImages(record);
 

@@ -17,10 +17,6 @@ export const metadata: Metadata = {
   title: "StayPack",
   description:
     "Branded short-term rental potential reports for real estate agencies",
-  icons: {
-    icon: "/staypack-logo.png",
-    apple: "/staypack-logo.png",
-  },
 };
 
 export default function RootLayout({

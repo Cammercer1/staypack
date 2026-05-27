@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ReportMediaPicker } from "@/components/reports/ReportMediaPicker";
 import { MAX_REPORT_IMAGES } from "@/lib/reports/constants";
 import { calculateAccommodates } from "@/lib/reports/formatters";
+import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
 import type { Report } from "@/lib/types";
 
 type Props = {
@@ -46,7 +47,7 @@ export function ScrapedListingReviewStep({
       (initialBedrooms === "" ? "" : calculateAccommodates(Number(initialBedrooms), null)),
     listing_title: report.listing_title ?? "",
     listing_description: report.listing_description ?? "",
-    display_price: report.display_price ?? "",
+    display_price: normalizeDisplayPrice(report.display_price) ?? "",
     hero_image_url: report.hero_image_url ?? scrapedImages[0] ?? "",
     selected_image_urls:
       report.selected_image_urls?.length

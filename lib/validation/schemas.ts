@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidReportTemplateId } from "@/lib/reports/templates/ids";
+import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
 
 function normalizeOptionalUrl(value: unknown) {
   if (typeof value !== "string" || !value.trim()) {
@@ -106,7 +107,21 @@ export const updateReportSchema = z.object({
   accommodates: z.coerce.number().nullable().optional(),
   listing_title: z.string().nullable().optional(),
   listing_description: z.string().nullable().optional(),
-  display_price: z.string().nullable().optional(),
+  display_price: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((value) => {
+      if (value == null) {
+        return value;
+      }
+      const normalized = normalizeDisplayPrice(value);
+      if (normalized) {
+        return normalized;
+      }
+      const trimmed = value.trim();
+      return trimmed === "" ? null : trimmed;
+    }),
   hero_image_url: z.string().nullable().optional(),
   selected_image_urls: z.array(z.string()).max(5).optional(),
   uploaded_image_urls: z.array(z.string()).max(20).optional(),
