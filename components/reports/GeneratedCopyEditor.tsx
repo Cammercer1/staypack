@@ -64,6 +64,40 @@ export function GeneratedCopyEditor({
     });
   }, [agency, copy, estimate, report, selectedTemplateId]);
 
+  async function persistReportDraft(options?: { silent?: boolean }) {
+    if (!copy) {
+      return true;
+    }
+
+    setSaving(true);
+    const response = await fetch(`/api/reports/${report.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ai_copy_json: copy,
+        template_id: selectedTemplateId,
+      }),
+    });
+    const payload = (await response.json()) as ApiError & { report?: Report };
+
+    if (!response.ok) {
+      toast.error(getErrorMessage(payload));
+      setSaving(false);
+      return false;
+    }
+
+    if (payload.report) {
+      onComplete(payload.report);
+    }
+
+    if (!options?.silent) {
+      toast.success("Copy saved");
+    }
+
+    setSaving(false);
+    return true;
+  }
+
   async function generateCopy() {
     if (!estimate) {
       toast.error("Run an STR estimate before generating copy");
@@ -73,6 +107,8 @@ export function GeneratedCopyEditor({
     setGenerating(true);
     const response = await fetch(`/api/reports/${report.id}/generate-copy`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ template_id: selectedTemplateId }),
     });
     const payload = (await response.json()) as ApiError & {
       copy?: AiCopyJson;
@@ -99,30 +135,50 @@ export function GeneratedCopyEditor({
 
   async function saveCopy() {
     if (!copy) return;
+    await persistReportDraft();
+  }
+
+  async function continueToPreview() {
+    if (copy) {
+      const saved = await persistReportDraft({ silent: true });
+      if (!saved) {
+        return;
+      }
+    }
+
+    onContinueToPreview?.();
+  }
+
+  async function handleTemplateChange(templateId: string) {
+    setSelectedTemplateId(templateId);
+
+    if (copy) {
+      setCopy((current) =>
+        current ? enforceTemplateCopyLimits(current, templateId) : current,
+      );
+    }
+
+    if (!copy || !report.ai_copy_json) {
+      return;
+    }
 
     setSaving(true);
     const response = await fetch(`/api/reports/${report.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ai_copy_json: copy,
-        template_id: selectedTemplateId,
-      }),
+      body: JSON.stringify({ template_id: templateId }),
     });
     const payload = (await response.json()) as ApiError & { report?: Report };
+    setSaving(false);
 
     if (!response.ok) {
       toast.error(getErrorMessage(payload));
-      setSaving(false);
       return;
     }
 
     if (payload.report) {
       onComplete(payload.report);
     }
-
-    toast.success("Copy saved");
-    setSaving(false);
   }
 
   function updateField(field: keyof AiCopyJson, value: string | string[]) {
@@ -304,7 +360,7 @@ export function GeneratedCopyEditor({
               </Button>
               {onContinueToPreview ? (
                 <Button
-                  onClick={onContinueToPreview}
+                  onClick={continueToPreview}
                   disabled={generating || saving}
                 >
                   Continue to preview
@@ -320,7 +376,7 @@ export function GeneratedCopyEditor({
           <p className="text-sm font-medium">Report layout</p>
           <ReportTemplatePicker
             value={selectedTemplateId}
-            onChange={setSelectedTemplateId}
+            onChange={handleTemplateChange}
             defaultTemplateId={agency.report_template_id ?? DEFAULT_REPORT_TEMPLATE_ID}
           />
         </div>

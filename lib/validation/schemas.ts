@@ -213,9 +213,20 @@ export const signupSchema = loginSchema.extend({
   path: ["confirmPassword"],
 });
 
+export const generateCopyRequestSchema = z.object({
+  template_id: z
+    .string()
+    .optional()
+    .refine(
+      (value) => value == null || isValidReportTemplateId(value),
+      { message: "Select a valid report template" },
+    ),
+});
+
 export type ParsedListingInput = z.infer<typeof parsedListingSchema>;
 
 export type AgencyInput = z.infer<typeof agencySchema>;
+export type GenerateCopyRequestInput = z.infer<typeof generateCopyRequestSchema>;
 export type AgentProfileInput = z.infer<typeof agentProfileSchema>;
 export type CreateReportInput = z.infer<typeof createReportSchema>;
 export type UpdateReportInput = z.infer<typeof updateReportSchema>;

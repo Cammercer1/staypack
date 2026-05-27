@@ -8,14 +8,20 @@ import {
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { loadReportAgentProfile } from "@/lib/reports/loadReportAgent";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
+import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
+import { generateCopyRequestSchema } from "@/lib/validation/schemas";
+import type { Report } from "@/lib/types";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
     const { supabase, agency, report } = await requireReportAccess(id);
+    const body = generateCopyRequestSchema.parse(
+      await request.json().catch(() => ({})),
+    );
 
     const estimate = resolveReportEstimate(report);
 
@@ -29,12 +35,21 @@ export async function POST(
       );
     }
 
+    const reportForBuild: Report = body.template_id
+      ? { ...report, template_id: body.template_id }
+      : report;
+    const templateId = resolveReportTemplateId(agency, reportForBuild);
+
     const agentProfile = await loadReportAgentProfile(supabase, report);
-    const copy = await generateReportCopy({ agency, report, estimate });
+    const copy = await generateReportCopy({
+      agency,
+      report: reportForBuild,
+      estimate,
+    });
     const finalReportJson = buildFinalReportJson({
       agency,
       agentProfile,
-      report,
+      report: reportForBuild,
       estimate,
       copy,
       scraped: report.scraped_listing_json,
@@ -43,6 +58,7 @@ export async function POST(
     const { data, error } = await supabase
       .from("reports")
       .update({
+        template_id: templateId,
         ai_copy_json: copy,
         final_report_json: finalReportJson,
         status: "generated",
