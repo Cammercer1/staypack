@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ScrapedListingReviewStep } from "@/components/reports/ScrapedListingReviewStep";
 import { StrEstimateStep } from "@/components/reports/StrEstimateStep";
 import { GeneratedCopyEditor } from "@/components/reports/GeneratedCopyEditor";
+import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import type { Agency, FinalReportJson, Report } from "@/lib/types";
@@ -176,9 +177,26 @@ export function ReportWizard({
             <Button variant="outline" disabled={loading}>
               Save draft
             </Button>
-            <Button variant="outline" disabled={loading || !finalReport}>
-              Generate PDF preview
-            </Button>
+            <DownloadPdfButton
+              url={report.pdf_url}
+              reportId={report.id}
+              cacheVersion={report.updated_at}
+              canGenerate={Boolean(finalReport) && !loading}
+              preview={report.status !== "published"}
+              size="default"
+              generateLabel="Generate PDF preview"
+              regenerateLabel="Regenerate PDF preview"
+              onGenerated={({ report: nextReport, pdf_url }) => {
+                if (nextReport) {
+                  setReport(nextReport);
+                  return;
+                }
+
+                if (pdf_url) {
+                  setReport((current) => ({ ...current, pdf_url }));
+                }
+              }}
+            />
             <Button onClick={publishReport} disabled={loading || !finalReport}>
               {loading ? (
                 <>

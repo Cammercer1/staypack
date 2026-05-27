@@ -5,13 +5,22 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import type { VariantProps } from "class-variance-authority";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
+import type { buttonVariants } from "@/components/ui/button";
+import type { Report } from "@/lib/types";
 
 type Props = {
   url?: string | null;
   reportId: string;
   canGenerate?: boolean;
   cacheVersion?: string | null;
+  preview?: boolean;
+  size?: VariantProps<typeof buttonVariants>["size"];
+  generateLabel?: string;
+  regenerateLabel?: string;
+  downloadLabel?: string;
+  onGenerated?: (payload: { pdf_url: string; report?: Report }) => void;
 };
 
 export function DownloadPdfButton({
@@ -19,6 +28,12 @@ export function DownloadPdfButton({
   reportId,
   canGenerate = false,
   cacheVersion = null,
+  preview = false,
+  size = "sm",
+  generateLabel = "Generate PDF",
+  regenerateLabel = "Regenerate PDF",
+  downloadLabel = "Download PDF",
+  onGenerated,
 }: Props) {
   const [pdfUrl, setPdfUrl] = useState(url);
   const [loading, setLoading] = useState(false);
@@ -48,6 +63,8 @@ export function DownloadPdfButton({
 
     const response = await fetch(`/api/reports/${reportId}/generate-pdf`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preview }),
     });
     const payload = await response.json();
 
@@ -58,9 +75,7 @@ export function DownloadPdfButton({
     }
 
     setPdfUrl(payload.pdf_url);
-    if (payload.pdf_url) {
-      window.open(payload.pdf_url, "_blank", "noopener,noreferrer");
-    }
+    onGenerated?.({ pdf_url: payload.pdf_url, report: payload.report });
     toast.success("PDF ready");
     setLoading(false);
   }
@@ -69,14 +84,14 @@ export function DownloadPdfButton({
     return (
       <div className="flex flex-wrap gap-2">
         <Link href={downloadUrl} target="_blank">
-          <Button variant="outline" size="sm">
-            Download PDF
+          <Button variant="outline" size={size}>
+            {downloadLabel}
           </Button>
         </Link>
         {canGenerate ? (
           <Button
             variant="outline"
-            size="sm"
+            size={size}
             disabled={loading}
             onClick={generatePdf}
           >
@@ -86,7 +101,7 @@ export function DownloadPdfButton({
                 Regenerating...
               </>
             ) : (
-              "Regenerate PDF"
+              regenerateLabel
             )}
           </Button>
         ) : null}
@@ -98,7 +113,7 @@ export function DownloadPdfButton({
     return (
       <Button
         variant="outline"
-        size="sm"
+        size={size}
         disabled={loading}
         onClick={generatePdf}
       >
@@ -108,15 +123,15 @@ export function DownloadPdfButton({
             Generating...
           </>
         ) : (
-          "Generate PDF"
+          generateLabel
         )}
       </Button>
     );
   }
 
   return (
-    <Button variant="outline" size="sm" disabled>
-      Download PDF
+    <Button variant="outline" size={size} disabled>
+      {downloadLabel}
     </Button>
   );
 }

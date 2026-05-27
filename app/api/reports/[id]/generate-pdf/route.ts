@@ -1,27 +1,44 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { requireReportAccess } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getReportsUrl } from "@/lib/env";
+import { getReportsUrl, getSiteUrl } from "@/lib/env";
 import { renderPdfFromUrl, buildPdfImagePath } from "@/lib/browserless/pdf";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
+import { buildPreviewPrintUrl } from "@/lib/reports/printAccessToken";
+
+const generatePdfSchema = z.object({
+  preview: z.boolean().optional(),
+});
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
 
   try {
     const { supabase, agency, report } = await requireReportAccess(id);
+    const body = generatePdfSchema.parse(await request.json().catch(() => ({})));
+    const preview = body.preview === true;
 
-    if (!report.public_slug) {
+    if (!report.final_report_json) {
+      return NextResponse.json(
+        { error: "Generate report copy before creating a PDF" },
+        { status: 400 },
+      );
+    }
+
+    if (!report.public_slug && !preview) {
       return NextResponse.json(
         { error: "Publish the report before generating a PDF" },
         { status: 400 },
       );
     }
 
-    const printUrl = `${getReportsUrl().replace(/\/$/, "")}/${agency.slug}/${report.public_slug}/print`;
+    const printUrl = report.public_slug
+      ? `${getReportsUrl().replace(/\/$/, "")}/${agency.slug}/${report.public_slug}/print`
+      : buildPreviewPrintUrl(report.id, getSiteUrl());
     const admin = createAdminClient();
 
     const pdfBuffer = await renderPdfFromUrl(printUrl, {
