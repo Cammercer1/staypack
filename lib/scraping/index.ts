@@ -1,4 +1,5 @@
 import type { ParsedListing } from "@/lib/types";
+import { mergeListingAgents } from "@/lib/agents/agentContact";
 import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
 import { parsersForUrl } from "@/lib/scraping/parsers/registry";
 
@@ -18,7 +19,7 @@ function mergeListings(base: ParsedListing, next: ParsedListing): ParsedListing 
     description: base.description ?? next.description,
     displayPrice: normalizeDisplayPrice(base.displayPrice ?? next.displayPrice),
     images: base.images.length ? base.images : next.images,
-    agents: base.agents.length ? base.agents : next.agents,
+    agents: mergeListingAgents(base.agents, next.agents),
     rentalAppraisal: base.rentalAppraisal ?? next.rentalAppraisal,
     outgoings: base.outgoings ?? next.outgoings,
     confidence:

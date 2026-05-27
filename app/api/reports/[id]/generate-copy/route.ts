@@ -6,7 +6,7 @@ import {
   generateReportCopy,
 } from "@/lib/openai/generateReportCopy";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
-import { loadReportAgent } from "@/lib/reports/loadReportAgent";
+import { loadReportAgentProfile } from "@/lib/reports/loadReportAgent";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
 
 export async function POST(
@@ -29,11 +29,11 @@ export async function POST(
       );
     }
 
-    const agent = await loadReportAgent(supabase, report);
+    const agentProfile = await loadReportAgentProfile(supabase, report);
     const copy = await generateReportCopy({ agency, report, estimate });
     const finalReportJson = buildFinalReportJson({
       agency,
-      agent,
+      agentProfile,
       report,
       estimate,
       copy,

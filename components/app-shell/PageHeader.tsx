@@ -30,7 +30,7 @@ export function PageHeader({
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="font-display text-4xl leading-[1.05] tracking-tight text-foreground md:text-5xl">
+        <h1 className="heading-gradient font-display text-4xl leading-[1.05] tracking-tight md:text-5xl">
           {highlight ? (
             <>
               <span className="italic">{highlight}</span> {title}

@@ -47,9 +47,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               })}
             </nav>
           </div>
-          <Link href="/reports/new">
-            <Button size="lg" className="rounded-full px-5">
-              <Plus className="mr-2 h-4 w-4" />
+          <Link href="/reports/new" prefetch={false}>
+            <Button size="lg">
+              <Plus className="h-4 w-4" />
               New report
             </Button>
           </Link>

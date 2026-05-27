@@ -1,7 +1,7 @@
 import type { AgentProfile, Report } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export async function loadReportAgent(
+export async function loadReportAgentProfile(
   supabase: SupabaseClient,
   report: Report,
 ): Promise<AgentProfile | null> {
@@ -17,12 +17,5 @@ export async function loadReportAgent(
     }
   }
 
-  const { data: defaultAgent } = await supabase
-    .from("agent_profiles")
-    .select("*")
-    .eq("agency_id", report.agency_id)
-    .eq("is_default", true)
-    .maybeSingle();
-
-  return (defaultAgent as AgentProfile | null) ?? null;
+  return null;
 }

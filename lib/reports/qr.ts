@@ -1,5 +1,10 @@
 import QRCode from "qrcode";
 
+export function resolveQrCodeTargetUrl(listingUrl: string | null | undefined) {
+  const url = listingUrl?.trim();
+  return url || null;
+}
+
 export async function generateQrCodeDataUrl(url: string) {
   return QRCode.toDataURL(url, {
     margin: 1,

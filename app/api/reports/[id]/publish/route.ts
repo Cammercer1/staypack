@@ -6,7 +6,7 @@ import {
   buildPublicReportUrl,
   generateReportSlug,
 } from "@/lib/reports/slugs";
-import { generateQrCodeBuffer } from "@/lib/reports/qr";
+import { generateQrCodeBuffer, resolveQrCodeTargetUrl } from "@/lib/reports/qr";
 
 export async function POST(
   _request: Request,
@@ -30,31 +30,40 @@ export async function POST(
       publicSlug,
     );
 
+    const qrTargetUrl = resolveQrCodeTargetUrl(report.listing_url);
     const admin = createAdminClient();
-    const qrBuffer = await generateQrCodeBuffer(publicUrl);
-    const qrPath = `${agency.id}/${report.id}/qr.png`;
+    let qrPublicUrl: string | null = null;
 
-    const { error: uploadError } = await admin.storage
-      .from("report-assets")
-      .upload(qrPath, qrBuffer, {
-        contentType: "image/png",
-        upsert: true,
-      });
+    if (qrTargetUrl) {
+      const qrBuffer = await generateQrCodeBuffer(qrTargetUrl);
+      const qrPath = `${agency.id}/${report.id}/qr.png`;
 
-    if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 400 });
+      const { error: uploadError } = await admin.storage
+        .from("report-assets")
+        .upload(qrPath, qrBuffer, {
+          contentType: "image/png",
+          upsert: true,
+        });
+
+      if (uploadError) {
+        return NextResponse.json({ error: uploadError.message }, { status: 400 });
+      }
+
+      const {
+        data: { publicUrl: uploadedQrUrl },
+      } = admin.storage.from("report-assets").getPublicUrl(qrPath);
+      qrPublicUrl = uploadedQrUrl;
     }
 
-    const {
-      data: { publicUrl: qrPublicUrl },
-    } = admin.storage.from("report-assets").getPublicUrl(qrPath);
+    const existingAssets =
+      (report.final_report_json as { assets?: Record<string, string> })?.assets ??
+      {};
 
     const finalReportJson = {
       ...(report.final_report_json as Record<string, unknown>),
       assets: {
-        ...((report.final_report_json as { assets?: Record<string, string> })
-          ?.assets ?? {}),
-        qr_code_url: qrPublicUrl,
+        ...existingAssets,
+        ...(qrPublicUrl ? { qr_code_url: qrPublicUrl } : {}),
       },
     };
 

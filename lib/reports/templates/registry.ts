@@ -12,8 +12,8 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
   {
     id: "classic",
     label: "Classic",
-    description: "Logo top-left, hero image and metrics side by side.",
-    pages: 2,
+    description: "Logo header, four-image hero, single-page layout.",
+    pages: 1,
     Component: ClassicTemplate,
   },
 ];

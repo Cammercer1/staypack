@@ -25,7 +25,7 @@ export default async function ReportDetailPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold">
+        <h1 className="heading-gradient text-3xl font-semibold">
           {report.property_address ?? "Report editor"}
         </h1>
         <p className="text-muted-foreground">

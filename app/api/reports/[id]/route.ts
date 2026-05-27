@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { requireReportAccess } from "@/lib/auth/requireUser";
 import { geocodeReportAddress, hasGeocodableAddress } from "@/lib/geocoding";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
-import { loadReportAgent } from "@/lib/reports/loadReportAgent";
+import { loadReportAgentProfile } from "@/lib/reports/loadReportAgent";
 import { normalizeAiCopy } from "@/lib/reports/normalizeAiCopy";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
-import { aiCopySchema, updateReportSchema, type UpdateReportInput } from "@/lib/validation/schemas";
+import { aiCopySchema, parsedListingSchema, updateReportSchema, type UpdateReportInput } from "@/lib/validation/schemas";
 import type { Agency, AiCopyJson, Report } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -44,10 +44,10 @@ async function rebuildFinalReportJson({
     };
   }
 
-  const agent = await loadReportAgent(supabase, report);
+  const agentProfile = await loadReportAgentProfile(supabase, report);
   body.final_report_json = buildFinalReportJson({
     agency,
-    agent,
+    agentProfile,
     report: {
       ...report,
       ...(body as Partial<Report>),
@@ -85,6 +85,32 @@ export async function PATCH(
     const { id } = await params;
     const { supabase, agency, report } = await requireReportAccess(id);
     const body = updateReportSchema.parse(await request.json());
+
+    if (body.listing_agents !== undefined) {
+      const currentScraped = parsedListingSchema.parse(
+        report.scraped_listing_json ?? {
+          images: [],
+          agents: [],
+          confidence: "low",
+          warnings: [],
+        },
+      );
+      const listingAgents = body.listing_agents
+        .map((agent) => ({
+          name: agent.name.trim(),
+          email: agent.email?.trim() || undefined,
+          phone: agent.phone?.trim() || undefined,
+          role_title: agent.role_title?.trim() || undefined,
+          photo_url: agent.photo_url?.trim() || undefined,
+        }))
+        .filter((agent) => agent.name);
+
+      body.scraped_listing_json = {
+        ...currentScraped,
+        agents: listingAgents,
+      };
+      delete body.listing_agents;
+    }
 
     if (body.ai_copy_json) {
       const parsedCopy = aiCopySchema.safeParse(

@@ -1,4 +1,5 @@
 import type { ParsedListing } from "@/lib/types";
+import { mergeListingAgents } from "@/lib/agents/agentContact";
 import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
 
 export function mergeParsedListings(base: ParsedListing, next: ParsedListing): ParsedListing {
@@ -15,7 +16,7 @@ export function mergeParsedListings(base: ParsedListing, next: ParsedListing): P
     description: next.description ?? base.description,
     displayPrice: normalizeDisplayPrice(next.displayPrice ?? base.displayPrice),
     images: [...new Set([...next.images, ...base.images])],
-    agents: next.agents.length ? next.agents : base.agents,
+    agents: mergeListingAgents(base.agents, next.agents),
     rentalAppraisal: next.rentalAppraisal ?? base.rentalAppraisal,
     outgoings: next.outgoings ?? base.outgoings,
     confidence:

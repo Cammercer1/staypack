@@ -24,7 +24,7 @@ Return JSON only with this shape:
   "description": string | null,
   "displayPrice": string | null,
   "images": string[],
-  "agents": [{ "name": string | null, "email": string | null, "phone": string | null }],
+  "agents": [{ "name": string | null, "email": string | null, "phone": string | null, "photo_url": string | null }],
   "confidence": "low" | "medium" | "high",
   "warnings": string[]
 }
@@ -35,7 +35,8 @@ Rules:
 - Prefer full street addresses when available.
 - Australian states should be 2-3 letter codes when possible (QLD, NSW, VIC, etc).
 - images must be absolute URLs from the supplied image list or page content.
-- Exclude logos, icons, agent headshots, and tiny thumbnails when possible.
+- Exclude logos, icons, and tiny thumbnails when possible.
+- For agents, use full phone numbers from tel: links or structured data. Never return masked numbers containing asterisks (e.g. "0497***").
 - Keep description concise but faithful (max ~1200 chars).
 - displayPrice must be a concise human-readable price (e.g. "$2,300,000 – $2,500,000" or "Offers over $1,200,000"), not portal labels like "Price Range".
 - If unsure, leave fields null and add a warning.
@@ -67,6 +68,7 @@ function normalizeAiListing(raw: ParsedListingInput): ParsedListing {
         name: agent.name ?? undefined,
         email: agent.email ?? undefined,
         phone: agent.phone ?? undefined,
+        photo_url: agent.photo_url ?? undefined,
       })),
     confidence: raw.confidence,
     warnings: [...new Set(raw.warnings.filter(Boolean))],

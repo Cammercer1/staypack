@@ -24,9 +24,9 @@ export default async function ReportsPage() {
         title="STR report library."
         description="Browse draft, generated and published reports. Copy links, download PDFs, and continue editing from one library."
         action={
-          <Link href="/reports/new">
+          <Link href="/reports/new" prefetch={false}>
             <Button size="lg">
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="h-4 w-4" />
               Create report
             </Button>
           </Link>

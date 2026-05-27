@@ -9,11 +9,15 @@ import type {
 } from "@/lib/types";
 import { DEFAULT_DISCLAIMER } from "@/lib/types";
 import { calculateAccommodates } from "@/lib/reports/formatters";
+import {
+  primaryReportAgent,
+  resolveReportAgents,
+} from "@/lib/reports/resolveReportAgents";
 import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
 
 type BuildFinalReportInput = {
   agency: Agency;
-  agent?: AgentProfile | null;
+  agentProfile?: AgentProfile | null;
   report: Report;
   estimate: StrEstimate;
   copy: AiCopyJson;
@@ -22,7 +26,7 @@ type BuildFinalReportInput = {
 
 export function buildFinalReportJson({
   agency,
-  agent,
+  agentProfile,
   report,
   estimate,
   copy,
@@ -41,6 +45,10 @@ export function buildFinalReportJson({
     annualMidpoint != null && estimate.annualRevenue != null
       ? estimate.annualRevenue - annualMidpoint
       : null;
+  const agents = resolveReportAgents({
+    scraped: scraped ?? report.scraped_listing_json,
+    agentProfile,
+  });
 
   return {
     version: "standard_2_page_v1",
@@ -64,13 +72,8 @@ export function buildFinalReportJson({
       phone: agency.phone ?? "",
       email: agency.email ?? "",
     },
-    agent: {
-      name: agent?.name ?? "",
-      role_title: agent?.role_title ?? "",
-      phone: agent?.phone ?? "",
-      email: agent?.email ?? "",
-      photo_url: agent?.photo_url ?? "",
-    },
+    agent: primaryReportAgent(agents),
+    agents,
     property: {
       address: report.property_address ?? "",
       suburb: report.suburb ?? "",

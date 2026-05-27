@@ -35,9 +35,9 @@ export default async function DashboardPage() {
         title={`back, ${agency.name}.`}
         description="Create branded STR potential reports, review estimates, and publish buyer-facing pages from one place."
         action={
-          <Link href="/reports/new">
+          <Link href="/reports/new" prefetch={false}>
             <Button size="lg">
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="h-4 w-4" />
               Create report
             </Button>
           </Link>

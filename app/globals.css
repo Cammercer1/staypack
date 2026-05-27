@@ -36,6 +36,8 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-hiline-green: var(--hiline-green);
+  --color-hiline-green-light: var(--hiline-green-light);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -50,6 +52,9 @@
 }
 
 :root {
+  --transparent: transparent;
+  --hiline-green: #095b42;
+  --hiline-green-light: #6fb690;
   --background: #f9f5ea;
   --foreground: #002e36;
   --card: #fffdf8;
@@ -149,6 +154,14 @@
 
   .surface-soft {
     @apply rounded-2xl border border-border/60 bg-muted/50;
+  }
+
+  .heading-gradient {
+    color: var(--transparent);
+    -webkit-text-fill-color: transparent;
+    background-image: linear-gradient(45deg, #095b42, #6fb690 50%, #095b42);
+    background-clip: text;
+    -webkit-background-clip: text;
   }
 }
 

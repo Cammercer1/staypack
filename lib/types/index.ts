@@ -28,6 +28,8 @@ export type ParsedListing = {
     name?: string;
     email?: string;
     phone?: string;
+    photo_url?: string;
+    role_title?: string;
   }[];
   rentalAppraisal?: {
     weeklyMin?: number;
@@ -95,6 +97,13 @@ export type FinalReportJson = {
     email: string;
     photo_url: string;
   };
+  agents: {
+    name: string;
+    role_title: string;
+    phone: string;
+    email: string;
+    photo_url: string;
+  }[];
   property: {
     address: string;
     suburb: string;

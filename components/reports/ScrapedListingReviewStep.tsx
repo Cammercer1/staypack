@@ -1,16 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ListingAgentsEditor } from "@/components/reports/ListingAgentsEditor";
 import { ReportMediaPicker } from "@/components/reports/ReportMediaPicker";
 import { MAX_REPORT_IMAGES } from "@/lib/reports/constants";
+import {
+  initialListingAgents,
+  listingAgentsToParsed,
+  type ListingAgentDraft,
+} from "@/lib/reports/listingAgents";
 import { calculateAccommodates } from "@/lib/reports/formatters";
+import { isPersistedReport } from "@/lib/reports/emptyReportDraft";
 import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
-import type { Report } from "@/lib/types";
+import type { AgentProfile, Report } from "@/lib/types";
 
 type Props = {
   report: Report;
@@ -32,6 +39,10 @@ export function ScrapedListingReviewStep({
   );
   const [uploadedImages, setUploadedImages] = useState(
     report.uploaded_image_urls ?? [],
+  );
+  const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
+  const [listingAgents, setListingAgents] = useState<ListingAgentDraft[]>(() =>
+    initialListingAgents(report.scraped_listing_json?.agents),
   );
   const [form, setForm] = useState({
     property_address: report.property_address ?? "",
@@ -58,6 +69,15 @@ export function ScrapedListingReviewStep({
   });
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    fetch("/api/agents")
+      .then((response) => response.json())
+      .then((payload) => setAgencyAgents(payload.agents ?? []))
+      .catch(() => {
+        // Non-blocking — manual agent entry still works.
+      });
+  }, []);
+
   const scrapeWarnings = report.scraped_listing_json?.warnings ?? [];
   const scrapeConfidence = report.scraped_listing_json?.confidence;
 
@@ -77,21 +97,27 @@ export function ScrapedListingReviewStep({
       form.accommodates === "" ? null : Number(form.accommodates),
     );
 
-    const response = await fetch(`/api/reports/${report.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        hero_image_url: form.hero_image_url || selected[0] || null,
-        selected_image_urls: selected,
-        uploaded_image_urls: uploadedImages,
-        bedrooms,
-        bathrooms: form.bathrooms === "" ? null : Number(form.bathrooms),
-        car_spaces: form.car_spaces === "" ? null : Number(form.car_spaces),
-        accommodates,
-        status: "scraped",
-      }),
-    });
+    const payloadBody = {
+      ...form,
+      listing_agents: listingAgentsToParsed(listingAgents),
+      hero_image_url: form.hero_image_url || selected[0] || null,
+      selected_image_urls: selected,
+      uploaded_image_urls: uploadedImages,
+      bedrooms,
+      bathrooms: form.bathrooms === "" ? null : Number(form.bathrooms),
+      car_spaces: form.car_spaces === "" ? null : Number(form.car_spaces),
+      accommodates,
+      status: "scraped" as const,
+    };
+
+    const response = await fetch(
+      isPersistedReport(report) ? `/api/reports/${report.id}` : "/api/reports",
+      {
+        method: isPersistedReport(report) ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payloadBody),
+      },
+    );
     const payload = await response.json();
 
     if (!response.ok) {
@@ -222,12 +248,18 @@ export function ScrapedListingReviewStep({
         />
       </div>
 
+      <ListingAgentsEditor
+        agents={listingAgents}
+        agencyAgents={agencyAgents}
+        onChange={setListingAgents}
+      />
+
       <ReportMediaPicker
         scrapedImages={scrapedImages}
         uploadedImages={uploadedImages}
         heroImageUrl={form.hero_image_url}
         selectedImageUrls={form.selected_image_urls}
-        reportId={report.id}
+        reportId={isPersistedReport(report) ? report.id : undefined}
         maxSelected={MAX_REPORT_IMAGES}
         onUploaded={setUploadedImages}
         onChange={(hero, selected) => {
@@ -236,7 +268,10 @@ export function ScrapedListingReviewStep({
         }}
       />
 
-      <Button onClick={saveReport} disabled={loading || !report.id}>
+      <Button
+        onClick={saveReport}
+        disabled={loading || !form.property_address.trim()}
+      >
         {loading ? "Saving..." : "Save and estimate STR"}
       </Button>
     </div>

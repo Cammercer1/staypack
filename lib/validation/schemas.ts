@@ -81,12 +81,40 @@ export const agentProfileSchema = z.object({
   is_default: z.boolean(),
 });
 
-export const createReportSchema = z.object({
-  listing_url: z.string().url().optional(),
-  property_address: z.string().optional(),
-  bedrooms: z.coerce.number().optional(),
-  bathrooms: z.coerce.number().optional(),
-  car_spaces: z.coerce.number().optional(),
+export const listingAgentSchema = z.object({
+  name: z.string().trim(),
+  email: optionalEmail.optional().nullable(),
+  phone: z.string().optional().nullable(),
+  role_title: z.string().optional().nullable(),
+  photo_url: z.string().optional().nullable(),
+});
+
+export const parsedListingSchema = z.object({
+  title: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+  suburb: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  postcode: z.string().nullable().optional(),
+  propertyType: z.string().nullable().optional(),
+  bedrooms: z.coerce.number().nullable().optional(),
+  bathrooms: z.coerce.number().nullable().optional(),
+  carSpaces: z.coerce.number().nullable().optional(),
+  description: z.string().nullable().optional(),
+  displayPrice: z.string().nullable().optional(),
+  images: z.array(z.string()).default([]),
+  agents: z
+    .array(
+      z.object({
+        name: z.string().nullable().optional(),
+        email: z.string().nullable().optional(),
+        phone: z.string().nullable().optional(),
+        photo_url: z.string().nullable().optional(),
+        role_title: z.string().nullable().optional(),
+      }),
+    )
+    .default([]),
+  confidence: z.enum(["low", "medium", "high"]).default("low"),
+  warnings: z.array(z.string()).default([]),
 });
 
 export const updateReportSchema = z.object({
@@ -137,36 +165,16 @@ export const updateReportSchema = z.object({
       (value) => value == null || isValidReportTemplateId(value),
       { message: "Select a valid report template" },
     ),
+  listing_agents: z.array(listingAgentSchema).max(2).optional(),
+  scraped_listing_json: parsedListingSchema.optional(),
 });
 
-export const parsedListingSchema = z.object({
-  title: z.string().nullable().optional(),
-  address: z.string().nullable().optional(),
-  suburb: z.string().nullable().optional(),
-  state: z.string().nullable().optional(),
-  postcode: z.string().nullable().optional(),
-  propertyType: z.string().nullable().optional(),
-  bedrooms: z.coerce.number().nullable().optional(),
-  bathrooms: z.coerce.number().nullable().optional(),
-  carSpaces: z.coerce.number().nullable().optional(),
-  description: z.string().nullable().optional(),
-  displayPrice: z.string().nullable().optional(),
-  images: z.array(z.string()).default([]),
-  agents: z
-    .array(
-      z.object({
-        name: z.string().nullable().optional(),
-        email: z.string().nullable().optional(),
-        phone: z.string().nullable().optional(),
-      }),
-    )
-    .default([]),
-  confidence: z.enum(["low", "medium", "high"]).default("low"),
-  warnings: z.array(z.string()).default([]),
+export const createReportSchema = updateReportSchema.extend({
+  property_address: z.string().trim().min(1, "Property address is required"),
 });
 
 export const scrapeListingSchema = z.object({
-  report_id: z.string().uuid(),
+  report_id: z.string().uuid().optional(),
   listing_url: z.string().url(),
 });
 

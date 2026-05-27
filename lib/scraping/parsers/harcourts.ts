@@ -90,6 +90,46 @@ function collectCloudHiImages($: cheerio.CheerioAPI) {
   );
 }
 
+function extractAgentPhoto(
+  $: cheerio.CheerioAPI,
+  root: ReturnType<cheerio.CheerioAPI>,
+) {
+  for (const selector of ["img.agent-card__wrapper-img", "img"]) {
+    const img = root.find(selector).first();
+    for (const attribute of ["data-lazy-src", "data-src", "src"]) {
+      const value = img.attr(attribute)?.trim();
+      if (value && !/^data:image\/svg/i.test(value)) {
+        return value;
+      }
+    }
+
+    const noscriptPhoto = img
+      .parent()
+      .find("noscript img")
+      .first()
+      .attr("src")
+      ?.trim();
+    if (noscriptPhoto && !/^data:image\/svg/i.test(noscriptPhoto)) {
+      return noscriptPhoto;
+    }
+  }
+
+  return undefined;
+}
+
+function extractTelPhone(root: ReturnType<cheerio.CheerioAPI>) {
+  const href = root.find('a[href^="tel:"]').first().attr("href");
+  if (!href) {
+    return undefined;
+  }
+
+  try {
+    return decodeURIComponent(href.replace(/^tel:/i, "")).trim();
+  } catch {
+    return href.replace(/^tel:/i, "").trim();
+  }
+}
+
 function parseSteppsAgents($: cheerio.CheerioAPI): ParsedListing["agents"] {
   const agents: ParsedListing["agents"] = [];
 
@@ -100,12 +140,7 @@ function parseSteppsAgents($: cheerio.CheerioAPI): ParsedListing["agents"] {
       return;
     }
 
-    const phone = root
-      .find('a[href^="tel:"]')
-      .first()
-      .attr("href")
-      ?.replace(/^tel:/i, "")
-      .trim();
+    const phone = extractTelPhone(root);
     const email = root
       .find('a[href^="mailto:"]')
       .first()
@@ -113,8 +148,14 @@ function parseSteppsAgents($: cheerio.CheerioAPI): ParsedListing["agents"] {
       ?.replace(/^mailto:/i, "")
       .split("?")[0]
       ?.trim();
+    const role_title = root
+      .find(".agent-card__details-position")
+      .first()
+      .text()
+      .trim();
+    const photo_url = extractAgentPhoto($, root);
 
-    agents.push({ name, phone, email });
+    agents.push({ name, phone, email, role_title, photo_url });
   });
 
   return agents;
@@ -132,14 +173,10 @@ function parseCloudHiAgents($: cheerio.CheerioAPI): ParsedListing["agents"] {
     }
 
     seen.add(name.toLowerCase());
-    const phone = root
-      .find('a[href^="tel:"]')
-      .first()
-      .attr("href")
-      ?.replace(/^tel:/i, "")
-      .trim();
+    const phone = extractTelPhone(root);
+    const photo_url = extractAgentPhoto($, root);
 
-    agents.push({ name, phone });
+    agents.push({ name, phone, photo_url });
   });
 
   return agents;
