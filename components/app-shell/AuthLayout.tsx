@@ -20,7 +20,7 @@ export function AuthLayout({
           <StayPackLogo href="/" height={28} />
         </div>
         <div className="relative max-w-md space-y-6">
-          <h1 className="font-display text-5xl leading-[1.05] tracking-tight">
+          <h1 className="font-display text-5xl tracking-tight">
             <span className="italic">{highlight}</span> {title}
           </h1>
           <p className="text-lg leading-8 text-primary-foreground/80">
