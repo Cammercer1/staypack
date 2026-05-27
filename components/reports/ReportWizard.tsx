@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrapedListingReviewStep } from "@/components/reports/ScrapedListingReviewStep";
@@ -30,6 +32,9 @@ export function ReportWizard({
   const [step, setStep] = useState(getInitialStep(initialReport));
   const [manualEntry, setManualEntry] = useState(!initialReport.scraped_listing_json);
   const [loading, setLoading] = useState(false);
+  const [publishStage, setPublishStage] = useState<
+    "idle" | "publishing" | "generating-pdf"
+  >("idle");
 
   useEffect(() => {
     setBrandAgency(agency);
@@ -69,6 +74,8 @@ export function ReportWizard({
 
   async function publishReport() {
     setLoading(true);
+    setPublishStage("publishing");
+
     const publishResponse = await fetch(`/api/reports/${report.id}/publish`, {
       method: "POST",
     });
@@ -77,9 +84,11 @@ export function ReportWizard({
     if (!publishResponse.ok) {
       toast.error(publishPayload.error ?? "Publish failed");
       setLoading(false);
+      setPublishStage("idle");
       return;
     }
 
+    setPublishStage("generating-pdf");
     const pdfResponse = await fetch(`/api/reports/${report.id}/generate-pdf`, {
       method: "POST",
     });
@@ -88,12 +97,14 @@ export function ReportWizard({
     if (!pdfResponse.ok) {
       toast.error(pdfPayload.error ?? "PDF generation failed");
       setLoading(false);
+      setPublishStage("idle");
       return;
     }
 
     setReport(pdfPayload.report);
     toast.success("Report published");
     setLoading(false);
+    setPublishStage("idle");
   }
 
   return (
@@ -140,13 +151,27 @@ export function ReportWizard({
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-6">
-          {finalReport ? (
-            <FittedReportPreview report={finalReport} maxHeight="min(80vh, 900px)" />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Generate copy first to preview the report.
-            </p>
-          )}
+          <AsyncLoadingOverlay
+            active={loading}
+            title={
+              publishStage === "generating-pdf"
+                ? "Generating PDF"
+                : "Publishing report"
+            }
+            description={
+              publishStage === "generating-pdf"
+                ? "Rendering the final buyer pack. This can take 15–30 seconds."
+                : "Saving the published report."
+            }
+          >
+            {finalReport ? (
+              <FittedReportPreview report={finalReport} maxHeight="min(80vh, 900px)" />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Generate copy first to preview the report.
+              </p>
+            )}
+          </AsyncLoadingOverlay>
           <div className="flex flex-wrap gap-3 no-print">
             <Button variant="outline" disabled={loading}>
               Save draft
@@ -155,7 +180,16 @@ export function ReportWizard({
               Generate PDF preview
             </Button>
             <Button onClick={publishReport} disabled={loading || !finalReport}>
-              {loading ? "Publishing..." : "Publish report"}
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  {publishStage === "generating-pdf"
+                    ? "Generating PDF..."
+                    : "Publishing..."}
+                </>
+              ) : (
+                "Publish report"
+              )}
             </Button>
           </div>
         </TabsContent>

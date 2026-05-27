@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -168,6 +170,11 @@ export function ScrapedListingReviewStep({
   }
 
   return (
+    <AsyncLoadingOverlay
+      active={loading}
+      title="Saving listing"
+      description="Saving details and geocoding the address for the STR estimate."
+    >
     <div className="space-y-6">
       {manualMode ? (
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/10 p-4">
@@ -272,8 +279,16 @@ export function ScrapedListingReviewStep({
         onClick={saveReport}
         disabled={loading || !form.property_address.trim()}
       >
-        {loading ? "Saving..." : "Save and estimate STR"}
+        {loading ? (
+          <>
+            <Loader2 className="animate-spin" />
+            Saving...
+          </>
+        ) : (
+          "Save and estimate STR"
+        )}
       </Button>
     </div>
+    </AsyncLoadingOverlay>
   );
 }

@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -212,7 +214,14 @@ export function GeneratedCopyEditor({
     .filter(Boolean)
     .join(", ");
 
+  const overlayActive = generating;
+
   return (
+    <AsyncLoadingOverlay
+      active={overlayActive}
+      title="Generating report copy"
+      description="Writing buyer-facing copy from your listing and STR numbers. This usually takes 10–20 seconds."
+    >
     <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="space-y-6">
         <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm">
@@ -265,11 +274,16 @@ export function GeneratedCopyEditor({
             onClick={generateCopy}
             disabled={generating || saving || !estimate}
           >
-            {generating
-              ? "Generating copy..."
-              : copy
-                ? "Regenerate copy"
-                : "Generate report copy"}
+            {generating ? (
+              <>
+                <Loader2 className="animate-spin" />
+                Generating copy...
+              </>
+            ) : copy ? (
+              "Regenerate copy"
+            ) : (
+              "Generate report copy"
+            )}
           </Button>
         </div>
 
@@ -391,6 +405,7 @@ export function GeneratedCopyEditor({
         )}
       </div>
     </div>
+    </AsyncLoadingOverlay>
   );
 }
 

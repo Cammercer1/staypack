@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Link2 } from "lucide-react";
+import { Link2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UnknownAgentsAfterScrapeModal } from "@/components/reports/UnknownAgentsAfterScrapeModal";
@@ -100,7 +101,13 @@ export function ListingUrlStep({ report, onComplete, onManualEntry }: Props) {
 
   return (
     <>
-      <div className="max-w-2xl space-y-5 rounded-2xl border border-border/70 bg-background/70 p-6">
+      <AsyncLoadingOverlay
+        active={loading}
+        title="Importing listing"
+        description="Fetching the page and extracting property details. This usually takes 15–30 seconds."
+        className="max-w-2xl"
+      >
+      <div className="space-y-5 rounded-2xl border border-border/70 bg-background/70 p-6">
         <div>
           <div className="mb-2 flex items-center gap-2 text-sm font-medium">
             <Link2 className="h-4 w-4" />
@@ -125,7 +132,14 @@ export function ListingUrlStep({ report, onComplete, onManualEntry }: Props) {
 
         <div className="flex flex-wrap gap-3">
           <Button onClick={handleScrape} disabled={!listingUrl || loading}>
-            {loading ? "Importing listing..." : "Import listing"}
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin" />
+                Importing listing...
+              </>
+            ) : (
+              "Import listing"
+            )}
           </Button>
           <Button
             type="button"
@@ -137,6 +151,7 @@ export function ListingUrlStep({ report, onComplete, onManualEntry }: Props) {
           </Button>
         </div>
       </div>
+      </AsyncLoadingOverlay>
 
       <UnknownAgentsAfterScrapeModal
         open={agentModalOpen}

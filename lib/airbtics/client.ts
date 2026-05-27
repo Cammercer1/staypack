@@ -189,13 +189,19 @@ async function wait(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getPollDelayMs(attempt: number) {
+  if (attempt < 2) return 600;
+  if (attempt < 5) return 1000;
+  return 1500;
+}
+
 async function pollAirbticsReport(
   reportId: string,
   apiKey: string,
   baseUrl: string,
   tier: AirbticsTier,
 ) {
-  const maxAttempts = tier === "full" ? 12 : 8;
+  const maxAttempts = tier === "full" ? 14 : 10;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const message = await readAirbticsReport(reportId, apiKey, baseUrl);
@@ -213,7 +219,7 @@ async function pollAirbticsReport(
     }
 
     if (attempt < maxAttempts - 1) {
-      await wait(1500);
+      await wait(getPollDelayMs(attempt));
     }
   }
 

@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,7 +65,9 @@ export function StrEstimateStep({ report, onComplete }: Props) {
     [report.bedrooms, report.accommodates],
   );
   const [accommodates, setAccommodates] = useState(String(defaultAccommodates));
-  const [loading, setLoading] = useState(false);
+  const [estimating, setEstimating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const loading = estimating || saving;
 
   async function runEstimate() {
     if (!report.property_address?.trim()) {
@@ -76,7 +80,7 @@ export function StrEstimateStep({ report, onComplete }: Props) {
       accommodates === "" ? null : Number(accommodates),
     );
 
-    setLoading(true);
+    setEstimating(true);
     const response = await fetch("/api/airbtics/estimate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -95,7 +99,7 @@ export function StrEstimateStep({ report, onComplete }: Props) {
 
     if (!response.ok) {
       toast.error(payload.error ?? "Estimate failed");
-      setLoading(false);
+      setEstimating(false);
       return;
     }
 
@@ -109,11 +113,11 @@ export function StrEstimateStep({ report, onComplete }: Props) {
         ? "Detailed STR estimate generated"
         : "Light STR estimate generated",
     );
-    setLoading(false);
+    setEstimating(false);
   }
 
   async function saveOverride() {
-    setLoading(true);
+    setSaving(true);
     const response = await fetch(`/api/reports/${report.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -133,16 +137,30 @@ export function StrEstimateStep({ report, onComplete }: Props) {
 
     if (!response.ok) {
       toast.error(payload.error ?? "Failed to save override");
-      setLoading(false);
+      setSaving(false);
       return;
     }
 
     onComplete(payload.report);
     toast.success("Estimate saved");
-    setLoading(false);
+    setSaving(false);
   }
 
+  const estimateLoadingMessage =
+    selectedTier === "full"
+      ? "Pulling comparable listings and seasonality data. This can take up to 30 seconds."
+      : "Fetching headline revenue numbers. This usually takes 10–20 seconds.";
+
   return (
+    <AsyncLoadingOverlay
+      active={estimating}
+      title={
+        selectedTier === "full"
+          ? "Running detailed STR estimate"
+          : "Running light STR estimate"
+      }
+      description={estimateLoadingMessage}
+    >
     <div className="space-y-6">
       <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm">
         <p className="font-medium">Property location</p>
@@ -240,11 +258,16 @@ export function StrEstimateStep({ report, onComplete }: Props) {
 
       <div className="flex flex-wrap items-center gap-3">
         <Button onClick={runEstimate} disabled={loading}>
-          {loading
-            ? "Estimating..."
-            : selectedTier === "full"
-              ? "Run detailed STR estimate"
-              : "Run light STR estimate"}
+          {estimating ? (
+            <>
+              <Loader2 className="animate-spin" />
+              Estimating...
+            </>
+          ) : selectedTier === "full" ? (
+            "Run detailed STR estimate"
+          ) : (
+            "Run light STR estimate"
+          )}
         </Button>
         {report.airbtics_tier ? (
           <p className="text-sm text-muted-foreground">
@@ -275,9 +298,17 @@ export function StrEstimateStep({ report, onComplete }: Props) {
       </div>
 
       <Button variant="outline" onClick={saveOverride} disabled={loading || !overrideAnnual}>
-        Save estimate override
+        {saving ? (
+          <>
+            <Loader2 className="animate-spin" />
+            Saving...
+          </>
+        ) : (
+          "Save estimate override"
+        )}
       </Button>
     </div>
+    </AsyncLoadingOverlay>
   );
 }
 

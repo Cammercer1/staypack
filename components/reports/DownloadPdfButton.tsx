@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
@@ -79,7 +80,14 @@ export function DownloadPdfButton({
             disabled={loading}
             onClick={generatePdf}
           >
-            {loading ? "Regenerating..." : "Regenerate PDF"}
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin" />
+                Regenerating...
+              </>
+            ) : (
+              "Regenerate PDF"
+            )}
           </Button>
         ) : null}
       </div>
@@ -94,7 +102,14 @@ export function DownloadPdfButton({
         disabled={loading}
         onClick={generatePdf}
       >
-        {loading ? "Generating..." : "Generate PDF"}
+        {loading ? (
+          <>
+            <Loader2 className="animate-spin" />
+            Generating...
+          </>
+        ) : (
+          "Generate PDF"
+        )}
       </Button>
     );
   }
