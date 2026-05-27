@@ -75,9 +75,11 @@ export function TemplatePlayground({
             >
               {printMode ? "Print mode on" : "Print mode off"}
             </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/reports/${reportId}`}>Open report editor</Link>
-            </Button>
+            <Link href={`/reports/${reportId}`}>
+              <Button variant="outline" size="sm">
+                Open report editor
+              </Button>
+            </Link>
           </div>
 
           <div className="space-y-2 rounded-xl border bg-muted/30 p-4 text-sm">

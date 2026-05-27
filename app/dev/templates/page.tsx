@@ -40,9 +40,9 @@ export default async function DevTemplatesPage({
           <p className="break-all font-mono text-xs text-muted-foreground">
             {reportId}
           </p>
-          <Button asChild variant="outline">
-            <Link href={`/reports/${reportId}`}>Open report editor</Link>
-          </Button>
+          <Link href={`/reports/${reportId}`}>
+            <Button variant="outline">Open report editor</Button>
+          </Link>
         </div>
       </div>
     );
