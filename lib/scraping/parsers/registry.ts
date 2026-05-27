@@ -1,4 +1,5 @@
 import { parseGenericListing } from "@/lib/scraping/parsers/generic";
+import { parseHarcourtsListing } from "@/lib/scraping/parsers/harcourts";
 import { parseJsonLdListing } from "@/lib/scraping/parsers/jsonLd";
 import { parseOpenGraphListing } from "@/lib/scraping/parsers/openGraph";
 import { parseRayWhiteListing } from "@/lib/scraping/parsers/rayWhite";
@@ -11,13 +12,68 @@ import type { ListingParser, SiteListingParser } from "@/lib/scraping/parsers/ty
 export const SITE_PARSERS: SiteListingParser[] = [
   {
     name: "ray_white",
+    platform: "Ray White",
     hosts: [/raywhite\.com\.au$/i, /raywhite\.com$/i],
     parse: parseRayWhiteListing,
+    rolloutStatus: "in_review",
+    notes: "Next.js __NEXT_DATA__ property payload; same template nationally.",
+    qaListingUrls: [],
+  },
+  {
+    name: "harcourts",
+    platform: "Harcourts",
+    hosts: [/harcourts[a-z0-9-]*\.com\.au$/i],
+    parse: parseHarcourtsListing,
+    rolloutStatus: "in_review",
+    notes:
+      "WordPress Stepps theme; static fetch only. Images in #listing-single__photos (data-lazy on propertyimages.stepps.net). Agents in .listing-single__agent-card.",
+    qaListingUrls: [
+      "https://harcourtsnr.com.au/property/house-nsw-goonellabah-l37978463/",
+    ],
   },
   // Examples for future parsers:
-  // { name: "domain", hosts: [/domain\.com\.au$/i], parse: parseDomainListing },
-  // { name: "realestate_com_au", hosts: [/realestate\.com\.au$/i], parse: parseRealestateComAuListing },
+  // {
+  //   name: "domain",
+  //   platform: "Domain",
+  //   hosts: [/domain\.com\.au$/i],
+  //   parse: parseDomainListing,
+  //   rolloutStatus: "planned",
+  // },
 ];
+
+/** Ordered checklist when onboarding a new franchise platform (one parser covers all offices). */
+export const PLATFORM_ROLLOUT_STEPS = [
+  "Collect 3–5 live listing URLs (metro, regional, house, unit) from the same host.",
+  "Save rendered HTML / __NEXT_DATA__ and confirm one parser covers all samples.",
+  "Verify address, beds/baths, display price, description, and 5+ images per sample.",
+  "Import via StayPacks and confirm scrape_jobs.parser_name matches the site parser.",
+  "Mark rolloutStatus verified in registry before enabling that agency group.",
+] as const;
+
+export function platformForListingUrl(url: string) {
+  return resolveSiteParser(url)?.platform ?? null;
+}
+
+export function platformForAgencyWebsite(websiteUrl: string | null | undefined) {
+  if (!websiteUrl?.trim()) {
+    return null;
+  }
+  return platformForListingUrl(websiteUrl);
+}
+
+export function isPlatformVerified(url: string) {
+  return resolveSiteParser(url)?.rolloutStatus === "verified";
+}
+
+export function scraperRolloutSummary() {
+  return SITE_PARSERS.map(({ platform, name, rolloutStatus, hosts, qaListingUrls }) => ({
+    platform,
+    parser: name,
+    rolloutStatus,
+    hosts: hosts.map((pattern) => pattern.source),
+    qaListingUrls: qaListingUrls ?? [],
+  }));
+}
 
 /** Run on every listing to fill gaps (structured data, meta tags, heuristics). */
 export const UNIVERSAL_PARSERS: ListingParser[] = [
