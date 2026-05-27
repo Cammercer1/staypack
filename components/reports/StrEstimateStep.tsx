@@ -2,20 +2,58 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { calculateAccommodates, formatCurrency, formatPercent } from "@/lib/reports/formatters";
-import type { Report, StrEstimate } from "@/lib/types";
+import type { AirbticsTier, Report, StrEstimate } from "@/lib/types";
 
 type Props = {
   report: Report;
   onComplete: (report: Report) => void;
 };
 
+type TierOption = {
+  id: AirbticsTier;
+  title: string;
+  description: string;
+  features: string[];
+};
+
+const TIER_OPTIONS: TierOption[] = [
+  {
+    id: "summary",
+    title: "Light estimate",
+    description: "Headline STR numbers for the report.",
+    features: [
+      "Annual, monthly and weekly revenue",
+      "Average nightly rate and occupancy",
+      "Booked nights and search radius",
+      "Fast result, lower data cost",
+    ],
+  },
+  {
+    id: "full",
+    title: "Detailed estimate",
+    description: "Same headline numbers plus market evidence.",
+    features: [
+      "Everything in the light estimate",
+      "Revenue range (25th to 90th percentile)",
+      "Up to 40 comparable listings with photos",
+      "Monthly seasonality for charts and copy",
+      "More data for a stronger buyer report",
+    ],
+  },
+];
+
 export function StrEstimateStep({ report, onComplete }: Props) {
   const [estimate, setEstimate] = useState<StrEstimate | null>(
     report.final_estimate_json,
+  );
+  const [selectedTier, setSelectedTier] = useState<AirbticsTier>(
+    report.airbtics_tier ?? "summary",
   );
   const [overrideAnnual, setOverrideAnnual] = useState(
     String(report.final_estimate_json?.annualRevenue ?? ""),
@@ -44,6 +82,7 @@ export function StrEstimateStep({ report, onComplete }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         report_id: report.id,
+        tier: selectedTier,
         address: report.property_address,
         latitude: report.latitude,
         longitude: report.longitude,
@@ -61,10 +100,15 @@ export function StrEstimateStep({ report, onComplete }: Props) {
     }
 
     setEstimate(payload.estimate);
+    setSelectedTier(payload.tier ?? selectedTier);
     setOverrideAnnual(String(payload.estimate.annualRevenue ?? ""));
     setAccommodates(String(payload.accommodates ?? resolvedAccommodates));
     onComplete(payload.report);
-    toast.success("STR estimate generated");
+    toast.success(
+      selectedTier === "full"
+        ? "Detailed STR estimate generated"
+        : "Light STR estimate generated",
+    );
     setLoading(false);
   }
 
@@ -143,9 +187,72 @@ export function StrEstimateStep({ report, onComplete }: Props) {
         </div>
       </div>
 
-      <Button onClick={runEstimate} disabled={loading}>
-        {loading ? "Estimating..." : "Run STR estimate"}
-      </Button>
+      <div className="space-y-3">
+        <div>
+          <Label>Estimate type</Label>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Choose how much market data to pull for this report.
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {TIER_OPTIONS.map((option) => {
+            const isSelected = selectedTier === option.id;
+
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setSelectedTier(option.id)}
+                disabled={loading}
+                className={cn(
+                  "rounded-xl border p-4 text-left transition-colors",
+                  isSelected
+                    ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                    : "border-border/70 bg-background hover:bg-muted/30",
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{option.title}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {option.description}
+                    </p>
+                  </div>
+                  {isSelected ? <Badge>Selected</Badge> : null}
+                </div>
+
+                <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+                  {option.features.map((feature) => (
+                    <li key={feature} className="flex gap-2">
+                      <span aria-hidden className="text-primary">
+                        •
+                      </span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={runEstimate} disabled={loading}>
+          {loading
+            ? "Estimating..."
+            : selectedTier === "full"
+              ? "Run detailed STR estimate"
+              : "Run light STR estimate"}
+        </Button>
+        {report.airbtics_tier ? (
+          <p className="text-sm text-muted-foreground">
+            Last run:{" "}
+            {report.airbtics_tier === "full" ? "Detailed" : "Light"} estimate
+          </p>
+        ) : null}
+      </div>
 
       {estimate ? (
         <div className="grid gap-4 md:grid-cols-3">

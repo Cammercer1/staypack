@@ -37,13 +37,17 @@ export async function POST(request: Request) {
       body.accommodates ?? report.accommodates,
     );
 
-    const estimate = await fetchAirbticsEstimate({
-      latitude,
-      longitude,
-      bedrooms,
-      bathrooms,
-      accommodates,
-    });
+    const result = await fetchAirbticsEstimate(
+      {
+        latitude,
+        longitude,
+        bedrooms,
+        bathrooms,
+        accommodates,
+      },
+      body.tier,
+    );
+    const { estimate, tier, reportId, costCents, enrichment } = result;
 
     const { data, error } = await supabase
       .from("reports")
@@ -53,9 +57,14 @@ export async function POST(request: Request) {
         bedrooms,
         bathrooms,
         accommodates,
+        airbtics_tier: tier,
+        airbtics_report_id: reportId,
+        airbtics_cost_cents: costCents,
+        airbtics_fetched_at: new Date().toISOString(),
         original_estimate_json: estimate,
         final_estimate_json: estimate,
         raw_airbtics_json: estimate.raw,
+        str_enrichment_json: enrichment,
         status: "estimated",
       })
       .eq("id", report.id)
@@ -68,6 +77,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ...estimate,
+      tier,
+      enrichment,
       annual_revenue: estimate.annualRevenue,
       monthly_revenue: estimate.monthlyRevenue,
       weekly_revenue: estimate.weeklyRevenue,

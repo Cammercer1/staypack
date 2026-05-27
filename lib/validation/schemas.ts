@@ -180,6 +180,7 @@ export const scrapeListingSchema = z.object({
 
 export const airbticsEstimateSchema = z.object({
   report_id: z.string().uuid(),
+  tier: z.enum(["summary", "full"]).default("summary"),
   address: z.string().optional(),
   latitude: z.coerce.number().nullable().optional(),
   longitude: z.coerce.number().nullable().optional(),

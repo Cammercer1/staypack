@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ReportPreview } from "@/components/reports/ReportPreview";
+import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { formatCurrency, formatPercent } from "@/lib/reports/formatters";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
@@ -297,9 +297,7 @@ export function GeneratedCopyEditor({
 
         <p className="text-sm font-medium">Live preview</p>
         {previewReport ? (
-          <div className="max-h-[calc(100vh-8rem)] overflow-auto rounded-xl border bg-white shadow-sm">
-            <ReportPreview report={previewReport} />
-          </div>
+          <FittedReportPreview report={previewReport} />
         ) : (
           <div className="rounded-xl border border-dashed p-8 text-sm text-muted-foreground">
             Generate or edit copy to preview the report layout.

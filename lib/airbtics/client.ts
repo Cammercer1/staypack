@@ -1,5 +1,10 @@
-import type { StrEstimate } from "@/lib/types";
+import type { AirbticsTier, StrEstimate } from "@/lib/types";
 import { isDevelopment } from "@/lib/env";
+import {
+  AIRBTICS_TIER_COST_CENTS,
+  AIRBTICS_TIER_ENDPOINT,
+} from "@/lib/airbtics/constants";
+import { buildStrEnrichment } from "@/lib/airbtics/enrich";
 
 const DEFAULT_AIRBTICS_BASE_URL =
   "https://crap0y5bx5.execute-api.us-east-2.amazonaws.com/prod";
@@ -12,6 +17,14 @@ export type AirbticsInput = {
   accommodates: number;
 };
 
+export type AirbticsEstimateResult = {
+  estimate: StrEstimate;
+  tier: AirbticsTier;
+  reportId: string;
+  costCents: number;
+  enrichment: ReturnType<typeof buildStrEnrichment>;
+};
+
 type AirbticsReportMessage = Record<string, unknown> & {
   id?: string;
   report_id?: string;
@@ -20,6 +33,7 @@ type AirbticsReportMessage = Record<string, unknown> & {
   occupancy_rate?: number;
   nightly_rate?: number;
   radius?: number;
+  kpis?: Record<string, Record<string, unknown>>;
 };
 
 function getAirbticsBaseUrl() {
@@ -61,13 +75,14 @@ function unwrapMessage(payload: Record<string, unknown>): AirbticsReportMessage 
   return payload as AirbticsReportMessage;
 }
 
-async function createAirbticsSummaryReport(
+async function createAirbticsReport(
   input: AirbticsInput,
+  tier: AirbticsTier,
   apiKey: string,
   baseUrl: string,
 ) {
   const response = await airbticsFetch(
-    `${baseUrl}/report/summary`,
+    `${baseUrl}${AIRBTICS_TIER_ENDPOINT[tier]}`,
     {
       method: "POST",
       headers: buildHeaders(apiKey),
@@ -79,7 +94,7 @@ async function createAirbticsSummaryReport(
         accommodates: input.accommodates,
       }),
     },
-    "summary request",
+    `${tier} request`,
   );
 
   const rawText = await response.text();
@@ -143,6 +158,33 @@ async function readAirbticsReport(
   return unwrapMessage(payload);
 }
 
+function getReportRevenue(message: AirbticsReportMessage) {
+  if (message.revenue != null && Number.isFinite(Number(message.revenue))) {
+    return Number(message.revenue);
+  }
+
+  const edited = message.kpis?.edited ?? message.kpis?.["50"];
+  const revenue = edited?.ltm_revenue;
+
+  if (revenue != null && Number.isFinite(Number(revenue))) {
+    return Number(revenue);
+  }
+
+  return null;
+}
+
+function isReportReady(message: AirbticsReportMessage) {
+  if (message.comps_status === "failed") {
+    return "failed" as const;
+  }
+
+  if (message.comps_status === "success" && getReportRevenue(message) != null) {
+    return "success" as const;
+  }
+
+  return "pending" as const;
+}
+
 async function wait(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -151,21 +193,19 @@ async function pollAirbticsReport(
   reportId: string,
   apiKey: string,
   baseUrl: string,
+  tier: AirbticsTier,
 ) {
-  const maxAttempts = 8;
+  const maxAttempts = tier === "full" ? 12 : 8;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const message = await readAirbticsReport(reportId, apiKey, baseUrl);
+    const status = isReportReady(message);
 
-    if (message.comps_status === "failed") {
+    if (status === "failed") {
       throw new Error("Could not find enough comparable short-term rentals nearby");
     }
 
-    if (
-      message.comps_status === "success" &&
-      message.revenue != null &&
-      Number.isFinite(Number(message.revenue))
-    ) {
+    if (status === "success") {
       return {
         reportId,
         message,
@@ -180,9 +220,13 @@ async function pollAirbticsReport(
   throw new Error("STR estimate is still processing. Try again in a moment.");
 }
 
-export async function fetchAirbticsEstimate(input: AirbticsInput): Promise<StrEstimate> {
+export async function fetchAirbticsEstimate(
+  input: AirbticsInput,
+  tier: AirbticsTier = "summary",
+): Promise<AirbticsEstimateResult> {
   if (isDevelopment() && !process.env.AIRBTICS_API_KEY) {
-    return {
+    const raw = { mock: true, tier, input };
+    const estimate = {
       annualRevenue: 72000,
       monthlyRevenue: 6000,
       weeklyRevenue: 1385,
@@ -190,19 +234,35 @@ export async function fetchAirbticsEstimate(input: AirbticsInput): Promise<StrEs
       occupancyRate: 69,
       bookedNights: 252,
       radiusM: 500,
-      raw: { mock: true, input },
+      raw,
+    };
+
+    return {
+      estimate,
+      tier,
+      reportId: "mock-report-id",
+      costCents: AIRBTICS_TIER_COST_CENTS[tier],
+      enrichment: tier === "full" ? buildStrEnrichment(raw) : null,
     };
   }
 
   const apiKey = getAirbticsApiKey();
   const baseUrl = getAirbticsBaseUrl();
-  const reportId = await createAirbticsSummaryReport(input, apiKey, baseUrl);
-  const { message } = await pollAirbticsReport(reportId, apiKey, baseUrl);
-
-  return normaliseAirbticsResponse({
+  const reportId = await createAirbticsReport(input, tier, apiKey, baseUrl);
+  const { message } = await pollAirbticsReport(reportId, apiKey, baseUrl, tier);
+  const raw = {
     report_id: reportId,
+    tier,
     ...message,
-  });
+  };
+
+  return {
+    estimate: normaliseAirbticsResponse(raw),
+    tier,
+    reportId,
+    costCents: AIRBTICS_TIER_COST_CENTS[tier],
+    enrichment: tier === "full" ? buildStrEnrichment(raw) : null,
+  };
 }
 
 export function normaliseAirbticsResponse(raw: Record<string, unknown>): StrEstimate {
@@ -215,8 +275,13 @@ export function normaliseAirbticsResponse(raw: Record<string, unknown>): StrEsti
           ? (raw.summary as Record<string, unknown>)
           : raw;
 
+  const kpiSource =
+    (source.kpis as Record<string, Record<string, unknown>> | undefined)?.edited ??
+    (source.kpis as Record<string, Record<string, unknown>> | undefined)?.["50"];
+
   const annualRevenue = numberOrNull(
-    source.revenue ??
+    kpiSource?.ltm_revenue ??
+      source.revenue ??
       source.annual_revenue ??
       source.annualRevenue ??
       source.estimated_annual_revenue,
@@ -228,10 +293,16 @@ export function normaliseAirbticsResponse(raw: Record<string, unknown>): StrEsti
     numberOrNull(source.weekly_revenue ?? source.weeklyRevenue) ??
     (annualRevenue != null ? Math.round(annualRevenue / 52) : null);
   const nightlyRate = numberOrNull(
-    source.nightly_rate ?? source.nightlyRate ?? source.average_nightly_rate,
+    kpiSource?.ltm_nightly_rate ??
+      source.nightly_rate ??
+      source.nightlyRate ??
+      source.average_nightly_rate,
   );
   const occupancyRate = numberOrNull(
-    source.occupancy_rate ?? source.occupancyRate ?? source.occupancy,
+    kpiSource?.ltm_occupancy_rate ??
+      source.occupancy_rate ??
+      source.occupancyRate ??
+      source.occupancy,
   );
   const bookedNights =
     numberOrNull(source.booked_nights ?? source.bookedNights) ??

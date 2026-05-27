@@ -45,6 +45,8 @@ export type ParsedListing = {
   warnings: string[];
 };
 
+export type AirbticsTier = "summary" | "full";
+
 export type StrEstimate = {
   annualRevenue: number | null;
   monthlyRevenue: number | null;
@@ -54,6 +56,39 @@ export type StrEstimate = {
   bookedNights: number | null;
   radiusM: number | null;
   raw: unknown;
+};
+
+export type StrCompCard = {
+  listing_id: string;
+  name: string;
+  thumbnail_url: string;
+  listing_url: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  accommodates: number | null;
+  distance_m: number | null;
+  annual_revenue: number | null;
+  occupancy_rate: number | null;
+  nightly_rate: number | null;
+};
+
+export type StrEnrichmentJson = {
+  tier: "full";
+  comp_count: number;
+  radius_m: number | null;
+  revenue_range: {
+    p25: number | null;
+    p50: number | null;
+    p75: number | null;
+    p90: number | null;
+  } | null;
+  seasonality: {
+    month: string;
+    revenue: number | null;
+    occupancy: number | null;
+    adr: number | null;
+  }[];
+  comps: StrCompCard[];
 };
 
 export type AiCopyJson = {
@@ -223,6 +258,11 @@ export type Report = {
   pdf_url: string | null;
   scraped_listing_json: ParsedListing | null;
   raw_airbtics_json: unknown;
+  airbtics_tier: AirbticsTier | null;
+  airbtics_report_id: string | null;
+  str_enrichment_json: StrEnrichmentJson | null;
+  airbtics_cost_cents: number | null;
+  airbtics_fetched_at: string | null;
   original_estimate_json: StrEstimate | null;
   user_overrides_json: Partial<StrEstimate> | null;
   final_estimate_json: StrEstimate | null;
