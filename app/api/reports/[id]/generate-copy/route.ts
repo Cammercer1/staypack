@@ -6,7 +6,7 @@ import {
   generateReportCopy,
 } from "@/lib/openai/generateReportCopy";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
-import { loadReportAgentProfile } from "@/lib/reports/loadReportAgent";
+import { loadAgencyAgentProfiles, loadReportAgentProfile } from "@/lib/reports/loadReportAgent";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
 import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
 import { generateCopyRequestSchema } from "@/lib/validation/schemas";
@@ -41,6 +41,7 @@ export async function POST(
     const templateId = resolveReportTemplateId(agency, reportForBuild);
 
     const agentProfile = await loadReportAgentProfile(supabase, report);
+    const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
     const copy = await generateReportCopy({
       agency,
       report: reportForBuild,
@@ -49,6 +50,7 @@ export async function POST(
     const finalReportJson = buildFinalReportJson({
       agency,
       agentProfile,
+      agencyAgents,
       report: reportForBuild,
       estimate,
       copy,

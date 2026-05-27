@@ -16,10 +16,11 @@ import { enforceTemplateCopyLimits } from "@/lib/reports/enforceTemplateCopyLimi
 import { getTemplateCopyFieldLimit } from "@/lib/reports/getTemplateCopyLimits";
 import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
 import { ReportTemplatePicker } from "@/components/reports/ReportTemplatePicker";
-import type { Agency, AiCopyJson, Report } from "@/lib/types";
+import type { Agency, AgentProfile, AiCopyJson, Report } from "@/lib/types";
 
 type Props = {
   agency: Agency;
+  agencyAgents?: AgentProfile[];
   report: Report;
   onComplete: (report: Report) => void;
   onContinueToPreview?: () => void;
@@ -32,6 +33,7 @@ type ApiError = {
 
 export function GeneratedCopyEditor({
   agency,
+  agencyAgents = [],
   report,
   onComplete,
   onContinueToPreview,
@@ -56,6 +58,7 @@ export function GeneratedCopyEditor({
 
     return buildFinalReportJson({
       agency,
+      agencyAgents,
       report: {
         ...report,
         template_id: selectedTemplateId,
@@ -64,7 +67,7 @@ export function GeneratedCopyEditor({
       copy,
       scraped: report.scraped_listing_json,
     });
-  }, [agency, copy, estimate, report, selectedTemplateId]);
+  }, [agency, agencyAgents, copy, estimate, report, selectedTemplateId]);
 
   async function persistReportDraft(options?: { silent?: boolean }) {
     if (!copy) {
@@ -200,10 +203,6 @@ export function GeneratedCopyEditor({
     selectedTemplateId,
     "sales_pack_blurb",
   );
-  const metricsLimit = getTemplateCopyFieldLimit(
-    selectedTemplateId,
-    "key_metrics_line",
-  );
 
   const addressLine = [
     report.property_address,
@@ -309,12 +308,6 @@ export function GeneratedCopyEditor({
               limit={blurbLimit}
             />
             <Field
-              label="Key metrics line"
-              value={copy.key_metrics_line}
-              onChange={(value) => updateField("key_metrics_line", value)}
-              limit={metricsLimit}
-            />
-            <Field
               label="Appeal points"
               value={copy.property_appeal_points.join("\n")}
               onChange={(value) =>
@@ -324,44 +317,13 @@ export function GeneratedCopyEditor({
                 )
               }
               textarea
-            />
-            <Field
-              label="Supporting factors"
-              value={copy.performance_supporting_factors.join("\n")}
-              onChange={(value) =>
-                updateField(
-                  "performance_supporting_factors",
-                  value.split("\n").filter(Boolean),
-                )
-              }
-              textarea
-            />
-            <Field
-              label="Buyer checks"
-              value={copy.buyer_checks.join("\n")}
-              onChange={(value) =>
-                updateField("buyer_checks", value.split("\n").filter(Boolean))
-              }
-              textarea
-            />
-            <Field
-              label="Methodology note"
-              value={copy.methodology_note}
-              onChange={(value) => updateField("methodology_note", value)}
-              textarea
+              hint="One point per line."
             />
             <Field
               label="Disclaimer"
               value={copy.disclaimer}
               onChange={(value) => updateField("disclaimer", value)}
               textarea
-            />
-            <Field
-              label="Confidence notes (internal)"
-              value={copy.confidence_notes}
-              onChange={(value) => updateField("confidence_notes", value)}
-              textarea
-              hint="Staff-only notes. Not shown on the published report."
             />
 
             <div className="flex flex-wrap gap-3">
@@ -397,7 +359,11 @@ export function GeneratedCopyEditor({
 
         <p className="text-sm font-medium">Live preview</p>
         {previewReport ? (
-          <FittedReportPreview report={previewReport} />
+          <FittedReportPreview
+            report={previewReport}
+            maxHeight="min(80vh, 900px)"
+            fitToWidth
+          />
         ) : (
           <div className="rounded-xl border border-dashed p-8 text-sm text-muted-foreground">
             Generate or edit copy to preview the report layout.

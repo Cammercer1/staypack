@@ -16,6 +16,8 @@ type Props = {
   className?: string;
   maxHeight?: string;
   orientation?: ReportPageOrientation;
+  /** Scale to container width and scroll vertically instead of shrinking to fit height. */
+  fitToWidth?: boolean;
 };
 
 export function FittedReportPreview({
@@ -23,6 +25,7 @@ export function FittedReportPreview({
   className,
   maxHeight = "calc(100vh - 12rem)",
   orientation = "portrait",
+  fitToWidth = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const pageFormat = getReportPageFormat(orientation);
@@ -44,11 +47,13 @@ export function FittedReportPreview({
         ? container.clientHeight - padding
         : contentHeightPx;
 
-      const nextScale = Math.min(
-        availableWidth / pageWidthPx,
-        fitToPanel ? availableHeight / contentHeightPx : availableWidth / pageWidthPx,
-        1,
-      );
+      const nextScale = fitToWidth
+        ? Math.min(availableWidth / pageWidthPx, 1)
+        : Math.min(
+            availableWidth / pageWidthPx,
+            fitToPanel ? availableHeight / contentHeightPx : availableWidth / pageWidthPx,
+            1,
+          );
 
       setScale(nextScale > 0 ? nextScale : 0.5);
     };
@@ -59,7 +64,7 @@ export function FittedReportPreview({
     observer.observe(container);
 
     return () => observer.disconnect();
-  }, [report, orientation, contentHeightPx, fitToPanel, pageWidthPx]);
+  }, [report, orientation, contentHeightPx, fitToPanel, fitToWidth, pageWidthPx]);
 
   const scaledWidth = pageWidthPx * scale;
   const scaledHeight = contentHeightPx * scale;
@@ -68,7 +73,8 @@ export function FittedReportPreview({
     <div
       ref={containerRef}
       className={cn(
-        "overflow-hidden rounded-xl border bg-white shadow-sm",
+        "rounded-xl border bg-white shadow-sm",
+        fitToWidth ? "overflow-x-hidden overflow-y-auto" : "overflow-hidden",
         className,
       )}
       style={fitToPanel ? { height: maxHeight, maxHeight } : undefined}
@@ -76,7 +82,7 @@ export function FittedReportPreview({
       <div
         className={cn(
           "flex w-full justify-center p-2",
-          fitToPanel ? "h-full items-start" : "items-start py-4",
+          fitToPanel && !fitToWidth ? "h-full items-start" : "items-start py-4",
         )}
       >
         <div

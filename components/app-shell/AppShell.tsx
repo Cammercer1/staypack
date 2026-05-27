@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FileText, LayoutDashboard, Plus, Settings } from "lucide-react";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { StayPackLogo } from "@/components/app-shell/StayPackLogo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -47,12 +48,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               })}
             </nav>
           </div>
-          <Link href="/reports/new" prefetch={false}>
-            <Button size="lg">
-              <Plus className="h-4 w-4" />
-              New report
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <LogoutButton />
+            <Link href="/reports/new" prefetch={false}>
+              <Button size="lg">
+                <Plus className="h-4 w-4" />
+                New report
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 

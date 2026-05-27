@@ -2,6 +2,10 @@ import { Bath, BedDouble, Car, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { FinalReportJson } from "@/lib/types";
 import { formatCurrency, formatNumber } from "@/lib/reports/formatters";
+import {
+  formatStrGrossYield,
+  resolveStrGrossYield,
+} from "@/lib/reports/calculateStrYield";
 
 type Props = {
   report: FinalReportJson;
@@ -10,6 +14,11 @@ type Props = {
 
 export function ClassicPropertySection({ report, variant = "light" }: Props) {
   const { property, str, copy } = report;
+  const grossYield = resolveStrGrossYield({
+    display_price: property.display_price,
+    annual_revenue: str.annual_revenue,
+    str_yield: report.str_yield,
+  });
 
   const propertyStats = [
     { id: "bedrooms", icon: BedDouble, value: formatNumber(property.bedrooms), label: "Beds" },
@@ -102,6 +111,28 @@ export function ClassicPropertySection({ report, variant = "light" }: Props) {
             {formatCurrency(str.annual_revenue)}
           </p>
           <p className="mt-2 text-sm font-medium text-neutral-700">per year before costs</p>
+          {grossYield ? (
+            <div className="mt-3 border-t border-neutral-200/70 pt-3">
+              <p
+                className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600"
+                style={{ fontFamily: "var(--report-heading-font, inherit)" }}
+              >
+                Est. gross STR yield
+              </p>
+              <p
+                className="mt-1.5 text-[1.35rem] font-semibold leading-none tracking-tight"
+                style={{
+                  fontFamily: "var(--report-heading-font, inherit)",
+                  color: "var(--report-text-colour, inherit)",
+                }}
+              >
+                {formatStrGrossYield(grossYield)}
+              </p>
+              <p className="mt-1.5 text-xs leading-5 text-neutral-600">
+                Before costs, based on listing price {grossYield.display_price}
+              </p>
+            </div>
+          ) : null}
           {variant === "detailed" && report.str_enrichment?.revenue_range ? (
             <p className="mt-2 text-xs leading-5 text-neutral-600">
               Market range (annual gross):{" "}

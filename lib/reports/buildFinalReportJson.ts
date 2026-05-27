@@ -9,6 +9,8 @@ import type {
 } from "@/lib/types";
 import { DEFAULT_DISCLAIMER } from "@/lib/types";
 import { calculateAccommodates } from "@/lib/reports/formatters";
+import { calculateStrGrossYield } from "@/lib/reports/calculateStrYield";
+import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
 import {
   primaryReportAgent,
   resolveReportAgents,
@@ -18,6 +20,7 @@ import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplate
 type BuildFinalReportInput = {
   agency: Agency;
   agentProfile?: AgentProfile | null;
+  agencyAgents?: AgentProfile[];
   report: Report;
   estimate: StrEstimate;
   copy: AiCopyJson;
@@ -27,6 +30,7 @@ type BuildFinalReportInput = {
 export function buildFinalReportJson({
   agency,
   agentProfile,
+  agencyAgents,
   report,
   estimate,
   copy,
@@ -48,7 +52,11 @@ export function buildFinalReportJson({
   const agents = resolveReportAgents({
     scraped: scraped ?? report.scraped_listing_json,
     agentProfile,
+    agencyAgents,
   });
+  const displayPrice =
+    normalizeDisplayPrice(report.display_price) ?? report.display_price ?? null;
+  const strYield = calculateStrGrossYield(displayPrice, estimate.annualRevenue);
 
   return {
     version: "standard_2_page_v1",
@@ -91,6 +99,7 @@ export function buildFinalReportJson({
       listing_url: report.listing_url ?? "",
       hero_image_url: report.hero_image_url ?? "",
       selected_image_urls: report.selected_image_urls ?? [],
+      display_price: displayPrice,
     },
     str: {
       annual_revenue: estimate.annualRevenue,
@@ -101,6 +110,7 @@ export function buildFinalReportJson({
       booked_nights: estimate.bookedNights,
       radius_m: estimate.radiusM,
     },
+    str_yield: strYield,
     ltr: {
       weekly_min: weeklyMin,
       weekly_max: weeklyMax,

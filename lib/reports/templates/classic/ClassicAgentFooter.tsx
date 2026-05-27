@@ -43,18 +43,11 @@ function AgentContactLine({
 
 function AgentBlock({
   agent,
-  fallbackPhone,
-  fallbackEmail,
   compact = false,
 }: {
   agent: FooterAgent;
-  fallbackPhone?: string;
-  fallbackEmail?: string;
   compact?: boolean;
 }) {
-  const phone = agent.phone || fallbackPhone;
-  const email = agent.email || fallbackEmail;
-
   return (
     <div className="flex min-w-0 items-center gap-3">
       {agent.photo_url ? (
@@ -81,11 +74,11 @@ function AgentBlock({
             {agent.role_title}
           </p>
         ) : null}
-        {phone ? (
-          <AgentContactLine label={compact ? undefined : "P:"} value={phone} compact={compact} />
+        {agent.phone ? (
+          <AgentContactLine label={compact ? undefined : "P:"} value={agent.phone} compact={compact} />
         ) : null}
-        {email ? (
-          <AgentContactLine label={compact ? undefined : "E:"} value={email} compact={compact} />
+        {agent.email ? (
+          <AgentContactLine label={compact ? undefined : "E:"} value={agent.email} compact={compact} />
         ) : null}
       </div>
     </div>
@@ -93,7 +86,6 @@ function AgentBlock({
 }
 
 export function ClassicAgentFooter({ report }: Props) {
-  const { agency } = report;
   const agents = resolveFooterAgents(report);
   const hasQr = Boolean(report.assets.qr_code_url);
 
@@ -118,8 +110,6 @@ export function ClassicAgentFooter({ report }: Props) {
               <AgentBlock
                 key={agent.name || agent.email || agent.phone}
                 agent={agent}
-                fallbackPhone={agency.phone}
-                fallbackEmail={agency.email}
                 compact={multiAgent}
               />
             ))}

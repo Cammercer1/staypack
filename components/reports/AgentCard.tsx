@@ -30,8 +30,8 @@ export function AgentCard({
         <div>
           <p className="font-semibold">{agent.name || "Agent"}</p>
           <p className="text-sm text-muted-foreground">{agent.role_title}</p>
-          <p className="text-sm">{agent.phone || agency.phone}</p>
-          <p className="text-sm">{agent.email || agency.email}</p>
+          <p className="text-sm">{agent.phone || "—"}</p>
+          <p className="text-sm">{agent.email || "—"}</p>
         </div>
       </div>
       {cta ? <p className="max-w-sm text-sm">{cta}</p> : null}

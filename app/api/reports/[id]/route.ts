@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireReportAccess } from "@/lib/auth/requireUser";
 import { geocodeReportAddress, hasGeocodableAddress } from "@/lib/geocoding";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
-import { loadReportAgentProfile } from "@/lib/reports/loadReportAgent";
+import { loadAgencyAgentProfiles, loadReportAgentProfile } from "@/lib/reports/loadReportAgent";
 import { normalizeAiCopy } from "@/lib/reports/normalizeAiCopy";
 import { enforceTemplateCopyLimits } from "@/lib/reports/enforceTemplateCopyLimits";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
@@ -46,9 +46,11 @@ async function rebuildFinalReportJson({
   }
 
   const agentProfile = await loadReportAgentProfile(supabase, report);
+  const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
   body.final_report_json = buildFinalReportJson({
     agency,
     agentProfile,
+    agencyAgents,
     report: {
       ...report,
       ...(body as Partial<Report>),

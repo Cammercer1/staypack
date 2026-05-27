@@ -54,6 +54,10 @@ function extractAmounts(text: string): number[] {
   return [...new Set(amounts)];
 }
 
+export function extractPropertyPriceAmounts(text: string): number[] {
+  return extractAmounts(text);
+}
+
 function extractSingleQualifier(text: string): string | null {
   const stripped = text.replace(PRICE_LABEL_PREFIX, "").trim();
   const match = stripped.match(SINGLE_QUALIFIER);

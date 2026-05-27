@@ -1,5 +1,6 @@
 import { MAX_LISTING_AGENTS } from "@/lib/reports/constants";
 import { sanitizeAgentPhone } from "@/lib/agents/agentContact";
+import { enrichScrapedAgentsWithProfiles } from "@/lib/agents/enrichScrapedAgents";
 import type { AgentProfile, ParsedListing } from "@/lib/types";
 
 export type ReportAgent = {
@@ -48,11 +49,17 @@ function normalizeProfileAgent(agent: AgentProfile): ReportAgent {
 export function resolveReportAgents({
   scraped,
   agentProfile,
+  agencyAgents,
 }: {
   scraped?: ParsedListing | null;
   agentProfile?: AgentProfile | null;
+  agencyAgents?: AgentProfile[];
 }): ReportAgent[] {
-  const fromScrape = (scraped?.agents ?? [])
+  const scrapedAgents = agencyAgents?.length
+    ? enrichScrapedAgentsWithProfiles(scraped?.agents, agencyAgents)
+    : (scraped?.agents ?? []);
+
+  const fromScrape = scrapedAgents
     .map(normalizeScrapedAgent)
     .filter((agent): agent is ReportAgent => agent != null);
 

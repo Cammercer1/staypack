@@ -12,7 +12,8 @@ import { GeneratedCopyEditor } from "@/components/reports/GeneratedCopyEditor";
 import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
-import type { Agency, FinalReportJson, Report } from "@/lib/types";
+import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
+import type { Agency, AgentProfile, FinalReportJson, Report } from "@/lib/types";
 
 const steps = [
   { id: "review", label: "Review listing" },
@@ -36,6 +37,16 @@ export function ReportWizard({
   const [publishStage, setPublishStage] = useState<
     "idle" | "publishing" | "generating-pdf"
   >("idle");
+  const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
+
+  useEffect(() => {
+    fetch("/api/agents")
+      .then((response) => response.json())
+      .then((payload) => setAgencyAgents(payload.agents ?? []))
+      .catch(() => {
+        // Non-blocking — agent enrichment falls back to scraped listing data.
+      });
+  }, []);
 
   useEffect(() => {
     setBrandAgency(agency);
@@ -70,8 +81,12 @@ export function ReportWizard({
       return null;
     }
 
-    return mergeAgencyBrandIntoFinalReport(brandAgency, cached);
-  }, [brandAgency, report.final_report_json]);
+    return enrichFinalReportMetrics(
+      report,
+      mergeAgencyBrandIntoFinalReport(brandAgency, cached),
+      { agencyAgents },
+    );
+  }, [brandAgency, report, agencyAgents]);
 
   async function publishReport() {
     setLoading(true);
@@ -143,6 +158,7 @@ export function ReportWizard({
         <TabsContent value="copy">
           <GeneratedCopyEditor
             agency={agency}
+            agencyAgents={agencyAgents}
             report={report}
             onComplete={(nextReport) => {
               setReport(nextReport);
@@ -166,7 +182,11 @@ export function ReportWizard({
             }
           >
             {finalReport ? (
-              <FittedReportPreview report={finalReport} maxHeight="min(80vh, 900px)" />
+              <FittedReportPreview
+                report={finalReport}
+                maxHeight="min(80vh, 900px)"
+                fitToWidth
+              />
             ) : (
               <p className="text-sm text-muted-foreground">
                 Generate copy first to preview the report.

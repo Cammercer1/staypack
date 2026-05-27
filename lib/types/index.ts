@@ -155,6 +155,7 @@ export type FinalReportJson = {
     listing_url: string;
     hero_image_url: string;
     selected_image_urls: string[];
+    display_price?: string | null;
   };
   str: {
     annual_revenue: number | null;
@@ -165,6 +166,15 @@ export type FinalReportJson = {
     booked_nights: number | null;
     radius_m: number | null;
   };
+  str_yield?: {
+    display_price: string;
+    price_min: number;
+    price_max: number;
+    price_midpoint: number;
+    yield_min_percent: number;
+    yield_max_percent: number;
+    yield_midpoint_percent: number;
+  } | null;
   ltr: {
     weekly_min: number | null;
     weekly_max: number | null;
