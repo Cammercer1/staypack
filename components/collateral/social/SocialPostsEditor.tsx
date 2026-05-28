@@ -227,15 +227,25 @@ export function SocialPostsEditor({ listing, agency, collateral: initialCollater
         throw new Error(payload.error ?? "Unable to export PNG");
       }
 
-      setCollateral(payload.collateral as CollateralItem);
+      const updatedCollateral = payload.collateral;
+      if (!updatedCollateral) {
+        throw new Error("Export succeeded but collateral was not returned");
+      }
+
+      const pngUrl = payload.png_url;
+      if (!pngUrl) {
+        throw new Error("Export succeeded but PNG URL was not returned");
+      }
+
+      setCollateral(updatedCollateral);
       setDocument(
         ensureSocialPostsDocument(
-          payload.collateral.document_json as SocialPostsDocumentJson,
+          updatedCollateral.document_json as SocialPostsDocumentJson,
         ),
       );
 
       const link = window.document.createElement("a");
-      link.href = payload.png_url;
+      link.href = pngUrl;
       link.download = `${listing.property_address ?? "property"}-${variant}.png`;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
