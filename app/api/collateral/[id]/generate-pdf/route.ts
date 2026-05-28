@@ -3,7 +3,7 @@ import { requireCollateralAccess } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildCollateralPreviewPrintUrl } from "@/lib/collateral/printAccessToken";
 import { getCollateralTemplate } from "@/lib/collateral/templates/registry";
-import { renderPdfFromUrl, buildPdfImagePath } from "@/lib/browserless/pdf";
+import { renderPdfFromUrl, buildPdfImagePath, buildPdfStylesheetPath } from "@/lib/browserless/pdf";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
 import { getSiteUrl } from "@/lib/env";
 import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
@@ -36,6 +36,27 @@ export async function POST(
           collateral.id,
           sourceUrl,
           contentType,
+        );
+
+        const { error } = await admin.storage
+          .from("report-assets")
+          .upload(path, buffer, {
+            contentType,
+            upsert: true,
+          });
+
+        if (error) {
+          return null;
+        }
+
+        return admin.storage.from("report-assets").getPublicUrl(path).data
+          .publicUrl;
+      },
+      mirrorStylesheet: async (sourceUrl, buffer, contentType) => {
+        const path = buildPdfStylesheetPath(
+          agency.id,
+          collateral.id,
+          sourceUrl,
         );
 
         const { error } = await admin.storage

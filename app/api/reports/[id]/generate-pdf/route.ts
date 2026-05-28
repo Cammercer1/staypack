@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireReportAccess } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getReportsUrl, getSiteUrl } from "@/lib/env";
-import { renderPdfFromUrl, buildPdfImagePath } from "@/lib/browserless/pdf";
+import { renderPdfFromUrl, buildPdfImagePath, buildPdfStylesheetPath } from "@/lib/browserless/pdf";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
 import { buildPreviewPrintUrl } from "@/lib/reports/printAccessToken";
 
@@ -49,6 +49,23 @@ export async function POST(
           sourceUrl,
           contentType,
         );
+
+        const { error } = await admin.storage
+          .from("report-assets")
+          .upload(path, buffer, {
+            contentType,
+            upsert: true,
+          });
+
+        if (error) {
+          return null;
+        }
+
+        return admin.storage.from("report-assets").getPublicUrl(path).data
+          .publicUrl;
+      },
+      mirrorStylesheet: async (sourceUrl, buffer, contentType) => {
+        const path = buildPdfStylesheetPath(agency.id, report.id, sourceUrl);
 
         const { error } = await admin.storage
           .from("report-assets")

@@ -15,11 +15,15 @@ const BROWSER_USER_AGENT =
 
 const DEFAULT_PDF_OPTIONS = getPdfOptionsForFormat(getReportPageFormat("portrait"));
 
-export type PrintHtmlImageMirror = (
+export type PrintHtmlAssetMirror = (
   sourceUrl: string,
   buffer: Buffer,
   contentType: string,
 ) => Promise<string | null>;
+
+export type PrintHtmlImageMirror = PrintHtmlAssetMirror;
+
+export type PrintHtmlStylesheetMirror = PrintHtmlAssetMirror;
 
 function decodeHtmlEntities(value: string) {
   return value
@@ -28,20 +32,6 @@ function decodeHtmlEntities(value: string) {
     .replace(/&#39;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
-}
-
-function isPublicPrintUrl(url: string) {
-  try {
-    const { hostname, protocol } = new URL(url);
-    return (
-      protocol === "https:" &&
-      hostname !== "localhost" &&
-      hostname !== "127.0.0.1" &&
-      hostname !== "[::1]"
-    );
-  } catch {
-    return false;
-  }
 }
 
 function resolveAssetUrl(href: string, origin: string) {
@@ -64,18 +54,6 @@ function replaceImageSrc(html: string, source: string, replacement: string) {
     .join(`src="${replacement}"`)
     .split(`src='${source}'`)
     .join(`src='${replacement}'`);
-}
-
-async function fetchStylesheetContent(href: string, origin: string) {
-  const stylesheetUrl = resolveAssetUrl(href, origin);
-  const response = await fetch(stylesheetUrl, { cache: "no-store" });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const css = await response.text();
-  return absolutizeCssUrls(css, origin);
 }
 
 async function fetchImageBuffer(src: string) {
@@ -162,46 +140,118 @@ async function mirrorImages(
   };
 }
 
-async function inlineRemoteStylesheets(html: string, pageUrl: string) {
+const MAX_INLINE_STYLESHEET_BYTES = 8_000;
+
+function extractPrintRootHtml(html: string) {
+  const reportRoot = html.match(
+    /<div class="report-print-root[\s\S]*?(?=<\/body>)/,
+  )?.[0];
+  if (reportRoot) {
+    return reportRoot;
+  }
+
+  const collateralRoot = html.match(
+    /<div class="collateral-print-root[\s\S]*?(?=<\/body>)/,
+  )?.[0];
+  if (collateralRoot) {
+    return collateralRoot;
+  }
+
+  const dataRoot = html.match(
+    /<div[^>]+data-report-root[\s\S]*?(?=<\/body>)/,
+  )?.[0];
+  if (dataRoot) {
+    return dataRoot;
+  }
+
+  return null;
+}
+
+async function preparePrintStyles(
+  html: string,
+  pageUrl: string,
+  mirrorStylesheet?: PrintHtmlStylesheetMirror,
+) {
   const origin = new URL(pageUrl).origin;
   const stylesheetPattern =
     /<link[^>]+rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*>/gi;
   const hrefs = [...html.matchAll(stylesheetPattern)].map((match) => match[1]);
   const inlineStyles: string[] = [];
+  const linkedStyles: string[] = [];
+  let linkedStylesheetCount = 0;
+  let inlinedStylesheetCount = 0;
 
   for (const href of hrefs) {
-    const css = await fetchStylesheetContent(href, origin);
-    if (css) {
-      inlineStyles.push(css);
+    const stylesheetUrl = resolveAssetUrl(decodeHtmlEntities(href), origin);
+    const response = await fetch(stylesheetUrl, { cache: "no-store" });
+
+    if (!response.ok) {
+      continue;
+    }
+
+    const cssBuffer = Buffer.from(await response.arrayBuffer());
+    const cssText = cssBuffer.toString("utf8");
+
+    if (stylesheetUrl.includes("fonts.googleapis.com")) {
+      inlineStyles.push(cssText);
+      inlinedStylesheetCount += 1;
+      continue;
+    }
+
+    if (mirrorStylesheet) {
+      const publicUrl = await mirrorStylesheet(
+        stylesheetUrl,
+        cssBuffer,
+        "text/css",
+      );
+
+      if (publicUrl) {
+        linkedStyles.push(publicUrl);
+        linkedStylesheetCount += 1;
+        continue;
+      }
+    }
+
+    if (cssText.length <= MAX_INLINE_STYLESHEET_BYTES) {
+      inlineStyles.push(absolutizeCssUrls(cssText, origin));
+      inlinedStylesheetCount += 1;
     }
   }
 
-  let preparedHtml = html.replace(stylesheetPattern, "");
-  preparedHtml = preparedHtml.replace(
-    /<script\b[^>]*>[\s\S]*?<\/script>/gi,
-    "",
-  );
-  preparedHtml = preparedHtml.replace(
-    /<section[^>]*data-sonner-toaster[^>]*>[\s\S]*?<\/section>/gi,
-    "",
-  );
-
-  const styleBlock = `<style>${inlineStyles.join("\n")}</style>`;
-  preparedHtml = preparedHtml.includes("</head>")
-    ? preparedHtml.replace("</head>", `${styleBlock}</head>`)
-    : `${styleBlock}${preparedHtml}`;
+  const embeddedStyles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)]
+    .map((match) => match[1])
+    .join("\n");
 
   return {
-    html: preparedHtml,
+    inlineStyles: [embeddedStyles, ...inlineStyles].filter(Boolean).join("\n"),
+    linkedStyles,
     stylesheetCount: hrefs.length,
-    inlinedStylesheetCount: inlineStyles.length,
+    linkedStylesheetCount,
+    inlinedStylesheetCount,
     inlinedCssBytes: inlineStyles.join("\n").length,
   };
 }
 
+function buildPrintDocument(
+  bodyHtml: string,
+  styles: Awaited<ReturnType<typeof preparePrintStyles>>,
+) {
+  const headLinks = styles.linkedStyles
+    .map((href) => `<link rel="stylesheet" href="${href}">`)
+    .join("");
+  const headStyles = styles.inlineStyles
+    ? `<style>${styles.inlineStyles}</style>`
+    : "";
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">${headLinks}${headStyles}</head><body>${bodyHtml}</body></html>`;
+}
+
 async function preparePrintHtml(
   url: string,
-  mirrorImage?: PrintHtmlImageMirror,
+  options?: {
+    mirrorImage?: PrintHtmlImageMirror;
+    mirrorStylesheet?: PrintHtmlStylesheetMirror;
+  },
 ) {
   const response = await fetch(url, { cache: "no-store" });
 
@@ -210,14 +260,25 @@ async function preparePrintHtml(
   }
 
   const html = await response.text();
-  const withStyles = await inlineRemoteStylesheets(html, url);
-  const withImages = await mirrorImages(withStyles.html, mirrorImage);
+  const printRootHtml = extractPrintRootHtml(html);
+
+  if (!printRootHtml) {
+    throw new Error("Could not find printable report content on the print page");
+  }
+
+  const styles = await preparePrintStyles(
+    html,
+    url,
+    options?.mirrorStylesheet,
+  );
+  const withImages = await mirrorImages(printRootHtml, options?.mirrorImage);
 
   return {
-    html: withImages.html,
-    stylesheetCount: withStyles.stylesheetCount,
-    inlinedStylesheetCount: withStyles.inlinedStylesheetCount,
-    inlinedCssBytes: withStyles.inlinedCssBytes,
+    html: buildPrintDocument(withImages.html, styles),
+    stylesheetCount: styles.stylesheetCount,
+    linkedStylesheetCount: styles.linkedStylesheetCount,
+    inlinedStylesheetCount: styles.inlinedStylesheetCount,
+    inlinedCssBytes: styles.inlinedCssBytes,
     imageCount: withImages.imageCount,
     mirroredImageCount: withImages.mirroredCount,
     failedImageCount: withImages.failedCount,
@@ -239,6 +300,16 @@ export function buildPdfImagePath(
   const hash = createHash("sha256").update(sourceUrl).digest("hex").slice(0, 16);
 
   return `${agencyId}/${reportId}/pdf-images/${hash}.${ext}`;
+}
+
+export function buildPdfStylesheetPath(
+  agencyId: string,
+  assetScopeId: string,
+  sourceUrl: string,
+) {
+  const hash = createHash("sha256").update(sourceUrl).digest("hex").slice(0, 16);
+
+  return `${agencyId}/${assetScopeId}/pdf-assets/${hash}.css`;
 }
 
 type BrowserlessPdfOptions = {
@@ -265,7 +336,7 @@ function buildBrowserlessPdfBody(
     options: pdfOptions,
     emulateMediaType: "print",
     gotoOptions: {
-      waitUntil: "networkidle0" as const,
+      waitUntil: "load" as const,
       timeout: 60000,
     },
   };
@@ -281,6 +352,7 @@ export async function renderPdfFromUrl(
   url: string,
   options?: {
     mirrorImage?: PrintHtmlImageMirror;
+    mirrorStylesheet?: PrintHtmlStylesheetMirror;
     pageFormatId?: string;
   },
 ) {
@@ -288,16 +360,17 @@ export async function renderPdfFromUrl(
     ? getPdfOptionsForCollateralFormat(getCollateralPageFormat(options.pageFormatId))
     : DEFAULT_PDF_OPTIONS;
 
-  const usePublicUrl = isPublicPrintUrl(url);
-  const prepared = usePublicUrl ? null : await preparePrintHtml(url, options?.mirrorImage);
+  const prepared = await preparePrintHtml(url, {
+    mirrorImage: options?.mirrorImage,
+    mirrorStylesheet: options?.mirrorStylesheet,
+  });
 
-  const body = buildBrowserlessPdfBody(
-    prepared?.html ?? null,
-    usePublicUrl ? url : null,
-    pdfOptions,
-  );
+  const body = buildBrowserlessPdfBody(prepared.html, null, pdfOptions);
 
-  const pdf = await browserlessRequest("/pdf", body, { responseType: "buffer" });
+  const pdf = await browserlessRequest("/pdf", body, {
+    responseType: "buffer",
+    errorContext: "pdf",
+  });
 
   if (!pdf) {
     if (isDevelopment()) {

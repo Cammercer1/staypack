@@ -53,6 +53,7 @@ export async function browserlessRequest(
   options?: {
     responseType?: "text" | "buffer" | "json";
     query?: Record<string, string | number>;
+    errorContext?: "scrape" | "pdf";
   },
 ) {
   const apiKey = getBrowserlessApiKey();
@@ -79,7 +80,8 @@ export async function browserlessRequest(
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(formatBrowserlessError(response.status, detail));
+
+    throw new Error(formatBrowserlessError(response.status, detail, options?.errorContext));
   }
 
   if (options?.responseType === "buffer") {
@@ -128,13 +130,24 @@ export async function fetchSmartScrapeHtml(url: string): Promise<string | null> 
   return payload.content;
 }
 
-function formatBrowserlessError(status: number, detail: string) {
+function formatBrowserlessError(
+  status: number,
+  detail: string,
+  context: "scrape" | "pdf" = "scrape",
+) {
   const trimmedDetail = detail.trim().slice(0, 240);
+  const label =
+    context === "pdf" ? "PDF generation failed" : "Listing import failed";
 
   if (status === 401) {
+    const authLabel =
+      context === "pdf"
+        ? "PDF generation authentication failed."
+        : "Listing import authentication failed.";
+
     return [
-      "Listing import authentication failed.",
-      "Check your import service settings and try again.",
+      authLabel,
+      "Check your Browserless settings and try again.",
       trimmedDetail ? `Response: ${trimmedDetail}` : "",
     ]
       .filter(Boolean)
@@ -142,6 +155,6 @@ function formatBrowserlessError(status: number, detail: string) {
   }
 
   return trimmedDetail
-    ? `Listing import failed (${status}): ${trimmedDetail}`
-    : `Listing import failed (${status})`;
+    ? `${label} (${status}): ${trimmedDetail}`
+    : `${label} (${status})`;
 }
