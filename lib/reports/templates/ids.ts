@@ -5,9 +5,44 @@ export const DEFAULT_REPORT_TEMPLATE_ID = CLASSIC_LIGHT_TEMPLATE_ID;
 /** @deprecated Use classic-light */
 export const LEGACY_CLASSIC_TEMPLATE_ID = "classic";
 
+export const BOLD_LIGHT_TEMPLATE_ID = "bold-light";
+export const BOLD_DETAILED_TEMPLATE_ID = "bold-detailed";
+
+export const GALLERY_LIGHT_TEMPLATE_ID = "gallery-light";
+export const GALLERY_DETAILED_TEMPLATE_ID = "gallery-detailed";
+
+export const EDITORIAL_LIGHT_TEMPLATE_ID = "editorial-light";
+export const EDITORIAL_DETAILED_TEMPLATE_ID = "editorial-detailed";
+
+export const SPLIT_LIGHT_TEMPLATE_ID = "split-light";
+export const SPLIT_DETAILED_TEMPLATE_ID = "split-detailed";
+
+export const REFINED_LIGHT_TEMPLATE_ID = "refined-light";
+export const REFINED_DETAILED_TEMPLATE_ID = "refined-detailed";
+
+export const MINIMALIST_LIGHT_TEMPLATE_ID = "minimalist-light";
+export const MINIMALIST_DETAILED_TEMPLATE_ID = "minimalist-detailed";
+
+export const LANDMARK_LIGHT_TEMPLATE_ID = "landmark-light";
+export const LANDMARK_DETAILED_TEMPLATE_ID = "landmark-detailed";
+
 export const REPORT_TEMPLATE_IDS = [
   CLASSIC_LIGHT_TEMPLATE_ID,
   CLASSIC_DETAILED_TEMPLATE_ID,
+  BOLD_LIGHT_TEMPLATE_ID,
+  BOLD_DETAILED_TEMPLATE_ID,
+  GALLERY_LIGHT_TEMPLATE_ID,
+  GALLERY_DETAILED_TEMPLATE_ID,
+  EDITORIAL_LIGHT_TEMPLATE_ID,
+  EDITORIAL_DETAILED_TEMPLATE_ID,
+  SPLIT_LIGHT_TEMPLATE_ID,
+  SPLIT_DETAILED_TEMPLATE_ID,
+  REFINED_LIGHT_TEMPLATE_ID,
+  REFINED_DETAILED_TEMPLATE_ID,
+  MINIMALIST_LIGHT_TEMPLATE_ID,
+  MINIMALIST_DETAILED_TEMPLATE_ID,
+  LANDMARK_LIGHT_TEMPLATE_ID,
+  LANDMARK_DETAILED_TEMPLATE_ID,
 ] as const;
 
 export type ReportTemplateId = (typeof REPORT_TEMPLATE_IDS)[number];
