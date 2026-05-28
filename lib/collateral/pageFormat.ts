@@ -1,9 +1,14 @@
+import type { SocialPostVariantId } from "@/lib/collateral/social/formats";
+import { getSocialPostFormat } from "@/lib/collateral/social/formats";
+
 export type CollateralPageFormat = {
   id: string;
   width: string;
   height: string;
   widthMm: number;
   heightMm: number;
+  widthPx?: number;
+  heightPx?: number;
   pdfLandscape: boolean;
   pdfFormat?: string;
 };
@@ -52,6 +57,21 @@ export function getCollateralPageFormatStyle(format: CollateralPageFormat) {
   return {
     ["--collateral-page-width" as string]: format.width,
     ["--collateral-page-height" as string]: format.height,
+  };
+}
+
+export function getSocialPostPageFormat(variantId: SocialPostVariantId): CollateralPageFormat {
+  const spec = getSocialPostFormat(variantId);
+
+  return {
+    id: `social-${variantId}`,
+    width: `${spec.widthPx}px`,
+    height: `${spec.heightPx}px`,
+    widthMm: spec.widthPx,
+    heightMm: spec.heightPx,
+    widthPx: spec.widthPx,
+    heightPx: spec.heightPx,
+    pdfLandscape: spec.widthPx > spec.heightPx,
   };
 }
 

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildBusinessCardDocument } from "@/lib/collateral/buildBusinessCardDocument";
+import { buildSocialPostsDocument } from "@/lib/collateral/buildSocialPostsDocument";
 import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
 import { ensureListingLandingProvisioned } from "@/lib/listings/provisionLandingPage";
 import {
@@ -32,6 +33,16 @@ export async function generateCollateralDocument({
   agentProfile,
   agencyAgents,
 }: GenerateInput): Promise<CollateralDocumentJson> {
+  if (collateral.type === "social_posts") {
+    return buildSocialPostsDocument({
+      agency,
+      listing,
+      collateral,
+      agentProfile,
+      agencyAgents,
+    });
+  }
+
   const provisionedListing = await ensureListingLandingProvisioned(
     listing,
     agency,

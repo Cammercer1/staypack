@@ -32,7 +32,6 @@ export const COLLATERAL_TYPE_META: Record<
   social_posts: {
     label: "Social posts",
     description: "Ready-to-share graphics for Instagram, Facebook and LinkedIn.",
-    comingSoon: true,
   },
   investor_snapshot: {
     label: "Investor snapshot",

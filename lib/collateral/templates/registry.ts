@@ -1,4 +1,5 @@
 import { BUSINESS_CARD_TEMPLATES } from "@/lib/collateral/templates/business-card/registry";
+import { SOCIAL_POST_TEMPLATES } from "@/lib/collateral/templates/social/registry";
 import {
   DEFAULT_COLLATERAL_TEMPLATE_IDS,
   isValidCollateralTemplateId,
@@ -8,6 +9,7 @@ import type { CollateralType } from "@/lib/types";
 
 export const COLLATERAL_TEMPLATES: CollateralTemplateDefinition[] = [
   ...BUSINESS_CARD_TEMPLATES,
+  ...SOCIAL_POST_TEMPLATES,
 ];
 
 export function getCollateralTemplate(id: string): CollateralTemplateDefinition {

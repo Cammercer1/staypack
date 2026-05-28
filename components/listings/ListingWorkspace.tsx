@@ -513,6 +513,13 @@ function CollateralTab({
                 </p>
               ) : null}
 
+              {type === "social_posts" && item?.document_json ? (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Branded graphics for Instagram, Facebook and LinkedIn with your
+                  logo and property address.
+                </p>
+              ) : null}
+
               {strReport?.final_estimate_json?.annualRevenue != null ? (
                 <p className="mt-4 text-sm text-muted-foreground">
                   Estimated annual STR revenue:{" "}
@@ -548,14 +555,23 @@ function CollateralTab({
                       photoRequirement={photoRequirement}
                     />
                   )
-                ) : type === "agent_business_card" ? (
-                  <CollateralItemActions
-                    listingId={listing.id}
-                    type={type}
-                    item={item ?? null}
-                    photoRequirement={photoRequirement}
-                    onRefresh={onRefresh}
-                  />
+                ) : type === "agent_business_card" || type === "social_posts" ? (
+                  <>
+                    <CollateralItemActions
+                      listingId={listing.id}
+                      type={type}
+                      item={item ?? null}
+                      photoRequirement={photoRequirement}
+                      onRefresh={onRefresh}
+                    />
+                    {type === "social_posts" && item ? (
+                      <Link href={`/listings/${listing.id}/social`}>
+                        <Button size="sm" variant="outline">
+                          {item.document_json ? "Edit social posts" : "Open editor"}
+                        </Button>
+                      </Link>
+                    ) : null}
+                  </>
                 ) : item ? (
                   <Badge variant="outline">Draft saved</Badge>
                 ) : (

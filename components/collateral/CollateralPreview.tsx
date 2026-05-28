@@ -4,7 +4,13 @@ import { BrandFontLoader } from "@/components/settings/BrandFontLoader";
 import {
   getCollateralPageFormat,
   getCollateralPageFormatStyle,
+  getSocialPostPageFormat,
 } from "@/lib/collateral/pageFormat";
+import {
+  getDefaultSocialPostVariantId,
+  normalizeSocialPostVariantId,
+} from "@/lib/collateral/social/formats";
+import { isSocialPostsDocument } from "@/lib/collateral/templates/types";
 import { getCollateralTemplate } from "@/lib/collateral/templates/registry";
 import { resolveTemplateIdFromDocument } from "@/lib/collateral/templates/resolveTemplateId";
 import {
@@ -22,15 +28,27 @@ export function CollateralPreview({
   document,
   collateralType,
   printMode = false,
+  variantId,
 }: {
   document: CollateralDocumentJson;
   collateralType: CollateralType;
   printMode?: boolean;
+  variantId?: string;
 }) {
   const templateId = resolveTemplateIdFromDocument(document, collateralType);
   const template = getCollateralTemplate(templateId);
   const Template = template.Component;
-  const pageFormat = getCollateralPageFormat(template.pageFormat);
+
+  const socialVariantId = isSocialPostsDocument(document)
+    ? variantId
+      ? normalizeSocialPostVariantId(variantId)
+      : normalizeSocialPostVariantId(document.active_variant_id)
+    : null;
+
+  const pageFormat =
+    socialVariantId != null
+      ? getSocialPostPageFormat(socialVariantId)
+      : getCollateralPageFormat(template.pageFormat);
   const agency = document.agency;
 
   const headingFontId = agency.heading_font_family || agency.font_family || "fraunces";
@@ -96,7 +114,14 @@ export function CollateralPreview({
           `,
         }}
       />
-      <Template document={document} />
+      <Template
+        document={document}
+        {...(socialVariantId
+          ? { variantId: socialVariantId }
+          : collateralType === "social_posts"
+            ? { variantId: getDefaultSocialPostVariantId() }
+            : {})}
+      />
     </div>
   );
 }

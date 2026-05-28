@@ -3,6 +3,7 @@ import { requireCollateralAccess } from "@/lib/auth/requireUser";
 import { generateCollateralDocument } from "@/lib/collateral/generateCollateralDocument";
 import { collateralPhotoRequirementError } from "@/lib/listings/collateralPhotoRequirements";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
+import { isBusinessCardDocument } from "@/lib/collateral/templates/types";
 
 export async function POST(
   _request: Request,
@@ -53,7 +54,9 @@ export async function POST(
       .update({
         document_json: documentJson,
         template_id: templateId,
-        qr_code_url: documentJson.assets.qr_code_url,
+        qr_code_url: isBusinessCardDocument(documentJson)
+          ? documentJson.assets.qr_code_url
+          : null,
         status: "generated",
         generated_at: generatedAt,
       })

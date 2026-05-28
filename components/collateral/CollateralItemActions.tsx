@@ -31,7 +31,7 @@ export function CollateralItemActions({
   const activeItem = localItem ?? item;
   const meta = COLLATERAL_TYPE_META[type];
   const hasDocument = Boolean(activeItem?.document_json);
-  const canGeneratePdf = hasDocument;
+  const canGeneratePdf = hasDocument && type !== "social_posts";
   const canCreateOrGenerate = photoRequirement.met;
 
   async function createDraft() {

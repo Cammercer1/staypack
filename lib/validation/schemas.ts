@@ -285,6 +285,159 @@ export const createCollateralSchema = z.object({
   type: collateralTypeSchema,
 });
 
+const socialPostVariantIdSchema = z.enum(["square", "wide", "story"]);
+
+const socialPostCornerSchema = z.enum([
+  "top_left",
+  "top_right",
+  "bottom_left",
+  "bottom_right",
+]);
+
+const socialPostCopyPlacementSchema = z.enum([
+  "bottom_left",
+  "bottom_center",
+  "bottom_right",
+]);
+
+const socialPostTextAlignSchema = z.enum(["left", "center", "right"]);
+
+const socialPostTextLayerSchema = z.object({
+  enabled: z.boolean(),
+  text: z.string().max(500),
+  scale: z.number().min(0.6).max(2.5).optional(),
+  box_width_scale: z.number().min(0.5).max(1).optional(),
+  zone_inset_top: z.number().min(0).max(1).optional(),
+  zone_inset_bottom: z.number().min(0).max(1).optional(),
+  line_gap_scale: z.number().min(0).max(3).optional(),
+  box_height_scale: z.number().min(0.5).max(3).optional(),
+  align: socialPostTextAlignSchema.optional(),
+  block_placement: socialPostCornerSchema.optional(),
+  x: z.number().min(0).max(100).optional(),
+  y: z.number().min(0).max(100).optional(),
+});
+
+const socialPostLogoColourSchema = z.enum([
+  "original",
+  "white",
+  "black",
+  "primary",
+]);
+
+const socialPostLogoLayerSchema = z.object({
+  enabled: z.boolean(),
+  placement: socialPostCornerSchema.optional(),
+  scale: z.number().min(0.5).max(2).optional(),
+  colour: socialPostLogoColourSchema.optional(),
+  x: z.number().min(0).max(100).optional(),
+  y: z.number().min(0).max(100).optional(),
+});
+
+const socialPostAgentLayoutSchema = z.enum(["vertical", "horizontal"]);
+const socialPostAvatarShapeSchema = z.enum(["circle", "square"]);
+
+const socialPostAgentBackgroundStyleSchema = z.enum([
+  "none",
+  "glass",
+  "brand",
+  "custom",
+]);
+
+const socialPostAgentBrandColourSchema = z.enum([
+  "primary",
+  "secondary",
+  "accent",
+]);
+
+const socialPostFeaturesLayerSchema = z.object({
+  enabled: z.boolean(),
+  show_bedrooms: z.boolean().optional(),
+  show_bathrooms: z.boolean().optional(),
+  show_car_spaces: z.boolean().optional(),
+  show_land_area: z.boolean().optional(),
+  scale: z.number().min(0.6).max(2.5).optional(),
+});
+
+const socialPostListingSliceSchema = z.object({
+  bedrooms: z.coerce.number().nullable().optional(),
+  bathrooms: z.coerce.number().nullable().optional(),
+  car_spaces: z.coerce.number().nullable().optional(),
+  land_area_sqm: z.coerce.number().nullable().optional(),
+});
+
+const socialPostAgentLayerSchema = z.object({
+  enabled: z.boolean(),
+  placement: socialPostCopyPlacementSchema.optional(),
+  scale: z.number().min(0.1).max(2).optional(),
+  x: z.number().min(0).max(100).optional(),
+  y: z.number().min(0).max(100).optional(),
+  layout: socialPostAgentLayoutSchema.optional(),
+  avatar_shape: socialPostAvatarShapeSchema.optional(),
+  background_style: socialPostAgentBackgroundStyleSchema.optional(),
+  background_colour: z.string().max(32).optional(),
+  text_colour: z.string().max(32).optional(),
+  brand_colour: socialPostAgentBrandColourSchema.optional(),
+  inner_gap_scale: z.number().min(0).max(2).optional(),
+  vertical_align: socialPostTextAlignSchema.optional(),
+});
+
+const socialPostLayersSchema = z.object({
+  logo: socialPostLogoLayerSchema,
+  title: socialPostTextLayerSchema,
+  subcopy: socialPostTextLayerSchema,
+  features: socialPostFeaturesLayerSchema,
+  agent: socialPostAgentLayerSchema,
+});
+
+const socialPostBackgroundLayoutSchema = z.enum([
+  "single",
+  "split_vertical",
+  "split_horizontal",
+  "grid_2x2",
+  "row_3",
+  "col_3",
+]);
+
+const socialPostVariantStateSchema = z.object({
+  background_image_url: z.string().min(0),
+  background_layout: socialPostBackgroundLayoutSchema.optional(),
+  background_image_urls: z.array(z.string().min(0)).max(4).optional(),
+  layers: socialPostLayersSchema.optional(),
+  layout_customized: z.boolean().optional(),
+});
+
+const socialPostAgentSliceSchema = z.object({
+  name: z.string().max(200).optional(),
+  role_title: z.string().max(200).optional(),
+  phone: z.string().max(80).optional(),
+  email: z.string().max(200).optional(),
+  photo_url: z.string().max(2000).optional(),
+});
+
+export const updateSocialPostsDocumentSchema = z.object({
+  active_variant_id: socialPostVariantIdSchema.optional(),
+  agent: socialPostAgentSliceSchema.optional(),
+  listing: socialPostListingSliceSchema.optional(),
+  layers: z
+    .object({
+      logo: socialPostLogoLayerSchema.optional(),
+      title: socialPostTextLayerSchema.optional(),
+      subcopy: socialPostTextLayerSchema.optional(),
+      features: socialPostFeaturesLayerSchema.optional(),
+      agent: socialPostAgentLayerSchema.optional(),
+    })
+    .optional(),
+  variants: z
+    .record(socialPostVariantIdSchema, socialPostVariantStateSchema)
+    .optional(),
+});
+
+export const exportSocialPostPngSchema = z.object({
+  variant: socialPostVariantIdSchema,
+  /** PNG bytes from client-side canvas capture (base64). */
+  png_base64: z.string().min(1),
+});
+
 export type ParsedListingInput = z.infer<typeof parsedListingSchema>;
 
 export type AgencyInput = z.infer<typeof agencySchema>;

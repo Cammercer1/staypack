@@ -48,9 +48,15 @@ export function verifyCollateralPrintAccessToken(
 export function buildCollateralPreviewPrintUrl(
   collateralId: string,
   baseUrl: string,
+  options?: { variant?: string },
 ) {
   const token = createCollateralPrintAccessToken(collateralId);
   const origin = baseUrl.replace(/\/$/, "");
+  const params = new URLSearchParams({ token });
 
-  return `${origin}/p/collateral/${collateralId}/print?token=${encodeURIComponent(token)}`;
+  if (options?.variant) {
+    params.set("variant", options.variant);
+  }
+
+  return `${origin}/p/collateral/${collateralId}/print?${params.toString()}`;
 }
