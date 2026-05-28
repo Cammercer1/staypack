@@ -5,6 +5,8 @@ export const STR_REPORT_LABEL = "Short-Term Rental Report";
 export const COLLATERAL_TYPE_ORDER: CollateralType[] = [
   "str_report",
   "sales_brochure",
+  "rental_brochure",
+  "social_posts",
   "investor_snapshot",
   "agent_business_card",
 ];
@@ -20,6 +22,16 @@ export const COLLATERAL_TYPE_META: Record<
   sales_brochure: {
     label: "Sales brochure",
     description: "Print-ready property brochure for open homes.",
+    comingSoon: true,
+  },
+  rental_brochure: {
+    label: "Rental brochure",
+    description: "Branded brochure showcasing the property as a short-term rental.",
+    comingSoon: true,
+  },
+  social_posts: {
+    label: "Social posts",
+    description: "Ready-to-share graphics for Instagram, Facebook and LinkedIn.",
     comingSoon: true,
   },
   investor_snapshot: {

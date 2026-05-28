@@ -129,6 +129,8 @@ const collateralImageChannelSchema = z.enum([
   "landing",
   "str_report",
   "sales_brochure",
+  "rental_brochure",
+  "social_posts",
   "investor_snapshot",
   "agent_business_card",
 ]);
@@ -261,6 +263,8 @@ export const leadStatusSchema = z.enum(["new", "contacted"]);
 export const collateralTypeSchema = z.enum([
   "str_report",
   "sales_brochure",
+  "rental_brochure",
+  "social_posts",
   "investor_snapshot",
   "agent_business_card",
 ]);

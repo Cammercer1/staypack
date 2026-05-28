@@ -9,6 +9,7 @@ import {
   Car,
   Check,
   ExternalLink,
+  BookOpen,
   Eye,
   FileText,
   Globe,
@@ -17,6 +18,7 @@ import {
   Loader2,
   PieChart,
   ScrollText,
+  Share2,
   TrendingUp,
   Users,
   X,
@@ -55,6 +57,8 @@ import type {
 const COLLATERAL_ICONS: Record<CollateralType, typeof FileText> = {
   str_report: FileText,
   sales_brochure: ScrollText,
+  rental_brochure: BookOpen,
+  social_posts: Share2,
   investor_snapshot: PieChart,
   agent_business_card: IdCard,
 };
