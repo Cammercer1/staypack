@@ -114,6 +114,8 @@ export type FinalReportJson = {
   agency: {
     name: string;
     logo_url: string;
+    logo_light_url?: string;
+    logo_dark_url?: string;
     primary_colour: string;
     secondary_colour: string;
     accent_colour: string;
@@ -212,6 +214,8 @@ export type Agency = {
   email: string | null;
   phone: string | null;
   logo_url: string | null;
+  logo_light_url: string | null;
+  logo_dark_url: string | null;
   primary_colour: string;
   secondary_colour: string;
   accent_colour: string;

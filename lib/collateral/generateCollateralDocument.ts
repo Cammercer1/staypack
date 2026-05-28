@@ -1,13 +1,15 @@
-import { createAdminClient } from "@/lib/supabase/admin";
 import { buildBusinessCardDocument } from "@/lib/collateral/buildBusinessCardDocument";
-import { buildSocialPostsDocument } from "@/lib/collateral/buildSocialPostsDocument";
-import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
-import { ensureListingLandingProvisioned } from "@/lib/listings/provisionLandingPage";
 import {
-  buildListingQrTrackingUrl,
-  resolveListingDestinationUrl,
-} from "@/lib/listings/listingUrls";
-import { generateQrCodeBuffer } from "@/lib/reports/qr";
+  buildSalesBrochureDocument,
+  getMockSalesBrochureCopy,
+} from "@/lib/collateral/buildSalesBrochureDocument";
+import { buildSocialPostsDocument } from "@/lib/collateral/buildSocialPostsDocument";
+import { provisionCollateralQr } from "@/lib/collateral/provisionCollateralQr";
+import {
+  isSalesBrochureDocument,
+  type CollateralDocumentJson,
+  type SalesBrochureCopyJson,
+} from "@/lib/collateral/templates/types";
 import type {
   Agency,
   AgentProfile,
@@ -43,40 +45,13 @@ export async function generateCollateralDocument({
     });
   }
 
-  const provisionedListing = await ensureListingLandingProvisioned(
-    listing,
-    agency,
-    supabase,
-  );
-
-  const qrTrackingUrl = buildListingQrTrackingUrl(
-    agency.slug,
-    provisionedListing.public_slug!,
-  );
-  const qrDestinationUrl = resolveListingDestinationUrl(provisionedListing);
-
-  if (!qrDestinationUrl) {
-    throw new Error("Listing landing page is not provisioned");
-  }
-
-  const admin = createAdminClient();
-  const qrBuffer = await generateQrCodeBuffer(qrTrackingUrl);
-  const qrPath = `${agency.id}/${listing.id}/collateral-${collateral.id}-qr.png`;
-
-  const { error: uploadError } = await admin.storage
-    .from("report-assets")
-    .upload(qrPath, qrBuffer, {
-      contentType: "image/png",
-      upsert: true,
+  const { provisionedListing, qrCodeUrl, qrTargetUrl } =
+    await provisionCollateralQr({
+      agency,
+      listing,
+      collateral,
+      supabase,
     });
-
-  if (uploadError) {
-    throw new Error(uploadError.message);
-  }
-
-  const {
-    data: { publicUrl: qrCodeUrl },
-  } = admin.storage.from("report-assets").getPublicUrl(qrPath);
 
   switch (collateral.type) {
     case "agent_business_card":
@@ -87,8 +62,27 @@ export async function generateCollateralDocument({
         agentProfile,
         agencyAgents,
         qrCodeUrl,
-        qrTargetUrl: qrDestinationUrl,
+        qrTargetUrl,
       });
+    case "sales_brochure": {
+      const existingCopy =
+        collateral.document_json && isSalesBrochureDocument(collateral.document_json)
+          ? collateral.document_json.copy
+          : null;
+      const copy: SalesBrochureCopyJson =
+        existingCopy ?? getMockSalesBrochureCopy(provisionedListing, agency);
+
+      return buildSalesBrochureDocument({
+        agency,
+        listing: provisionedListing,
+        collateral,
+        copy,
+        agentProfile,
+        agencyAgents,
+        qrCodeUrl,
+        qrTargetUrl,
+      });
+    }
     default:
       throw new Error(`${collateral.type} generation is not implemented yet`);
   }

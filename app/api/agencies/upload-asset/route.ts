@@ -4,6 +4,8 @@ import { requireAgencyAdmin } from "@/lib/auth/requireUser";
 
 const ALLOWED_TYPES = {
   logo: ["image/png", "image/jpeg", "image/webp", "image/svg+xml"],
+  "logo-light": ["image/png", "image/jpeg", "image/webp", "image/svg+xml"],
+  "logo-dark": ["image/png", "image/jpeg", "image/webp", "image/svg+xml"],
   font: [
     "font/woff",
     "font/woff2",
@@ -50,12 +52,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    if (type !== "logo" && type !== "font" && type !== "heading-font" && type !== "body-font") {
+    const isLogoUpload =
+      type === "logo" || type === "logo-light" || type === "logo-dark";
+
+    if (!isLogoUpload && type !== "font" && type !== "heading-font" && type !== "body-font") {
       return NextResponse.json({ error: "Invalid upload type" }, { status: 400 });
     }
 
     const allowed = ALLOWED_TYPES[type as keyof typeof ALLOWED_TYPES];
-    if (!allowed.includes(file.type) && type === "logo") {
+    if (!allowed.includes(file.type) && isLogoUpload) {
       return NextResponse.json(
         { error: "Logo must be PNG, JPG, WEBP or SVG" },
         { status: 400 },
@@ -68,7 +73,9 @@ export async function POST(request: Request) {
         ? "heading-font"
         : type === "body-font"
           ? "body-font"
-          : type;
+          : type === "logo"
+            ? "logo-dark"
+            : type;
     const path = `${agency.id}/${storageType}.${extension}`;
     const admin = createAdminClient();
     const buffer = Buffer.from(await file.arrayBuffer());

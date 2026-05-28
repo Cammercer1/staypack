@@ -2,6 +2,7 @@ import {
   getBrandAdvancedCssVars,
   resolveBrandAdvanced,
 } from "@/lib/branding/advanced";
+import { getBrandLogoCssVars } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
 
 export type ReportBrandColours = {
@@ -39,4 +40,22 @@ export function getReportBrandAdvancedVars(agency: FinalReportJson["agency"]) {
   });
 
   return getBrandAdvancedCssVars(resolved);
+}
+
+export function getReportBrandLogoVars(agency: FinalReportJson["agency"]) {
+  return getBrandLogoCssVars(agency);
+}
+
+/** Colour, advanced, and logo CSS variables for report/collateral previews. */
+export function getReportBrandStyleVars(
+  agency: FinalReportJson["agency"],
+  colours?: ReportBrandColours,
+) {
+  const brandColours = colours ?? getReportBrandColours(agency);
+
+  return {
+    ...getReportBrandColourVars(brandColours),
+    ...getReportBrandAdvancedVars(agency),
+    ...getReportBrandLogoVars(agency),
+  };
 }

@@ -82,6 +82,10 @@
   --radius: 1rem;
   --sidebar: #f9f5ea;
   --sidebar-foreground: #002e36;
+  /* Agency logos — set on report/collateral preview roots via getBrandLogoCssVars */
+  --brand-logo-on-light: "";
+  --brand-logo-on-dark: "";
+  --brand-logo-url: "";
   --sidebar-primary: #002e36;
   --sidebar-primary-foreground: #f9f5ea;
   --sidebar-accent: #f3ede0;
@@ -225,6 +229,22 @@
 .print-mode .collateral-page,
 .collateral-preview.print-mode .collateral-page {
   box-shadow: none !important;
+  page-break-after: avoid;
+}
+
+.print-mode .collateral-preview .report-page,
+.collateral-preview.print-mode .report-page {
+  width: var(--report-page-width, 210mm);
+  height: var(--report-page-height, 297mm);
+  min-height: var(--report-page-height, 297mm);
+  max-height: var(--report-page-height, 297mm);
+  overflow: hidden;
+  box-shadow: none !important;
+  page-break-after: always;
+}
+
+.print-mode .collateral-preview .report-page:last-child,
+.collateral-preview.print-mode .report-page:last-child {
   page-break-after: avoid;
 }
 

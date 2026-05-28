@@ -29,6 +29,8 @@ const steps = [
     description: "Logo, colours and fonts for buyer-facing collateral.",
     fields: [
       "logo_url",
+      "logo_light_url",
+      "logo_dark_url",
       "primary_colour",
       "secondary_colour",
       "accent_colour",
@@ -144,6 +146,8 @@ export function OnboardingForm() {
       email: "",
       phone: "",
       logo_url: "",
+      logo_light_url: "",
+      logo_dark_url: "",
       ...DEFAULT_BRAND_VALUES,
       heading_font_family: "fraunces",
       body_font_family: "inter",

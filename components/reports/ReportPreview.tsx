@@ -5,6 +5,7 @@ import {
   getReportBrandAdvancedVars,
   getReportBrandColourVars,
   getReportBrandColours,
+  getReportBrandLogoVars,
 } from "@/lib/reports/brandColours";
 import { BrandFontLoader } from "@/components/settings/BrandFontLoader";
 import {
@@ -39,6 +40,7 @@ export function ReportPreview({
       style={{
         ...getReportPageFormatStyle(pageFormat),
         ...getReportBrandColourVars(brand),
+        ...getReportBrandLogoVars(report.agency),
         ...getReportBrandAdvancedVars(report.agency),
         color: brand.text,
         backgroundColor: brand.pageBackground,

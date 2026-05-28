@@ -22,7 +22,6 @@ export const COLLATERAL_TYPE_META: Record<
   sales_brochure: {
     label: "Sales brochure",
     description: "Print-ready property brochure for open homes.",
-    comingSoon: true,
   },
   rental_brochure: {
     label: "Rental brochure",

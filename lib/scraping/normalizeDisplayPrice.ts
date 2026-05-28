@@ -92,6 +92,35 @@ function formatQualifier(raw: string) {
   return QUALIFIER_LABELS[raw.trim().toLowerCase()] ?? raw.trim();
 }
 
+export type DisplayPricePresentation = {
+  label: string;
+  amount: string;
+};
+
+/** Splits a configured display price into a label and amount for brochure layouts. */
+export function resolveDisplayPricePresentation(
+  displayPrice: string,
+): DisplayPricePresentation | null {
+  const trimmed = displayPrice.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const amounts = extractPropertyPriceAmounts(trimmed);
+  if (!amounts.length) {
+    return { label: "", amount: trimmed };
+  }
+
+  const qualifier = extractSingleQualifier(trimmed);
+  if (qualifier) {
+    const label = formatQualifier(qualifier);
+    const amount = trimmed.replace(new RegExp(`^${label}\\s*`, "i"), "").trim();
+    return { label, amount: amount || trimmed };
+  }
+
+  return { label: "Guide price", amount: trimmed };
+}
+
 /**
  * Turns noisy scraped price strings into concise display text.
  * e.g. "Price Range $2,300,000 to $2,500,000" → "$2,300,000 – $2,500,000"

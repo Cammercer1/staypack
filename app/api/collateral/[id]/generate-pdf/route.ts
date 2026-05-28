@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildCollateralPreviewPrintUrl } from "@/lib/collateral/printAccessToken";
+import { buildPublicCollateralPrintUrl } from "@/lib/collateral/slugs";
 import { getCollateralTemplate } from "@/lib/collateral/templates/registry";
 import { renderPdfFromUrl, buildPdfImagePath, buildPdfStylesheetPath } from "@/lib/browserless/pdf";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
@@ -25,7 +26,11 @@ export async function POST(
 
     const document = collateral.document_json as CollateralDocumentJson;
     const template = getCollateralTemplate(document.template_id);
-    const printUrl = buildCollateralPreviewPrintUrl(collateral.id, getSiteUrl());
+    const siteUrl = getSiteUrl();
+    const printUrl =
+      collateral.public_slug && collateral.status === "published"
+        ? buildPublicCollateralPrintUrl(agency.slug, collateral.public_slug)
+        : buildCollateralPreviewPrintUrl(collateral.id, siteUrl);
 
     const admin = createAdminClient();
     const pdfBuffer = await renderPdfFromUrl(printUrl, {

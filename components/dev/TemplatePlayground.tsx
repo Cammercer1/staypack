@@ -86,6 +86,11 @@ export function TemplatePlayground({
                 Open report editor
               </Button>
             </Link>
+            <Link href="/dev/sales-brochures">
+              <Button variant="outline" size="sm">
+                Sales brochures
+              </Button>
+            </Link>
           </div>
 
           <div className="space-y-3 rounded-xl border bg-muted/30 p-4 text-sm">

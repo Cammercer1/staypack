@@ -18,6 +18,20 @@ const A4_LONG_MM = 297;
 const BUSINESS_CARD_WIDTH_MM = 90;
 const BUSINESS_CARD_HEIGHT_MM = 55;
 
+/** Short label for template picker pills (e.g. A4, A5). */
+export function getCollateralPageFormatLabel(pageFormatId: string): string {
+  switch (pageFormatId) {
+    case "a4-portrait":
+    case "a4-landscape":
+      return "A4";
+    case "business-card-au":
+      return "Card";
+    default:
+      if (pageFormatId.startsWith("a5")) return "A5";
+      return pageFormatId.split("-")[0]?.toUpperCase() ?? pageFormatId;
+  }
+}
+
 export function getCollateralPageFormat(id: string): CollateralPageFormat {
   switch (id) {
     case "a4-landscape":

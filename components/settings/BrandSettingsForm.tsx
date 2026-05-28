@@ -37,6 +37,8 @@ const TAB_DIRTY_FIELDS: Record<BrandSettingsTab, (keyof AgencyInput)[]> = {
   agency: ["name", "slug", "website_url", "email", "phone"],
   brand: [
     "logo_url",
+    "logo_light_url",
+    "logo_dark_url",
     "primary_colour",
     "secondary_colour",
     "accent_colour",
@@ -119,6 +121,8 @@ export function BrandSettingsForm({ agency: initialAgency }: { agency: Agency })
       email: agency.email ?? "",
       phone: agency.phone ?? "",
       logo_url: agency.logo_url ?? "",
+      logo_light_url: agency.logo_light_url ?? "",
+      logo_dark_url: agency.logo_dark_url ?? agency.logo_url ?? "",
       primary_colour: agency.primary_colour,
       secondary_colour: agency.secondary_colour,
       accent_colour: agency.accent_colour,

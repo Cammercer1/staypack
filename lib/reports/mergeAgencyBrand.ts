@@ -10,7 +10,9 @@ export function mergeAgencyBrandIntoFinalReport(
     agency: {
       ...report.agency,
       name: agency.name,
-      logo_url: agency.logo_url ?? "",
+      logo_url: agency.logo_dark_url ?? agency.logo_url ?? "",
+      logo_light_url: agency.logo_light_url ?? "",
+      logo_dark_url: agency.logo_dark_url ?? agency.logo_url ?? "",
       primary_colour: agency.primary_colour,
       secondary_colour: agency.background_colour ?? agency.secondary_colour,
       accent_colour: agency.accent_colour,

@@ -6,16 +6,43 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { BrandLogoSurface } from "@/lib/branding/logos";
+
+export type AgencyLogoVariant = BrandLogoSurface;
+
+const VARIANT_COPY: Record<
+  AgencyLogoVariant,
+  { title: string; description: string; previewBg: string; uploadType: string; fieldId: string }
+> = {
+  light: {
+    title: "Logo for dark backgrounds",
+    description:
+      "Light or white version of your mark — for coloured headers, photos, and dark panels.",
+    previewBg: "bg-[#002e36]",
+    uploadType: "logo-light",
+    fieldId: "logo_light_url",
+  },
+  dark: {
+    title: "Logo for light backgrounds",
+    description:
+      "Full-colour or dark version of your mark — for report pages, white cards, and light panels.",
+    previewBg: "bg-white",
+    uploadType: "logo-dark",
+    fieldId: "logo_dark_url",
+  },
+};
 
 type Props = {
+  variant: AgencyLogoVariant;
   value: string;
   onChange: (value: string) => void;
   agencyId?: string;
 };
 
-export function AgencyLogoUploader({ value, onChange, agencyId }: Props) {
+export function AgencyLogoUploader({ variant, value, onChange, agencyId }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const copy = VARIANT_COPY[variant];
 
   async function uploadLogo(file: File) {
     if (!agencyId) {
@@ -31,7 +58,7 @@ export function AgencyLogoUploader({ value, onChange, agencyId }: Props) {
     setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("type", "logo");
+    formData.append("type", copy.uploadType);
 
     const response = await fetch("/api/agencies/upload-asset", {
       method: "POST",
@@ -52,19 +79,16 @@ export function AgencyLogoUploader({ value, onChange, agencyId }: Props) {
   return (
     <div className="space-y-4 rounded-2xl border border-border/70 bg-background/70 p-4">
       <div>
-        <Label htmlFor="logo_url" className="text-base font-medium">
-          Agency logo
+        <Label htmlFor={copy.fieldId} className="text-base font-medium">
+          {copy.title}
         </Label>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          Add the logo that should appear at the top of every report. PNG or SVG
-          with a transparent background works best.
-        </p>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy.description}</p>
       </div>
 
       {value ? (
-        <div className="rounded-xl border border-border/60 bg-white p-4">
+        <div className={`rounded-xl border border-border/60 p-4 ${copy.previewBg}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="Agency logo preview" className="h-16 object-contain" />
+          <img src={value} alt="" className="h-16 object-contain" />
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/40 px-4 py-8 text-center text-sm text-muted-foreground">
@@ -74,7 +98,7 @@ export function AgencyLogoUploader({ value, onChange, agencyId }: Props) {
 
       <div className="grid gap-3 md:grid-cols-[1fr_auto]">
         <Input
-          id="logo_url"
+          id={copy.fieldId}
           placeholder="https://your-agency.com/logo.png"
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -97,14 +121,10 @@ export function AgencyLogoUploader({ value, onChange, agencyId }: Props) {
             onClick={() => inputRef.current?.click()}
           >
             <Upload className="mr-2 h-4 w-4" />
-            {uploading ? "Uploading..." : "Upload logo"}
+            {uploading ? "Uploading..." : "Upload"}
           </Button>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Paste a link or upload a file. If upload is greyed out during onboarding,
-        finish setup first then upload in Settings → Brand.
-      </p>
     </div>
   );
 }

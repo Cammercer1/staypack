@@ -36,6 +36,7 @@ import { ScrapedListingReviewStep } from "@/components/reports/ScrapedListingRev
 import { CreateStrReportButton } from "@/components/listings/CreateStrReportButton";
 import { ListingAgentsStrip } from "@/components/listings/ListingAgentsStrip";
 import { CollateralItemActions } from "@/components/collateral/CollateralItemActions";
+import { CollateralPdfButton } from "@/components/collateral/CollateralPdfButton";
 import { CollateralImageEditor } from "@/components/listings/CollateralImageEditor";
 import { CollateralPhotoRequirementNotice } from "@/components/listings/CollateralPhotoRequirementNotice";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
@@ -502,7 +503,7 @@ function CollateralTab({
                 ) : null}
               </div>
 
-              {meta.comingSoon && type !== "agent_business_card" && item ? (
+              {meta.comingSoon && item ? (
                 <p className="mt-4 text-sm text-muted-foreground">Coming soon</p>
               ) : null}
 
@@ -517,6 +518,18 @@ function CollateralTab({
                 <p className="mt-4 text-sm text-muted-foreground">
                   Branded graphics for Instagram, Facebook and LinkedIn with your
                   logo and property address.
+                </p>
+              ) : null}
+
+              {type === "sales_brochure" && item?.document_json ? (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Print-ready A4 brochure with property photos, copy and a QR code
+                  to your listing page.
+                </p>
+              ) : null}
+              {type === "sales_brochure" && !item?.document_json ? (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  {meta.description}
                 </p>
               ) : null}
 
@@ -555,21 +568,55 @@ function CollateralTab({
                       photoRequirement={photoRequirement}
                     />
                   )
-                ) : type === "agent_business_card" || type === "social_posts" ? (
+                ) : type === "agent_business_card" ||
+                  type === "social_posts" ||
+                  type === "sales_brochure" ? (
                   <>
-                    <CollateralItemActions
-                      listingId={listing.id}
-                      type={type}
-                      item={item ?? null}
-                      photoRequirement={photoRequirement}
-                      onRefresh={onRefresh}
-                    />
+                    {type !== "sales_brochure" ? (
+                      <CollateralItemActions
+                        listingId={listing.id}
+                        type={type}
+                        item={item ?? null}
+                        photoRequirement={photoRequirement}
+                        onRefresh={onRefresh}
+                      />
+                    ) : null}
                     {type === "social_posts" && item ? (
                       <Link href={`/listings/${listing.id}/social`}>
                         <Button size="sm" variant="outline">
                           {item.document_json ? "Edit social posts" : "Open editor"}
                         </Button>
                       </Link>
+                    ) : null}
+                    {type === "sales_brochure" ? (
+                      item ? (
+                        <>
+                          <Link href={`/listings/${listing.id}/brochure`}>
+                            <Button size="sm">
+                              {item.document_json ? "Open" : "Continue"}
+                            </Button>
+                          </Link>
+                          {item.public_url ? (
+                            <CopyLinkButton url={item.public_url} />
+                          ) : null}
+                          {item.document_json ? (
+                            <CollateralPdfButton
+                              collateralId={item.id}
+                              url={item.pdf_url}
+                              canGenerate
+                              cacheVersion={item.updated_at}
+                              onUpdated={() => onRefresh()}
+                            />
+                          ) : null}
+                        </>
+                      ) : (
+                        <CreateCollateralDraftButton
+                          listingId={listing.id}
+                          type={type}
+                          photoRequirement={photoRequirement}
+                          onCreated={onRefresh}
+                        />
+                      )
                     ) : null}
                   </>
                 ) : item ? (

@@ -11,7 +11,13 @@ export function normalizeAgencyBrandPayload(body: AgencyInput) {
     website_url: body.website_url || null,
     email: body.email || null,
     phone: body.phone || null,
-    logo_url: body.logo_url || null,
+    logo_light_url: body.logo_light_url?.trim() || null,
+    logo_dark_url: body.logo_dark_url?.trim() || null,
+    logo_url:
+      body.logo_dark_url?.trim() ||
+      body.logo_url?.trim() ||
+      body.logo_light_url?.trim() ||
+      null,
     heading_font_family: headingFontFamily,
     body_font_family: bodyFontFamily,
     font_family: bodyFontFamily,

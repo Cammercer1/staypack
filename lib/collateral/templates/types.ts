@@ -10,6 +10,8 @@ export type CollateralPageFormatId =
 export type CollateralBrandSlice = {
   name: string;
   logo_url: string;
+  logo_light_url: string;
+  logo_dark_url: string;
   primary_colour: string;
   secondary_colour: string;
   accent_colour: string;
@@ -192,9 +194,59 @@ export type SocialPostsDocumentJson = {
   >;
 };
 
+export type SalesBrochureCopyJson = {
+  heading: string;
+  blurb: string;
+  appeal_points: string[];
+  feature_highlights: string[];
+  inspection_cta: string;
+  disclaimer: string;
+};
+
+export type SalesBrochurePropertySlice = {
+  address: string;
+  suburb: string;
+  state: string;
+  postcode: string;
+  summary: string;
+  property_type: string;
+  bedrooms: number;
+  bathrooms: number;
+  car_spaces: number;
+  land_area_sqm: number | null;
+  display_price: string;
+  hero_image_url: string;
+  selected_image_urls: string[];
+  page_one_image_urls: string[];
+  page_two_image_urls: string[];
+};
+
+export type SalesBrochureDocumentJson = {
+  version: "sales_brochure_v1";
+  type: "sales_brochure";
+  template_id: string;
+  generated_at: string;
+  agency: CollateralBrandSlice;
+  agent: CollateralAgentSlice;
+  agents: CollateralAgentSlice[];
+  property: SalesBrochurePropertySlice;
+  copy: SalesBrochureCopyJson;
+  qr_target_url: string;
+  assets: {
+    qr_code_url: string;
+  };
+};
+
 export type CollateralDocumentJson =
   | BusinessCardDocumentJson
-  | SocialPostsDocumentJson;
+  | SocialPostsDocumentJson
+  | SalesBrochureDocumentJson;
+
+export function isSalesBrochureDocument(
+  document: CollateralDocumentJson,
+): document is SalesBrochureDocumentJson {
+  return document.type === "sales_brochure";
+}
 
 export function isSocialPostsDocument(
   document: CollateralDocumentJson,

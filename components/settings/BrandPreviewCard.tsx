@@ -5,6 +5,7 @@ import {
   getBrandButtonInlineStyle,
   resolveBrandAdvanced,
 } from "@/lib/branding/advanced";
+import { resolveAgencyLogos } from "@/lib/branding/logos";
 import type { AgencyInput } from "@/lib/validation/schemas";
 
 export function BrandPreviewCard({ preview }: { preview: AgencyInput }) {
@@ -20,6 +21,7 @@ export function BrandPreviewCard({ preview }: { preview: AgencyInput }) {
     text_colour: preview.text_colour || "#002e36",
     brand_advanced_json: preview.brand_advanced_json ?? null,
   });
+  const logos = resolveAgencyLogos(preview);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border/70 shadow-sm">
@@ -31,13 +33,17 @@ export function BrandPreviewCard({ preview }: { preview: AgencyInput }) {
           backgroundColor: preview.background_colour || "#f9f5ea",
           color: preview.text_colour || "#002e36",
           fontFamily: bodyFamily,
+          ...({
+            "--brand-logo-on-light": logos.onLight,
+            "--brand-logo-on-dark": logos.onDark,
+          } as React.CSSProperties),
         }}
       >
         <div className="flex items-start justify-between gap-4 border-b border-black/10 pb-4">
           <div>
-            {preview.logo_url ? (
+            {logos.onLight ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={preview.logo_url} alt="" className="mb-3 h-10 object-contain" />
+              <img src={logos.onLight} alt="" className="mb-3 h-10 object-contain" />
             ) : null}
             <p
               className="text-xl font-semibold"
@@ -62,6 +68,10 @@ export function BrandPreviewCard({ preview }: { preview: AgencyInput }) {
             className="rounded-2xl p-4 text-white"
             style={{ backgroundColor: preview.primary_colour || "#002e36" }}
           >
+            {logos.onDark ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logos.onDark} alt="" className="mb-3 h-8 object-contain" />
+            ) : null}
             <p
               className="text-xs uppercase tracking-wide opacity-80"
               style={{ fontFamily: headingFamily }}

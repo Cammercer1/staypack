@@ -53,6 +53,8 @@ export const agencySchema = z.object({
   email: optionalEmail,
   phone: z.string().optional(),
   logo_url: z.string().optional(),
+  logo_light_url: z.string().optional(),
+  logo_dark_url: z.string().optional(),
   primary_colour: z.string(),
   secondary_colour: z.string(),
   accent_colour: z.string(),
@@ -235,6 +237,25 @@ export const aiCopySchema = z.object({
   disclaimer: z.string(),
   confidence_notes: z.string(),
 });
+
+export const salesBrochureCopySchema = z.object({
+  heading: z.string(),
+  blurb: z.string(),
+  appeal_points: z.array(z.string()),
+  feature_highlights: z.array(z.string()),
+  inspection_cta: z.string(),
+  disclaimer: z.string(),
+});
+
+export const updateSalesBrochureDocumentSchema = z
+  .object({
+    copy: salesBrochureCopySchema.partial().optional(),
+    template_id: z.string().optional(),
+  })
+  .refine(
+    (data) => data.copy != null || data.template_id != null,
+    { message: "Provide copy or template_id" },
+  );
 
 export const loginSchema = z.object({
   email: z.string().email(),

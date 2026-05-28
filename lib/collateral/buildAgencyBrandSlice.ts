@@ -1,11 +1,16 @@
 import { parseAgencyBrandAdvanced } from "@/lib/branding/advanced";
+import { resolveAgencyLogos } from "@/lib/branding/logos";
 import type { Agency } from "@/lib/types";
 import type { CollateralBrandSlice } from "@/lib/collateral/templates/types";
 
 export function buildAgencyBrandSlice(agency: Agency): CollateralBrandSlice {
+  const logos = resolveAgencyLogos(agency);
+
   return {
     name: agency.name,
-    logo_url: agency.logo_url ?? "",
+    logo_url: logos.legacy,
+    logo_light_url: agency.logo_light_url ?? "",
+    logo_dark_url: agency.logo_dark_url ?? "",
     primary_colour: agency.primary_colour,
     secondary_colour: agency.secondary_colour,
     accent_colour: agency.accent_colour,

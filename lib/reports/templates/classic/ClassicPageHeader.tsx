@@ -1,12 +1,15 @@
+import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
 
 export function ClassicPageHeader({ report }: { report: FinalReportJson }) {
+  const logoUrl = getAgencyLogoUrl(report.agency, "light");
+
   return (
     <header className="shrink-0 border-b border-neutral-200 bg-white px-10 py-4">
-      {report.agency.logo_url ? (
+      {logoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={report.agency.logo_url}
+          src={logoUrl}
           alt={report.agency.name}
           className="h-10 object-contain object-left"
         />

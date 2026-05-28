@@ -1,0 +1,28 @@
+import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
+import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
+import { GalleryPageOneSpread } from "@/lib/collateral/templates/sales-brochure/gallery/GalleryLayout";
+import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
+import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
+
+/** Gallery · 1 page — hero + three photos, address bar, details, website & QR. */
+export function GalleryBrochureOnePage({ document }: { document: CollateralDocumentJson }) {
+  if (!isSalesBrochureDocument(document)) return null;
+
+  const { report, brand } = useBrochurePage(document);
+
+  return (
+    <div
+      className="sales-brochure-preview flex flex-col"
+      style={{
+        ["--report-page-width" as string]: "210mm",
+        ["--report-page-height" as string]: "297mm",
+      }}
+    >
+      <BrochurePageShell brand={brand}>
+        <div className="flex h-[297mm] flex-col overflow-hidden">
+          <GalleryPageOneSpread document={document} report={report} />
+        </div>
+      </BrochurePageShell>
+    </div>
+  );
+}

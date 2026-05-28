@@ -31,17 +31,34 @@ export function BrandKitEditor({
       <section className="space-y-4">
         <div>
           <h3 className="font-display text-xl tracking-tight">
-            {sectionPrefix(1)}Logo
+            {sectionPrefix(1)}Logos
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            This appears at the top of every buyer-facing report.
+            Upload two versions so reports and collateral pick the right mark for light
+            and dark backgrounds.
           </p>
         </div>
-        <AgencyLogoUploader
-          value={preview.logo_url ?? ""}
-          onChange={(value) => form.setValue("logo_url", value, { shouldDirty: true })}
-          agencyId={agencyId}
-        />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <AgencyLogoUploader
+            variant="dark"
+            value={preview.logo_dark_url ?? preview.logo_url ?? ""}
+            onChange={(value) => {
+              form.setValue("logo_dark_url", value, { shouldDirty: true });
+              if (!form.getValues("logo_light_url")) {
+                form.setValue("logo_url", value, { shouldDirty: true });
+              }
+            }}
+            agencyId={agencyId}
+          />
+          <AgencyLogoUploader
+            variant="light"
+            value={preview.logo_light_url ?? ""}
+            onChange={(value) =>
+              form.setValue("logo_light_url", value, { shouldDirty: true })
+            }
+            agencyId={agencyId}
+          />
+        </div>
       </section>
 
       <section className="space-y-4">

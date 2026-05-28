@@ -10,7 +10,23 @@ import {
   getDefaultSocialPostVariantId,
   normalizeSocialPostVariantId,
 } from "@/lib/collateral/social/formats";
-import { isSocialPostsDocument } from "@/lib/collateral/templates/types";
+import { salesBrochureToReportShape } from "@/lib/collateral/sales-brochure/toReportShape";
+import {
+  isSalesBrochureDocument,
+  isSocialPostsDocument,
+} from "@/lib/collateral/templates/types";
+import {
+  getReportBrandAdvancedVars,
+  getReportBrandColourVars,
+  getReportBrandColours,
+  getReportBrandLogoVars,
+} from "@/lib/reports/brandColours";
+import { getBrandLogoCssVars } from "@/lib/branding/logos";
+import { getReportFontConfig } from "@/lib/reports/reportFonts";
+import {
+  getReportPageFormat,
+  getReportPageFormatStyle,
+} from "@/lib/reports/pageFormat";
 import { getCollateralTemplate } from "@/lib/collateral/templates/registry";
 import { resolveTemplateIdFromDocument } from "@/lib/collateral/templates/resolveTemplateId";
 import {
@@ -67,17 +83,42 @@ export function CollateralPreview({
     brand_advanced_json: agency.brand_advanced ?? null,
   });
 
+  const salesBrochureReport = isSalesBrochureDocument(document)
+    ? salesBrochureToReportShape(document)
+    : null;
+  const reportBrand = salesBrochureReport
+    ? getReportBrandColours(salesBrochureReport.agency)
+    : null;
+  const reportFonts = salesBrochureReport
+    ? getReportFontConfig(salesBrochureReport.agency)
+    : null;
+
   return (
     <div
       className={printMode ? "collateral-preview print-mode" : "collateral-preview"}
       data-collateral-root
       style={{
         ...getCollateralPageFormatStyle(pageFormat),
+        ...(salesBrochureReport
+          ? getReportPageFormatStyle(getReportPageFormat("portrait"))
+          : {}),
         ["--collateral-heading-font" as string]: headingFontFamily,
         ["--collateral-body-font" as string]: bodyFontFamily,
         ["--collateral-primary" as string]: agency.primary_colour,
         ["--collateral-text" as string]: agency.text_colour || "#1a1a1a",
-        ...getBrandAdvancedCssVars(brandAdvanced),
+        ...(reportBrand ? getReportBrandColourVars(reportBrand) : {}),
+        ...(salesBrochureReport
+          ? getReportBrandLogoVars(salesBrochureReport.agency)
+          : getBrandLogoCssVars(agency)),
+        ...(salesBrochureReport
+          ? getReportBrandAdvancedVars(salesBrochureReport.agency)
+          : getBrandAdvancedCssVars(brandAdvanced)),
+        ...(reportFonts
+          ? {
+              ["--report-heading-font" as string]: reportFonts.headingFontFamily,
+              ["--report-body-font" as string]: reportFonts.bodyFontFamily,
+            }
+          : {}),
       }}
     >
       <BrandFontLoader
@@ -101,6 +142,13 @@ export function CollateralPreview({
             }
             .collateral-preview.print-mode .collateral-page {
               box-shadow: none;
+            }
+            .collateral-preview.print-mode .report-page {
+              page-break-after: always;
+              box-shadow: none;
+            }
+            .collateral-preview.print-mode .report-page:last-child {
+              page-break-after: avoid;
             }
             @media print {
               @page {
