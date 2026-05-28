@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildListingQrTrackingUrl,
   buildPublicListingUrl,
 } from "@/lib/listings/listingUrls";
-import { getSiteUrl } from "@/lib/env";
 import { generateQrCodeBuffer } from "@/lib/reports/qr";
 
 export async function POST(
@@ -13,7 +12,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const supabase = await createServerClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -49,28 +48,6 @@ export async function POST(
   const admin = createAdminClient();
   const trackingUrl = buildListingQrTrackingUrl(agency.slug, listing.public_slug);
   const publicUrl = buildPublicListingUrl(agency.slug, listing.public_slug);
-  // #region agent log
-  fetch("http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "a515ca",
-    },
-    body: JSON.stringify({
-      sessionId: "a515ca",
-      location: "regenerate-qr/route.ts:POST",
-      message: "Regenerating QR",
-      data: {
-        listingId: listing.id,
-        trackingUrl,
-        publicUrl,
-        siteUrl: getSiteUrl(),
-      },
-      timestamp: Date.now(),
-      hypothesisId: "H1-H5",
-    }),
-  }).catch(() => {});
-  // #endregion
   const qrBuffer = await generateQrCodeBuffer(trackingUrl);
   const qrPath = `${agency.id}/${listing.id}/landing-qr.png`;
 
