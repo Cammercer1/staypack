@@ -23,6 +23,7 @@ import {
   SOCIAL_POST_VARIANT_IDS,
   type SocialPostVariantId,
 } from "@/lib/collateral/social/formats";
+import { mergeAgencyBrandIntoSocialPostsDocument } from "@/lib/collateral/mergeAgencyBrand";
 import { ensureSocialPostsDocument } from "@/lib/collateral/social/normalizeSocialDocument";
 import {
   getLayersForVariant,
@@ -58,9 +59,16 @@ export function SocialPostsEditor({ listing, agency, collateral: initialCollater
   const [exportingVariant, setExportingVariant] = useState<SocialPostVariantId | "all" | null>(
     null,
   );
-  const [exportCaptureVariant, setExportCaptureVariant] =
-    useState<SocialPostVariantId | null>(null);
+  const [exportCapture, setExportCapture] = useState<{
+    variantId: SocialPostVariantId;
+    document: SocialPostsDocumentJson;
+  } | null>(null);
   const exportCaptureRootRef = useRef<HTMLDivElement>(null);
+
+  const documentWithLiveBrand = useMemo(
+    () => mergeAgencyBrandIntoSocialPostsDocument(agency, document),
+    [agency, document],
+  );
 
   const activeVariantId = document.active_variant_id;
 
@@ -94,38 +102,46 @@ export function SocialPostsEditor({ listing, agency, collateral: initialCollater
     ...getBrandAdvancedCssVars(brandAdvanced),
   };
 
+  const persistDocument = useCallback(
+    async (next: SocialPostsDocumentJson) => {
+      const response = await fetch(`/api/collateral/${collateral.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          active_variant_id: next.active_variant_id,
+          agent: next.agent,
+          listing: {
+            bedrooms: next.listing.bedrooms,
+            bathrooms: next.listing.bathrooms,
+            car_spaces: next.listing.car_spaces,
+            land_area_sqm: next.listing.land_area_sqm,
+          },
+          layers: getLayersForVariant(next, next.active_variant_id),
+          variants: next.variants,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to save");
+      }
+
+      const saved = payload.collateral as CollateralItem;
+      const savedDocument = ensureSocialPostsDocument(
+        saved.document_json as SocialPostsDocumentJson,
+      );
+      setCollateral(saved);
+      setDocument(savedDocument);
+      return savedDocument;
+    },
+    [collateral.id],
+  );
+
   const saveDocument = useCallback(
     async (next: SocialPostsDocumentJson) => {
       setSaving(true);
       try {
-        const response = await fetch(`/api/collateral/${collateral.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            active_variant_id: next.active_variant_id,
-            agent: next.agent,
-            listing: {
-              bedrooms: next.listing.bedrooms,
-              bathrooms: next.listing.bathrooms,
-              car_spaces: next.listing.car_spaces,
-              land_area_sqm: next.listing.land_area_sqm,
-            },
-            layers: getLayersForVariant(next, next.active_variant_id),
-            variants: next.variants,
-          }),
-        });
-        const payload = await response.json();
-
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to save");
-        }
-
-        setCollateral(payload.collateral as CollateralItem);
-        setDocument(
-          ensureSocialPostsDocument(
-            payload.collateral.document_json as SocialPostsDocumentJson,
-          ),
-        );
+        await persistDocument(next);
         toast.success("Saved");
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to save");
@@ -133,7 +149,7 @@ export function SocialPostsEditor({ listing, agency, collateral: initialCollater
         setSaving(false);
       }
     },
-    [collateral.id],
+    [persistDocument],
   );
 
   function handleVariantChange(variantId: SocialPostVariantId) {
@@ -197,7 +213,13 @@ export function SocialPostsEditor({ listing, agency, collateral: initialCollater
   }
 
   async function runExport(variant: SocialPostVariantId) {
-    flushSync(() => setExportCaptureVariant(variant));
+    const savedDocument = await persistDocument(document);
+    const exportDocument = mergeAgencyBrandIntoSocialPostsDocument(
+      agency,
+      savedDocument,
+    );
+
+    flushSync(() => setExportCapture({ variantId: variant, document: exportDocument }));
     try {
       const canvas = await waitForSocialPostExportCanvas(
         () => exportCaptureRootRef.current,
@@ -232,11 +254,6 @@ export function SocialPostsEditor({ listing, agency, collateral: initialCollater
         throw new Error("Export succeeded but collateral was not returned");
       }
 
-      const pngUrl = payload.png_url;
-      if (!pngUrl) {
-        throw new Error("Export succeeded but PNG URL was not returned");
-      }
-
       setCollateral(updatedCollateral);
       setDocument(
         ensureSocialPostsDocument(
@@ -244,14 +261,15 @@ export function SocialPostsEditor({ listing, agency, collateral: initialCollater
         ),
       );
 
+      const filename = `${listing.property_address ?? "property"}-${variant}.png`;
+      const objectUrl = URL.createObjectURL(pngBlob);
       const link = window.document.createElement("a");
-      link.href = pngUrl;
-      link.download = `${listing.property_address ?? "property"}-${variant}.png`;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
+      link.href = objectUrl;
+      link.download = filename;
       link.click();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 15_000);
     } finally {
-      setExportCaptureVariant(null);
+      setExportCapture(null);
     }
   }
 
@@ -349,7 +367,7 @@ export function SocialPostsEditor({ listing, agency, collateral: initialCollater
       <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:flex-row">
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-border/60 lg:max-w-[58%] lg:border-b-0 lg:border-r">
           <SocialPostPreviewStage
-            document={document}
+            document={documentWithLiveBrand}
             activeVariantId={activeVariantId}
             previewStyle={previewStyle}
             fonts={{
@@ -372,7 +390,7 @@ export function SocialPostsEditor({ listing, agency, collateral: initialCollater
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5">
             <SocialPostLayerPanel
-              document={document}
+              document={documentWithLiveBrand}
               listing={listing}
               backgroundOptions={backgroundOptions}
               onChange={setDocument}
@@ -386,10 +404,10 @@ export function SocialPostsEditor({ listing, agency, collateral: initialCollater
         aria-hidden
         className="pointer-events-none fixed left-0 top-0 -z-10 opacity-0"
       >
-        {exportCaptureVariant ? (
+        {exportCapture ? (
           <SocialPostExportCapture
-            variantId={exportCaptureVariant}
-            document={document}
+            variantId={exportCapture.variantId}
+            document={exportCapture.document}
             previewStyle={previewStyle}
             fonts={{
               heading_font_family: headingFontId,

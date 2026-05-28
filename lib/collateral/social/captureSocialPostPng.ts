@@ -1,8 +1,13 @@
 import { toPng } from "html-to-image";
 import {
+  buildCollateralExportImageProxyUrl,
+  shouldProxyImageForExport,
+} from "@/lib/collateral/social/exportImageProxy";
+import {
   getSocialPostDesignSize,
   type SocialPostVariantId,
 } from "@/lib/collateral/social/formats";
+import { validateSocialPostPngBytes } from "@/lib/collateral/social/validateExportPng";
 
 const MOUNT_TIMEOUT_MS = 15_000;
 const IMAGE_TIMEOUT_MS = 8_000;
@@ -27,45 +32,23 @@ function blobToDataUrl(blob: Blob) {
   });
 }
 
-async function loadImageViaCanvas(url: string) {
-  return new Promise<string | null>((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          resolve(null);
-          return;
-        }
-        ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL("image/png"));
-      } catch {
-        resolve(null);
-      }
-    };
-    img.onerror = () => resolve(null);
-    const cacheBust = url.includes("?") ? "&" : "?";
-    img.src = `${url}${cacheBust}export=${Date.now()}`;
-  });
-}
-
 async function fetchImageAsDataUrl(url: string) {
   if (!url || url.startsWith("data:") || url.startsWith("blob:")) {
     return url.startsWith("data:") ? url : null;
   }
 
+  const fetchUrl = shouldProxyImageForExport(url)
+    ? buildCollateralExportImageProxyUrl(url)
+    : url;
+
   try {
-    const response = await fetch(url, { mode: "cors", cache: "no-store" });
+    const response = await fetch(fetchUrl, { cache: "no-store" });
     if (!response.ok) {
-      return loadImageViaCanvas(url);
+      return null;
     }
     return blobToDataUrl(await response.blob());
   } catch {
-    return loadImageViaCanvas(url);
+    return null;
   }
 }
 
@@ -214,6 +197,7 @@ export async function captureSocialPostPng(
     for (let i = 0; i < binary.length; i++) {
       bytes[i] = binary.charCodeAt(i);
     }
+    validateSocialPostPngBytes(bytes.length);
     return new Blob([bytes], { type: "image/png" });
   } catch (error) {
     throw wrapCaptureError(error);

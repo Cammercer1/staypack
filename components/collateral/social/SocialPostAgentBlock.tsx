@@ -45,7 +45,6 @@ export function SocialPostAgentBlock({
     <img
       src={agent.photo_url}
       alt={agent.name || "Agent"}
-      crossOrigin="anonymous"
       className={`shrink-0 object-cover object-top ${avatarClass}`}
       style={{ width: avatarSize, height: avatarSize }}
       draggable={false}

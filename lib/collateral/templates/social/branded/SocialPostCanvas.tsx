@@ -287,7 +287,6 @@ export function SocialPostCanvas({
             <img
               src={agency.logo_url}
               alt={agency.name}
-              crossOrigin="anonymous"
               className={`h-full w-full object-contain drop-shadow-md ${
                 normalizeCorner(layers.logo.placement).endsWith("_right")
                   ? "object-right-top"

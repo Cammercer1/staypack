@@ -22,7 +22,6 @@ function BackgroundCell({ url }: { url: string }) {
       <img
         src={url}
         alt=""
-        crossOrigin="anonymous"
         className="absolute inset-0 h-full w-full object-cover"
         draggable={false}
       />
@@ -60,7 +59,6 @@ export function SocialPostBackground({
       <img
         src={urls[0]}
         alt=""
-        crossOrigin="anonymous"
         className="absolute inset-0 h-full w-full object-cover"
         draggable={false}
       />

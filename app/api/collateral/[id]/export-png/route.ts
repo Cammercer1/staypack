@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
+import { withStorageCacheBust } from "@/lib/collateral/social/storageUrl";
+import { validateSocialPostPngBytes } from "@/lib/collateral/social/validateExportPng";
 import {
   isSocialPostsDocument,
   type SocialPostsDocumentJson,
@@ -80,15 +82,19 @@ export async function POST(
     }
 
     const { variant, pngBuffer } = await readPngFromRequest(request);
+    validateSocialPostPngBytes(pngBuffer.length);
 
     const admin = createAdminClient();
-    const storagePath = `${agency.id}/collateral/${collateral.id}/${variant}.png`;
+    const exportedAt = new Date().toISOString();
+    const version = Date.now();
+    const storagePath = `${agency.id}/collateral/${collateral.id}/${variant}-${version}.png`;
 
     const { error: uploadError } = await admin.storage
       .from("report-assets")
       .upload(storagePath, pngBuffer, {
         contentType: "image/png",
-        upsert: true,
+        upsert: false,
+        cacheControl: "3600",
       });
 
     if (uploadError) {
@@ -99,18 +105,19 @@ export async function POST(
       data: { publicUrl },
     } = admin.storage.from("report-assets").getPublicUrl(storagePath);
 
+    const pngUrl = withStorageCacheBust(publicUrl, version);
+
     const document = collateral.document_json as SocialPostsDocumentJson;
 
     if (!isSocialPostsDocument(document)) {
       return NextResponse.json({ error: "Invalid document" }, { status: 400 });
     }
 
-    const exportedAt = new Date().toISOString();
     const nextDocument: SocialPostsDocumentJson = {
       ...document,
       exports: {
         ...document.exports,
-        [variant]: { png_url: publicUrl, exported_at: exportedAt },
+        [variant]: { png_url: pngUrl, exported_at: exportedAt },
       },
     };
 
@@ -126,7 +133,7 @@ export async function POST(
     }
 
     return NextResponse.json({
-      png_url: publicUrl,
+      png_url: pngUrl,
       variant,
       collateral: data,
     });

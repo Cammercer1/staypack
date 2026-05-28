@@ -1,5 +1,8 @@
 import type { Agency } from "@/lib/types";
-import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
+import type {
+  CollateralDocumentJson,
+  SocialPostsDocumentJson,
+} from "@/lib/collateral/templates/types";
 import { buildAgencyBrandSlice } from "@/lib/collateral/buildAgencyBrandSlice";
 
 export function mergeAgencyBrandIntoCollateralDocument(
@@ -10,4 +13,14 @@ export function mergeAgencyBrandIntoCollateralDocument(
     ...document,
     agency: buildAgencyBrandSlice(agency),
   };
+}
+
+export function mergeAgencyBrandIntoSocialPostsDocument(
+  agency: Agency,
+  document: SocialPostsDocumentJson,
+): SocialPostsDocumentJson {
+  return mergeAgencyBrandIntoCollateralDocument(
+    agency,
+    document,
+  ) as SocialPostsDocumentJson;
 }
