@@ -5,17 +5,22 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  getBrandButtonInlineStyle,
+  getBrandCardInlineStyle,
+  type ResolvedBrandAdvanced,
+} from "@/lib/branding/advanced";
 
 type Props = {
   agencySlug: string;
   listingSlug: string;
-  primaryColour?: string;
+  brandAdvanced: ResolvedBrandAdvanced;
 };
 
 export function ListingLeadForm({
   agencySlug,
   listingSlug,
-  primaryColour = "#002e36",
+  brandAdvanced,
 }: Props) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -55,12 +60,15 @@ export function ListingLeadForm({
 
   if (submitted) {
     return (
-      <div className="border border-black/10 bg-white/90 p-8 text-center shadow-sm">
+      <div
+        className="p-8 text-center"
+        style={getBrandCardInlineStyle(brandAdvanced)}
+      >
         <CheckCircle2
           className="mx-auto h-10 w-10"
-          style={{ color: primaryColour }}
+          style={{ color: brandAdvanced.linkColour }}
         />
-        <p className="mt-4 font-semibold" style={{ color: primaryColour }}>
+        <p className="mt-4 font-semibold" style={{ color: brandAdvanced.linkColour }}>
           Thanks! Enquiry received.
         </p>
         <p className="mt-2 text-sm opacity-60">
@@ -73,12 +81,13 @@ export function ListingLeadForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="border border-black/10 bg-white/90 p-6 shadow-sm"
+      className="p-6"
+      style={getBrandCardInlineStyle(brandAdvanced)}
     >
       <div className="mb-5">
         <h2
           className="font-display text-xl font-bold tracking-tight"
-          style={{ color: primaryColour }}
+          style={{ color: brandAdvanced.linkColour }}
         >
           Register your interest
         </h2>
@@ -99,6 +108,7 @@ export function ListingLeadForm({
             placeholder="Jane Smith"
             required
             className="bg-white"
+            style={{ borderRadius: brandAdvanced.inputBorderRadiusPx }}
           />
         </div>
 
@@ -113,6 +123,7 @@ export function ListingLeadForm({
             onChange={(event) => setEmail(event.target.value)}
             placeholder="jane@example.com"
             className="bg-white"
+            style={{ borderRadius: brandAdvanced.inputBorderRadiusPx }}
           />
         </div>
 
@@ -127,14 +138,15 @@ export function ListingLeadForm({
             onChange={(event) => setPhone(event.target.value)}
             placeholder="0400 000 000"
             className="bg-white"
+            style={{ borderRadius: brandAdvanced.inputBorderRadiusPx }}
           />
         </div>
 
         <button
           type="submit"
           disabled={loading || !name.trim()}
-          className="mt-2 flex w-full items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-white shadow transition-opacity disabled:opacity-50 hover:opacity-90"
-          style={{ backgroundColor: primaryColour }}
+          className="mt-2 flex w-full items-center justify-center gap-2 px-6 py-3 text-sm font-semibold shadow transition-opacity disabled:opacity-50 hover:opacity-90"
+          style={getBrandButtonInlineStyle(brandAdvanced)}
         >
           {loading ? (
             <>

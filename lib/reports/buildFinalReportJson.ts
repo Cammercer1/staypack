@@ -84,6 +84,7 @@ export function buildFinalReportJson({
       website_url: agency.website_url ?? "",
       phone: agency.phone ?? "",
       email: agency.email ?? "",
+      brand_advanced: agency.brand_advanced_json ?? null,
     },
     agent: primaryReportAgent(agents),
     agents,

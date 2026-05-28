@@ -16,7 +16,7 @@ import type { Agency, AgentProfile, FinalReportJson, Listing, Report } from "@/l
 
 const steps = [
   { id: "estimate", label: "STR estimate" },
-  { id: "copy", label: "Generate copy" },
+  { id: "copy", label: "Generate collateral" },
   { id: "preview", label: "Preview & publish" },
 ];
 
@@ -195,7 +195,7 @@ export function ReportWizard({
               />
             ) : (
               <p className="text-sm text-muted-foreground">
-                Generate copy first to preview the report.
+                Generate collateral first to preview the report.
               </p>
             )}
           </AsyncLoadingOverlay>

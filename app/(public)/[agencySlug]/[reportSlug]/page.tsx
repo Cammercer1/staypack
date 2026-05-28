@@ -1,4 +1,8 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import {
+  agencySlugNeedsRedirect,
+  resolveAgencyBySlug,
+} from "@/lib/agencies/resolveAgencyBySlug";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
@@ -24,14 +28,14 @@ export default async function PublicReportPage({
   }
 
   const admin = createAdminClient();
-  const { data: agency } = await admin
-    .from("agencies")
-    .select("*")
-    .eq("slug", agencySlug)
-    .maybeSingle();
+  const agency = await resolveAgencyBySlug(admin, agencySlug);
 
   if (!agency) {
     notFound();
+  }
+
+  if (agencySlugNeedsRedirect(agency, agencySlug)) {
+    redirect(`/${agency.slug}/${reportSlug}`);
   }
 
   const { data: report } = await admin

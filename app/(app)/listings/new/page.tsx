@@ -10,7 +10,7 @@ export default async function NewListingPage() {
         <h1 className="heading-gradient text-3xl font-semibold">New listing</h1>
         <p className="text-muted-foreground">
           Import or enter property details, choose photos, and assign listing agents.
-          STR reports and other collateral are created from the listing page.
+          Short-term rental reports and other collateral are created from the listing page.
         </p>
       </div>
       <NewListingFlow />

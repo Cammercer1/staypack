@@ -1,4 +1,8 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import {
+  agencySlugNeedsRedirect,
+  resolveAgencyBySlug,
+} from "@/lib/agencies/resolveAgencyBySlug";
 import { Bath, BedDouble, Car } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
@@ -13,6 +17,11 @@ import { createClient } from "@/lib/supabase/server";
 import { ListingLeadForm } from "@/components/listings/ListingLeadForm";
 import { ListingImageGallery } from "@/components/listings/ListingImageGallery";
 import { InlineDescriptionEditor } from "@/components/listings/InlineDescriptionEditor";
+import {
+  getBrandAdvancedCssVars,
+  getBrandButtonInlineStyle,
+  resolveBrandAdvanced,
+} from "@/lib/branding/advanced";
 import { resolveCollateralGalleryUrls } from "@/lib/listings/collateralImages";
 import { ListingViewTracker } from "@/components/listings/ListingViewTracker";
 import { StayPackLogo } from "@/components/app-shell/StayPackLogo";
@@ -36,13 +45,13 @@ export default async function PublicListingLandingPage({
   }
 
   const admin = createAdminClient();
-  const { data: agency } = await admin
-    .from("agencies")
-    .select("*")
-    .eq("slug", agencySlug)
-    .maybeSingle();
+  const agency = await resolveAgencyBySlug(admin, agencySlug);
 
   if (!agency) notFound();
+
+  if (agencySlugNeedsRedirect(agency, agencySlug)) {
+    redirect(`/${agency.slug}/l/${listingSlug}`);
+  }
 
   const { data: listing } = await admin
     .from("listings")
@@ -60,6 +69,8 @@ export default async function PublicListingLandingPage({
   const primaryColour = a.primary_colour ?? "#002e36";
   const bgColour = a.background_colour ?? "#f9f5ea";
   const textColour = a.text_colour ?? "#002e36";
+  const brandAdvanced = resolveBrandAdvanced(a);
+  const brandCssVars = getBrandAdvancedCssVars(brandAdvanced);
 
   // Fonts
   const headingFontId = a.heading_font_family || a.font_family || "fraunces";
@@ -121,6 +132,7 @@ export default async function PublicListingLandingPage({
         backgroundColor: bgColour,
         color: textColour,
         fontFamily: bodyFontFamily,
+        ...brandCssVars,
       }}
     >
       {/* ── View tracker (skipped for logged-in owners) ─────────── */}
@@ -152,8 +164,8 @@ export default async function PublicListingLandingPage({
           )}
           <a
             href="#lead-form"
-            className="px-5 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
-            style={{ backgroundColor: primaryColour }}
+            className="px-5 py-2 text-sm font-semibold shadow-sm transition-opacity hover:opacity-90"
+            style={getBrandButtonInlineStyle(brandAdvanced)}
           >
             Express interest
           </a>
@@ -299,7 +311,7 @@ export default async function PublicListingLandingPage({
             <ListingLeadForm
               agencySlug={agencySlug}
               listingSlug={listingSlug}
-              primaryColour={primaryColour}
+              brandAdvanced={brandAdvanced}
             />
           </div>
         </div>

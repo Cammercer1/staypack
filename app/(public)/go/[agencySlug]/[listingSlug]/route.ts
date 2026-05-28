@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveAgencyBySlug } from "@/lib/agencies/resolveAgencyBySlug";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
 import { buildListingQrRedirectDestination } from "@/lib/listings/listingUrls";
@@ -19,11 +20,7 @@ export async function GET(
 
   const admin = createAdminClient();
 
-  const { data: agency } = await admin
-    .from("agencies")
-    .select("id")
-    .eq("slug", agencySlug)
-    .maybeSingle();
+  const agency = await resolveAgencyBySlug(admin, agencySlug);
 
   if (!agency) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

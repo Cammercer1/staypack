@@ -42,7 +42,7 @@ export default async function DashboardPage() {
         eyebrow="Dashboard"
         highlight="Welcome"
         title={`back, ${agency.name}.`}
-        description="Create listings, build STR reports, and publish buyer-facing collateral from one place."
+        description="Create listings, build short-term rental reports, and publish buyer-facing collateral from one place."
         action={
           <Link href="/listings/new" prefetch={false}>
             <Button size="lg">

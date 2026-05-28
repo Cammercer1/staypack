@@ -1,3 +1,4 @@
+import { parseAgencyBrandAdvanced } from "@/lib/branding/advanced";
 import type { Agency, FinalReportJson } from "@/lib/types";
 
 export function mergeAgencyBrandIntoFinalReport(
@@ -24,6 +25,7 @@ export function mergeAgencyBrandIntoFinalReport(
       website_url: agency.website_url ?? "",
       phone: agency.phone ?? "",
       email: agency.email ?? "",
+      brand_advanced: parseAgencyBrandAdvanced(agency.brand_advanced_json),
     },
   };
 }

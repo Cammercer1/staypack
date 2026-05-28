@@ -105,6 +105,8 @@ export type AiCopyJson = {
   confidence_notes: string;
 };
 
+export type { AgencyBrandAdvanced } from "@/lib/branding/advanced";
+
 export type FinalReportJson = {
   version: string;
   template_id: string;
@@ -126,6 +128,7 @@ export type FinalReportJson = {
     website_url: string;
     phone: string;
     email: string;
+    brand_advanced?: import("@/lib/branding/advanced").AgencyBrandAdvanced | null;
   };
   agent: {
     name: string;
@@ -204,6 +207,7 @@ export type Agency = {
   id: string;
   name: string;
   slug: string;
+  slug_aliases: string[];
   website_url: string | null;
   email: string | null;
   phone: string | null;
@@ -224,6 +228,7 @@ export type Agency = {
   default_disclaimer: string | null;
   report_template_id: string;
   collateral_template_defaults: Record<string, string>;
+  brand_advanced_json?: import("@/lib/branding/advanced").AgencyBrandAdvanced | null;
   created_at: string;
   updated_at: string;
 };

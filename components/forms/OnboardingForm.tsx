@@ -26,7 +26,7 @@ const steps = [
   {
     id: "branding",
     label: "Branding",
-    description: "Logo, colours, fonts and the default report layout.",
+    description: "Logo, colours and fonts for buyer-facing collateral.",
     fields: [
       "logo_url",
       "primary_colour",
@@ -40,7 +40,6 @@ const steps = [
       "body_font_file_url",
       "font_file_url",
       "font_family",
-      "report_template_id",
     ] as const,
   },
   {

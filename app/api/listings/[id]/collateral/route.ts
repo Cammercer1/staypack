@@ -45,7 +45,7 @@ export async function POST(
 
     if (body.type === "str_report") {
       return NextResponse.json(
-        { error: "Use the STR report flow to create an STR report" },
+        { error: "Use the Short-Term Rental Report flow to create this report" },
         { status: 400 },
       );
     }

@@ -1,5 +1,7 @@
 import type { CollateralType } from "@/lib/types";
 
+export const STR_REPORT_LABEL = "Short-Term Rental Report";
+
 export const COLLATERAL_TYPE_ORDER: CollateralType[] = [
   "str_report",
   "sales_brochure",
@@ -12,7 +14,7 @@ export const COLLATERAL_TYPE_META: Record<
   { label: string; description: string; comingSoon?: boolean }
 > = {
   str_report: {
-    label: "STR report",
+    label: STR_REPORT_LABEL,
     description: "Short-term rental potential report for buyers.",
   },
   sales_brochure: {

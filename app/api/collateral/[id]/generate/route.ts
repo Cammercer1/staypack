@@ -15,7 +15,7 @@ export async function POST(
 
     if (collateral.type === "str_report") {
       return NextResponse.json(
-        { error: "Use the STR report flow for STR reports" },
+        { error: "Use the Short-Term Rental Report flow for this collateral type" },
         { status: 400 },
       );
     }

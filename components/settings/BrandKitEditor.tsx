@@ -7,7 +7,6 @@ import { AgencyLogoUploader } from "@/components/settings/AgencyLogoUploader";
 import { BrandPreviewCard } from "@/components/settings/BrandPreviewCard";
 import { ColourField } from "@/components/settings/ColourField";
 import { FontPicker } from "@/components/settings/FontPicker";
-import { ReportTemplatePicker } from "@/components/reports/ReportTemplatePicker";
 
 type Props = {
   form: UseFormReturn<AgencyInput>;
@@ -81,24 +80,6 @@ export function BrandKitEditor({
           </p>
         </div>
         <FontPicker form={form} agencyId={agencyId} />
-      </section>
-
-      <section className="space-y-4">
-        <div>
-          <h3 className="font-display text-xl tracking-tight">
-            {sectionPrefix(4)}Report template
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Choose the default layout for new reports. Agents can pick a different
-            template when generating an individual report.
-          </p>
-        </div>
-        <ReportTemplatePicker
-          value={preview.report_template_id ?? "classic-light"}
-          onChange={(templateId) =>
-            form.setValue("report_template_id", templateId, { shouldDirty: true })
-          }
-        />
       </section>
 
       {showPreview ? (

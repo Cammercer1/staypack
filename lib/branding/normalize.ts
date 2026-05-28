@@ -1,11 +1,13 @@
+import { parseAgencyBrandAdvanced } from "@/lib/branding/advanced";
 import type { AgencyInput } from "@/lib/validation/schemas";
 
 export function normalizeAgencyBrandPayload(body: AgencyInput) {
   const headingFontFamily = body.heading_font_family || body.font_family || "fraunces";
   const bodyFontFamily = body.body_font_family || body.font_family || "inter";
+  const { brand_advanced_json, ...rest } = body;
 
   return {
-    ...body,
+    ...rest,
     website_url: body.website_url || null,
     email: body.email || null,
     phone: body.phone || null,
@@ -19,6 +21,9 @@ export function normalizeAgencyBrandPayload(body: AgencyInput) {
     default_disclaimer: body.default_disclaimer || null,
     report_template_id: body.report_template_id || "classic-light",
     secondary_colour: body.background_colour,
+    ...(brand_advanced_json !== undefined
+      ? { brand_advanced_json: parseAgencyBrandAdvanced(brand_advanced_json) }
+      : {}),
   };
 }
 

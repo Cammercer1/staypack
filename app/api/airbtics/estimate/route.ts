@@ -4,6 +4,7 @@ import { geocodeReportAddress } from "@/lib/geocoding";
 import { airbticsEstimateSchema } from "@/lib/validation/schemas";
 import { fetchAirbticsEstimate } from "@/lib/airbtics/client";
 import { calculateAccommodates } from "@/lib/reports/formatters";
+import { reportTemplateIdFromAirbticsTier } from "@/lib/reports/templateFromEstimateTier";
 
 export async function POST(request: Request) {
   try {
@@ -64,10 +65,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: listingError.message }, { status: 400 });
     }
 
+    const templateId = reportTemplateIdFromAirbticsTier(tier);
+
     const { data, error } = await supabase
       .from("reports")
       .update({
         airbtics_tier: tier,
+        ...(templateId ? { template_id: templateId } : {}),
         airbtics_report_id: reportId,
         airbtics_cost_cents: costCents,
         airbtics_fetched_at: new Date().toISOString(),

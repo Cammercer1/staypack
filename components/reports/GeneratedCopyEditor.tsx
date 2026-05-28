@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
@@ -15,7 +15,7 @@ import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPri
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
 import { enforceTemplateCopyLimits } from "@/lib/reports/enforceTemplateCopyLimits";
 import { getTemplateCopyFieldLimit } from "@/lib/reports/getTemplateCopyLimits";
-import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
+import { resolveReportTemplateIdForReport } from "@/lib/reports/templateFromEstimateTier";
 import { ReportTemplatePicker } from "@/components/reports/ReportTemplatePicker";
 import type { Agency, AgentProfile, AiCopyJson, Listing, Report } from "@/lib/types";
 
@@ -45,15 +45,22 @@ export function GeneratedCopyEditor({
     report.ai_copy_json
       ? enforceTemplateCopyLimits(
           report.ai_copy_json,
-          report.template_id ?? agency.report_template_id ?? DEFAULT_REPORT_TEMPLATE_ID,
+          resolveReportTemplateIdForReport(agency, report),
         )
       : null,
   );
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = useState(
-    () => report.template_id ?? agency.report_template_id ?? DEFAULT_REPORT_TEMPLATE_ID,
+  const layoutLockedToEstimate = report.airbtics_tier != null;
+  const resolvedTemplateId = useMemo(
+    () => resolveReportTemplateIdForReport(agency, report),
+    [agency, report],
   );
+  const [selectedTemplateId, setSelectedTemplateId] = useState(resolvedTemplateId);
+
+  useEffect(() => {
+    setSelectedTemplateId(resolvedTemplateId);
+  }, [resolvedTemplateId]);
 
   const estimate = useMemo(() => resolveReportEstimate(report), [report]);
   const displayPrice = useMemo(() => resolveReportDisplayPrice(listing), [listing]);
@@ -101,7 +108,7 @@ export function GeneratedCopyEditor({
     }
 
     if (!options?.silent) {
-      toast.success("Copy saved");
+      toast.success("Collateral saved");
     }
 
     setSaving(false);
@@ -110,7 +117,7 @@ export function GeneratedCopyEditor({
 
   async function generateCopy() {
     if (!estimate) {
-      toast.error("Run an STR estimate before generating copy");
+      toast.error("Run an STR estimate before generating collateral");
       return;
     }
 
@@ -139,7 +146,7 @@ export function GeneratedCopyEditor({
       onComplete(payload.report);
     }
 
-    toast.success("Report copy generated");
+    toast.success("Collateral generated");
     setGenerating(false);
   }
 
@@ -223,8 +230,8 @@ export function GeneratedCopyEditor({
   return (
     <AsyncLoadingOverlay
       active={overlayActive}
-      title="Generating report copy"
-      description="Writing buyer-facing copy from your listing and STR numbers. This usually takes 10–20 seconds."
+      title="Generating collateral"
+      description="Writing buyer-facing collateral from your listing and STR numbers. This usually takes 10–20 seconds."
     >
     <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="space-y-6">
@@ -271,7 +278,7 @@ export function GeneratedCopyEditor({
               </>
             ) : (
               <p className="sm:col-span-2 text-muted-foreground">
-                Run an STR estimate first to generate buyer-facing copy.
+                Run an STR estimate first to generate buyer-facing collateral.
               </p>
             )}
           </div>
@@ -291,19 +298,19 @@ export function GeneratedCopyEditor({
             {generating ? (
               <>
                 <Loader2 className="animate-spin" />
-                Generating copy...
+                Generating collateral...
               </>
             ) : copy ? (
-              "Regenerate copy"
+              "Regenerate collateral"
             ) : (
-              "Generate report copy"
+              "Generate collateral"
             )}
           </Button>
         </div>
 
         {!estimate ? (
           <p className="text-sm text-muted-foreground">
-            Go to the STR estimate tab and run an estimate before generating copy.
+            Go to the STR estimate tab and run an estimate before generating collateral.
           </p>
         ) : null}
 
@@ -347,7 +354,7 @@ export function GeneratedCopyEditor({
                 onClick={saveCopy}
                 disabled={generating || saving}
               >
-                {saving ? "Saving..." : "Save copy"}
+                {saving ? "Saving..." : "Save collateral"}
               </Button>
               {onContinueToPreview ? (
                 <Button
@@ -363,14 +370,16 @@ export function GeneratedCopyEditor({
       </div>
 
       <div className="space-y-3 xl:sticky xl:top-6 xl:self-start">
-        <div className="space-y-3">
-          <p className="text-sm font-medium">Report layout</p>
-          <ReportTemplatePicker
-            value={selectedTemplateId}
-            onChange={handleTemplateChange}
-            defaultTemplateId={agency.report_template_id ?? DEFAULT_REPORT_TEMPLATE_ID}
-          />
-        </div>
+        {!layoutLockedToEstimate ? (
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Report template</p>
+            <ReportTemplatePicker
+              value={selectedTemplateId}
+              onChange={handleTemplateChange}
+              defaultTemplateId={agency.report_template_id}
+            />
+          </div>
+        ) : null}
 
         <p className="text-sm font-medium">Live preview</p>
         {previewReport ? (
@@ -381,7 +390,7 @@ export function GeneratedCopyEditor({
           />
         ) : (
           <div className="rounded-xl border border-dashed p-8 text-sm text-muted-foreground">
-            Generate or edit copy to preview the report layout.
+            Generate or edit collateral to preview the report.
           </div>
         )}
       </div>
@@ -459,12 +468,12 @@ function Field({
 
 function getErrorMessage(payload: ApiError) {
   if (payload.code === "missing_estimate") {
-    return "Run an STR estimate before generating copy.";
+    return "Run an STR estimate before generating collateral.";
   }
 
   if (payload.code === "validation_failed") {
-    return "Generated copy did not pass validation. Try again.";
+    return "Generated collateral did not pass validation. Try again.";
   }
 
-  return payload.error ?? "Copy generation failed";
+  return payload.error ?? "Collateral generation failed";
 }

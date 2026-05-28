@@ -5,7 +5,7 @@ export default function SignupPage() {
   return (
     <AuthLayout
       highlight="Expert"
-      title="STR reports built for agencies."
+      title="Short-term rental reports built for agencies."
       description="Sign up to configure your agency branding, generate buyer-facing reports, and publish shareable links in minutes."
     >
       <SignupForm />

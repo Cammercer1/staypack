@@ -26,7 +26,7 @@ export function ListingLibrary({ listings }: { listings: ListingWithReport[] }) 
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead className={headClassName}>Property</TableHead>
-            <TableHead className={headClassName}>STR report</TableHead>
+            <TableHead className={headClassName}>Short-Term Rental Report</TableHead>
             <TableHead className={headClassName}>
               Estimated annual STR revenue
             </TableHead>

@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { requireListingReportAccess } from "@/lib/auth/requireUser";
 import { ReportEditor } from "@/components/reports/ReportEditor";
 import { Button } from "@/components/ui/button";
+import { STR_REPORT_LABEL } from "@/lib/listings/collateralTypes";
 import type { Listing, Report } from "@/lib/types";
 
 export default async function ListingReportEditorPage({
@@ -39,10 +40,10 @@ export default async function ListingReportEditorPage({
 
       <div>
         <h1 className="heading-gradient text-3xl font-semibold">
-          STR report
+          {STR_REPORT_LABEL}
         </h1>
         <p className="text-muted-foreground">
-          Run the STR estimate, generate copy, and publish this report for{" "}
+          Run the STR estimate, generate collateral, and publish this report for{" "}
           {listing.property_address ?? "this listing"}.
         </p>
       </div>

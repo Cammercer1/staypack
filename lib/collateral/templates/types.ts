@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import type { CollateralType } from "@/lib/types";
+import type { AgencyBrandAdvanced, CollateralType } from "@/lib/types";
 
 export type CollateralPageFormatId =
   | "a4-portrait"
@@ -23,6 +23,7 @@ export type CollateralBrandSlice = {
   website_url: string;
   email: string;
   phone: string;
+  brand_advanced?: AgencyBrandAdvanced | null;
 };
 
 export type CollateralAgentSlice = {

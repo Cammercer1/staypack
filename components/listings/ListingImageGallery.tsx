@@ -71,9 +71,13 @@ export function ListingImageGallery({ images, address }: Props) {
   function desktopImg(src: string | undefined, alt: string) {
     if (!src) return null;
     return (
-      <div className="relative h-full w-full">
+      <div className="relative h-full min-h-0 w-full overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} className="h-full w-full object-cover" />
+        <img
+          src={src}
+          alt={alt}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
       </div>
     );
   }
@@ -92,42 +96,38 @@ export function ListingImageGallery({ images, address }: Props) {
       </div>
 
       {/* ── Desktop gallery ───────────────────────────────── */}
-      <div className="hidden gap-1 md:flex" style={{ height: 480 }}>
+      <div className="hidden h-[480px] min-h-0 gap-1 overflow-hidden md:flex">
 
         {/* Col 1 — hero, full height, 2/4 width */}
-        <div className="relative flex-[2]">
+        <div className="relative min-h-0 flex-[2] overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={images[0]}
             alt={`${address} — 1`}
-            className="h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
           />
         </div>
 
         {/* Col 2 — two equal rows, 1/4 width */}
-        {(images[1] || images[2]) ? (
-          <div className="flex flex-[1] flex-col gap-1">
-            <div className="relative flex-1">
+        {images[1] || images[2] ? (
+          <div className="flex min-h-0 flex-[1] flex-col gap-1 overflow-hidden">
+            <div className="relative min-h-0 flex-1 overflow-hidden">
               {desktopImg(images[1], `${address} — 2`)}
             </div>
-            <div className="relative flex-1">
+            <div className="relative min-h-0 flex-1 overflow-hidden">
               {desktopImg(images[2], `${address} — 3`)}
             </div>
           </div>
         ) : null}
 
-        {/* Col 3 — single image ~90% height, Show All Photos bar below */}
+        {/* Col 3 — single image + Show All Photos bar */}
         {images[3] ? (
-          <div className="flex flex-[1] flex-col gap-1">
-            <div className="relative min-h-0 flex-1">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={images[3]}
-                alt={`${address} — 4`}
-                className="h-full w-full object-cover"
-              />
+          <div className="flex min-h-0 flex-[1] flex-col gap-1 overflow-hidden">
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              {desktopImg(images[3], `${address} — 4`)}
             </div>
             <button
+              type="button"
               onClick={() => setModalOpen(true)}
               className="flex shrink-0 items-center justify-between bg-black/80 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-black"
             >

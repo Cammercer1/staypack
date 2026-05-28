@@ -70,6 +70,7 @@ export const agencySchema = z.object({
   report_template_id: z
     .string()
     .refine(isValidReportTemplateId, { message: "Select a valid report template" }),
+  brand_advanced_json: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
 export const agentProfileSchema = z.object({

@@ -1,3 +1,4 @@
+import { reportTemplateIdFromAirbticsTier } from "@/lib/reports/templateFromEstimateTier";
 import {
   DEFAULT_REPORT_TEMPLATE_ID,
   isValidReportTemplateId,
@@ -6,6 +7,11 @@ import {
 import type { Agency, FinalReportJson, Report } from "@/lib/types";
 
 export function resolveReportTemplateId(agency: Agency, report: Report): string {
+  const fromEstimateTier = reportTemplateIdFromAirbticsTier(report.airbtics_tier);
+  if (fromEstimateTier) {
+    return fromEstimateTier;
+  }
+
   if (report.template_id && isValidReportTemplateId(report.template_id)) {
     return normalizeReportTemplateId(report.template_id);
   }

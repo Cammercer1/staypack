@@ -1,4 +1,8 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import {
+  agencySlugNeedsRedirect,
+  resolveAgencyBySlug,
+} from "@/lib/agencies/resolveAgencyBySlug";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
 import { CollateralPreview } from "@/components/collateral/CollateralPreview";
@@ -17,14 +21,14 @@ export default async function PublicCollateralPrintPage({
   }
 
   const admin = createAdminClient();
-  const { data: agency } = await admin
-    .from("agencies")
-    .select("*")
-    .eq("slug", agencySlug)
-    .maybeSingle();
+  const agency = await resolveAgencyBySlug(admin, agencySlug);
 
   if (!agency) {
     notFound();
+  }
+
+  if (agencySlugNeedsRedirect(agency, agencySlug)) {
+    redirect(`/${agency.slug}/c/${collateralSlug}/print`);
   }
 
   const { data: collateral } = await admin

@@ -1,3 +1,7 @@
+import {
+  getBrandAdvancedCssVars,
+  resolveBrandAdvanced,
+} from "@/lib/branding/advanced";
 import type { FinalReportJson } from "@/lib/types";
 
 export type ReportBrandColours = {
@@ -25,4 +29,14 @@ export function getReportBrandColourVars(colours: ReportBrandColours) {
     ["--report-soft-highlight" as string]: colours.softHighlight,
     ["--report-page-background" as string]: colours.pageBackground,
   };
+}
+
+export function getReportBrandAdvancedVars(agency: FinalReportJson["agency"]) {
+  const resolved = resolveBrandAdvanced({
+    primary_colour: agency.primary_colour,
+    text_colour: agency.text_colour,
+    brand_advanced_json: agency.brand_advanced ?? null,
+  });
+
+  return getBrandAdvancedCssVars(resolved);
 }

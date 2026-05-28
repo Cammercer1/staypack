@@ -6,6 +6,10 @@ import {
   requireUser,
 } from "@/lib/auth/requireUser";
 import { agencySchema } from "@/lib/validation/schemas";
+import {
+  discoverStaleAgencySlugsInPublicUrls,
+  syncAgencyPublicUrls,
+} from "@/lib/agencies/syncAgencyPublicUrls";
 import { normalizeAgencyBrandPayload } from "@/lib/branding/normalize";
 
 export async function POST(request: Request) {
@@ -53,10 +57,27 @@ export async function PATCH(request: Request) {
     const { supabase, agency } = await requireAgencyAdmin();
     const body = agencySchema.parse(await request.json());
     const payload = normalizeAgencyBrandPayload(body);
+    const slugChanged = payload.slug !== agency.slug;
+    const staleSlugs = await discoverStaleAgencySlugsInPublicUrls(
+      supabase,
+      agency.id,
+      payload.slug,
+    );
+    const slugAliases = [
+      ...new Set([
+        ...(agency.slug_aliases ?? []),
+        ...(slugChanged ? [agency.slug] : []),
+        ...staleSlugs,
+      ]),
+    ];
+    const updatePayload =
+      slugAliases.length > (agency.slug_aliases?.length ?? 0) || slugChanged
+        ? { ...payload, slug_aliases: slugAliases }
+        : payload;
 
     const { data, error } = await supabase
       .from("agencies")
-      .update(payload)
+      .update(updatePayload)
       .eq("id", agency.id)
       .select("*")
       .single();
@@ -64,6 +85,8 @@ export async function PATCH(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    await syncAgencyPublicUrls(supabase, agency.id, data.slug);
 
     return NextResponse.json({ agency: data });
   } catch (error) {

@@ -33,7 +33,7 @@ export default async function DevTemplatesPage({
         <div className="max-w-md space-y-4 text-center">
           <h1 className="text-xl font-semibold">Report missing preview data</h1>
           <p className="text-sm text-muted-foreground">
-            This report needs an STR estimate and generated copy before it can
+            This report needs an STR estimate and generated collateral before it can
             be used as a template fixture. Finish the report wizard first, or
             pick a report that already has{" "}
             <code className="text-xs">final_report_json</code>.

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveAgencyBySlug } from "@/lib/agencies/resolveAgencyBySlug";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createPublicLeadSchema } from "@/lib/validation/schemas";
 
@@ -7,13 +8,20 @@ export async function POST(request: Request) {
     const body = createPublicLeadSchema.parse(await request.json());
     const admin = createAdminClient();
 
-    const { data: agency, error: agencyError } = await admin
-      .from("agencies")
-      .select("id")
-      .eq("slug", body.agency_slug)
-      .maybeSingle();
+    let agency;
+    try {
+      agency = await resolveAgencyBySlug(admin, body.agency_slug);
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error ? error.message : "Unable to load agency",
+        },
+        { status: 400 },
+      );
+    }
 
-    if (agencyError || !agency) {
+    if (!agency) {
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 

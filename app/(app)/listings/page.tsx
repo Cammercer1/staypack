@@ -32,7 +32,7 @@ export default async function ListingsPage() {
         eyebrow="Listings"
         highlight="Your"
         title="open house library."
-        description="Browse listings and open each property to manage STR reports, links, and PDFs."
+        description="Browse listings and open each property to manage short-term rental reports, links, and PDFs."
         action={
           <Link href="/listings/new" prefetch={false}>
             <Button size="lg">

@@ -1,3 +1,4 @@
+import { parseAgencyBrandAdvanced } from "@/lib/branding/advanced";
 import type { Agency } from "@/lib/types";
 import type { CollateralBrandSlice } from "@/lib/collateral/templates/types";
 
@@ -19,5 +20,6 @@ export function buildAgencyBrandSlice(agency: Agency): CollateralBrandSlice {
     website_url: agency.website_url ?? "",
     email: agency.email ?? "",
     phone: agency.phone ?? "",
+    brand_advanced: parseAgencyBrandAdvanced(agency.brand_advanced_json),
   };
 }

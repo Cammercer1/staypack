@@ -28,7 +28,7 @@ export async function POST(
     if (!estimate) {
       return NextResponse.json(
         {
-          error: "Run an STR estimate before generating copy",
+          error: "Run an STR estimate before generating collateral",
           code: "missing_estimate",
         },
         { status: 400 },

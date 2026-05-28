@@ -8,6 +8,10 @@ import {
 import { getCollateralTemplate } from "@/lib/collateral/templates/registry";
 import { resolveTemplateIdFromDocument } from "@/lib/collateral/templates/resolveTemplateId";
 import {
+  getBrandAdvancedCssVars,
+  resolveBrandAdvanced,
+} from "@/lib/branding/advanced";
+import {
   resolveBodyFontFamily,
   resolveHeadingFontFamily,
 } from "@/lib/branding/google-fonts";
@@ -39,6 +43,11 @@ export function CollateralPreview({
     headingFontFileUrl,
   );
   const bodyFontFamily = resolveBodyFontFamily(bodyFontId, bodyFontFileUrl);
+  const brandAdvanced = resolveBrandAdvanced({
+    primary_colour: agency.primary_colour,
+    text_colour: agency.text_colour,
+    brand_advanced_json: agency.brand_advanced ?? null,
+  });
 
   return (
     <div
@@ -50,6 +59,7 @@ export function CollateralPreview({
         ["--collateral-body-font" as string]: bodyFontFamily,
         ["--collateral-primary" as string]: agency.primary_colour,
         ["--collateral-text" as string]: agency.text_colour || "#1a1a1a",
+        ...getBrandAdvancedCssVars(brandAdvanced),
       }}
     >
       <BrandFontLoader

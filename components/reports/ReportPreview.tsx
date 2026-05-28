@@ -2,6 +2,7 @@
 
 import type { FinalReportJson } from "@/lib/types";
 import {
+  getReportBrandAdvancedVars,
   getReportBrandColourVars,
   getReportBrandColours,
 } from "@/lib/reports/brandColours";
@@ -38,6 +39,7 @@ export function ReportPreview({
       style={{
         ...getReportPageFormatStyle(pageFormat),
         ...getReportBrandColourVars(brand),
+        ...getReportBrandAdvancedVars(report.agency),
         color: brand.text,
         backgroundColor: brand.pageBackground,
         ["--report-heading-font" as string]: fonts.headingFontFamily,

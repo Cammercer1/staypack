@@ -24,7 +24,7 @@ export async function POST(
 
     if (!report.final_report_json) {
       return NextResponse.json(
-        { error: "Generate report copy before publishing" },
+        { error: "Generate collateral before publishing" },
         { status: 400 },
       );
     }

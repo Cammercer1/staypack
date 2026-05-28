@@ -1,6 +1,10 @@
 "use client";
 
 import { BrandFontLoader, useBrandFontStyles } from "@/components/settings/BrandFontLoader";
+import {
+  getBrandButtonInlineStyle,
+  resolveBrandAdvanced,
+} from "@/lib/branding/advanced";
 import type { AgencyInput } from "@/lib/validation/schemas";
 
 export function BrandPreviewCard({ preview }: { preview: AgencyInput }) {
@@ -11,6 +15,11 @@ export function BrandPreviewCard({ preview }: { preview: AgencyInput }) {
     body_font_file_url: preview.body_font_file_url || preview.font_file_url,
   };
   const { headingFamily, bodyFamily } = useBrandFontStyles(fonts);
+  const brandAdvanced = resolveBrandAdvanced({
+    primary_colour: preview.primary_colour || "#002e36",
+    text_colour: preview.text_colour || "#002e36",
+    brand_advanced_json: preview.brand_advanced_json ?? null,
+  });
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border/70 shadow-sm">
@@ -74,6 +83,14 @@ export function BrandPreviewCard({ preview }: { preview: AgencyInput }) {
             </p>
           </div>
         </div>
+
+        <button
+          type="button"
+          className="mt-5 px-5 py-2.5 text-sm font-semibold shadow-sm"
+          style={getBrandButtonInlineStyle(brandAdvanced)}
+        >
+          Sample button style
+        </button>
       </div>
     </div>
   );
