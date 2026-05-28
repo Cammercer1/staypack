@@ -5,13 +5,18 @@ import type { ReportTemplateTier } from "@/lib/reports/templates/types";
 
 type Props = {
   value: string;
-  /** Inherited from the STR estimate step — controls light vs detailed. */
-  tier: ReportTemplateTier;
+  /**
+   * Inherited from the STR estimate step — controls light vs detailed.
+   * When omitted the tier is derived from the current value (useful in dev/playground).
+   */
+  tier?: ReportTemplateTier;
   onChange: (templateId: string) => void;
 };
 
 /** One option per visual family; tier (pages) is inherited from the estimate step. */
-export function ReportTemplatePicker({ value, tier, onChange }: Props) {
+export function ReportTemplatePicker({ value, tier: tierProp, onChange }: Props) {
+  const tier: ReportTemplateTier =
+    tierProp ?? (value.endsWith("-detailed") ? "detailed" : "light");
   // Deduplicate: one entry per family (use the light variant as the canonical label)
   const families = REPORT_TEMPLATES.filter((t) => t.tier === "light").map((t) => ({
     family: t.family,
