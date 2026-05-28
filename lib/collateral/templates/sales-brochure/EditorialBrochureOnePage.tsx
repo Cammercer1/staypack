@@ -1,4 +1,5 @@
-import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
+import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
+import type { CollateralDocumentJson, CollateralTemplateProps } from "@/lib/collateral/templates/types";
 import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
 import { ClassicAgentFooter } from "@/lib/reports/templates/classic/ClassicAgentFooter";
 import {
@@ -17,18 +18,19 @@ import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/share
 /**
  * Editorial · 1 page — hero flush to page top, logo over image, overlay typography below.
  */
-export function EditorialBrochureOnePage({ document }: { document: CollateralDocumentJson }) {
+export function EditorialBrochureOnePage({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isSalesBrochureDocument(document)) return null;
 
   const { report, brand, pageOneGallery } = useBrochurePage(document);
   const hero = pageOneGallery.hero_image_url;
+  const fmt = getCollateralPageFormat(pageFormat);
 
   return (
     <div
       className="sales-brochure-preview flex flex-col"
       style={{
-        ["--report-page-width" as string]: "210mm",
-        ["--report-page-height" as string]: "297mm",
+        ["--report-page-width" as string]: fmt.width,
+        ["--report-page-height" as string]: fmt.height,
       }}
     >
       <BrochurePageShell brand={brand}>

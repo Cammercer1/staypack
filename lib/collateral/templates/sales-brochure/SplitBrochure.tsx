@@ -1,5 +1,6 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
-import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
+import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
+import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
 import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
 import {
   SplitSpreadLayout,
@@ -49,7 +50,7 @@ function SplitPageTwoPhotoMosaic({ urls }: { urls: string[] }) {
 }
 
 /** Split · 2 pages — page 1 open-home split; page 2 photo mosaic + highlights + footer. */
-export function SplitBrochure({ document }: { document: CollateralDocumentJson }) {
+export function SplitBrochure({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isSalesBrochureDocument(document)) return null;
 
   const { report, brand, pageTwoImages } = useBrochurePage(document);
@@ -57,6 +58,7 @@ export function SplitBrochure({ document }: { document: CollateralDocumentJson }
   const agent = report.agent;
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
   const accent = document.agency.primary_colour || "#1f2937";
+  const fmt = getCollateralPageFormat(pageFormat);
 
   // Use page_two_image_urls, fall back to page_one_image_urls[1+]
   const photoPool = pageTwoImages.length >= 2
@@ -67,8 +69,8 @@ export function SplitBrochure({ document }: { document: CollateralDocumentJson }
     <div
       className="sales-brochure-preview flex flex-col"
       style={{
-        ["--report-page-width" as string]: "210mm",
-        ["--report-page-height" as string]: "297mm",
+        ["--report-page-width" as string]: fmt.width,
+        ["--report-page-height" as string]: fmt.height,
       }}
     >
       <BrochurePageShell brand={brand}>
@@ -76,7 +78,7 @@ export function SplitBrochure({ document }: { document: CollateralDocumentJson }
       </BrochurePageShell>
 
       <BrochurePageShell brand={brand}>
-        <div className="flex h-[297mm] flex-col overflow-hidden">
+        <div className="flex flex-col overflow-hidden" style={{ height: fmt.height }}>
 
           {/* Photo mosaic — 52% of page */}
           <div className="h-[155mm] shrink-0 overflow-hidden">

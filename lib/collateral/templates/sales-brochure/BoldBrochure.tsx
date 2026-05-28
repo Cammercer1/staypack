@@ -1,5 +1,6 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
-import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
+import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
+import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
 import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
 import {
   BoldFooterBand,
@@ -13,11 +14,12 @@ const headingFont = "var(--report-heading-font, var(--collateral-heading-font, i
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
 
 /** Bold · 2 pages — dramatic hero cover; page 2 photo mosaic + highlights + footer. */
-export function BoldBrochure({ document }: { document: CollateralDocumentJson }) {
+export function BoldBrochure({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isSalesBrochureDocument(document)) return null;
 
   const { report, brand, pageTwoImages } = useBrochurePage(document);
   const { secondary } = resolveBoldPhotos(document);
+  const fmt = getCollateralPageFormat(pageFormat);
   const accent = document.agency.primary_colour || "#1a1a2e";
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
 
@@ -44,18 +46,18 @@ export function BoldBrochure({ document }: { document: CollateralDocumentJson })
     <div
       className="sales-brochure-preview flex flex-col"
       style={{
-        ["--report-page-width" as string]: "210mm",
-        ["--report-page-height" as string]: "297mm",
+        ["--report-page-width" as string]: fmt.width,
+        ["--report-page-height" as string]: fmt.height,
       }}
     >
       <BrochurePageShell brand={brand}>
-        <div className="flex h-[297mm] flex-col overflow-hidden">
+        <div className="flex flex-col overflow-hidden" style={{ height: fmt.height }}>
           <BoldPageOneSpread document={document} report={report} />
         </div>
       </BrochurePageShell>
 
       <BrochurePageShell brand={brand}>
-        <div className="flex h-[297mm] flex-col overflow-hidden">
+        <div className="flex flex-col overflow-hidden" style={{ height: fmt.height }}>
           {/* Page 2 header */}
           <div
             className="flex shrink-0 items-center justify-between px-8 py-4"

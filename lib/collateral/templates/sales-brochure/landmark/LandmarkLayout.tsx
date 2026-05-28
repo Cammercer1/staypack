@@ -349,7 +349,7 @@ export function LandmarkSpread({
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
 
   return (
-    <div className="flex h-[297mm] flex-col overflow-hidden bg-white">
+    <div className="flex flex-col overflow-hidden bg-white" style={{ height: "var(--report-page-height, 297mm)" }}>
       {/* Hero — ~42% of page */}
       <div className="relative h-[125mm] shrink-0 overflow-hidden">
         {hero ? (

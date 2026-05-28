@@ -1,6 +1,6 @@
-import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
+import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
+import type { CollateralTemplateProps, SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
 import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
 import { ClassicAgentFooter } from "@/lib/reports/templates/classic/ClassicAgentFooter";
 import { formatNumber } from "@/lib/reports/formatters";
 import {
@@ -119,11 +119,12 @@ function EditorialCoverFacts({
 /**
  * Editorial · 2 pages — photo spread from page top with logo; inside spread below.
  */
-export function EditorialBrochure({ document }: { document: CollateralDocumentJson }) {
+export function EditorialBrochure({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isSalesBrochureDocument(document)) return null;
 
   const { report, brand, pageOneGallery, pageTwoImages } = useBrochurePage(document);
   const hero = pageOneGallery.hero_image_url;
+  const fmt = getCollateralPageFormat(pageFormat);
   const sideStack = pageOneGallery.selected_image_urls.slice(0, 2);
 
   // Build a rich left-column photo pool: page two images first, then page one leftovers
@@ -147,13 +148,13 @@ export function EditorialBrochure({ document }: { document: CollateralDocumentJs
     <div
       className="sales-brochure-preview flex flex-col"
       style={{
-        ["--report-page-width" as string]: "210mm",
-        ["--report-page-height" as string]: "297mm",
+        ["--report-page-width" as string]: fmt.width,
+        ["--report-page-height" as string]: fmt.height,
       }}
     >
       {/* Page 1 — cover spread, images from top */}
       <BrochurePageShell brand={brand}>
-        <div className="flex h-[297mm] flex-col overflow-hidden">
+        <div className="flex flex-col overflow-hidden" style={{ height: fmt.height }}>
           <div className="relative grid h-[164mm] shrink-0 grid-cols-[1.35fr_0.65fr] gap-[3px] bg-neutral-900">
             <EditorialPhotoTopScrim />
             <EditorialLogoOverlay document={document} report={report} />
@@ -225,7 +226,7 @@ export function EditorialBrochure({ document }: { document: CollateralDocumentJs
 
       {/* Page 2 — left photo stack, right highlights + footer */}
       <BrochurePageShell brand={brand}>
-        <div className="flex h-[297mm] flex-col overflow-hidden">
+        <div className="flex flex-col overflow-hidden" style={{ height: fmt.height }}>
           <EditorialMasthead document={document} report={report} />
 
           <div className="grid min-h-0 flex-1 grid-cols-[1fr_1fr] overflow-hidden">

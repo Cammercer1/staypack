@@ -294,7 +294,7 @@ export function SplitSpreadLayout({
   report: FinalReportJson;
 }) {
   return (
-    <div className="grid h-[297mm] grid-cols-[0.42fr_0.58fr] overflow-hidden">
+    <div className="grid grid-cols-[0.42fr_0.58fr] overflow-hidden" style={{ height: "var(--report-page-height, 297mm)" }}>
       <SplitContentColumn document={document} report={report} />
       <SplitPhotoColumn document={document} />
     </div>

@@ -2,23 +2,21 @@ import { ClassicAgentFooter } from "@/lib/reports/templates/classic/ClassicAgent
 import { ClassicHeroGallery } from "@/lib/reports/templates/classic/ClassicHeroGallery";
 import { ClassicPageHeader } from "@/lib/reports/templates/classic/ClassicPageHeader";
 import { salesBrochureToReportShape } from "@/lib/collateral/sales-brochure/toReportShape";
-import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
+import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
+import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
 import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
 import { getReportBrandColours } from "@/lib/reports/brandColours";
 import { SalesBrochurePropertySection } from "@/lib/collateral/templates/sales-brochure/SalesBrochurePropertySection";
 
-type Props = {
-  document: CollateralDocumentJson;
-};
-
 /** Single-page Classic sales brochure (gallery, copy, agent + QR on one A4). */
-export function ClassicSalesBrochureOnePage({ document }: Props) {
+export function ClassicSalesBrochureOnePage({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isSalesBrochureDocument(document)) {
     return null;
   }
 
   const report = salesBrochureToReportShape(document);
   const brand = getReportBrandColours(report.agency);
+  const fmt = getCollateralPageFormat(pageFormat);
   const pageOneProperty = {
     ...report.property,
     hero_image_url:
@@ -30,8 +28,8 @@ export function ClassicSalesBrochureOnePage({ document }: Props) {
     <div
       className="sales-brochure-preview flex flex-col gap-0"
       style={{
-        ["--report-page-width" as string]: "210mm",
-        ["--report-page-height" as string]: "297mm",
+        ["--report-page-width" as string]: fmt.width,
+        ["--report-page-height" as string]: fmt.height,
       }}
     >
       <section
@@ -39,8 +37,8 @@ export function ClassicSalesBrochureOnePage({ document }: Props) {
         style={{
           backgroundColor: brand.pageBackground,
           color: brand.text,
-          width: "var(--report-page-width, 210mm)",
-          minHeight: "var(--report-page-height, 297mm)",
+          width: "var(--report-page-width)",
+          minHeight: "var(--report-page-height)",
         }}
       >
         <ClassicPageHeader report={report} />

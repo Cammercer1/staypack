@@ -262,6 +262,7 @@ export function isBusinessCardDocument(
 
 export type CollateralTemplateProps = {
   document: CollateralDocumentJson;
+  pageFormat?: CollateralPageFormatId;
   variantId?: SocialPostVariantId;
 };
 
