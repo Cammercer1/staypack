@@ -3,8 +3,8 @@ import type { CollateralType } from "@/lib/types";
 export const STR_REPORT_LABEL = "Short-Term Rental Report";
 
 export const COLLATERAL_TYPE_ORDER: CollateralType[] = [
-  "str_report",
   "sales_brochure",
+  "str_report",
   "rental_brochure",
   "social_posts",
   "investor_snapshot",

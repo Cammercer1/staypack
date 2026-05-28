@@ -240,31 +240,33 @@ function LandingPageCard({ listing }: { listing: Listing }) {
         </div>
       </div>
 
-      {listing.landing_qr_code_url ? (
-        <div className="mt-4 flex items-start gap-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={listing.landing_qr_code_url}
-            alt="Landing page QR code"
-            className="h-24 w-24 rounded-md border border-border/70 bg-white p-1"
-          />
-          <p className="text-xs text-muted-foreground">
-            Scans are tracked, then visitors are sent to your{" "}
-            {listing.custom_landing_url ? "custom" : "StayPacks"} listing page.
-          </p>
-        </div>
-      ) : null}
-
-      <div className="mt-6 flex flex-wrap gap-2">
-        <CopyLinkButton url={effectiveUrl} />
-        {effectiveUrl ? (
-          <Link href={effectiveUrl} target="_blank">
-            <Button variant="outline" size="sm">
-              <ExternalLink className="h-4 w-4" />
-              View public page
-            </Button>
-          </Link>
+      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {listing.landing_qr_code_url ? (
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={listing.landing_qr_code_url}
+              alt="Landing page QR code"
+              className="h-16 w-16 shrink-0 rounded-md border border-border/70 bg-white p-1"
+            />
+            <p className="text-xs text-muted-foreground">
+              Scans are tracked, then visitors are sent to your{" "}
+              {listing.custom_landing_url ? "custom" : "StayPacks"} listing page.
+            </p>
+          </div>
         ) : null}
+
+        <div className="flex shrink-0 flex-wrap gap-2 sm:ml-auto">
+          <CopyLinkButton url={effectiveUrl} />
+          {effectiveUrl ? (
+            <Link href={effectiveUrl} target="_blank">
+              <Button variant="outline" size="sm">
+                <ExternalLink className="h-4 w-4" />
+                View public page
+              </Button>
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {/* ── Custom URL override ───────────────────────────────────────── */}
@@ -523,6 +525,15 @@ function CollateralTab({
                   />
                 )}
               </div>
+
+              {type === "str_report" ? (
+                <div className="mt-4 flex justify-end">
+                  <div className="flex items-center gap-1.5 opacity-40">
+                    <span className="text-[10px] text-muted-foreground">Powered by</span>
+                    <img src="/airbtics-logo.png" alt="Airbtics" className="h-3.5 w-auto" />
+                  </div>
+                </div>
+              ) : null}
             </div>
           );
         })}
