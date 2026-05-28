@@ -7,20 +7,20 @@ import {
 import type { Agency, FinalReportJson, Report } from "@/lib/types";
 
 export function resolveReportTemplateId(agency: Agency, report: Report): string {
-  const fromEstimateTier = reportTemplateIdFromAirbticsTier(report.airbtics_tier);
-  if (fromEstimateTier) {
-    return fromEstimateTier;
-  }
-
+  // Explicit per-report choice wins over everything.
   if (report.template_id && isValidReportTemplateId(report.template_id)) {
     return normalizeReportTemplateId(report.template_id);
   }
 
-  if (
-    agency.report_template_id &&
-    isValidReportTemplateId(agency.report_template_id)
-  ) {
+  // Agency-level default is next in priority.
+  if (agency.report_template_id && isValidReportTemplateId(agency.report_template_id)) {
     return normalizeReportTemplateId(agency.report_template_id);
+  }
+
+  // If nothing explicit is set, fall back to the estimate-tier implied layout.
+  const fromEstimateTier = reportTemplateIdFromAirbticsTier(report.airbtics_tier);
+  if (fromEstimateTier) {
+    return fromEstimateTier;
   }
 
   return DEFAULT_REPORT_TEMPLATE_ID;

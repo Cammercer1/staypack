@@ -28,12 +28,5 @@ export function resolveReportTemplateIdForReport(
   agency: Agency,
   report: Report,
 ): string {
-  // An explicit template choice always wins over the estimate-tier default.
-  const explicit = resolveReportTemplateId(agency, report);
-  if (explicit !== CLASSIC_LIGHT_TEMPLATE_ID && explicit !== CLASSIC_DETAILED_TEMPLATE_ID) {
-    return explicit;
-  }
-
-  // If the resolved ID is still a classic default, let the tier refine light vs detailed.
-  return reportTemplateIdFromAirbticsTier(report.airbtics_tier) ?? explicit;
+  return resolveReportTemplateId(agency, report);
 }
