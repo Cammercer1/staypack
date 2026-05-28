@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TemplatePlayground } from "@/components/dev/TemplatePlayground";
 import { Button } from "@/components/ui/button";
-import { requireReportAccess } from "@/lib/auth/requireUser";
+import { requireReportWithListing } from "@/lib/auth/requireUser";
 import { resolvePlaygroundFinalReport } from "@/lib/reports/resolvePlaygroundFinalReport";
 
 export const DEFAULT_PLAYGROUND_REPORT_ID =
@@ -19,10 +19,11 @@ export default async function DevTemplatesPage({
 
   const { reportId = DEFAULT_PLAYGROUND_REPORT_ID } = await searchParams;
 
-  const { supabase, agency, report } = await requireReportAccess(reportId);
+  const { supabase, agency, report, listing } = await requireReportWithListing(reportId);
   const finalReport = await resolvePlaygroundFinalReport(
     supabase,
     agency,
+    listing,
     report,
   );
 
@@ -40,7 +41,7 @@ export default async function DevTemplatesPage({
           <p className="break-all font-mono text-xs text-muted-foreground">
             {reportId}
           </p>
-          <Link href={`/reports/${reportId}`}>
+          <Link href={`/listings/${listing.id}/reports/${reportId}`}>
             <Button variant="outline">Open report editor</Button>
           </Link>
         </div>
@@ -51,7 +52,7 @@ export default async function DevTemplatesPage({
   return (
     <TemplatePlayground
       reportId={reportId}
-      propertyAddress={report.property_address}
+      propertyAddress={listing.property_address}
       baseReport={finalReport}
     />
   );

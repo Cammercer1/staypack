@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireReportAccess } from "@/lib/auth/requireUser";
+import { requireReportWithListing } from "@/lib/auth/requireUser";
 import { geocodeReportAddress } from "@/lib/geocoding";
 import { airbticsEstimateSchema } from "@/lib/validation/schemas";
 import { fetchAirbticsEstimate } from "@/lib/airbtics/client";
@@ -8,21 +8,21 @@ import { calculateAccommodates } from "@/lib/reports/formatters";
 export async function POST(request: Request) {
   try {
     const body = airbticsEstimateSchema.parse(await request.json());
-    const { supabase, report } = await requireReportAccess(body.report_id);
+    const { supabase, report, listing } = await requireReportWithListing(body.report_id);
 
     let latitude =
-      body.latitude != null ? Number(body.latitude) : report.latitude;
+      body.latitude != null ? Number(body.latitude) : listing.latitude;
     let longitude =
-      body.longitude != null ? Number(body.longitude) : report.longitude;
+      body.longitude != null ? Number(body.longitude) : listing.longitude;
     let formattedAddress: string | null = null;
 
     if (latitude == null || longitude == null) {
       const geocoded = await geocodeReportAddress({
-        property_address: body.address ?? report.property_address,
-        suburb: report.suburb,
-        state: report.state,
-        postcode: report.postcode,
-        country: report.country,
+        property_address: body.address ?? listing.property_address,
+        suburb: listing.suburb,
+        state: listing.state,
+        postcode: listing.postcode,
+        country: listing.country,
       });
 
       latitude = geocoded.latitude;
@@ -30,11 +30,11 @@ export async function POST(request: Request) {
       formattedAddress = geocoded.formattedAddress;
     }
 
-    const bedrooms = Number(body.bedrooms ?? report.bedrooms ?? 2);
-    const bathrooms = Number(body.bathrooms ?? report.bathrooms ?? 1);
+    const bedrooms = Number(body.bedrooms ?? listing.bedrooms ?? 2);
+    const bathrooms = Number(body.bathrooms ?? listing.bathrooms ?? 1);
     const accommodates = calculateAccommodates(
       bedrooms,
-      body.accommodates ?? report.accommodates,
+      body.accommodates ?? listing.accommodates,
     );
 
     const result = await fetchAirbticsEstimate(
@@ -49,14 +49,24 @@ export async function POST(request: Request) {
     );
     const { estimate, tier, reportId, costCents, enrichment } = result;
 
-    const { data, error } = await supabase
-      .from("reports")
+    const { error: listingError } = await supabase
+      .from("listings")
       .update({
         latitude,
         longitude,
         bedrooms,
         bathrooms,
         accommodates,
+      })
+      .eq("id", listing.id);
+
+    if (listingError) {
+      return NextResponse.json({ error: listingError.message }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from("reports")
+      .update({
         airbtics_tier: tier,
         airbtics_report_id: reportId,
         airbtics_cost_cents: costCents,
@@ -74,6 +84,12 @@ export async function POST(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    const { data: updatedListing } = await supabase
+      .from("listings")
+      .select("*")
+      .eq("id", listing.id)
+      .single();
 
     return NextResponse.json({
       ...estimate,
@@ -95,6 +111,7 @@ export async function POST(request: Request) {
       raw: estimate.raw,
       estimate,
       report: data,
+      listing: updatedListing,
     });
   } catch (error) {
     return NextResponse.json(

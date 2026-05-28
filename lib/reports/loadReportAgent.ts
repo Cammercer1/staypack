@@ -1,4 +1,4 @@
-import type { AgentProfile, Report } from "@/lib/types";
+import type { AgentProfile, Listing } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export async function loadAgencyAgentProfiles(
@@ -13,15 +13,15 @@ export async function loadAgencyAgentProfiles(
   return (data ?? []) as AgentProfile[];
 }
 
-export async function loadReportAgentProfile(
+export async function loadListingAgentProfile(
   supabase: SupabaseClient,
-  report: Report,
+  listing: Listing,
 ): Promise<AgentProfile | null> {
-  if (report.agent_profile_id) {
+  if (listing.agent_profile_id) {
     const { data } = await supabase
       .from("agent_profiles")
       .select("*")
-      .eq("id", report.agent_profile_id)
+      .eq("id", listing.agent_profile_id)
       .maybeSingle();
 
     if (data) {

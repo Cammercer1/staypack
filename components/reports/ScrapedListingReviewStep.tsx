@@ -1,93 +1,113 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ListingAgentsEditor } from "@/components/reports/ListingAgentsEditor";
 import { ReportMediaPicker } from "@/components/reports/ReportMediaPicker";
-import { MAX_REPORT_IMAGES } from "@/lib/reports/constants";
+import { MAX_LANDING_IMAGES } from "@/lib/listings/collateralImageLimits";
+import {
+  resolveMasterPhotoSelection,
+} from "@/lib/listings/collateralImages";
 import {
   initialListingAgents,
   listingAgentsToParsed,
-  type ListingAgentDraft,
 } from "@/lib/reports/listingAgents";
 import { calculateAccommodates } from "@/lib/reports/formatters";
-import { isPersistedReport } from "@/lib/reports/emptyReportDraft";
+import { isPersistedListing } from "@/lib/listings/emptyListingDraft";
 import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
-import type { AgentProfile, Report } from "@/lib/types";
+import type { Listing, Report } from "@/lib/types";
 
 type Props = {
-  report: Report;
+  listing: Listing;
+  report?: Report | null;
   manualMode?: boolean;
-  onSaved: (report: Report) => void;
+  listingSetup?: boolean;
+  onSaved: (state: { listing: Listing; report?: Report | null }) => void;
 };
 
 export function ScrapedListingReviewStep({
-  report,
+  listing,
+  report = null,
   manualMode = false,
+  listingSetup = false,
   onSaved,
 }: Props) {
-  const imported = !manualMode && Boolean(report.scraped_listing_json);
-  const scrapedImages = report.scraped_listing_json?.images ?? [];
+  const imported = !manualMode && Boolean(listing.scraped_listing_json);
+  const scrapedImages = listing.scraped_listing_json?.images ?? [];
+  const masterSelection = resolveMasterPhotoSelection(listing);
 
-  const initialBedrooms = report.bedrooms ?? "";
+  const initialBedrooms = listing.bedrooms ?? "";
   const [accommodatesTouched, setAccommodatesTouched] = useState(
-    report.accommodates != null,
+    listing.accommodates != null,
   );
   const [uploadedImages, setUploadedImages] = useState(
-    report.uploaded_image_urls ?? [],
-  );
-  const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
-  const [listingAgents, setListingAgents] = useState<ListingAgentDraft[]>(() =>
-    initialListingAgents(report.scraped_listing_json?.agents),
+    listing.uploaded_image_urls ?? [],
   );
   const [form, setForm] = useState({
-    property_address: report.property_address ?? "",
-    suburb: report.suburb ?? "",
-    state: report.state ?? "",
-    postcode: report.postcode ?? "",
-    property_type: report.property_type ?? "",
+    property_address: listing.property_address ?? "",
+    suburb: listing.suburb ?? "",
+    state: listing.state ?? "",
+    postcode: listing.postcode ?? "",
+    property_type: listing.property_type ?? "",
     bedrooms: initialBedrooms,
-    bathrooms: report.bathrooms ?? "",
-    car_spaces: report.car_spaces ?? "",
+    bathrooms: listing.bathrooms ?? "",
+    car_spaces: listing.car_spaces ?? "",
     accommodates:
-      report.accommodates ??
+      listing.accommodates ??
       (initialBedrooms === "" ? "" : calculateAccommodates(Number(initialBedrooms), null)),
-    listing_title: report.listing_title ?? "",
-    listing_description: report.listing_description ?? "",
-    display_price: normalizeDisplayPrice(report.display_price) ?? "",
-    hero_image_url: report.hero_image_url ?? scrapedImages[0] ?? "",
-    selected_image_urls:
-      report.selected_image_urls?.length
-        ? report.selected_image_urls.slice(0, MAX_REPORT_IMAGES)
-        : scrapedImages[0]
-          ? [scrapedImages[0]]
-          : [],
+    listing_title: listing.listing_title ?? "",
+    listing_description: listing.listing_description ?? "",
+    display_price: normalizeDisplayPrice(listing.display_price) ?? "",
+    hero_image_url:
+      masterSelection.hero_image_url ?? scrapedImages[0] ?? "",
+    selected_image_urls: masterSelection.selected_image_urls.length
+      ? masterSelection.selected_image_urls.slice(0, MAX_LANDING_IMAGES)
+      : scrapedImages[0]
+        ? [scrapedImages[0]]
+        : [],
   });
   const [loading, setLoading] = useState(false);
+  const [generatingDesc, setGeneratingDesc] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/agents")
-      .then((response) => response.json())
-      .then((payload) => setAgencyAgents(payload.agents ?? []))
-      .catch(() => {
-        // Non-blocking — manual agent entry still works.
-      });
-  }, []);
+  async function generateDescription() {
+    if (!isPersistedListing(listing)) return;
+    setGeneratingDesc(true);
 
-  const scrapeWarnings = report.scraped_listing_json?.warnings ?? [];
-  const scrapeConfidence = report.scraped_listing_json?.confidence;
+    try {
+      const response = await fetch(
+        `/api/listings/${listing.id}/generate-description`,
+        { method: "POST" },
+      );
+      const payload = await response.json();
 
-  async function saveReport() {
-    const selected = form.selected_image_urls.slice(0, MAX_REPORT_IMAGES);
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to generate description");
+      }
 
-    if (selected.length > MAX_REPORT_IMAGES) {
-      toast.error(`Choose up to ${MAX_REPORT_IMAGES} images for the report`);
+      updateField("listing_description", payload.description as string);
+      toast.success("Description generated");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to generate description",
+      );
+    } finally {
+      setGeneratingDesc(false);
+    }
+  }
+
+  const scrapeWarnings = listing.scraped_listing_json?.warnings ?? [];
+  const scrapeConfidence = listing.scraped_listing_json?.confidence;
+
+  async function saveListing() {
+    const selected = form.selected_image_urls.slice(0, MAX_LANDING_IMAGES);
+
+    if (selected.length > MAX_LANDING_IMAGES) {
+      toast.error(`Choose up to ${MAX_LANDING_IMAGES} photos`);
       return;
     }
 
@@ -101,44 +121,68 @@ export function ScrapedListingReviewStep({
 
     const payloadBody = {
       ...form,
-      listing_agents: listingAgentsToParsed(listingAgents),
-      hero_image_url: form.hero_image_url || selected[0] || null,
-      selected_image_urls: selected,
-      uploaded_image_urls: uploadedImages,
+      ...(listingSetup
+        ? {}
+        : {
+            listing_agents: listingAgentsToParsed(
+              initialListingAgents(listing.scraped_listing_json?.agents),
+            ),
+            hero_image_url: form.hero_image_url || selected[0] || null,
+            selected_image_urls: selected.slice(0, MAX_LANDING_IMAGES),
+            uploaded_image_urls: uploadedImages,
+          }),
       bedrooms,
       bathrooms: form.bathrooms === "" ? null : Number(form.bathrooms),
       car_spaces: form.car_spaces === "" ? null : Number(form.car_spaces),
       accommodates,
-      status: "scraped" as const,
     };
 
-    const response = await fetch(
-      isPersistedReport(report) ? `/api/reports/${report.id}` : "/api/reports",
+    const listingResponse = await fetch(
+      isPersistedListing(listing) ? `/api/listings/${listing.id}` : "/api/listings",
       {
-        method: isPersistedReport(report) ? "PATCH" : "POST",
+        method: isPersistedListing(listing) ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payloadBody),
       },
     );
-    const payload = await response.json();
+    const listingPayload = await listingResponse.json();
 
-    if (!response.ok) {
-      toast.error(payload.error ?? "Failed to save report");
+    if (!listingResponse.ok) {
+      toast.error(listingPayload.error ?? "Failed to save listing");
       setLoading(false);
       return;
     }
 
-    if (payload.geocode_warning) {
-      toast.message("Listing saved, but geocoding needs review", {
-        description: payload.geocode_warning,
+    const nextListing = listingPayload.listing as Listing;
+
+    if (!listingSetup && report) {
+      const reportResponse = await fetch(`/api/reports/${report.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "scraped" }),
       });
-    } else if (payload.report.latitude != null && payload.report.longitude != null) {
+      const reportPayload = await reportResponse.json();
+
+      if (!reportResponse.ok) {
+        toast.error(reportPayload.error ?? "Failed to update report");
+        setLoading(false);
+        return;
+      }
+
+      onSaved({ listing: nextListing, report: reportPayload.report as Report });
+    } else {
+      onSaved({ listing: nextListing, report: report ?? null });
+    }
+    if (listingPayload.geocode_warning) {
+      toast.message("Listing saved, but geocoding needs review", {
+        description: listingPayload.geocode_warning,
+      });
+    } else if (nextListing.latitude != null && nextListing.longitude != null) {
       toast.success("Listing saved and address geocoded");
     } else {
-      toast.success("Listing details saved");
+      toast.success("Listing saved");
     }
 
-    onSaved(payload.report);
     setLoading(false);
   }
 
@@ -146,7 +190,7 @@ export function ScrapedListingReviewStep({
     if (field === "selected_image_urls" && Array.isArray(value)) {
       setForm((current) => ({
         ...current,
-        selected_image_urls: value.slice(0, MAX_REPORT_IMAGES),
+        selected_image_urls: value.slice(0, MAX_LANDING_IMAGES),
       }));
       return;
     }
@@ -181,7 +225,7 @@ export function ScrapedListingReviewStep({
           <p className="text-sm font-medium">Enter listing details manually</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Import didn&apos;t work for this URL. Fill in the property information
-            below and upload up to {MAX_REPORT_IMAGES} photos for the report.
+            below and upload photos.
           </p>
         </div>
       ) : (
@@ -192,15 +236,16 @@ export function ScrapedListingReviewStep({
               : "Review imported listing details"}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Check the prefilled fields, then choose up to {MAX_REPORT_IMAGES} photos
-            for the report. Upload your own images if the import missed any from the
-            listing gallery.
+            Check the prefilled fields, review the webpage description, and choose
+            which photos to keep. All are selected by default.
           </p>
-          {scrapedImages.length < MAX_REPORT_IMAGES ? (
+          {scrapedImages.length > 0 ? (
             <p className="mt-2 text-sm text-muted-foreground">
-              Only {scrapedImages.length} photo
-              {scrapedImages.length === 1 ? "" : "s"} imported from the listing —
-              add more in the upload area below.
+              {scrapedImages.length} photo
+              {scrapedImages.length === 1 ? "" : "s"} imported from the listing
+              {scrapedImages.length < MAX_LANDING_IMAGES
+                ? " — add more in the upload area below."
+                : "."}
             </p>
           ) : null}
           {scrapeWarnings.length ? (
@@ -244,10 +289,28 @@ export function ScrapedListingReviewStep({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="listing_description">Description</Label>
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="listing_description">Description</Label>
+          {isPersistedListing(listing) ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={generateDescription}
+              disabled={generatingDesc}
+            >
+              {generatingDesc ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
+              )}
+              Generate with AI
+            </Button>
+          ) : null}
+        </div>
         <Textarea
           id="listing_description"
-          rows={5}
+          rows={6}
           value={form.listing_description}
           onChange={(event) =>
             updateField("listing_description", event.target.value)
@@ -255,28 +318,30 @@ export function ScrapedListingReviewStep({
         />
       </div>
 
-      <ListingAgentsEditor
-        agents={listingAgents}
-        agencyAgents={agencyAgents}
-        onChange={setListingAgents}
-      />
-
-      <ReportMediaPicker
-        scrapedImages={scrapedImages}
-        uploadedImages={uploadedImages}
-        heroImageUrl={form.hero_image_url}
-        selectedImageUrls={form.selected_image_urls}
-        reportId={isPersistedReport(report) ? report.id : undefined}
-        maxSelected={MAX_REPORT_IMAGES}
-        onUploaded={setUploadedImages}
-        onChange={(hero, selected) => {
-          updateField("hero_image_url", hero);
-          updateField("selected_image_urls", selected);
-        }}
-      />
+      {!listingSetup ? (
+        <ReportMediaPicker
+          scrapedImages={scrapedImages}
+          uploadedImages={uploadedImages}
+          heroImageUrl={form.hero_image_url}
+          selectedImageUrls={form.selected_image_urls}
+          listingId={isPersistedListing(listing) ? listing.id : undefined}
+          reportId={report?.id}
+          maxSelected={MAX_LANDING_IMAGES}
+          title="Property photos"
+          onUploaded={setUploadedImages}
+          onChange={(hero, selected) => {
+            updateField("hero_image_url", hero);
+            updateField("selected_image_urls", selected);
+          }}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Manage photos in the <strong>Photos</strong> tab on the listing page.
+        </p>
+      )}
 
       <Button
-        onClick={saveReport}
+        onClick={saveListing}
         disabled={loading || !form.property_address.trim()}
       >
         {loading ? (
@@ -284,8 +349,10 @@ export function ScrapedListingReviewStep({
             <Loader2 className="animate-spin" />
             Saving...
           </>
+        ) : listingSetup ? (
+          "Save listing"
         ) : (
-          "Save and estimate STR"
+          "Save listing details"
         )}
       </Button>
     </div>

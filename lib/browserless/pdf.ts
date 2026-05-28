@@ -2,6 +2,10 @@ import { createHash } from "crypto";
 import { browserlessRequest } from "@/lib/browserless/client";
 import { isDevelopment } from "@/lib/env";
 import {
+  getCollateralPageFormat,
+  getPdfOptionsForCollateralFormat,
+} from "@/lib/collateral/pageFormat";
+import {
   getPdfOptionsForFormat,
   getReportPageFormat,
 } from "@/lib/reports/pageFormat";
@@ -9,7 +13,7 @@ import {
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-const PDF_OPTIONS = getPdfOptionsForFormat(getReportPageFormat("portrait"));
+const DEFAULT_PDF_OPTIONS = getPdfOptionsForFormat(getReportPageFormat("portrait"));
 
 export type PrintHtmlImageMirror = (
   sourceUrl: string,
@@ -237,9 +241,28 @@ export function buildPdfImagePath(
   return `${agencyId}/${reportId}/pdf-images/${hash}.${ext}`;
 }
 
-function buildBrowserlessPdfBody(html: string | null, url: string | null) {
+type BrowserlessPdfOptions = {
+  format?: string;
+  width?: string;
+  height?: string;
+  landscape?: boolean;
+  printBackground: boolean;
+  preferCSSPageSize: boolean;
+  margin: {
+    top: string;
+    right: string;
+    bottom: string;
+    left: string;
+  };
+};
+
+function buildBrowserlessPdfBody(
+  html: string | null,
+  url: string | null,
+  pdfOptions: BrowserlessPdfOptions = DEFAULT_PDF_OPTIONS,
+) {
   const base = {
-    options: PDF_OPTIONS,
+    options: pdfOptions,
     emulateMediaType: "print",
     gotoOptions: {
       waitUntil: "networkidle0" as const,
@@ -256,14 +279,22 @@ function buildBrowserlessPdfBody(html: string | null, url: string | null) {
 
 export async function renderPdfFromUrl(
   url: string,
-  options?: { mirrorImage?: PrintHtmlImageMirror },
+  options?: {
+    mirrorImage?: PrintHtmlImageMirror;
+    pageFormatId?: string;
+  },
 ) {
+  const pdfOptions: BrowserlessPdfOptions = options?.pageFormatId
+    ? getPdfOptionsForCollateralFormat(getCollateralPageFormat(options.pageFormatId))
+    : DEFAULT_PDF_OPTIONS;
+
   const usePublicUrl = isPublicPrintUrl(url);
   const prepared = usePublicUrl ? null : await preparePrintHtml(url, options?.mirrorImage);
 
   const body = buildBrowserlessPdfBody(
     prepared?.html ?? null,
     usePublicUrl ? url : null,
+    pdfOptions,
   );
 
   const pdf = await browserlessRequest("/pdf", body, { responseType: "buffer" });

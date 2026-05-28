@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, LayoutDashboard, Plus, Settings } from "lucide-react";
+import { Home, LayoutDashboard, Plus, Settings } from "lucide-react";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { StayPackLogo } from "@/components/app-shell/StayPackLogo";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/reports", label: "Reports", icon: FileText },
+  { href: "/listings", label: "Listings", icon: Home },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -50,10 +50,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-2">
             <LogoutButton />
-            <Link href="/reports/new" prefetch={false}>
+            <Link href="/listings/new" prefetch={false}>
               <Button size="lg">
                 <Plus className="h-4 w-4" />
-                New report
+                New listing
               </Button>
             </Link>
           </div>

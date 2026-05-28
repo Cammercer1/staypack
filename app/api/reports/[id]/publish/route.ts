@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
-import { requireReportAccess } from "@/lib/auth/requireUser";
+import { requireReportWithListing } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getReportsUrl } from "@/lib/env";
+import { ensureListingLandingProvisioned } from "@/lib/listings/provisionLandingPage";
+import {
+  buildListingQrTrackingUrl,
+  resolveListingDestinationUrl,
+} from "@/lib/listings/listingUrls";
 import {
   buildPublicReportUrl,
   generateReportSlug,
 } from "@/lib/reports/slugs";
-import { generateQrCodeBuffer, resolveQrCodeTargetUrl } from "@/lib/reports/qr";
+import { generateQrCodeBuffer } from "@/lib/reports/qr";
+import type { Listing } from "@/lib/types";
 
 export async function POST(
   _request: Request,
@@ -14,7 +20,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { supabase, agency, report } = await requireReportAccess(id);
+    const { supabase, agency, report, listing } = await requireReportWithListing(id);
 
     if (!report.final_report_json) {
       return NextResponse.json(
@@ -23,6 +29,12 @@ export async function POST(
       );
     }
 
+    const provisionedListing = await ensureListingLandingProvisioned(
+      listing as Listing,
+      agency,
+      supabase,
+    );
+
     const publicSlug = report.public_slug ?? generateReportSlug();
     const publicUrl = buildPublicReportUrl(
       getReportsUrl(),
@@ -30,30 +42,39 @@ export async function POST(
       publicSlug,
     );
 
-    const qrTargetUrl = resolveQrCodeTargetUrl(report.listing_url);
+    const qrTrackingUrl = buildListingQrTrackingUrl(
+      agency.slug,
+      provisionedListing.public_slug!,
+    );
+    const qrDestinationUrl = resolveListingDestinationUrl(provisionedListing);
     const admin = createAdminClient();
     let qrPublicUrl: string | null = null;
 
-    if (qrTargetUrl) {
-      const qrBuffer = await generateQrCodeBuffer(qrTargetUrl);
-      const qrPath = `${agency.id}/${report.id}/qr.png`;
-
-      const { error: uploadError } = await admin.storage
-        .from("report-assets")
-        .upload(qrPath, qrBuffer, {
-          contentType: "image/png",
-          upsert: true,
-        });
-
-      if (uploadError) {
-        return NextResponse.json({ error: uploadError.message }, { status: 400 });
-      }
-
-      const {
-        data: { publicUrl: uploadedQrUrl },
-      } = admin.storage.from("report-assets").getPublicUrl(qrPath);
-      qrPublicUrl = uploadedQrUrl;
+    if (!qrDestinationUrl) {
+      return NextResponse.json(
+        { error: "Listing landing page is not provisioned" },
+        { status: 400 },
+      );
     }
+
+    const qrBuffer = await generateQrCodeBuffer(qrTrackingUrl);
+    const qrPath = `${agency.id}/${report.id}/qr.png`;
+
+    const { error: uploadError } = await admin.storage
+      .from("report-assets")
+      .upload(qrPath, qrBuffer, {
+        contentType: "image/png",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      return NextResponse.json({ error: uploadError.message }, { status: 400 });
+    }
+
+    const {
+      data: { publicUrl: uploadedQrUrl },
+    } = admin.storage.from("report-assets").getPublicUrl(qrPath);
+    qrPublicUrl = uploadedQrUrl;
 
     const existingAssets =
       (report.final_report_json as { assets?: Record<string, string> })?.assets ??
@@ -84,6 +105,12 @@ export async function POST(
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    await supabase
+      .from("collateral_items")
+      .update({ status: "published" })
+      .eq("report_id", report.id)
+      .eq("listing_id", listing.id);
 
     return NextResponse.json({
       public_url: publicUrl,

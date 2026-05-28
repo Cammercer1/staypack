@@ -11,16 +11,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { formatCurrency, formatPercent } from "@/lib/reports/formatters";
+import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
 import { enforceTemplateCopyLimits } from "@/lib/reports/enforceTemplateCopyLimits";
 import { getTemplateCopyFieldLimit } from "@/lib/reports/getTemplateCopyLimits";
 import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
 import { ReportTemplatePicker } from "@/components/reports/ReportTemplatePicker";
-import type { Agency, AgentProfile, AiCopyJson, Report } from "@/lib/types";
+import type { Agency, AgentProfile, AiCopyJson, Listing, Report } from "@/lib/types";
 
 type Props = {
   agency: Agency;
   agencyAgents?: AgentProfile[];
+  listing: Listing;
   report: Report;
   onComplete: (report: Report) => void;
   onContinueToPreview?: () => void;
@@ -34,6 +36,7 @@ type ApiError = {
 export function GeneratedCopyEditor({
   agency,
   agencyAgents = [],
+  listing,
   report,
   onComplete,
   onContinueToPreview,
@@ -53,21 +56,23 @@ export function GeneratedCopyEditor({
   );
 
   const estimate = useMemo(() => resolveReportEstimate(report), [report]);
+  const displayPrice = useMemo(() => resolveReportDisplayPrice(listing), [listing]);
   const previewReport = useMemo(() => {
     if (!copy || !estimate) return null;
 
     return buildFinalReportJson({
       agency,
       agencyAgents,
+      listing,
       report: {
         ...report,
         template_id: selectedTemplateId,
       },
       estimate,
       copy,
-      scraped: report.scraped_listing_json,
+      scraped: listing.scraped_listing_json,
     });
-  }, [agency, agencyAgents, copy, estimate, report, selectedTemplateId]);
+  }, [agency, agencyAgents, copy, estimate, listing, report, selectedTemplateId]);
 
   async function persistReportDraft(options?: { silent?: boolean }) {
     if (!copy) {
@@ -205,10 +210,10 @@ export function GeneratedCopyEditor({
   );
 
   const addressLine = [
-    report.property_address,
-    report.suburb,
-    report.state,
-    report.postcode,
+    listing.property_address,
+    listing.suburb,
+    listing.state,
+    listing.postcode,
   ]
     .filter(Boolean)
     .join(", ");
@@ -231,11 +236,15 @@ export function GeneratedCopyEditor({
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <ContextMetric
               label="Bedrooms"
-              value={report.bedrooms != null ? String(report.bedrooms) : "—"}
+              value={listing.bedrooms != null ? String(listing.bedrooms) : "—"}
             />
             <ContextMetric
               label="Bathrooms"
-              value={report.bathrooms != null ? String(report.bathrooms) : "—"}
+              value={listing.bathrooms != null ? String(listing.bathrooms) : "—"}
+            />
+            <ContextMetric
+              label="Listing price"
+              value={displayPrice ?? "—"}
             />
             {estimate ? (
               <>
@@ -266,6 +275,12 @@ export function GeneratedCopyEditor({
               </p>
             )}
           </div>
+          {!displayPrice ? (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Add a numeric listing price on the Review listing step to show
+              estimated gross STR yield on the report.
+            </p>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-3">

@@ -20,3 +20,7 @@ export function hasSupabaseConfig() {
 export function hasServiceRoleKey() {
   return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
+
+export function getGoogleMapsApiKey() {
+  return process.env.GOOGLE_MAPS_API_KEY ?? null;
+}

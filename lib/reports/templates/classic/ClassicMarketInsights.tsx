@@ -1,5 +1,9 @@
 import type { FinalReportJson } from "@/lib/types";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/reports/formatters";
+import {
+  formatStrGrossYield,
+  resolveStrGrossYield,
+} from "@/lib/reports/calculateStrYield";
 
 type Props = {
   report: FinalReportJson;
@@ -14,8 +18,21 @@ type SnapshotStat = {
 function buildSnapshotStats(report: FinalReportJson) {
   const { str, str_enrichment: enrichment } = report;
   const range = enrichment?.revenue_range;
+  const grossYield = resolveStrGrossYield({
+    display_price: report.property.display_price,
+    annual_revenue: str.annual_revenue,
+    str_yield: report.str_yield,
+  });
 
   const supporting: SnapshotStat[] = [];
+
+  if (grossYield) {
+    supporting.push({
+      id: "yield",
+      label: "Est. gross STR yield",
+      value: formatStrGrossYield(grossYield),
+    });
+  }
 
   if (range?.p25 != null && range.p75 != null) {
     supporting.push({

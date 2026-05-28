@@ -5,7 +5,7 @@ import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand"
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
 import { verifyPrintAccessToken } from "@/lib/reports/printAccessToken";
 import { ReportPreview } from "@/components/reports/ReportPreview";
-import type { Agency, FinalReportJson } from "@/lib/types";
+import type { Agency, FinalReportJson, Listing } from "@/lib/types";
 
 export default async function DraftReportPrintPage({
   params,
@@ -24,11 +24,11 @@ export default async function DraftReportPrintPage({
   const admin = createAdminClient();
   const { data: report } = await admin
     .from("reports")
-    .select("final_report_json, agency_id, display_price, scraped_listing_json")
+    .select("final_report_json, agency_id, listing_id")
     .eq("id", reportId)
     .maybeSingle();
 
-  if (!report?.final_report_json) {
+  if (!report?.final_report_json || !report.listing_id) {
     notFound();
   }
 
@@ -42,18 +42,32 @@ export default async function DraftReportPrintPage({
     notFound();
   }
 
+  const { data: listing } = await admin
+    .from("listings")
+    .select("display_price, scraped_listing_json, agent_profile_id")
+    .eq("id", report.listing_id)
+    .maybeSingle();
+
   const { data: agencyAgents } = await admin
     .from("agent_profiles")
     .select("*")
     .eq("agency_id", agency.id);
 
+  const agentProfile =
+    listing?.agent_profile_id != null
+      ? agencyAgents?.find((agent) => agent.id === listing.agent_profile_id) ?? null
+      : null;
+
   const finalReport = enrichFinalReportMetrics(
-    report,
+    (listing ?? { display_price: null, scraped_listing_json: null }) as Pick<
+      Listing,
+      "display_price" | "scraped_listing_json"
+    >,
     mergeAgencyBrandIntoFinalReport(
       agency as Agency,
       report.final_report_json as FinalReportJson,
     ),
-    { agencyAgents: agencyAgents ?? [] },
+    { agentProfile, agencyAgents: agencyAgents ?? [] },
   );
 
   return (

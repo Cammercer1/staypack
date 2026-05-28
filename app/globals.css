@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -210,6 +211,23 @@
   page-break-after: avoid;
 }
 
+.collateral-page {
+  width: var(--collateral-page-width, 90mm);
+  height: var(--collateral-page-height, 55mm);
+  background: #ffffff;
+}
+
+.print-mode .collateral-preview,
+.collateral-preview.print-mode {
+  gap: 0;
+}
+
+.print-mode .collateral-page,
+.collateral-preview.print-mode .collateral-page {
+  box-shadow: none !important;
+  page-break-after: avoid;
+}
+
 @page {
   size: A4;
   margin: 0;
@@ -248,4 +266,13 @@
   .no-print {
     display: none !important;
   }
+}
+
+/* Tiptap placeholder */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd;
+  pointer-events: none;
+  height: 0;
 }

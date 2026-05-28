@@ -223,6 +223,7 @@ export type Agency = {
   default_cta: string;
   default_disclaimer: string | null;
   report_template_id: string;
+  collateral_template_defaults: Record<string, string>;
   created_at: string;
   updated_at: string;
 };
@@ -240,12 +241,14 @@ export type AgentProfile = {
   updated_at: string;
 };
 
-export type Report = {
+export type ListingStatus = "active" | "archived";
+
+export type Listing = {
   id: string;
   agency_id: string;
-  agent_profile_id: string | null;
   created_by: string | null;
-  status: ReportStatus;
+  agent_profile_id: string | null;
+  status: ListingStatus;
   listing_url: string | null;
   property_address: string | null;
   suburb: string | null;
@@ -265,11 +268,86 @@ export type Report = {
   hero_image_url: string | null;
   selected_image_urls: string[] | null;
   uploaded_image_urls: string[] | null;
+  collateral_image_selections: Record<string, { hero_image_url: string | null; selected_image_urls: string[] }>;
+  scraped_listing_json: ParsedListing | null;
+  public_slug: string | null;
+  public_url: string | null;
+  custom_landing_url: string | null;
+  landing_qr_code_url: string | null;
+  landing_published_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ListingStats = {
+  total_views: number;
+  views_last_30d: number;
+  total_leads: number;
+};
+
+export type LeadStatus = "new" | "contacted";
+
+export type Lead = {
+  id: string;
+  listing_id: string;
+  agency_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  status: LeadStatus;
+  source: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CollateralType =
+  | "str_report"
+  | "sales_brochure"
+  | "investor_snapshot"
+  | "agent_business_card";
+
+export type CollateralItemStatus = "draft" | "generated" | "published" | "archived";
+
+export type CollateralItem = {
+  id: string;
+  listing_id: string;
+  agency_id: string;
+  type: CollateralType;
+  status: CollateralItemStatus;
+  report_id: string | null;
+  template_id: string | null;
+  document_json: CollateralDocumentJson | null;
+  public_slug: string | null;
+  public_url: string | null;
+  pdf_url: string | null;
+  qr_code_url: string | null;
+  generated_at: string | null;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CollateralDocumentJson = import("@/lib/collateral/templates/types").CollateralDocumentJson;
+
+export type ListingWithReport = Listing & {
+  str_report: Report | null;
+};
+
+export type ReportEditorState = {
+  listing: Listing;
+  report: Report;
+};
+
+export type Report = {
+  id: string;
+  agency_id: string;
+  listing_id: string;
+  created_by: string | null;
+  status: ReportStatus;
   public_slug: string | null;
   public_url: string | null;
   qr_code_url: string | null;
   pdf_url: string | null;
-  scraped_listing_json: ParsedListing | null;
   raw_airbtics_json: unknown;
   airbtics_tier: AirbticsTier | null;
   airbtics_report_id: string | null;

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Agency, AgencyRole } from "@/lib/types";
+import type { Agency, AgencyRole, CollateralItem, Listing, Report } from "@/lib/types";
 
 export async function requireUser() {
   const supabase = await createClient();
@@ -65,6 +65,26 @@ export async function requireAgencyAdmin() {
   return context;
 }
 
+export async function requireListingAccess(listingId: string) {
+  const context = await requireAgency();
+  const { data: listing, error } = await context.supabase
+    .from("listings")
+    .select("*")
+    .eq("id", listingId)
+    .eq("agency_id", context.agency.id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!listing) {
+    throw new Error("Listing not found");
+  }
+
+  return { ...context, listing: listing as Listing };
+}
+
 export async function requireReportAccess(reportId: string) {
   const context = await requireAgency();
   const { data: report, error } = await context.supabase
@@ -82,5 +102,89 @@ export async function requireReportAccess(reportId: string) {
     throw new Error("Report not found");
   }
 
-  return { ...context, report };
+  return { ...context, report: report as Report };
+}
+
+export async function requireCollateralAccess(collateralId: string) {
+  const context = await requireAgency();
+  const { data: collateral, error } = await context.supabase
+    .from("collateral_items")
+    .select("*")
+    .eq("id", collateralId)
+    .eq("agency_id", context.agency.id)
+    .neq("status", "archived")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!collateral) {
+    throw new Error("Collateral not found");
+  }
+
+  const { data: listing, error: listingError } = await context.supabase
+    .from("listings")
+    .select("*")
+    .eq("id", collateral.listing_id)
+    .eq("agency_id", context.agency.id)
+    .maybeSingle();
+
+  if (listingError) {
+    throw new Error(listingError.message);
+  }
+
+  if (!listing) {
+    throw new Error("Listing not found");
+  }
+
+  return {
+    ...context,
+    collateral: collateral as CollateralItem,
+    listing: listing as Listing,
+  };
+}
+
+export async function requireReportWithListing(reportId: string) {
+  const { report, ...context } = await requireReportAccess(reportId);
+  const { data: listing, error } = await context.supabase
+    .from("listings")
+    .select("*")
+    .eq("id", report.listing_id)
+    .eq("agency_id", context.agency.id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!listing) {
+    throw new Error("Listing not found");
+  }
+
+  return { ...context, report, listing: listing as Listing };
+}
+
+export async function requireListingReportAccess(
+  listingId: string,
+  reportId: string,
+) {
+  const context = await requireListingAccess(listingId);
+  const { data: report, error } = await context.supabase
+    .from("reports")
+    .select("*")
+    .eq("id", reportId)
+    .eq("listing_id", listingId)
+    .eq("agency_id", context.agency.id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!report) {
+    throw new Error("Report not found");
+  }
+
+  return { ...context, report: report as Report };
 }

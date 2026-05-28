@@ -1,9 +1,7 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireAgency } from "@/lib/auth/requireUser";
-import { ReportEditor } from "@/components/reports/ReportEditor";
-import type { Report } from "@/lib/types";
 
-export default async function ReportDetailPage({
+export default async function LegacyReportDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -13,26 +11,14 @@ export default async function ReportDetailPage({
 
   const { data: report } = await supabase
     .from("reports")
-    .select("*")
+    .select("listing_id")
     .eq("id", id)
     .eq("agency_id", agency.id)
     .maybeSingle();
 
-  if (!report) {
+  if (!report?.listing_id) {
     notFound();
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="heading-gradient text-3xl font-semibold">
-          {report.property_address ?? "Report editor"}
-        </h1>
-        <p className="text-muted-foreground">
-          Continue building and publishing this STR potential report.
-        </p>
-      </div>
-      <ReportEditor initialReport={report as Report} agency={agency} />
-    </div>
-  );
+  redirect(`/listings/${report.listing_id}/reports/${id}`);
 }

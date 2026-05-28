@@ -9,30 +9,42 @@ import {
   MAX_UPLOADED_IMAGES,
 } from "@/lib/reports/constants";
 import { cn } from "@/lib/utils";
+import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
 
 type Props = {
   scrapedImages?: string[];
+  rawScrapedCount?: number;
   uploadedImages: string[];
   heroImageUrl?: string;
   selectedImageUrls?: string[];
   reportId?: string;
+  listingId?: string;
   maxSelected?: number;
   maxUploads?: number;
+  title?: string;
+  selectionHint?: string;
   onUploaded: (uploadedImageUrls: string[]) => void;
   onChange: (heroImageUrl: string, selectedImageUrls: string[]) => void;
 };
 
 export function ReportMediaPicker({
   scrapedImages = [],
+  rawScrapedCount,
   uploadedImages,
   heroImageUrl = "",
   selectedImageUrls = [],
   reportId,
+  listingId,
   maxSelected = MAX_REPORT_IMAGES,
   maxUploads = MAX_UPLOADED_IMAGES,
+  title = "Report photos",
+  selectionHint,
   onUploaded,
   onChange,
 }: Props) {
+  const displayScrapedImages = dedupeImageUrls(scrapedImages);
+  const importedTotal = rawScrapedCount ?? scrapedImages.length;
+  const canUpload = Boolean(reportId || listingId);
   const uploadRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -55,7 +67,7 @@ export function ReportMediaPicker({
     }
 
     if (selected.length >= maxSelected) {
-      toast.error(`You can select up to ${maxSelected} images for the report`);
+      toast.error(`You can select up to ${maxSelected} images`);
       return;
     }
 
@@ -77,8 +89,8 @@ export function ReportMediaPicker({
   }
 
   async function uploadImages(files: File[]) {
-    if (!reportId) {
-      toast.error("Report not ready for uploads yet.");
+    if (!reportId && !listingId) {
+      toast.error("Save the listing first to upload photos.");
       return;
     }
 
@@ -102,7 +114,12 @@ export function ReportMediaPicker({
     for (const file of filesToUpload) {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("report_id", reportId);
+      if (reportId) {
+        formData.append("report_id", reportId);
+      }
+      if (listingId) {
+        formData.append("listing_id", listingId);
+      }
 
       const response = await fetch("/api/reports/upload-asset", {
         method: "POST",
@@ -120,7 +137,6 @@ export function ReportMediaPicker({
       }
 
       if (
-        selectionSlotsRemaining > 0 &&
         nextSelected.length < maxSelected &&
         !nextSelected.includes(payload.url)
       ) {
@@ -154,16 +170,17 @@ export function ReportMediaPicker({
     void uploadImages(imageFiles);
   }
 
-  const hasMedia = scrapedImages.length > 0 || uploadedImages.length > 0;
+  const hasMedia = displayScrapedImages.length > 0 || uploadedImages.length > 0;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium">Report photos</p>
+          {title ? <p className="text-sm font-medium">{title}</p> : null}
           <p className="text-xs text-muted-foreground">
-            {selected.length} of {maxSelected} selected for the report ·{" "}
-            {uploadedImages.length} uploaded
+            {selected.length} of {maxSelected} selected
+            {selectionHint ? ` · ${selectionHint}` : ""} · {uploadedImages.length}{" "}
+            uploaded
           </p>
         </div>
       </div>
@@ -172,7 +189,7 @@ export function ReportMediaPicker({
         className={cn(
           "rounded-xl border border-dashed px-4 py-6 text-center transition-colors",
           dragActive ? "border-primary bg-primary/5" : "border-border/80 bg-muted/10",
-          (!reportId || uploading || uploadSlotsRemaining <= 0) && "opacity-60",
+          (!canUpload || uploading || uploadSlotsRemaining <= 0) && "opacity-60",
         )}
         onDragEnter={(event) => {
           event.preventDefault();
@@ -189,7 +206,7 @@ export function ReportMediaPicker({
         onDrop={(event) => {
           event.preventDefault();
           setDragActive(false);
-          if (!reportId || uploading || uploadSlotsRemaining <= 0) return;
+          if (!canUpload || uploading || uploadSlotsRemaining <= 0) return;
           handleFiles(event.dataTransfer.files);
         }}
       >
@@ -219,18 +236,22 @@ export function ReportMediaPicker({
           variant="outline"
           size="sm"
           className="mt-4"
-          disabled={uploading || !reportId || uploadSlotsRemaining <= 0}
+          disabled={uploading || !canUpload || uploadSlotsRemaining <= 0}
           onClick={() => uploadRef.current?.click()}
         >
           {uploading ? "Uploading..." : "Browse photos"}
         </Button>
       </div>
 
-      {scrapedImages.length ? (
+      {displayScrapedImages.length ? (
         <MediaSection
           title="From listing"
-          subtitle={`${scrapedImages.length} imported`}
-          images={scrapedImages}
+          subtitle={`${displayScrapedImages.length} unique${
+            importedTotal !== displayScrapedImages.length
+              ? ` (${importedTotal} imported)`
+              : " photos"
+          }`}
+          images={displayScrapedImages}
           selected={selected}
           heroImageUrl={heroImageUrl}
           onToggle={toggleImage}
@@ -258,8 +279,7 @@ export function ReportMediaPicker({
       ) : null}
 
       <p className="text-xs text-muted-foreground">
-        Click a photo to include it in the report (max {maxSelected}). Double-click
-        to set the hero image.
+        Click to select (max {maxSelected}). Double-click to set the hero image.
       </p>
     </div>
   );

@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
-import type { Agency, AiCopyJson, Report, StrEstimate } from "@/lib/types";
+import type { Agency, AiCopyJson, Listing, Report, StrEstimate } from "@/lib/types";
 import { DEFAULT_DISCLAIMER } from "@/lib/types";
 import { aiCopySchema } from "@/lib/validation/schemas";
 import { getMockAiCopy } from "@/lib/reports/buildFinalReportJson";
@@ -62,18 +62,20 @@ export class CopyOpenAIError extends Error {
 
 type GenerateCopyInput = {
   agency: Agency;
+  listing: Listing;
   report: Report;
   estimate: StrEstimate;
 };
 
 export async function generateReportCopy({
   agency,
+  listing,
   report,
   estimate,
 }: GenerateCopyInput): Promise<AiCopyJson> {
   if (!process.env.OPENAI_API_KEY) {
     if (isDevelopment()) {
-      return getMockAiCopy(report, agency);
+      return getMockAiCopy(listing, agency);
     }
 
     throw new CopyOpenAIError("Copy generation is not configured");
@@ -81,7 +83,7 @@ export async function generateReportCopy({
 
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const templateId = resolveReportTemplateId(agency, report);
-  const userPayload = buildUserPayload({ agency, report, estimate, templateId });
+  const userPayload = buildUserPayload({ agency, listing, report, estimate, templateId });
 
   const first = await requestCopy(client, userPayload);
   const parsed = parseCopyResponse(first, agency, templateId);
@@ -108,11 +110,12 @@ export async function generateReportCopy({
 
 function buildUserPayload({
   agency,
+  listing,
   report,
   estimate,
   templateId,
 }: GenerateCopyInput & { templateId: string }) {
-  const scraped = report.scraped_listing_json as
+  const scraped = listing.scraped_listing_json as
     | {
         rentalAppraisal?: {
           weeklyMin?: number;
@@ -131,17 +134,17 @@ function buildUserPayload({
       default_disclaimer: agency.default_disclaimer ?? DEFAULT_DISCLAIMER,
     },
     property: {
-      address: report.property_address,
-      suburb: report.suburb,
-      state: report.state,
-      postcode: report.postcode,
-      property_type: report.property_type,
-      bedrooms: report.bedrooms,
-      bathrooms: report.bathrooms,
-      car_spaces: report.car_spaces,
-      listing_title: report.listing_title,
-      listing_description: report.listing_description,
-      display_price: report.display_price,
+      address: listing.property_address,
+      suburb: listing.suburb,
+      state: listing.state,
+      postcode: listing.postcode,
+      property_type: listing.property_type,
+      bedrooms: listing.bedrooms,
+      bathrooms: listing.bathrooms,
+      car_spaces: listing.car_spaces,
+      listing_title: listing.listing_title,
+      listing_description: listing.listing_description,
+      display_price: listing.display_price,
     },
     estimate: {
       annual_revenue: estimate.annualRevenue,

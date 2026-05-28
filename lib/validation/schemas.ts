@@ -117,9 +117,23 @@ export const parsedListingSchema = z.object({
   warnings: z.array(z.string()).default([]),
 });
 
-export const updateReportSchema = z.object({
+export const listingStatusSchema = z.enum(["active", "archived"]);
+
+const collateralImageSelectionSchema = z.object({
+  hero_image_url: z.string().nullable().optional(),
+  selected_image_urls: z.array(z.string()).max(25).optional(),
+});
+
+const collateralImageChannelSchema = z.enum([
+  "landing",
+  "str_report",
+  "sales_brochure",
+  "investor_snapshot",
+  "agent_business_card",
+]);
+
+const listingPropertyFields = {
   agent_profile_id: z.string().uuid().nullable().optional(),
-  status: reportStatusSchema.optional(),
   listing_url: z.string().url().nullable().optional(),
   property_address: z.string().nullable().optional(),
   suburb: z.string().nullable().optional(),
@@ -151,8 +165,27 @@ export const updateReportSchema = z.object({
       return trimmed === "" ? null : trimmed;
     }),
   hero_image_url: z.string().nullable().optional(),
-  selected_image_urls: z.array(z.string()).max(5).optional(),
+  selected_image_urls: z.array(z.string()).max(25).optional(),
   uploaded_image_urls: z.array(z.string()).max(20).optional(),
+  custom_landing_url: z.string().url().nullable().optional(),
+  collateral_image_selections: z
+    .record(collateralImageChannelSchema, collateralImageSelectionSchema)
+    .optional(),
+  listing_agents: z.array(listingAgentSchema).max(2).optional(),
+  scraped_listing_json: parsedListingSchema.optional(),
+};
+
+export const updateListingSchema = z.object({
+  status: listingStatusSchema.optional(),
+  ...listingPropertyFields,
+});
+
+export const createListingSchema = updateListingSchema.extend({
+  property_address: z.string().trim().min(1, "Property address is required"),
+});
+
+export const updateReportSchema = z.object({
+  status: reportStatusSchema.optional(),
   user_overrides_json: z.record(z.string(), z.unknown()).optional(),
   final_estimate_json: z.record(z.string(), z.unknown()).optional(),
   ai_copy_json: z.record(z.string(), z.unknown()).optional(),
@@ -165,16 +198,15 @@ export const updateReportSchema = z.object({
       (value) => value == null || isValidReportTemplateId(value),
       { message: "Select a valid report template" },
     ),
-  listing_agents: z.array(listingAgentSchema).max(2).optional(),
-  scraped_listing_json: parsedListingSchema.optional(),
 });
 
-export const createReportSchema = updateReportSchema.extend({
-  property_address: z.string().trim().min(1, "Property address is required"),
+export const createReportSchema = z.object({
+  listing_id: z.string().uuid().optional(),
 });
 
 export const scrapeListingSchema = z.object({
   report_id: z.string().uuid().optional(),
+  listing_id: z.string().uuid().optional(),
   listing_url: z.string().url(),
 });
 
@@ -223,10 +255,40 @@ export const generateCopyRequestSchema = z.object({
     ),
 });
 
+export const leadStatusSchema = z.enum(["new", "contacted"]);
+
+export const collateralTypeSchema = z.enum([
+  "str_report",
+  "sales_brochure",
+  "investor_snapshot",
+  "agent_business_card",
+]);
+
+export const createPublicLeadSchema = z.object({
+  agency_slug: z.string().min(1),
+  listing_slug: z.string().min(1),
+  name: z.string().trim().min(1, "Name is required"),
+  email: optionalEmail.optional().nullable(),
+  phone: z.string().optional().nullable(),
+});
+
+export const updateLeadSchema = z.object({
+  status: leadStatusSchema,
+});
+
+export const createCollateralSchema = z.object({
+  type: collateralTypeSchema,
+});
+
 export type ParsedListingInput = z.infer<typeof parsedListingSchema>;
 
 export type AgencyInput = z.infer<typeof agencySchema>;
 export type GenerateCopyRequestInput = z.infer<typeof generateCopyRequestSchema>;
 export type AgentProfileInput = z.infer<typeof agentProfileSchema>;
+export type CreateListingInput = z.infer<typeof createListingSchema>;
+export type UpdateListingInput = z.infer<typeof updateListingSchema>;
 export type CreateReportInput = z.infer<typeof createReportSchema>;
 export type UpdateReportInput = z.infer<typeof updateReportSchema>;
+export type CreatePublicLeadInput = z.infer<typeof createPublicLeadSchema>;
+export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;
+export type CreateCollateralInput = z.infer<typeof createCollateralSchema>;

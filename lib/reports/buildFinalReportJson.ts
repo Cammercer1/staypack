@@ -3,6 +3,7 @@ import type {
   AgentProfile,
   AiCopyJson,
   FinalReportJson,
+  Listing,
   ParsedListing,
   Report,
   StrEstimate,
@@ -10,17 +11,19 @@ import type {
 import { DEFAULT_DISCLAIMER } from "@/lib/types";
 import { calculateAccommodates } from "@/lib/reports/formatters";
 import { calculateStrGrossYield } from "@/lib/reports/calculateStrYield";
-import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
+import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
 import {
   primaryReportAgent,
   resolveReportAgents,
 } from "@/lib/reports/resolveReportAgents";
+import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
 import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
 
 type BuildFinalReportInput = {
   agency: Agency;
   agentProfile?: AgentProfile | null;
   agencyAgents?: AgentProfile[];
+  listing: Listing;
   report: Report;
   estimate: StrEstimate;
   copy: AiCopyJson;
@@ -31,15 +34,17 @@ export function buildFinalReportJson({
   agency,
   agentProfile,
   agencyAgents,
+  listing,
   report,
   estimate,
   copy,
   scraped,
 }: BuildFinalReportInput): FinalReportJson {
-  const weeklyMin = scraped?.rentalAppraisal?.weeklyMin ?? null;
-  const weeklyMax = scraped?.rentalAppraisal?.weeklyMax ?? null;
+  const scrapedListing = scraped ?? listing.scraped_listing_json;
+  const weeklyMin = scrapedListing?.rentalAppraisal?.weeklyMin ?? null;
+  const weeklyMax = scrapedListing?.rentalAppraisal?.weeklyMax ?? null;
   const weeklyMidpoint =
-    scraped?.rentalAppraisal?.weeklyMidpoint ??
+    scrapedListing?.rentalAppraisal?.weeklyMidpoint ??
     (weeklyMin != null && weeklyMax != null
       ? (weeklyMin + weeklyMax) / 2
       : null);
@@ -50,13 +55,13 @@ export function buildFinalReportJson({
       ? estimate.annualRevenue - annualMidpoint
       : null;
   const agents = resolveReportAgents({
-    scraped: scraped ?? report.scraped_listing_json,
+    scraped: scrapedListing,
     agentProfile,
     agencyAgents,
   });
-  const displayPrice =
-    normalizeDisplayPrice(report.display_price) ?? report.display_price ?? null;
+  const displayPrice = resolveReportDisplayPrice(listing, scrapedListing);
   const strYield = calculateStrGrossYield(displayPrice, estimate.annualRevenue);
+  const strImages = resolveCollateralImageSelection(listing, "str_report");
 
   return {
     version: "standard_2_page_v1",
@@ -83,22 +88,22 @@ export function buildFinalReportJson({
     agent: primaryReportAgent(agents),
     agents,
     property: {
-      address: report.property_address ?? "",
-      suburb: report.suburb ?? "",
-      state: report.state ?? "",
-      postcode: report.postcode ?? "",
-      summary: report.listing_title ?? report.property_address ?? "",
-      property_type: report.property_type ?? "",
-      bedrooms: report.bedrooms ?? 0,
-      bathrooms: report.bathrooms ?? 0,
-      car_spaces: report.car_spaces ?? 0,
+      address: listing.property_address ?? "",
+      suburb: listing.suburb ?? "",
+      state: listing.state ?? "",
+      postcode: listing.postcode ?? "",
+      summary: listing.listing_title ?? listing.property_address ?? "",
+      property_type: listing.property_type ?? "",
+      bedrooms: listing.bedrooms ?? 0,
+      bathrooms: listing.bathrooms ?? 0,
+      car_spaces: listing.car_spaces ?? 0,
       accommodates: calculateAccommodates(
-        report.bedrooms,
-        report.accommodates,
+        listing.bedrooms,
+        listing.accommodates,
       ),
-      listing_url: report.listing_url ?? "",
-      hero_image_url: report.hero_image_url ?? "",
-      selected_image_urls: report.selected_image_urls ?? [],
+      listing_url: listing.listing_url ?? "",
+      hero_image_url: strImages.hero_image_url ?? "",
+      selected_image_urls: strImages.selected_image_urls,
       display_price: displayPrice,
     },
     str: {
@@ -137,8 +142,8 @@ export function buildFinalReportJson({
   };
 }
 
-export function getMockAiCopy(report: Report, agency: Agency): AiCopyJson {
-  const address = report.property_address ?? "this property";
+export function getMockAiCopy(listing: Listing, agency: Agency): AiCopyJson {
+  const address = listing.property_address ?? "this property";
 
   return {
     sales_pack_heading: `${agency.default_report_title}`,

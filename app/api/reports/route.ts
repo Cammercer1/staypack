@@ -1,31 +1,24 @@
 import { NextResponse } from "next/server";
-import { requireAgency } from "@/lib/auth/requireUser";
-import { geocodeReportAddress, hasGeocodableAddress } from "@/lib/geocoding";
-import {
-  createReportSchema,
-  parsedListingSchema,
-  type UpdateReportInput,
-} from "@/lib/validation/schemas";
-
-const ADDRESS_FIELDS = [
-  "property_address",
-  "suburb",
-  "state",
-  "postcode",
-  "country",
-] as const;
+import { requireAgency, requireListingAccess } from "@/lib/auth/requireUser";
+import { collateralPhotoRequirementError } from "@/lib/listings/collateralPhotoRequirements";
+import { createReportSchema } from "@/lib/validation/schemas";
 
 export async function GET(request: Request) {
   try {
     const { supabase, agency } = await requireAgency();
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
+    const listingId = searchParams.get("listing_id");
 
     let query = supabase
       .from("reports")
       .select("*")
       .eq("agency_id", agency.id)
       .order("created_at", { ascending: false });
+
+    if (listingId) {
+      query = query.eq("listing_id", listingId);
+    }
 
     if (status) {
       query = query.eq("status", status);
@@ -49,76 +42,29 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { supabase, agency, user } = await requireAgency();
-    const body = createReportSchema.parse(await request.json()) as UpdateReportInput;
+    const body = createReportSchema.parse(await request.json());
 
-    if (body.listing_agents !== undefined) {
-      const currentScraped = parsedListingSchema.parse({
-        images: [],
-        agents: [],
-        confidence: "low",
-        warnings: [],
-      });
-      const listingAgents = body.listing_agents
-        .map((agent) => ({
-          name: agent.name.trim(),
-          email: agent.email?.trim() || undefined,
-          phone: agent.phone?.trim() || undefined,
-          role_title: agent.role_title?.trim() || undefined,
-          photo_url: agent.photo_url?.trim() || undefined,
-        }))
-        .filter((agent) => agent.name);
-
-      body.scraped_listing_json = {
-        ...currentScraped,
-        agents: listingAgents,
-      };
-      delete body.listing_agents;
+    if (!body.listing_id) {
+      return NextResponse.json(
+        { error: "listing_id is required to create a report" },
+        { status: 400 },
+      );
     }
 
-    let geocodeWarning: string | undefined;
+    const { listing } = await requireListingAccess(body.listing_id);
 
-    if (
-      hasGeocodableAddress(body) &&
-      (body.latitude == null || body.longitude == null)
-    ) {
-      try {
-        const geocoded = await geocodeReportAddress(body);
-        body.latitude = geocoded.latitude;
-        body.longitude = geocoded.longitude;
-      } catch (error) {
-        geocodeWarning =
-          error instanceof Error
-            ? error.message
-            : "Unable to geocode property address";
-      }
+    const photoError = collateralPhotoRequirementError(listing);
+    if (photoError) {
+      return NextResponse.json({ error: photoError }, { status: 400 });
     }
 
     const { data, error } = await supabase
       .from("reports")
       .insert({
         agency_id: agency.id,
+        listing_id: listing.id,
         created_by: user.id,
-        status: body.status ?? "scraped",
-        listing_url: body.listing_url ?? null,
-        property_address: body.property_address,
-        suburb: body.suburb ?? null,
-        state: body.state ?? null,
-        postcode: body.postcode ?? null,
-        country: body.country ?? null,
-        latitude: body.latitude ?? null,
-        longitude: body.longitude ?? null,
-        property_type: body.property_type ?? null,
-        bedrooms: body.bedrooms ?? null,
-        bathrooms: body.bathrooms ?? null,
-        car_spaces: body.car_spaces ?? null,
-        accommodates: body.accommodates ?? null,
-        listing_title: body.listing_title ?? null,
-        listing_description: body.listing_description ?? null,
-        display_price: body.display_price ?? null,
-        hero_image_url: body.hero_image_url ?? null,
-        selected_image_urls: body.selected_image_urls ?? [],
-        uploaded_image_urls: body.uploaded_image_urls ?? [],
-        scraped_listing_json: body.scraped_listing_json ?? null,
+        status: "draft",
       })
       .select("*")
       .single();
@@ -127,10 +73,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({
-      report: data,
-      geocode_warning: geocodeWarning,
-    });
+    const { error: collateralError } = await supabase
+      .from("collateral_items")
+      .insert({
+        listing_id: listing.id,
+        agency_id: agency.id,
+        type: "str_report",
+        status: "draft",
+        report_id: data.id,
+      });
+
+    if (collateralError && collateralError.code !== "23505") {
+      return NextResponse.json({ error: collateralError.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ report: data });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to create report" },

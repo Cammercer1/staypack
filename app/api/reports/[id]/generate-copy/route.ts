@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireReportAccess } from "@/lib/auth/requireUser";
+import { requireReportWithListing } from "@/lib/auth/requireUser";
 import {
   CopyOpenAIError,
   CopyValidationError,
   generateReportCopy,
 } from "@/lib/openai/generateReportCopy";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
-import { loadAgencyAgentProfiles, loadReportAgentProfile } from "@/lib/reports/loadReportAgent";
+import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
 import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
 import { generateCopyRequestSchema } from "@/lib/validation/schemas";
@@ -18,7 +18,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { supabase, agency, report } = await requireReportAccess(id);
+    const { supabase, agency, report, listing } = await requireReportWithListing(id);
     const body = generateCopyRequestSchema.parse(
       await request.json().catch(() => ({})),
     );
@@ -40,10 +40,11 @@ export async function POST(
       : report;
     const templateId = resolveReportTemplateId(agency, reportForBuild);
 
-    const agentProfile = await loadReportAgentProfile(supabase, report);
+    const agentProfile = await loadListingAgentProfile(supabase, listing);
     const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
     const copy = await generateReportCopy({
       agency,
+      listing,
       report: reportForBuild,
       estimate,
     });
@@ -51,10 +52,11 @@ export async function POST(
       agency,
       agentProfile,
       agencyAgents,
+      listing,
       report: reportForBuild,
       estimate,
       copy,
-      scraped: report.scraped_listing_json,
+      scraped: listing.scraped_listing_json,
     });
 
     const { data, error } = await supabase
@@ -77,7 +79,7 @@ export async function POST(
       );
     }
 
-    return NextResponse.json({ copy, report: data });
+    return NextResponse.json({ copy, report: data, listing });
   } catch (error) {
     if (error instanceof CopyValidationError) {
       return NextResponse.json(

@@ -1,22 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { ReportListingEntry } from "@/components/reports/ReportListingEntry";
 import { ReportWizard } from "@/components/reports/ReportWizard";
-import { needsListingSetup } from "@/lib/reports/listingSetup";
-import type { Agency, Report } from "@/lib/types";
+import type { Agency, Listing, Report } from "@/lib/types";
 
 type Props = {
+  initialListing: Listing;
   initialReport: Report;
   agency: Agency;
 };
 
-export function ReportEditor({ initialReport, agency }: Props) {
+export function ReportEditor({ initialListing, initialReport, agency }: Props) {
+  const [listing, setListing] = useState(initialListing);
   const [report, setReport] = useState(initialReport);
 
-  if (needsListingSetup(report)) {
-    return <ReportListingEntry report={report} onComplete={setReport} />;
-  }
-
-  return <ReportWizard initialReport={report} agency={agency} />;
+  return (
+    <ReportWizard
+      initialListing={listing}
+      initialReport={report}
+      agency={agency}
+      onListingChange={setListing}
+      onReportChange={setReport}
+    />
+  );
 }

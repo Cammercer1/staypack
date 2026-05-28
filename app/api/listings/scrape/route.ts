@@ -1,28 +1,37 @@
 import { NextResponse } from "next/server";
 import { findUnknownScrapedAgents } from "@/lib/agents/matchScrapedAgents";
-import { requireAgency, requireReportAccess } from "@/lib/auth/requireUser";
+import {
+  requireAgency,
+  requireListingAccess,
+} from "@/lib/auth/requireUser";
 import { scrapeListingSchema } from "@/lib/validation/schemas";
 import { extractListingFromUrl } from "@/lib/scraping/extractListing";
-import type { ParsedListing } from "@/lib/types";
+import {
+  ensureListingLandingProvisioned,
+  generateListingSlug,
+} from "@/lib/listings/provisionLandingPage";
+import { mergeScrapeMasterSelection } from "@/lib/listings/collateralImages";
+import { expandListingDescriptionAfterScrape } from "@/lib/listings/expandListingDescriptionAfterScrape";
+import type { Listing, ParsedListing } from "@/lib/types";
 
-function buildScrapedReportFields(
+function buildScrapedListingFields(
   listingUrl: string,
   listing: ParsedListing,
-  existing?: {
-    property_address: string | null;
-    suburb: string | null;
-    state: string | null;
-    postcode: string | null;
-    property_type: string | null;
-    bedrooms: number | null;
-    bathrooms: number | null;
-    car_spaces: number | null;
-    listing_title: string | null;
-    listing_description: string | null;
-    display_price: string | null;
-    hero_image_url: string | null;
-  },
+  existing?: Partial<Listing>,
 ) {
+  const master = mergeScrapeMasterSelection(
+    {
+      scraped_listing_json: listing,
+      uploaded_image_urls: existing?.uploaded_image_urls ?? [],
+    },
+    existing
+      ? {
+          hero_image_url: existing.hero_image_url ?? null,
+          selected_image_urls: existing.selected_image_urls ?? [],
+        }
+      : null,
+  );
+
   return {
     listing_url: listingUrl,
     property_address: listing.address ?? existing?.property_address ?? null,
@@ -36,10 +45,155 @@ function buildScrapedReportFields(
     listing_title: listing.title ?? existing?.listing_title ?? null,
     listing_description: listing.description ?? existing?.listing_description ?? null,
     display_price: listing.displayPrice ?? existing?.display_price ?? null,
-    hero_image_url: listing.images[0] ?? existing?.hero_image_url ?? null,
-    selected_image_urls: listing.images[0] ? [listing.images[0]] : [],
+    hero_image_url: master.hero_image_url,
+    selected_image_urls: master.selected_image_urls,
     scraped_listing_json: listing,
-    status: "scraped" as const,
+  };
+}
+
+async function applyExpandedListingDescription({
+  supabase,
+  listing,
+  existingBeforeScrape,
+  warnings,
+}: {
+  supabase: Awaited<ReturnType<typeof requireAgency>>["supabase"];
+  listing: Listing;
+  existingBeforeScrape?: Pick<
+    Listing,
+    "listing_description" | "scraped_listing_json"
+  > | null;
+  warnings: string[];
+}) {
+  try {
+    const { description, expanded } = await expandListingDescriptionAfterScrape(
+      listing,
+      existingBeforeScrape,
+    );
+
+    if (!expanded || !description || description === listing.listing_description) {
+      return listing;
+    }
+
+    const { data, error } = await supabase
+      .from("listings")
+      .update({ listing_description: description })
+      .eq("id", listing.id)
+      .select("*")
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data as Listing;
+  } catch (error) {
+    warnings.push(
+      error instanceof Error
+        ? `Could not expand listing description: ${error.message}`
+        : "Could not expand listing description automatically",
+    );
+    return listing;
+  }
+}
+
+async function loadAgencyAgents(
+  supabase: Awaited<ReturnType<typeof requireAgency>>["supabase"],
+  agencyId: string,
+) {
+  const { data: agencyAgents, error: agentsError } = await supabase
+    .from("agent_profiles")
+    .select("*")
+    .eq("agency_id", agencyId);
+
+  if (agentsError) {
+    throw new Error(agentsError.message);
+  }
+
+  return agencyAgents ?? [];
+}
+
+async function updateListingFromScrape({
+  supabase,
+  user,
+  agency,
+  listingId,
+  listingUrl,
+  parsedListing,
+  method,
+  parserName,
+  warnings,
+  existingListing,
+}: {
+  supabase: Awaited<ReturnType<typeof requireAgency>>["supabase"];
+  user: Awaited<ReturnType<typeof requireAgency>>["user"];
+  agency: Awaited<ReturnType<typeof requireAgency>>["agency"];
+  listingId: string;
+  listingUrl: string;
+  parsedListing: ParsedListing;
+  method: string;
+  parserName: string;
+  warnings: string[];
+  existingListing: Listing;
+}) {
+  const { data: scrapeJob, error: scrapeError } = await supabase
+    .from("scrape_jobs")
+    .insert({
+      agency_id: agency.id,
+      listing_id: listingId,
+      user_id: user.id,
+      source_url: listingUrl,
+      status: "success",
+      method,
+      parser_name: parserName,
+      extracted_json: parsedListing,
+      warnings,
+    })
+    .select("*")
+    .single();
+
+  if (scrapeError) {
+    throw new Error(scrapeError.message);
+  }
+
+  const updateFields = buildScrapedListingFields(
+    listingUrl,
+    parsedListing,
+    existingListing,
+  );
+
+  const { data: updatedListing, error: listingError } = await supabase
+    .from("listings")
+    .update(updateFields)
+    .eq("id", listingId)
+    .select("*")
+    .single();
+
+  if (listingError) {
+    throw new Error(listingError.message);
+  }
+
+  const listingWithDescription = await applyExpandedListingDescription({
+    supabase,
+    listing: updatedListing as Listing,
+    existingBeforeScrape: existingListing,
+    warnings,
+  });
+
+  const agencyAgents = await loadAgencyAgents(supabase, agency.id);
+  const unknown_agents = findUnknownScrapedAgents(
+    parsedListing.agents,
+    agencyAgents,
+  );
+
+  return {
+    scrape_job_id: scrapeJob.id,
+    method,
+    parser_name: parserName,
+    listing: listingWithDescription,
+    scraped_listing: parsedListing,
+    warnings,
+    unknown_agents,
   };
 }
 
@@ -50,7 +204,7 @@ export async function POST(request: Request) {
       body.listing_url,
     );
 
-    const scrapedFields = buildScrapedReportFields(body.listing_url, listing);
+    const scrapedFields = buildScrapedListingFields(body.listing_url, listing);
 
     if (!scrapedFields.property_address?.trim()) {
       return NextResponse.json(
@@ -59,90 +213,56 @@ export async function POST(request: Request) {
       );
     }
 
-    if (body.report_id) {
-      const { supabase, user, agency, report } = await requireReportAccess(
-        body.report_id,
-      );
+    if (body.listing_id) {
+      const { supabase, user, agency, listing: existingListing } =
+        await requireListingAccess(body.listing_id);
 
-      const { data: scrapeJob, error: scrapeError } = await supabase
-        .from("scrape_jobs")
-        .insert({
-          agency_id: agency.id,
-          report_id: report.id,
-          user_id: user.id,
-          source_url: body.listing_url,
-          status: "success",
-          method,
-          parser_name: parserName,
-          extracted_json: listing,
-          warnings,
-        })
-        .select("*")
-        .single();
-
-      if (scrapeError) {
-        return NextResponse.json({ error: scrapeError.message }, { status: 400 });
-      }
-
-      const updateFields = buildScrapedReportFields(body.listing_url, listing, report);
-
-      const { data: updatedReport, error: reportError } = await supabase
-        .from("reports")
-        .update(updateFields)
-        .eq("id", report.id)
-        .select("*")
-        .single();
-
-      if (reportError) {
-        return NextResponse.json({ error: reportError.message }, { status: 400 });
-      }
-
-      const { data: agencyAgents, error: agentsError } = await supabase
-        .from("agent_profiles")
-        .select("*")
-        .eq("agency_id", agency.id);
-
-      if (agentsError) {
-        return NextResponse.json({ error: agentsError.message }, { status: 400 });
-      }
-
-      const unknown_agents = findUnknownScrapedAgents(
-        listing.agents,
-        agencyAgents ?? [],
-      );
+      const payload = await updateListingFromScrape({
+        supabase,
+        user,
+        agency,
+        listingId: existingListing.id,
+        listingUrl: body.listing_url,
+        parsedListing: listing,
+        method,
+        parserName,
+        warnings,
+        existingListing,
+      });
 
       return NextResponse.json({
-        scrape_job_id: scrapeJob.id,
-        method,
-        parser_name: parserName,
-        listing,
-        warnings,
-        unknown_agents,
-        report: updatedReport,
+        ...payload,
+        listing: await ensureListingLandingProvisioned(
+          payload.listing as Listing,
+          agency,
+          supabase,
+        ),
       });
     }
 
     const { supabase, user, agency } = await requireAgency();
 
-    const { data: report, error: insertError } = await supabase
-      .from("reports")
+    const { data: createdListing, error: listingInsertError } = await supabase
+      .from("listings")
       .insert({
         agency_id: agency.id,
         created_by: user.id,
+        status: "active",
+        public_slug: generateListingSlug(),
         ...scrapedFields,
       })
       .select("*")
       .single();
 
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 400 });
+    if (listingInsertError) {
+      return NextResponse.json({ error: listingInsertError.message }, { status: 400 });
     }
 
     const { data: scrapeJob, error: scrapeError } = await supabase
       .from("scrape_jobs")
       .insert({
         agency_id: agency.id,
-        report_id: report.id,
+        listing_id: createdListing.id,
         user_id: user.id,
         source_url: body.listing_url,
         status: "success",
@@ -158,28 +278,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: scrapeError.message }, { status: 400 });
     }
 
-    const { data: agencyAgents, error: agentsError } = await supabase
-      .from("agent_profiles")
-      .select("*")
-      .eq("agency_id", agency.id);
+    const listingWithDescription = await applyExpandedListingDescription({
+      supabase,
+      listing: createdListing as Listing,
+      existingBeforeScrape: null,
+      warnings,
+    });
 
-    if (agentsError) {
-      return NextResponse.json({ error: agentsError.message }, { status: 400 });
-    }
-
-    const unknown_agents = findUnknownScrapedAgents(
-      listing.agents,
-      agencyAgents ?? [],
-    );
+    const agencyAgents = await loadAgencyAgents(supabase, agency.id);
+    const unknown_agents = findUnknownScrapedAgents(listing.agents, agencyAgents);
 
     return NextResponse.json({
       scrape_job_id: scrapeJob.id,
       method,
       parser_name: parserName,
-      listing,
+      listing: await ensureListingLandingProvisioned(
+        listingWithDescription,
+        agency,
+        supabase,
+      ),
+      scraped_listing: listing,
       warnings,
       unknown_agents,
-      report,
     });
   } catch (error) {
     return NextResponse.json(

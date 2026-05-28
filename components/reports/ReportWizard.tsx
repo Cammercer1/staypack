@@ -6,38 +6,52 @@ import { toast } from "sonner";
 import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ScrapedListingReviewStep } from "@/components/reports/ScrapedListingReviewStep";
 import { StrEstimateStep } from "@/components/reports/StrEstimateStep";
 import { GeneratedCopyEditor } from "@/components/reports/GeneratedCopyEditor";
 import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
-import type { Agency, AgentProfile, FinalReportJson, Report } from "@/lib/types";
+import type { Agency, AgentProfile, FinalReportJson, Listing, Report } from "@/lib/types";
 
 const steps = [
-  { id: "review", label: "Review listing" },
   { id: "estimate", label: "STR estimate" },
   { id: "copy", label: "Generate copy" },
   { id: "preview", label: "Preview & publish" },
 ];
 
 export function ReportWizard({
+  initialListing,
   initialReport,
   agency,
+  onListingChange,
+  onReportChange,
 }: {
+  initialListing: Listing;
   initialReport: Report;
   agency: Agency;
+  onListingChange?: (listing: Listing) => void;
+  onReportChange?: (report: Report) => void;
 }) {
+  const [listing, setListing] = useState(initialListing);
   const [report, setReport] = useState(initialReport);
   const [brandAgency, setBrandAgency] = useState(agency);
   const [step, setStep] = useState(getInitialStep(initialReport));
-  const [manualEntry, setManualEntry] = useState(!initialReport.scraped_listing_json);
   const [loading, setLoading] = useState(false);
   const [publishStage, setPublishStage] = useState<
     "idle" | "publishing" | "generating-pdf"
   >("idle");
   const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
+
+  function updateListing(nextListing: Listing) {
+    setListing(nextListing);
+    onListingChange?.(nextListing);
+  }
+
+  function updateReport(nextReport: Report) {
+    setReport(nextReport);
+    onReportChange?.(nextReport);
+  }
 
   useEffect(() => {
     fetch("/api/agents")
@@ -82,11 +96,11 @@ export function ReportWizard({
     }
 
     return enrichFinalReportMetrics(
-      report,
+      listing,
       mergeAgencyBrandIntoFinalReport(brandAgency, cached),
       { agencyAgents },
     );
-  }, [brandAgency, report, agencyAgents]);
+  }, [brandAgency, listing, report, agencyAgents]);
 
   async function publishReport() {
     setLoading(true);
@@ -117,7 +131,7 @@ export function ReportWizard({
       return;
     }
 
-    setReport(pdfPayload.report);
+    updateReport(pdfPayload.report);
     toast.success("Report published");
     setLoading(false);
     setPublishStage("idle");
@@ -126,7 +140,7 @@ export function ReportWizard({
   return (
     <div className="space-y-6">
       <Tabs value={step} onValueChange={setStep}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           {steps.map((item) => (
             <TabsTrigger key={item.id} value={item.id}>
               {item.label}
@@ -134,22 +148,13 @@ export function ReportWizard({
           ))}
         </TabsList>
 
-        <TabsContent value="review">
-          <ScrapedListingReviewStep
-            report={report}
-            manualMode={manualEntry}
-            onSaved={(nextReport) => {
-              setReport(nextReport);
-              setStep("estimate");
-            }}
-          />
-        </TabsContent>
-
         <TabsContent value="estimate">
           <StrEstimateStep
+            listing={listing}
             report={report}
-            onComplete={(nextReport) => {
-              setReport(nextReport);
+            onComplete={({ listing: nextListing, report: nextReport }) => {
+              updateListing(nextListing);
+              updateReport(nextReport);
               setStep("copy");
             }}
           />
@@ -159,9 +164,10 @@ export function ReportWizard({
           <GeneratedCopyEditor
             agency={agency}
             agencyAgents={agencyAgents}
+            listing={listing}
             report={report}
             onComplete={(nextReport) => {
-              setReport(nextReport);
+              updateReport(nextReport);
             }}
             onContinueToPreview={() => setStep("preview")}
           />
@@ -208,12 +214,12 @@ export function ReportWizard({
               regenerateLabel="Regenerate PDF preview"
               onGenerated={({ report: nextReport, pdf_url }) => {
                 if (nextReport) {
-                  setReport(nextReport);
+                  updateReport(nextReport);
                   return;
                 }
 
                 if (pdf_url) {
-                  setReport((current) => ({ ...current, pdf_url }));
+                  updateReport({ ...report, pdf_url });
                 }
               }}
             />
@@ -243,5 +249,5 @@ function getInitialStep(report: Report) {
   if (report.status === "estimated") {
     return "copy";
   }
-  return "review";
+  return "estimate";
 }

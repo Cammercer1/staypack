@@ -10,11 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { calculateAccommodates, formatCurrency, formatPercent } from "@/lib/reports/formatters";
-import type { AirbticsTier, Report, StrEstimate } from "@/lib/types";
+import type { AirbticsTier, Listing, Report, StrEstimate } from "@/lib/types";
 
 type Props = {
+  listing: Listing;
   report: Report;
-  onComplete: (report: Report) => void;
+  onComplete: (state: { listing: Listing; report: Report }) => void;
 };
 
 type TierOption = {
@@ -50,7 +51,7 @@ const TIER_OPTIONS: TierOption[] = [
   },
 ];
 
-export function StrEstimateStep({ report, onComplete }: Props) {
+export function StrEstimateStep({ listing, report, onComplete }: Props) {
   const [estimate, setEstimate] = useState<StrEstimate | null>(
     report.final_estimate_json,
   );
@@ -61,8 +62,8 @@ export function StrEstimateStep({ report, onComplete }: Props) {
     String(report.final_estimate_json?.annualRevenue ?? ""),
   );
   const defaultAccommodates = useMemo(
-    () => calculateAccommodates(report.bedrooms, report.accommodates),
-    [report.bedrooms, report.accommodates],
+    () => calculateAccommodates(listing.bedrooms, listing.accommodates),
+    [listing.bedrooms, listing.accommodates],
   );
   const [accommodates, setAccommodates] = useState(String(defaultAccommodates));
   const [estimating, setEstimating] = useState(false);
@@ -70,13 +71,13 @@ export function StrEstimateStep({ report, onComplete }: Props) {
   const loading = estimating || saving;
 
   async function runEstimate() {
-    if (!report.property_address?.trim()) {
+    if (!listing.property_address?.trim()) {
       toast.error("Add a property address before running the STR estimate");
       return;
     }
 
     const resolvedAccommodates = calculateAccommodates(
-      report.bedrooms,
+      listing.bedrooms,
       accommodates === "" ? null : Number(accommodates),
     );
 
@@ -87,11 +88,11 @@ export function StrEstimateStep({ report, onComplete }: Props) {
       body: JSON.stringify({
         report_id: report.id,
         tier: selectedTier,
-        address: report.property_address,
-        latitude: report.latitude,
-        longitude: report.longitude,
-        bedrooms: report.bedrooms,
-        bathrooms: report.bathrooms,
+        address: listing.property_address,
+        latitude: listing.latitude,
+        longitude: listing.longitude,
+        bedrooms: listing.bedrooms,
+        bathrooms: listing.bathrooms,
         accommodates: resolvedAccommodates,
       }),
     });
@@ -107,7 +108,10 @@ export function StrEstimateStep({ report, onComplete }: Props) {
     setSelectedTier(payload.tier ?? selectedTier);
     setOverrideAnnual(String(payload.estimate.annualRevenue ?? ""));
     setAccommodates(String(payload.accommodates ?? resolvedAccommodates));
-    onComplete(payload.report);
+    onComplete({
+      listing: (payload.listing as Listing) ?? listing,
+      report: payload.report as Report,
+    });
     toast.success(
       selectedTier === "full"
         ? "Detailed STR estimate generated"
@@ -141,7 +145,7 @@ export function StrEstimateStep({ report, onComplete }: Props) {
       return;
     }
 
-    onComplete(payload.report);
+    onComplete({ listing, report: payload.report as Report });
     toast.success("Estimate saved");
     setSaving(false);
   }
@@ -165,15 +169,15 @@ export function StrEstimateStep({ report, onComplete }: Props) {
       <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm">
         <p className="font-medium">Property location</p>
         <p className="mt-1 text-muted-foreground">
-          {report.property_address || "No address saved yet"}
-          {report.suburb ? `, ${report.suburb}` : ""}
-          {report.state ? ` ${report.state}` : ""}
-          {report.postcode ? ` ${report.postcode}` : ""}
+          {listing.property_address || "No address saved yet"}
+          {listing.suburb ? `, ${listing.suburb}` : ""}
+          {listing.state ? ` ${listing.state}` : ""}
+          {listing.postcode ? ` ${listing.postcode}` : ""}
         </p>
-        {report.latitude != null && report.longitude != null ? (
+        {listing.latitude != null && listing.longitude != null ? (
           <p className="mt-2 text-xs text-muted-foreground">
-            Geocoded coordinates: {report.latitude.toFixed(5)},{" "}
-            {report.longitude.toFixed(5)}
+            Geocoded coordinates: {listing.latitude.toFixed(5)},{" "}
+            {listing.longitude.toFixed(5)}
           </p>
         ) : (
           <p className="mt-2 text-xs text-muted-foreground">
@@ -185,11 +189,11 @@ export function StrEstimateStep({ report, onComplete }: Props) {
       <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="estimateBedrooms">Bedrooms</Label>
-          <Input id="estimateBedrooms" value={String(report.bedrooms ?? "—")} disabled />
+          <Input id="estimateBedrooms" value={String(listing.bedrooms ?? "—")} disabled />
         </div>
         <div className="space-y-2">
           <Label htmlFor="estimateBathrooms">Bathrooms</Label>
-          <Input id="estimateBathrooms" value={String(report.bathrooms ?? "—")} disabled />
+          <Input id="estimateBathrooms" value={String(listing.bathrooms ?? "—")} disabled />
         </div>
         <div className="space-y-2">
           <Label htmlFor="estimateAccommodates">Accommodates</Label>

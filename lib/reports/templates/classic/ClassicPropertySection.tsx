@@ -111,33 +111,10 @@ export function ClassicPropertySection({ report, variant = "light" }: Props) {
             {formatCurrency(str.annual_revenue)}
           </p>
           <p className="mt-2 text-sm font-medium text-neutral-700">per year before costs</p>
-          {grossYield ? (
-            <div className="mt-3 border-t border-neutral-200/70 pt-3">
-              <p
-                className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600"
-                style={{ fontFamily: "var(--report-heading-font, inherit)" }}
-              >
-                Est. gross STR yield
-              </p>
-              <p
-                className="mt-1.5 text-[1.35rem] font-semibold leading-none tracking-tight"
-                style={{
-                  fontFamily: "var(--report-heading-font, inherit)",
-                  color: "var(--report-text-colour, inherit)",
-                }}
-              >
-                {formatStrGrossYield(grossYield)}
-              </p>
-              <p className="mt-1.5 text-xs leading-5 text-neutral-600">
-                Before costs, based on listing price {grossYield.display_price}
-              </p>
-            </div>
-          ) : null}
-          {variant === "detailed" && report.str_enrichment?.revenue_range ? (
+          {variant === "light" && grossYield ? (
             <p className="mt-2 text-xs leading-5 text-neutral-600">
-              Market range (annual gross):{" "}
-              {formatCurrency(report.str_enrichment.revenue_range.p25)} –{" "}
-              {formatCurrency(report.str_enrichment.revenue_range.p75)}
+              Est. gross STR yield {formatStrGrossYield(grossYield)} before costs
+              {" "}(listing price {grossYield.display_price})
             </p>
           ) : null}
           {copy.key_metrics_line ? (

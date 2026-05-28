@@ -8,42 +8,41 @@ import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UnknownAgentsAfterScrapeModal } from "@/components/reports/UnknownAgentsAfterScrapeModal";
-import { isPersistedReport } from "@/lib/reports/emptyReportDraft";
-import type { ParsedListing, Report } from "@/lib/types";
+import { isPersistedListing } from "@/lib/listings/emptyListingDraft";
+import type { Listing, ParsedListing } from "@/lib/types";
 
 type UnknownAgent = ParsedListing["agents"][number] & { name: string };
 
 type Props = {
-  report: Report;
-  onComplete: (report: Report) => void;
-  onManualEntry: (report: Report) => void;
+  listing: Listing;
+  onComplete: (listing: Listing) => void;
+  onManualEntry: (listing: Listing) => void;
 };
 
-export function ListingUrlStep({ report, onComplete, onManualEntry }: Props) {
-  const [listingUrl, setListingUrl] = useState(report.listing_url ?? "");
+export function ListingUrlStep({ listing, onComplete, onManualEntry }: Props) {
+  const [listingUrl, setListingUrl] = useState(listing.listing_url ?? "");
   const [loading, setLoading] = useState(false);
-  const [pendingReport, setPendingReport] = useState<Report | null>(null);
+  const [pendingListing, setPendingListing] = useState<Listing | null>(null);
   const [unknownAgents, setUnknownAgents] = useState<UnknownAgent[]>([]);
   const [agentModalOpen, setAgentModalOpen] = useState(false);
 
   function openManualEntry() {
     onManualEntry({
-      ...report,
+      ...listing,
       listing_url: listingUrl || null,
-      status: "scraped",
     });
   }
 
-  function finishScrape(nextReport: Report) {
-    setPendingReport(null);
+  function finishScrape(importedListing: Listing) {
+    setPendingListing(null);
     setUnknownAgents([]);
     setAgentModalOpen(false);
-    onComplete(nextReport);
+    onComplete(importedListing);
   }
 
   function handleUnknownAgentsComplete() {
-    if (pendingReport) {
-      finishScrape(pendingReport);
+    if (pendingListing) {
+      finishScrape(pendingListing);
     }
   }
 
@@ -55,7 +54,7 @@ export function ListingUrlStep({ report, onComplete, onManualEntry }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...(isPersistedReport(report) ? { report_id: report.id } : {}),
+          ...(isPersistedListing(listing) ? { listing_id: listing.id } : {}),
           listing_url: listingUrl,
         }),
       });
@@ -76,18 +75,20 @@ export function ListingUrlStep({ report, onComplete, onManualEntry }: Props) {
           description: payload.warnings.slice(0, 2).join(" "),
         });
       } else {
-        toast.success("Listing imported — choose up to 5 images on the next step");
+        toast.success("Listing imported — review details on the next step");
       }
 
+      const importedListing = payload.listing as Listing;
       const unknown = (payload.unknown_agents ?? []) as UnknownAgent[];
+
       if (unknown.length > 0) {
-        setPendingReport(payload.report as Report);
+        setPendingListing(importedListing);
         setUnknownAgents(unknown);
         setAgentModalOpen(true);
         return;
       }
 
-      finishScrape(payload.report as Report);
+      finishScrape(importedListing);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Import failed");
       toast.message("Enter the listing details manually on the next step.", {
@@ -104,7 +105,7 @@ export function ListingUrlStep({ report, onComplete, onManualEntry }: Props) {
       <AsyncLoadingOverlay
         active={loading}
         title="Importing listing"
-        description="Fetching the page and extracting property details. This usually takes 15–30 seconds."
+        description="Fetching the page, extracting property details, and writing your listing description. This usually takes 20–40 seconds."
         className="max-w-2xl"
       >
       <div className="space-y-5 rounded-2xl border border-border/70 bg-background/70 p-6">
@@ -114,9 +115,9 @@ export function ListingUrlStep({ report, onComplete, onManualEntry }: Props) {
             Paste a listing URL
           </div>
           <p className="text-sm leading-6 text-muted-foreground">
-            We fetch the listing page, extract property details automatically, then
-            you choose up to 5 photos on the next step. If import fails, you&apos;ll
-            enter everything manually instead.
+            We fetch the listing page and extract property details automatically.
+            On the next step you&apos;ll review the data, choose photos, and assign
+            listing agents before saving.
           </p>
         </div>
 
