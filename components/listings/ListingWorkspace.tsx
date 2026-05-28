@@ -39,6 +39,7 @@ import { CollateralItemActions } from "@/components/collateral/CollateralItemAct
 import { CollateralImageEditor } from "@/components/listings/CollateralImageEditor";
 import { CollateralPhotoRequirementNotice } from "@/components/listings/CollateralPhotoRequirementNotice";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
+import { resolveEffectiveListingPageUrl } from "@/lib/listings/listingUrls";
 import { getCollateralPhotoRequirement } from "@/lib/listings/collateralPhotoRequirements";
 import {
   COLLATERAL_TYPE_META,
@@ -65,6 +66,7 @@ const COLLATERAL_ICONS: Record<CollateralType, typeof FileText> = {
 };
 
 type Props = {
+  agencySlug: string;
   listing: Listing;
   collateral: CollateralItem[];
   leads: Lead[];
@@ -185,7 +187,13 @@ function ListingSummary({ listing }: { listing: Listing }) {
   );
 }
 
-function LandingPageCard({ listing }: { listing: Listing }) {
+function LandingPageCard({
+  listing,
+  agencySlug,
+}: {
+  listing: Listing;
+  agencySlug: string;
+}) {
   const router = useRouter();
   const [customUrl, setCustomUrl] = useState(listing.custom_landing_url ?? "");
   const [editing, setEditing] = useState(false);
@@ -208,8 +216,8 @@ function LandingPageCard({ listing }: { listing: Listing }) {
     }
   }
 
-  // The URL used for QR codes, Copy Link, and View buttons
-  const effectiveUrl = listing.custom_landing_url ?? listing.public_url;
+  // The URL used for Copy Link and View buttons (canonical when DB has localhost)
+  const effectiveUrl = resolveEffectiveListingPageUrl(agencySlug, listing);
 
   function startEditing() {
     setEditing(true);
@@ -433,6 +441,7 @@ function CreateCollateralDraftButton({
 }
 
 function CollateralTab({
+  agencySlug,
   listing,
   collateral,
   reports,
@@ -440,6 +449,7 @@ function CollateralTab({
   onGoToPhotos,
   onRefresh,
 }: {
+  agencySlug: string;
   listing: Listing;
   collateral: CollateralItem[];
   reports: Report[];
@@ -457,7 +467,7 @@ function CollateralTab({
         onGoToPhotos={onGoToPhotos}
       />
 
-      <LandingPageCard listing={listing} />
+      <LandingPageCard listing={listing} agencySlug={agencySlug} />
 
       <div className="grid gap-4 md:grid-cols-2">
         {COLLATERAL_TYPE_ORDER.map((type) => {
@@ -695,6 +705,7 @@ function SettingsTab({
 }
 
 export function ListingWorkspace({
+  agencySlug,
   listing: initialListing,
   collateral: initialCollateral,
   leads: initialLeads,
@@ -733,6 +744,7 @@ export function ListingWorkspace({
 
         <TabsContent value="collateral" className="mt-6">
           <CollateralTab
+            agencySlug={agencySlug}
             listing={listing}
             collateral={initialCollateral}
             reports={initialReports}

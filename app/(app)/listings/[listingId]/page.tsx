@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireAgency } from "@/lib/auth/requireUser";
+import { ensureListingLandingProvisioned } from "@/lib/listings/provisionLandingPage";
 import { ListingWorkspace } from "@/components/listings/ListingWorkspace";
 import { Button } from "@/components/ui/button";
 import type { CollateralItem, Lead, Listing, ListingStats, Report } from "@/lib/types";
@@ -25,6 +26,12 @@ export default async function ListingDetailPage({
   if (!listing) {
     notFound();
   }
+
+  const provisionedListing = await ensureListingLandingProvisioned(
+    listing as Listing,
+    agency,
+    supabase,
+  );
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -90,7 +97,8 @@ export default async function ListingDetailPage({
       </div>
 
       <ListingWorkspace
-        listing={listing as Listing}
+        agencySlug={agency.slug}
+        listing={provisionedListing}
         collateral={(collateral ?? []) as CollateralItem[]}
         leads={(leads ?? []) as Lead[]}
         reports={(reports ?? []) as Report[]}

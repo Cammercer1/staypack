@@ -15,6 +15,45 @@ export function buildPublicListingUrl(agencySlug: string, listingSlug: string) {
   return `${base}/${agencySlug}/l/${listingSlug}`;
 }
 
+function isStalePublicUrl(stored: string, canonical: string) {
+  try {
+    const storedUrl = new URL(stored);
+    if (
+      storedUrl.hostname === "localhost" ||
+      storedUrl.hostname.startsWith("127.")
+    ) {
+      return true;
+    }
+    const canonicalUrl = new URL(canonical);
+    return storedUrl.origin !== canonicalUrl.origin;
+  } catch {
+    return true;
+  }
+}
+
+/** Link shown in the app — prefers canonical URL when DB still has localhost. */
+export function resolveEffectiveListingPageUrl(
+  agencySlug: string,
+  listing: Pick<
+    Listing,
+    "custom_landing_url" | "public_url" | "public_slug"
+  >,
+) {
+  const custom = listing.custom_landing_url?.trim();
+  if (custom) return custom;
+
+  if (listing.public_slug) {
+    const canonical = buildPublicListingUrl(agencySlug, listing.public_slug);
+    const stored = listing.public_url?.trim();
+    if (!stored || isStalePublicUrl(stored, canonical)) {
+      return canonical;
+    }
+    return stored;
+  }
+
+  return listing.public_url?.trim() || null;
+}
+
 /** Where visitors should land after a QR scan or link click. */
 export function resolveListingDestinationUrl(
   listing: Pick<Listing, "custom_landing_url" | "public_url">,
@@ -48,13 +87,24 @@ export function isSameListingPageUrl(a: string, b: string) {
 }
 
 export function buildListingQrRedirectDestination(
-  listing: Pick<Listing, "custom_landing_url" | "public_url">,
+  listing: Pick<
+    Listing,
+    "custom_landing_url" | "public_url" | "public_slug"
+  >,
+  agencySlug: string,
 ) {
-  const destination = resolveListingDestinationUrl(listing);
+  const custom = listing.custom_landing_url?.trim();
+  if (custom) return custom;
+
+  const destination =
+    resolveEffectiveListingPageUrl(agencySlug, listing) ??
+    resolveListingDestinationUrl(listing);
   if (!destination) return null;
 
-  const publicUrl = listing.public_url?.trim();
-  if (publicUrl && isSameListingPageUrl(destination, publicUrl)) {
+  const canonical = listing.public_slug
+    ? buildPublicListingUrl(agencySlug, listing.public_slug)
+    : null;
+  if (canonical && isSameListingPageUrl(destination, canonical)) {
     return appendViaQrParam(destination);
   }
 

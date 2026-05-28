@@ -58,8 +58,55 @@ export async function provisionListingLanding(
   supabase?: SupabaseClient,
 ): Promise<ProvisionResult> {
   const publicSlug = listing.public_slug ?? generateListingSlug();
+  const canonicalPublicUrl = buildPublicListingUrl(agency.slug, publicSlug);
+  const storedPublicUrl = listing.public_url?.trim() ?? null;
+  const storedHost = storedPublicUrl
+    ? (() => {
+        try {
+          return new URL(storedPublicUrl).host;
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+  const canonicalHost = (() => {
+    try {
+      return new URL(canonicalPublicUrl).host;
+    } catch {
+      return null;
+    }
+  })();
   const publicUrl =
-    listing.public_url ?? buildPublicListingUrl(agency.slug, publicSlug);
+    !storedPublicUrl ||
+    storedHost === "localhost" ||
+    storedHost?.startsWith("localhost:") ||
+    (canonicalHost && storedHost && storedHost !== canonicalHost)
+      ? canonicalPublicUrl
+      : storedPublicUrl;
+  // #region agent log
+  fetch("http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "a515ca",
+    },
+    body: JSON.stringify({
+      sessionId: "a515ca",
+      location: "provisionLandingPage.ts:provision",
+      message: "Resolved public URL for listing",
+      data: {
+        listingId: listing.id,
+        storedPublicUrl,
+        storedHost,
+        canonicalPublicUrl,
+        canonicalHost,
+        publicUrl,
+      },
+      timestamp: Date.now(),
+      hypothesisId: "H1",
+    }),
+  }).catch(() => {});
+  // #endregion
   const landingQrCodeUrl = await uploadListingLandingQr(
     agency,
     listing.id,
