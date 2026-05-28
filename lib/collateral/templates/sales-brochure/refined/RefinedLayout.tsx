@@ -1,5 +1,4 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
-import { BrochureBrandedAgentBlock } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBrandedAgentBlock";
 import type { FinalReportJson } from "@/lib/types";
 import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
@@ -294,6 +293,8 @@ export function RefinedAgentBar({
   pinnedBottom?: boolean;
 }) {
   const agent = report.agent;
+  const logoUrl = getAgencyLogoUrl(document.agency, "light");
+  const accent = document.agency.primary_colour || "#1a1a2e";
 
   return (
     <div
@@ -301,33 +302,92 @@ export function RefinedAgentBar({
         pinnedBottom ? "py-5" : "border-t border-neutral-200 py-4"
       }`}
     >
-      <BrochureBrandedAgentBlock
-        agency={document.agency}
-        agent={{
-          name: agent.name,
-          role_title: agent.role_title ?? "",
-          phone: agent.phone ?? "",
-          email: agent.email ?? "",
-          photo_url: agent.photo_url ?? "",
-        }}
-        avatarSize={56}
-      />
-      <div className="flex items-center gap-6">
-        {getAgencyLogoUrl(document.agency, "light") ? (
+      {/* Agent — flat print style, no background card */}
+      <div className="flex items-center gap-4">
+        {agent.photo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={getAgencyLogoUrl(document.agency, "light")}
+            src={agent.photo_url}
+            alt={agent.name || "Agent"}
+            className="h-14 w-14 shrink-0 rounded-full object-cover object-top"
+          />
+        ) : null}
+        <div className="min-w-0">
+          {agent.name ? (
+            <p
+              className="text-[0.82rem] font-bold leading-tight text-neutral-900"
+              style={{ fontFamily: headingFont }}
+            >
+              {agent.name}
+            </p>
+          ) : null}
+          {agent.role_title ? (
+            <p
+              className="text-[0.7rem] text-neutral-500"
+              style={{ fontFamily: bodyFont }}
+            >
+              {agent.role_title}
+            </p>
+          ) : null}
+          {agent.phone ? (
+            <p
+              className="text-[0.72rem] text-neutral-700"
+              style={{ fontFamily: bodyFont }}
+            >
+              {agent.phone}
+            </p>
+          ) : null}
+          {agent.email ? (
+            <p
+              className="truncate text-[0.68rem] text-neutral-500"
+              style={{ fontFamily: bodyFont }}
+            >
+              {agent.email}
+            </p>
+          ) : null}
+        </div>
+        {/* Thin accent divider between agent and agency side */}
+        <div className="mx-2 h-10 w-px bg-neutral-200" aria-hidden />
+        <div className="min-w-0 space-y-0.5">
+          <p
+            className="text-[0.72rem] font-semibold text-neutral-900"
+            style={{ fontFamily: headingFont }}
+          >
+            {document.agency.name}
+          </p>
+          {document.agency.phone ? (
+            <p className="text-[0.68rem] text-neutral-600" style={{ fontFamily: bodyFont }}>
+              {document.agency.phone}
+            </p>
+          ) : null}
+          {document.agency.website_url ? (
+            <p className="text-[0.66rem] text-neutral-500" style={{ fontFamily: bodyFont }}>
+              {document.agency.website_url}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Logo + QR */}
+      <div className="flex shrink-0 items-center gap-5">
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoUrl}
             alt={document.agency.name}
             className="h-8 max-w-[140px] object-contain"
           />
         ) : (
-          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-800">
+          <p
+            className="text-xs font-semibold uppercase tracking-wide"
+            style={{ color: accent, fontFamily: headingFont }}
+          >
             {document.agency.name}
           </p>
         )}
         {document.assets.qr_code_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={document.assets.qr_code_url} alt="QR" className="h-12 w-12" />
+          <img src={document.assets.qr_code_url} alt="QR" className="h-12 w-12 shrink-0" />
         ) : null}
       </div>
     </div>

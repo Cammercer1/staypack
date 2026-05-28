@@ -6,6 +6,9 @@ import { EditorialBrochure } from "@/lib/collateral/templates/sales-brochure/Edi
 import { EditorialBrochureOnePage } from "@/lib/collateral/templates/sales-brochure/EditorialBrochureOnePage";
 import { GalleryBrochure } from "@/lib/collateral/templates/sales-brochure/GalleryBrochure";
 import { GalleryBrochureOnePage } from "@/lib/collateral/templates/sales-brochure/GalleryBrochureOnePage";
+import { LandmarkBrochureOnePage } from "@/lib/collateral/templates/sales-brochure/LandmarkBrochureOnePage";
+import { MinimalistBrochure } from "@/lib/collateral/templates/sales-brochure/MinimalistBrochure";
+import { MinimalistBrochureOnePage } from "@/lib/collateral/templates/sales-brochure/MinimalistBrochureOnePage";
 import { RefinedBrochure } from "@/lib/collateral/templates/sales-brochure/RefinedBrochure";
 import { RefinedBrochureOnePage } from "@/lib/collateral/templates/sales-brochure/RefinedBrochureOnePage";
 import { SplitBrochure } from "@/lib/collateral/templates/sales-brochure/SplitBrochure";
@@ -23,6 +26,9 @@ import {
   SALES_BROCHURE_SPLIT_2PG_TEMPLATE_ID,
   SALES_BROCHURE_REFINED_1PG_TEMPLATE_ID,
   SALES_BROCHURE_REFINED_2PG_TEMPLATE_ID,
+  SALES_BROCHURE_MINIMALIST_1PG_TEMPLATE_ID,
+  SALES_BROCHURE_MINIMALIST_2PG_TEMPLATE_ID,
+  SALES_BROCHURE_LANDMARK_1PG_TEMPLATE_ID,
 } from "@/lib/collateral/templates/ids";
 import type { CollateralTemplateDefinition } from "@/lib/collateral/templates/types";
 
@@ -96,6 +102,26 @@ export const SALES_BROCHURE_TEMPLATES: CollateralTemplateDefinition[] = [
     Component: RefinedBrochureOnePage,
   },
   {
+    id: SALES_BROCHURE_MINIMALIST_1PG_TEMPLATE_ID,
+    collateralType: "sales_brochure",
+    label: "Minimalist",
+    description:
+      "Hero plus three photos; copy left, sale/view/agent sidebar right on cream.",
+    pageFormat: "a4-portrait",
+    pages: 1,
+    Component: MinimalistBrochureOnePage,
+  },
+  {
+    id: SALES_BROCHURE_LANDMARK_1PG_TEMPLATE_ID,
+    collateralType: "sales_brochure",
+    label: "Landmark",
+    description:
+      "Full-bleed hero, branded stats banner, copy left with price/agents/photos right.",
+    pageFormat: "a4-portrait",
+    pages: 1,
+    Component: LandmarkBrochureOnePage,
+  },
+  {
     id: SALES_BROCHURE_CLASSIC_2PG_TEMPLATE_ID,
     collateralType: "sales_brochure",
     label: "Classic",
@@ -142,6 +168,16 @@ export const SALES_BROCHURE_TEMPLATES: CollateralTemplateDefinition[] = [
     pageFormat: "a4-portrait",
     pages: 2,
     Component: RefinedBrochure,
+  },
+  {
+    id: SALES_BROCHURE_MINIMALIST_2PG_TEMPLATE_ID,
+    collateralType: "sales_brochure",
+    label: "Minimalist",
+    description:
+      "LJ Hooker–style cover with photo strip and sidebar; page 2 features with photo stack.",
+    pageFormat: "a4-portrait",
+    pages: 2,
+    Component: MinimalistBrochure,
   },
 ];
 

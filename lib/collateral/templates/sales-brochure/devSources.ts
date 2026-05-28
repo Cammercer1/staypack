@@ -51,6 +51,18 @@ export const SALES_BROCHURE_DEV_SOURCES: Record<string, string[]> = {
     "lib/collateral/templates/sales-brochure/RefinedBrochure.tsx",
     "lib/collateral/templates/sales-brochure/refined/RefinedLayout.tsx",
   ],
+  "sales-brochure-minimalist-1pg": [
+    "lib/collateral/templates/sales-brochure/MinimalistBrochureOnePage.tsx",
+    "lib/collateral/templates/sales-brochure/minimalist/MinimalistLayout.tsx",
+  ],
+  "sales-brochure-minimalist-2pg": [
+    "lib/collateral/templates/sales-brochure/MinimalistBrochure.tsx",
+    "lib/collateral/templates/sales-brochure/minimalist/MinimalistLayout.tsx",
+  ],
+  "sales-brochure-landmark-1pg": [
+    "lib/collateral/templates/sales-brochure/LandmarkBrochureOnePage.tsx",
+    "lib/collateral/templates/sales-brochure/landmark/LandmarkLayout.tsx",
+  ],
 };
 
 export const SALES_BROCHURE_SHARED_SOURCES = [

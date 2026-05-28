@@ -64,9 +64,9 @@ const PLAYGROUND_AGENCY = {
 
 const PLAYGROUND_AGENT = {
   name: "Harvey Specter",
-  role_title: "Senior Sales Agent",
-  phone: "",
-  email: "",
+  role_title: "Licensed Real Estate Agent",
+  phone: "0419 290 030",
+  email: "harvey.specter@example.com",
   photo_url: "",
 };
 
