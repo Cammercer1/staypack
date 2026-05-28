@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { hasServiceRoleKey, isLegacyPublicUrlHost } from "@/lib/env";
 import {
   buildListingQrTrackingUrl,
   buildPublicListingUrl,
@@ -76,13 +77,12 @@ export async function provisionListingLanding(
       return null;
     }
   })();
-  const publicUrl =
+  const needsUrlRefresh =
     !storedPublicUrl ||
-    storedHost === "localhost" ||
-    storedHost?.startsWith("localhost:") ||
-    (canonicalHost && storedHost && storedHost !== canonicalHost)
-      ? canonicalPublicUrl
-      : storedPublicUrl;
+    !storedHost ||
+    !canonicalHost ||
+    isLegacyPublicUrlHost(storedHost, canonicalHost);
+  const publicUrl = needsUrlRefresh ? canonicalPublicUrl : storedPublicUrl;
   // #region agent log
   fetch("http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f", {
     method: "POST",
@@ -101,6 +101,7 @@ export async function provisionListingLanding(
         canonicalPublicUrl,
         canonicalHost,
         publicUrl,
+        needsUrlRefresh,
       },
       timestamp: Date.now(),
       hypothesisId: "H1",
@@ -140,7 +141,18 @@ export async function ensureListingLandingProvisioned(
   agency: Agency,
   supabase: SupabaseClient,
 ): Promise<Listing> {
-  const fields = await provisionListingLanding(listing, agency, supabase);
+  const fields = await provisionListingLanding(listing, agency);
+
+  const client = hasServiceRoleKey() ? createAdminClient() : supabase;
+
+  const { error } = await client
+    .from("listings")
+    .update(fields)
+    .eq("id", listing.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 
   return {
     ...listing,

@@ -3,7 +3,19 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const protectedPrefixes = ["/dashboard", "/onboarding", "/reports", "/listings", "/settings"];
 
+const CANONICAL_PRODUCTION_HOST = "staypack.app";
+const LEGACY_NETLIFY_HOST = "staypack.netlify.app";
+
 export async function middleware(request: NextRequest) {
+  const host = request.headers.get("host")?.split(":")[0] ?? "";
+
+  if (host === LEGACY_NETLIFY_HOST) {
+    const url = request.nextUrl.clone();
+    url.protocol = "https";
+    url.host = CANONICAL_PRODUCTION_HOST;
+    return NextResponse.redirect(url, 308);
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

@@ -1,4 +1,4 @@
-import { getSiteUrl } from "@/lib/env";
+import { getSiteUrl, isLegacyPublicUrlHost } from "@/lib/env";
 import type { Listing } from "@/lib/types";
 
 /** StayPacks redirect URL encoded in QR codes — logs the scan then forwards. */
@@ -18,14 +18,8 @@ export function buildPublicListingUrl(agencySlug: string, listingSlug: string) {
 function isStalePublicUrl(stored: string, canonical: string) {
   try {
     const storedUrl = new URL(stored);
-    if (
-      storedUrl.hostname === "localhost" ||
-      storedUrl.hostname.startsWith("127.")
-    ) {
-      return true;
-    }
     const canonicalUrl = new URL(canonical);
-    return storedUrl.origin !== canonicalUrl.origin;
+    return isLegacyPublicUrlHost(storedUrl.hostname, canonicalUrl.hostname);
   } catch {
     return true;
   }
