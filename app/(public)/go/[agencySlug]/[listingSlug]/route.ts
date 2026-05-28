@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveAgencyBySlug } from "@/lib/agencies/resolveAgencyBySlug";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { hasServiceRoleKey } from "@/lib/env";
+import { hasServiceRoleKey, isDevelopment } from "@/lib/env";
 import { buildListingQrRedirectDestination } from "@/lib/listings/listingUrls";
 import { recordListingPageView } from "@/lib/listings/pageViews";
 
@@ -49,16 +49,21 @@ export async function GET(
 
     const { data: listing, error: listingError } = await admin
       .from("listings")
-      .select("id, custom_landing_url, public_url, status, public_slug")
+      .select("*")
       .eq("agency_id", agency.id)
       .eq("public_slug", listingSlug)
       .eq("status", "active")
+      .limit(1)
       .maybeSingle();
 
     if (listingError) {
       console.error("[go] listing query failed", listingError.message);
       return NextResponse.json(
-        { error: "Server error", code: "listing_query" },
+        {
+          error: "Server error",
+          code: "listing_query",
+          ...(isDevelopment() ? { detail: listingError.message } : {}),
+        },
         { status: 500 },
       );
     }
