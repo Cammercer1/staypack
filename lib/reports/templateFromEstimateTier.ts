@@ -5,7 +5,11 @@ import {
 import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
 import type { Agency, AirbticsTier, Report } from "@/lib/types";
 
-/** Report layout variant implied by the STR estimate tier last run on this report. */
+/**
+ * When no explicit template has been chosen yet, use the estimate tier to pick
+ * the closest classic default (light vs detailed). This is a fallback only — it
+ * is intentionally skipped if a report.template_id is already set.
+ */
 export function reportTemplateIdFromAirbticsTier(
   tier: AirbticsTier | null | undefined,
 ): string | null {
@@ -24,8 +28,12 @@ export function resolveReportTemplateIdForReport(
   agency: Agency,
   report: Report,
 ): string {
-  return (
-    reportTemplateIdFromAirbticsTier(report.airbtics_tier) ??
-    resolveReportTemplateId(agency, report)
-  );
+  // An explicit template choice always wins over the estimate-tier default.
+  const explicit = resolveReportTemplateId(agency, report);
+  if (explicit !== CLASSIC_LIGHT_TEMPLATE_ID && explicit !== CLASSIC_DETAILED_TEMPLATE_ID) {
+    return explicit;
+  }
+
+  // If the resolved ID is still a classic default, let the tier refine light vs detailed.
+  return reportTemplateIdFromAirbticsTier(report.airbtics_tier) ?? explicit;
 }

@@ -51,7 +51,7 @@ export function GeneratedCopyEditor({
   );
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
-  const layoutLockedToEstimate = report.airbtics_tier != null;
+  const layoutLockedToEstimate = false;
   const resolvedTemplateId = useMemo(
     () => resolveReportTemplateIdForReport(agency, report),
     [agency, report],
