@@ -17,6 +17,7 @@ import {
   Link2,
   Loader2,
   PieChart,
+  RefreshCw,
   ScrollText,
   Share2,
   TrendingUp,
@@ -189,7 +190,23 @@ function LandingPageCard({ listing }: { listing: Listing }) {
   const [customUrl, setCustomUrl] = useState(listing.custom_landing_url ?? "");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [regeneratingQr, setRegeneratingQr] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  async function regenerateQr() {
+    setRegeneratingQr(true);
+    try {
+      const res = await fetch(`/api/listings/${listing.id}/regenerate-qr`, { method: "POST" });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error ?? "Failed to regenerate QR code");
+      toast.success("QR code updated");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to regenerate QR code");
+    } finally {
+      setRegeneratingQr(false);
+    }
+  }
 
   // The URL used for QR codes, Copy Link, and View buttons
   const effectiveUrl = listing.custom_landing_url ?? listing.public_url;
@@ -265,6 +282,21 @@ function LandingPageCard({ listing }: { listing: Listing }) {
                 View public page
               </Button>
             </Link>
+          ) : null}
+          {listing.landing_qr_code_url ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={regenerateQr}
+              disabled={regeneratingQr}
+            >
+              {regeneratingQr ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Regenerate QR
+            </Button>
           ) : null}
         </div>
       </div>
