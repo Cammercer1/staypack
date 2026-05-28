@@ -38,12 +38,17 @@ export async function recordListingPageView({
     return { ok: false as const, error: "Listing not found" as const };
   }
 
-  await admin.from("listing_page_views").insert({
+  const { error } = await admin.from("listing_page_views").insert({
     listing_id: listingId,
     agency_id: listing.agency_id,
     referrer: referrer ?? null,
     source,
   });
+
+  if (error) {
+    console.error("[pageViews] insert failed", error.message);
+    return { ok: false as const, error: error.message as const };
+  }
 
   return { ok: true as const, skipped: false as const };
 }
