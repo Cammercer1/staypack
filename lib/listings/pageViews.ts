@@ -2,6 +2,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ListingPageViewSource = "direct" | "qr";
 
+type PageViewResult =
+  | { ok: true; skipped: boolean }
+  | { ok: false; error: string };
+
 const BOT_PATTERNS =
   /bot|crawl|spider|slurp|mediapartners|facebookexternalhit|linkedinbot|twitterbot|whatsapp|telegram|preview|lighthouse|headless|puppeteer|playwright/i;
 
@@ -21,9 +25,9 @@ export async function recordListingPageView({
   source,
   referrer,
   userAgent,
-}: RecordPageViewInput) {
+}: RecordPageViewInput): Promise<PageViewResult> {
   if (userAgent && isBotUserAgent(userAgent)) {
-    return { ok: true as const, skipped: true as const };
+    return { ok: true, skipped: true };
   }
 
   const admin = createAdminClient();
@@ -35,7 +39,7 @@ export async function recordListingPageView({
     .maybeSingle();
 
   if (!listing) {
-    return { ok: false as const, error: "Listing not found" as const };
+    return { ok: false, error: "Listing not found" };
   }
 
   const { error } = await admin.from("listing_page_views").insert({
@@ -47,8 +51,8 @@ export async function recordListingPageView({
 
   if (error) {
     console.error("[pageViews] insert failed", error.message);
-    return { ok: false as const, error: error.message as const };
+    return { ok: false, error: error.message };
   }
 
-  return { ok: true as const, skipped: false as const };
+  return { ok: true, skipped: false };
 }
