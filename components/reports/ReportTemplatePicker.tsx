@@ -1,63 +1,42 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { REPORT_TEMPLATES } from "@/lib/reports/templates/registry";
+import type { ReportTemplateTier } from "@/lib/reports/templates/types";
 
 type Props = {
   value: string;
+  /** Inherited from the STR estimate step — controls light vs detailed. */
+  tier: ReportTemplateTier;
   onChange: (templateId: string) => void;
-  defaultTemplateId?: string;
 };
 
-export function ReportTemplatePicker({
-  value,
-  onChange,
-  defaultTemplateId,
-}: Props) {
-  const isAgencyDefault = defaultTemplateId != null && value === defaultTemplateId;
+/** One option per visual family; tier (pages) is inherited from the estimate step. */
+export function ReportTemplatePicker({ value, tier, onChange }: Props) {
+  // Deduplicate: one entry per family (use the light variant as the canonical label)
+  const families = REPORT_TEMPLATES.filter((t) => t.tier === "light").map((t) => ({
+    family: t.family,
+    label: t.label,
+  }));
+
+  // Derive the current family from the full template ID
+  const currentFamily = value.replace(/-(?:light|detailed)$/, "");
+
+  function handleChange(family: string) {
+    const id = `${family}-${tier}`;
+    onChange(id);
+  }
 
   return (
-    <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {REPORT_TEMPLATES.map((template) => {
-          const selected = value === template.id;
-
-          return (
-            <button
-              key={template.id}
-              type="button"
-              onClick={() => onChange(template.id)}
-              className={cn(
-                "rounded-xl border p-4 text-left transition-colors",
-                selected
-                  ? "border-primary bg-primary/5 ring-1 ring-primary"
-                  : "border-border/70 hover:border-border",
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="font-medium">{template.label}</p>
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">
-                  {template.tier}
-                </span>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {template.description}
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {template.pages} A4 {template.pages === 1 ? "page" : "pages"}
-              </p>
-            </button>
-          );
-        })}
-      </div>
-
-      {defaultTemplateId != null ? (
-        <p className="text-xs text-muted-foreground">
-          {isAgencyDefault
-            ? "Using your agency default template."
-            : "Overriding the agency default for this report."}
-        </p>
-      ) : null}
-    </div>
+    <select
+      value={currentFamily}
+      onChange={(e) => handleChange(e.target.value)}
+      className="h-8 rounded-md border border-input bg-background px-2.5 py-0 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+    >
+      {families.map((f) => (
+        <option key={f.family} value={f.family}>
+          {f.label}
+        </option>
+      ))}
+    </select>
   );
 }

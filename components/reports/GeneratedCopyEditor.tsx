@@ -51,7 +51,8 @@ export function GeneratedCopyEditor({
   );
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
-  const layoutLockedToEstimate = false;
+  // Tier is locked by the estimate step: full → detailed, summary/none → light
+  const tier = report.airbtics_tier === "full" ? "detailed" : "light";
   const resolvedTemplateId = useMemo(
     () => resolveReportTemplateIdForReport(agency, report),
     [agency, report],
@@ -369,19 +370,15 @@ export function GeneratedCopyEditor({
         ) : null}
       </div>
 
-      <div className="space-y-3 xl:sticky xl:top-6 xl:self-start">
-        {!layoutLockedToEstimate ? (
-          <div className="space-y-3">
-            <p className="text-sm font-medium">Report template</p>
-            <ReportTemplatePicker
-              value={selectedTemplateId}
-              onChange={handleTemplateChange}
-              defaultTemplateId={agency.report_template_id}
-            />
-          </div>
-        ) : null}
-
-        <p className="text-sm font-medium">Live preview</p>
+      <div className="space-y-2 xl:sticky xl:top-6 xl:self-start">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-medium">Live preview</p>
+          <ReportTemplatePicker
+            value={selectedTemplateId}
+            tier={tier}
+            onChange={handleTemplateChange}
+          />
+        </div>
         {previewReport ? (
           <FittedReportPreview
             report={previewReport}
