@@ -5,17 +5,35 @@ export async function resolveAgencyBySlug(
   client: SupabaseClient,
   agencySlug: string,
 ): Promise<Agency | null> {
-  const { data, error } = await client
+  const slug = agencySlug.trim();
+  if (!slug) return null;
+
+  const { data: bySlug, error: slugError } = await client
     .from("agencies")
     .select("*")
-    .or(`slug.eq.${agencySlug},slug_aliases.cs.{${agencySlug}}`)
+    .eq("slug", slug)
     .maybeSingle();
 
-  if (error) {
-    throw new Error(error.message);
+  if (slugError) {
+    throw new Error(slugError.message);
   }
 
-  return data as Agency | null;
+  if (bySlug) {
+    return bySlug as Agency;
+  }
+
+  const { data: byAlias, error: aliasError } = await client
+    .from("agencies")
+    .select("*")
+    .contains("slug_aliases", [slug])
+    .limit(1)
+    .maybeSingle();
+
+  if (aliasError) {
+    throw new Error(aliasError.message);
+  }
+
+  return (byAlias as Agency | null) ?? null;
 }
 
 export function agencySlugNeedsRedirect(
