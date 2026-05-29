@@ -136,11 +136,46 @@ export async function provisionListingLanding(
   return fields;
 }
 
+function listingLandingIsCurrent(listing: Listing, agency: Agency): boolean {
+  if (
+    !listing.public_slug ||
+    !listing.landing_qr_code_url ||
+    !listing.landing_published_at ||
+    !listing.public_url
+  ) {
+    return false;
+  }
+
+  let storedHost: string | null;
+  let canonicalHost: string | null;
+  try {
+    storedHost = new URL(listing.public_url).host;
+  } catch {
+    return false;
+  }
+  try {
+    canonicalHost = new URL(
+      buildPublicListingUrl(agency.slug, listing.public_slug),
+    ).host;
+  } catch {
+    return false;
+  }
+
+  // A legacy host means the stored URL needs refreshing, so it is not current.
+  return !isLegacyPublicUrlHost(storedHost, canonicalHost);
+}
+
 export async function ensureListingLandingProvisioned(
   listing: Listing,
   agency: Agency,
   supabase: SupabaseClient,
 ): Promise<Listing> {
+  // Skip the QR regeneration + DB write when the listing is already fully
+  // provisioned with a current public URL. This runs on every listing open.
+  if (listingLandingIsCurrent(listing, agency)) {
+    return listing;
+  }
+
   const fields = await provisionListingLanding(listing, agency);
 
   const client = hasServiceRoleKey() ? createAdminClient() : supabase;

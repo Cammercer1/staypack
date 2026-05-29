@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const protectedPrefixes = ["/dashboard", "/onboarding", "/reports", "/listings", "/settings"];
+const protectedPrefixes = ["/dashboard", "/onboarding", "/reports", "/listings", "/leads", "/settings"];
 
 const CANONICAL_PRODUCTION_HOST = "staypack.app";
 const LEGACY_NETLIFY_HOST = "staypack.netlify.app";

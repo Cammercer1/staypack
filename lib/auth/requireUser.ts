@@ -1,12 +1,21 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Agency, AgencyRole, CollateralItem, Listing, Report } from "@/lib/types";
 
-export async function requireUser() {
+// Deduped per server render so multiple requireUser/requireAgency calls in a
+// single request share one Supabase Auth round-trip instead of re-validating.
+const getAuthContext = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  return { supabase, user };
+});
+
+export async function requireUser() {
+  const { supabase, user } = await getAuthContext();
 
   if (!user) {
     redirect("/login");
@@ -15,7 +24,7 @@ export async function requireUser() {
   return { supabase, user };
 }
 
-export async function getAgencyMembership(userId: string) {
+export const getAgencyMembership = cache(async (userId: string) => {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -42,7 +51,7 @@ export async function getAgencyMembership(userId: string) {
     role: data.role as AgencyRole,
     agency: agency as Agency,
   };
-}
+});
 
 export async function requireAgency() {
   const { supabase, user } = await requireUser();
@@ -121,6 +130,14 @@ export async function requireCollateralAccess(collateralId: string) {
 
   if (!collateral) {
     throw new Error("Collateral not found");
+  }
+
+  if (!collateral.listing_id) {
+    return {
+      ...context,
+      collateral: collateral as CollateralItem,
+      listing: null,
+    };
   }
 
   const { data: listing, error: listingError } = await context.supabase

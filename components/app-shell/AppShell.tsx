@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, LayoutDashboard, Plus, Settings } from "lucide-react";
+import { Home, Inbox, LayoutDashboard, Plus, Settings } from "lucide-react";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { StayPackLogo } from "@/components/app-shell/StayPackLogo";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/listings", label: "Listings", icon: Home },
+  { href: "/leads", label: "Leads", icon: Inbox },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

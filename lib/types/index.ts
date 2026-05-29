@@ -284,6 +284,7 @@ export type Listing = {
   custom_landing_url: string | null;
   landing_qr_code_url: string | null;
   landing_published_at: string | null;
+  landing_template: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -309,6 +310,18 @@ export type Lead = {
   updated_at: string;
 };
 
+export type LeadListingContext = {
+  id: string;
+  listing_title: string | null;
+  property_address: string | null;
+  public_slug: string | null;
+  status: ListingStatus;
+};
+
+export type LeadWithListing = Lead & {
+  listings: LeadListingContext | null;
+};
+
 export type CollateralType =
   | "str_report"
   | "sales_brochure"
@@ -321,7 +334,7 @@ export type CollateralItemStatus = "draft" | "generated" | "published" | "archiv
 
 export type CollateralItem = {
   id: string;
-  listing_id: string;
+  listing_id: string | null;
   agency_id: string;
   type: CollateralType;
   status: CollateralItemStatus;

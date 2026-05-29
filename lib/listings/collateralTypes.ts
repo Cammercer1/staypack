@@ -40,5 +40,6 @@ export const COLLATERAL_TYPE_META: Record<
   agent_business_card: {
     label: "Agent business card",
     description: "Branded contact card linked to this listing.",
+    comingSoon: true,
   },
 };

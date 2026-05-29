@@ -39,6 +39,21 @@ export default function SettingsPage() {
             </Link>
           </CardContent>
         </Card>
+        <Card className="surface-card border-0 shadow-none ring-0 opacity-60">
+          <CardHeader>
+            <CardTitle className="font-display flex items-center gap-2 text-xl">
+              Business cards
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium tracking-wide text-muted-foreground">
+                Coming soon
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Design reusable front-and-back agent cards with optional property QR codes.
+            </p>
+          </CardContent>
+        </Card>
         <Card className="surface-card border-0 shadow-none ring-0">
           <CardHeader>
             <CardTitle className="font-display text-xl">Billing</CardTitle>

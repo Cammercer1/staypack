@@ -20,7 +20,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type GenerateInput = {
   agency: Agency;
-  listing: Listing;
+  listing: Listing | null;
   collateral: CollateralItem;
   supabase: SupabaseClient;
   agentProfile?: AgentProfile | null;
@@ -36,6 +36,10 @@ export async function generateCollateralDocument({
   agencyAgents,
 }: GenerateInput): Promise<CollateralDocumentJson> {
   if (collateral.type === "social_posts") {
+    if (!listing) {
+      throw new Error("Social posts require a listing");
+    }
+
     return buildSocialPostsDocument({
       agency,
       listing,
@@ -45,42 +49,49 @@ export async function generateCollateralDocument({
     });
   }
 
-  const { provisionedListing, qrCodeUrl, qrTargetUrl } =
-    await provisionCollateralQr({
-      agency,
-      listing,
-      collateral,
-      supabase,
-    });
+  const qr =
+    listing != null
+      ? await provisionCollateralQr({
+          agency,
+          listing,
+          collateral,
+          supabase,
+        })
+      : null;
 
   switch (collateral.type) {
     case "agent_business_card":
       return buildBusinessCardDocument({
         agency,
-        listing: provisionedListing,
+        listing: qr?.provisionedListing ?? listing,
         collateral,
         agentProfile,
         agencyAgents,
-        qrCodeUrl,
-        qrTargetUrl,
+        qrCodeUrl: qr?.qrCodeUrl ?? "",
+        qrTargetUrl: qr?.qrTargetUrl ?? "",
+        qrListingId: qr?.provisionedListing.id ?? null,
       });
     case "sales_brochure": {
+      if (!qr) {
+        throw new Error("Sales brochures require a listing");
+      }
+
       const existingCopy =
         collateral.document_json && isSalesBrochureDocument(collateral.document_json)
           ? collateral.document_json.copy
           : null;
       const copy: SalesBrochureCopyJson =
-        existingCopy ?? getMockSalesBrochureCopy(provisionedListing, agency);
+        existingCopy ?? getMockSalesBrochureCopy(qr.provisionedListing, agency);
 
       return buildSalesBrochureDocument({
         agency,
-        listing: provisionedListing,
+        listing: qr.provisionedListing,
         collateral,
         copy,
         agentProfile,
         agencyAgents,
-        qrCodeUrl,
-        qrTargetUrl,
+        qrCodeUrl: qr.qrCodeUrl,
+        qrTargetUrl: qr.qrTargetUrl,
       });
     }
     default:

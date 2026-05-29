@@ -21,9 +21,16 @@ export async function POST(
       );
     }
 
-    const photoError = collateralPhotoRequirementError(listing);
-    if (photoError) {
-      return NextResponse.json({ error: photoError }, { status: 400 });
+    if (listing) {
+      const photoError = collateralPhotoRequirementError(listing);
+      if (photoError) {
+        return NextResponse.json({ error: photoError }, { status: 400 });
+      }
+    } else if (collateral.type !== "agent_business_card") {
+      return NextResponse.json(
+        { error: "This collateral type requires a listing" },
+        { status: 400 },
+      );
     }
 
     const { data: agencyAgents } = await supabase
@@ -32,10 +39,10 @@ export async function POST(
       .eq("agency_id", agency.id);
 
     const agentProfile =
-      listing.agent_profile_id != null
+      listing?.agent_profile_id != null
         ? agencyAgents?.find((agent) => agent.id === listing.agent_profile_id) ??
           null
-        : null;
+        : agencyAgents?.find((agent) => agent.is_default) ?? agencyAgents?.[0] ?? null;
 
     const documentJson = await generateCollateralDocument({
       agency,
@@ -55,7 +62,7 @@ export async function POST(
         document_json: documentJson,
         template_id: templateId,
         qr_code_url: isBusinessCardDocument(documentJson)
-          ? documentJson.assets.qr_code_url
+          ? documentJson.assets.qr_code_url || null
           : null,
         status: "generated",
         generated_at: generatedAt,

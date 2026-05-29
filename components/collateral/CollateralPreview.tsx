@@ -7,6 +7,10 @@ import {
   getSocialPostPageFormat,
 } from "@/lib/collateral/pageFormat";
 import {
+  normalizeBusinessCardVariantId,
+  type BusinessCardVariantId,
+} from "@/lib/collateral/business-card/formats";
+import {
   getDefaultSocialPostVariantId,
   normalizeSocialPostVariantId,
 } from "@/lib/collateral/social/formats";
@@ -14,6 +18,7 @@ import { salesBrochureToReportShape } from "@/lib/collateral/sales-brochure/toRe
 import {
   isSalesBrochureDocument,
   isSocialPostsDocument,
+  isBusinessCardDocument,
 } from "@/lib/collateral/templates/types";
 import {
   getReportBrandAdvancedVars,
@@ -60,6 +65,10 @@ export function CollateralPreview({
       ? normalizeSocialPostVariantId(variantId)
       : normalizeSocialPostVariantId(document.active_variant_id)
     : null;
+  const businessCardVariantId =
+    isBusinessCardDocument(document) && (variantId === "front" || variantId === "back")
+      ? (normalizeBusinessCardVariantId(variantId) as BusinessCardVariantId)
+      : null;
 
   const pageFormat =
     socialVariantId != null
@@ -142,6 +151,10 @@ export function CollateralPreview({
             }
             .collateral-preview.print-mode .collateral-page {
               box-shadow: none;
+              page-break-after: always;
+            }
+            .collateral-preview.print-mode .collateral-page:last-child {
+              page-break-after: avoid;
             }
             .collateral-preview.print-mode .report-page {
               page-break-after: always;
@@ -166,6 +179,8 @@ export function CollateralPreview({
         document={document}
         {...(socialVariantId
           ? { variantId: socialVariantId }
+          : businessCardVariantId
+            ? { variantId: businessCardVariantId }
           : collateralType === "social_posts"
             ? { variantId: getDefaultSocialPostVariantId() }
             : {})}

@@ -62,6 +62,7 @@ export default async function DraftCollateralPrintPage({
             }
             .collateral-print-root {
               display: flex;
+              flex-direction: column;
               align-items: center;
               justify-content: center;
               min-height: 100vh;

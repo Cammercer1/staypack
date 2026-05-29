@@ -173,6 +173,7 @@ const listingPropertyFields = {
   selected_image_urls: z.array(z.string()).max(25).optional(),
   uploaded_image_urls: z.array(z.string()).max(20).optional(),
   custom_landing_url: z.string().url().nullable().optional(),
+  landing_template: z.string().nullable().optional(),
   collateral_image_selections: z
     .record(collateralImageChannelSchema, collateralImageSelectionSchema)
     .optional(),
@@ -451,6 +452,65 @@ export const updateSocialPostsDocumentSchema = z.object({
   variants: z
     .record(socialPostVariantIdSchema, socialPostVariantStateSchema)
     .optional(),
+});
+
+const businessCardVariantIdSchema = z.enum(["front", "back"]);
+
+const businessCardLayerStateSchema = z.object({
+  enabled: z.boolean().optional(),
+  x: z.number().min(0).max(100).optional(),
+  y: z.number().min(0).max(100).optional(),
+  scale: z.number().min(0.25).max(3).optional(),
+  width: z.number().min(8).max(100).optional(),
+});
+
+const businessCardVariantStateSchema = z.object({
+  headline: z.string().max(160).optional(),
+  subcopy: z.string().max(260).optional(),
+  show_logo: z.boolean().optional(),
+  show_agent_photo: z.boolean().optional(),
+  show_contact: z.boolean().optional(),
+  show_agency_details: z.boolean().optional(),
+  show_qr: z.boolean().optional(),
+  background_style: z.enum(["light", "brand"]).optional(),
+  back_style: z.enum(["colour", "photo"]).optional(),
+  back_colour: z.string().max(32).optional().nullable(),
+  qr_corner: z.enum(["bottom_left", "bottom_right"]).optional(),
+  back_logo_variant: z.enum(["light", "dark", "custom"]).optional(),
+  back_logo_custom_url: z.string().max(2000).optional(),
+  layers: z
+    .object({
+      logo: businessCardLayerStateSchema.optional(),
+      headline: businessCardLayerStateSchema.optional(),
+      subcopy: businessCardLayerStateSchema.optional(),
+      agent_photo: businessCardLayerStateSchema.optional(),
+      agent_contact: businessCardLayerStateSchema.optional(),
+      qr: businessCardLayerStateSchema.optional(),
+      agency_details: businessCardLayerStateSchema.optional(),
+    })
+    .optional(),
+});
+
+const businessCardAgentSliceSchema = z.object({
+  name: z.string().max(200).optional(),
+  role_title: z.string().max(200).optional(),
+  phone: z.string().max(80).optional(),
+  email: z.string().max(200).optional(),
+  photo_url: z.string().max(2000).optional(),
+});
+
+export const updateBusinessCardDocumentSchema = z.object({
+  active_variant_id: businessCardVariantIdSchema.optional(),
+  agent_profile_id: z.string().uuid().nullable().optional(),
+  agent: businessCardAgentSliceSchema.optional(),
+  qr_listing_id: z.string().uuid().nullable().optional(),
+  variants: z
+    .record(businessCardVariantIdSchema, businessCardVariantStateSchema)
+    .optional(),
+});
+
+export const createBusinessCardSchema = z.object({
+  agent_profile_id: z.string().uuid().nullable().optional(),
 });
 
 export const exportSocialPostPngSchema = z.object({

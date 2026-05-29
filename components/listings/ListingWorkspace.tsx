@@ -39,6 +39,8 @@ import { CollateralItemActions } from "@/components/collateral/CollateralItemAct
 import { CollateralPdfButton } from "@/components/collateral/CollateralPdfButton";
 import { CollateralImageEditor } from "@/components/listings/CollateralImageEditor";
 import { CollateralPhotoRequirementNotice } from "@/components/listings/CollateralPhotoRequirementNotice";
+import { LandingTemplatePreviewModal } from "@/components/listings/LandingTemplatePreviewModal";
+import { LeadStatusControl } from "@/components/leads/LeadStatusControl";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
 import { resolveEffectiveListingPageUrl } from "@/lib/listings/listingUrls";
 import { getCollateralPhotoRequirement } from "@/lib/listings/collateralPhotoRequirements";
@@ -292,6 +294,14 @@ function LandingPageCard({
               </Button>
             </Link>
           ) : null}
+          {listing.public_slug && !listing.custom_landing_url ? (
+            <LandingTemplatePreviewModal
+              listingId={listing.id}
+              agencySlug={agencySlug}
+              listingSlug={listing.public_slug}
+              savedTemplate={listing.landing_template}
+            />
+          ) : null}
           {listing.landing_qr_code_url ? (
             <Button
               variant="ghost"
@@ -503,8 +513,12 @@ function CollateralTab({
                 ) : null}
               </div>
 
-              {meta.comingSoon && item ? (
-                <p className="mt-4 text-sm text-muted-foreground">Coming soon</p>
+              {meta.comingSoon ? (
+                <p className="mt-3">
+                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                    Coming soon
+                  </span>
+                </p>
               ) : null}
 
               {type === "agent_business_card" && item?.document_json ? (
@@ -542,7 +556,7 @@ function CollateralTab({
                 </p>
               ) : null}
 
-              <div className="mt-6 flex flex-wrap gap-2">
+              {!meta.comingSoon ? <div className="mt-6 flex flex-wrap gap-2">
                 {type === "str_report" ? (
                   strReport ? (
                     <>
@@ -629,7 +643,7 @@ function CollateralTab({
                     onCreated={onRefresh}
                   />
                 )}
-              </div>
+              </div> : null}
 
               {type === "str_report" ? (
                 <div className="mt-4 flex justify-end">
@@ -657,9 +671,14 @@ function LeadsTab({
   const [leads, setLeads] = useState(initialLeads);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  async function toggleStatus(lead: Lead) {
-    const nextStatus: LeadStatus = lead.status === "new" ? "contacted" : "new";
+  async function updateStatus(lead: Lead, nextStatus: LeadStatus) {
+    const previousStatus = lead.status;
     setUpdatingId(lead.id);
+    setLeads((current) =>
+      current.map((item) =>
+        item.id === lead.id ? { ...item, status: nextStatus } : item,
+      ),
+    );
 
     try {
       const response = await fetch(
@@ -682,6 +701,11 @@ function LeadsTab({
         ),
       );
     } catch (error) {
+      setLeads((current) =>
+        current.map((item) =>
+          item.id === lead.id ? { ...item, status: previousStatus } : item,
+        ),
+      );
       toast.error(
         error instanceof Error ? error.message : "Unable to update lead",
       );
@@ -724,17 +748,12 @@ function LeadsTab({
                 {lead.phone ?? "—"}
               </td>
               <td className="px-4 py-3">
-                <Button
-                  variant="outline"
+                <LeadStatusControl
+                  status={lead.status}
+                  updating={updatingId === lead.id}
+                  onChange={(status) => updateStatus(lead, status)}
                   size="sm"
-                  disabled={updatingId === lead.id}
-                  onClick={() => toggleStatus(lead)}
-                >
-                  {updatingId === lead.id ? (
-                    <Loader2 className="animate-spin" />
-                  ) : null}
-                  {lead.status === "new" ? "New" : "Contacted"}
-                </Button>
+                />
               </td>
               <td className="px-4 py-3 text-muted-foreground">
                 {format(new Date(lead.created_at), "dd MMM yyyy")}

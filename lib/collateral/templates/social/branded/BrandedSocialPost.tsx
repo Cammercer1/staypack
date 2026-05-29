@@ -1,4 +1,4 @@
-import { getSocialPostFormat } from "@/lib/collateral/social/formats";
+import { getSocialPostFormat, normalizeSocialPostVariantId } from "@/lib/collateral/social/formats";
 import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
 import { isSocialPostsDocument } from "@/lib/collateral/templates/types";
 import { SocialPostCanvas } from "@/lib/collateral/templates/social/branded/SocialPostCanvas";
@@ -6,7 +6,9 @@ import { SocialPostCanvas } from "@/lib/collateral/templates/social/branded/Soci
 export function BrandedSocialPost({ document, variantId }: CollateralTemplateProps) {
   if (!isSocialPostsDocument(document)) return null;
 
-  const activeVariantId = variantId ?? document.active_variant_id;
+  const activeVariantId = normalizeSocialPostVariantId(
+    variantId ?? document.active_variant_id,
+  );
   const format = getSocialPostFormat(activeVariantId);
 
   return (

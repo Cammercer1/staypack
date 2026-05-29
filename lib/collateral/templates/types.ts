@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import type { BusinessCardVariantId } from "@/lib/collateral/business-card/formats";
 import type { SocialPostVariantId } from "@/lib/collateral/social/formats";
 import type { AgencyBrandAdvanced, CollateralType } from "@/lib/types";
 
@@ -65,12 +66,60 @@ export type BusinessCardDocumentJson = {
   template_id: string;
   generated_at: string;
   agency: CollateralBrandSlice;
-  listing: CollateralListingSlice;
+  agent_profile_id?: string | null;
+  listing: CollateralListingSlice | null;
   agent: CollateralAgentSlice;
-  qr_target_url: string;
+  active_variant_id: BusinessCardVariantId;
+  variants: Record<BusinessCardVariantId, BusinessCardVariantState>;
+  qr_listing_id?: string | null;
+  qr_target_url?: string;
   assets: {
-    qr_code_url: string;
+    qr_code_url?: string;
   };
+};
+
+export type BusinessCardVariantState = {
+  headline: string;
+  subcopy: string;
+  show_logo: boolean;
+  show_agent_photo: boolean;
+  show_contact: boolean;
+  show_agency_details: boolean;
+  show_qr: boolean;
+  background_style: "light" | "brand";
+  layers: BusinessCardLayers;
+  /** Back-side only: which back template to use. */
+  back_style?: "colour" | "photo";
+  /** Back-side only: hex colour override (falls back to agency primary). */
+  back_colour?: string;
+  /** Back-side only: which corner to place the QR code (legacy; layers.qr.x/y used instead). */
+  qr_corner?: "bottom_left" | "bottom_right";
+  /** Back-side only: which logo variant to use. */
+  back_logo_variant?: "light" | "dark" | "custom";
+  /** Back-side only: custom logo URL when back_logo_variant === "custom". */
+  back_logo_custom_url?: string;
+};
+
+export type BusinessCardLayerState = {
+  enabled: boolean;
+  /** Horizontal position as percentage of card width. */
+  x: number;
+  /** Vertical position as percentage of card height. */
+  y: number;
+  /** Size multiplier for the layer. */
+  scale: number;
+  /** Optional content width as percentage of card width. */
+  width: number;
+};
+
+export type BusinessCardLayers = {
+  logo: BusinessCardLayerState;
+  headline: BusinessCardLayerState;
+  subcopy: BusinessCardLayerState;
+  agent_photo: BusinessCardLayerState;
+  agent_contact: BusinessCardLayerState;
+  qr: BusinessCardLayerState;
+  agency_details: BusinessCardLayerState;
 };
 
 export type SocialPostTextAlign = "left" | "center" | "right";
@@ -263,7 +312,7 @@ export function isBusinessCardDocument(
 export type CollateralTemplateProps = {
   document: CollateralDocumentJson;
   pageFormat?: CollateralPageFormatId;
-  variantId?: SocialPostVariantId;
+  variantId?: string;
 };
 
 export type CollateralTemplateDefinition = {

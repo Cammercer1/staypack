@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
+import { buildBusinessCardListingSlice } from "@/lib/collateral/buildBusinessCardDocument";
+import { ensureBusinessCardDocument } from "@/lib/collateral/business-card/normalizeBusinessCardDocument";
+import { BUSINESS_CARD_VARIANT_IDS } from "@/lib/collateral/business-card/formats";
 import { enforceSalesBrochureCopyLimits } from "@/lib/collateral/sales-brochure/copyLimits";
+import { provisionCollateralQr } from "@/lib/collateral/provisionCollateralQr";
 import { SOCIAL_POST_VARIANT_IDS } from "@/lib/collateral/social/formats";
 import {
   getLayersForVariant,
@@ -12,12 +16,15 @@ import { ensureSocialPostsDocument, normalizeSocialLayers } from "@/lib/collater
 import {
   isSalesBrochureDocument,
   isSocialPostsDocument,
+  isBusinessCardDocument,
+  type BusinessCardDocumentJson,
   type SalesBrochureDocumentJson,
   type SocialPostsDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { isValidCollateralTemplateId } from "@/lib/collateral/templates/ids";
 import {
   updateSalesBrochureDocumentSchema,
+  updateBusinessCardDocumentSchema,
   updateSocialPostsDocumentSchema,
 } from "@/lib/validation/schemas";
 
@@ -27,7 +34,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { supabase, collateral } = await requireCollateralAccess(id);
+    const { supabase, agency, collateral } = await requireCollateralAccess(id);
 
     if (collateral.type === "sales_brochure") {
       return patchSalesBrochure(request, supabase, collateral);
@@ -35,6 +42,10 @@ export async function PATCH(
 
     if (collateral.type === "social_posts") {
       return patchSocialPosts(request, supabase, collateral);
+    }
+
+    if (collateral.type === "agent_business_card") {
+      return patchBusinessCard(request, supabase, agency, collateral);
     }
 
     return NextResponse.json(
@@ -50,6 +61,138 @@ export async function PATCH(
       { status: 400 },
     );
   }
+}
+
+async function patchBusinessCard(
+  request: Request,
+  supabase: Awaited<ReturnType<typeof requireCollateralAccess>>["supabase"],
+  agency: Awaited<ReturnType<typeof requireCollateralAccess>>["agency"],
+  collateral: Awaited<ReturnType<typeof requireCollateralAccess>>["collateral"],
+) {
+  if (!collateral.document_json) {
+    return NextResponse.json(
+      { error: "Create the business card before saving edits" },
+      { status: 400 },
+    );
+  }
+
+  const body = updateBusinessCardDocumentSchema.parse(await request.json());
+  const current = ensureBusinessCardDocument(
+    collateral.document_json as BusinessCardDocumentJson,
+  );
+
+  if (!isBusinessCardDocument(current)) {
+    return NextResponse.json({ error: "Invalid document" }, { status: 400 });
+  }
+
+  let nextDocument: BusinessCardDocumentJson = {
+    ...current,
+    active_variant_id: body.active_variant_id ?? current.active_variant_id,
+    agent_profile_id: body.agent_profile_id ?? current.agent_profile_id ?? null,
+    agent: body.agent ? { ...current.agent, ...body.agent } : current.agent,
+    variants: { ...current.variants },
+  };
+
+  if (body.variants) {
+    for (const variantId of BUSINESS_CARD_VARIANT_IDS) {
+      const patch = body.variants[variantId];
+      if (!patch) continue;
+      const currentVariant = nextDocument.variants[variantId];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      nextDocument.variants[variantId] = {
+        ...currentVariant,
+        ...(patch as any),
+        layers: patch.layers
+          ? {
+              ...currentVariant.layers,
+              logo: { ...currentVariant.layers.logo, ...patch.layers.logo },
+              headline: {
+                ...currentVariant.layers.headline,
+                ...patch.layers.headline,
+              },
+              subcopy: {
+                ...currentVariant.layers.subcopy,
+                ...patch.layers.subcopy,
+              },
+              agent_photo: {
+                ...currentVariant.layers.agent_photo,
+                ...patch.layers.agent_photo,
+              },
+              agent_contact: {
+                ...currentVariant.layers.agent_contact,
+                ...patch.layers.agent_contact,
+              },
+              qr: { ...currentVariant.layers.qr, ...patch.layers.qr },
+              agency_details: {
+                ...currentVariant.layers.agency_details,
+                ...patch.layers.agency_details,
+              },
+            }
+          : currentVariant.layers,
+      };
+    }
+  }
+
+  if (Object.hasOwn(body, "qr_listing_id")) {
+    if (!body.qr_listing_id) {
+      nextDocument = {
+        ...nextDocument,
+        qr_listing_id: null,
+        qr_target_url: "",
+        listing: null,
+        assets: { ...nextDocument.assets, qr_code_url: "" },
+      };
+    } else {
+      const { data: listing, error: listingError } = await supabase
+        .from("listings")
+        .select("*")
+        .eq("id", body.qr_listing_id)
+        .eq("agency_id", agency.id)
+        .maybeSingle();
+
+      if (listingError) {
+        return NextResponse.json({ error: listingError.message }, { status: 400 });
+      }
+
+      if (!listing) {
+        return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+      }
+
+      const { provisionedListing, qrCodeUrl, qrTargetUrl } =
+        await provisionCollateralQr({
+          agency,
+          listing,
+          collateral,
+          supabase,
+        });
+
+      nextDocument = {
+        ...nextDocument,
+        qr_listing_id: provisionedListing.id,
+        qr_target_url: qrTargetUrl,
+        listing: buildBusinessCardListingSlice(provisionedListing),
+        assets: { ...nextDocument.assets, qr_code_url: qrCodeUrl },
+      };
+    }
+  }
+
+  nextDocument = ensureBusinessCardDocument(nextDocument);
+
+  const { data, error } = await supabase
+    .from("collateral_items")
+    .update({
+      document_json: nextDocument,
+      qr_code_url: nextDocument.assets.qr_code_url || null,
+    })
+    .eq("id", collateral.id)
+    .select("*")
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  return NextResponse.json({ collateral: data });
 }
 
 async function patchSalesBrochure(
