@@ -10,18 +10,29 @@ import {
 } from "@/lib/reports/constants";
 import { cn } from "@/lib/utils";
 import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
+import { createClient } from "@/lib/supabase/client";
+import {
+  PRINT_SAFE_LONG_EDGE,
+  createOptimizerWorker,
+  optimizeOnMainThread,
+  optimizeWithWorker,
+} from "@/lib/reports/imageOptimizer";
 
-const COMPRESS_IF_BYTES = 4 * 1024 * 1024;
-const MAX_UPLOAD_LONG_EDGE = 4000;
-const PRINT_SAFE_LONG_EDGE = 2500;
+// Number of files compressed + uploaded in parallel. Listings carry ~5-15
+// photos, so a small cap keeps the network/CPU busy without overwhelming the
+// browser or hitting storage rate limits.
+const UPLOAD_CONCURRENCY = 4;
 
 type UploadStatus = {
-  currentName: string;
-  currentSizeBytes: number;
-  currentIndex: number;
   total: number;
-  progressPercent: number;
+  completed: number;
   optimizedCount: number;
+};
+
+type SignedUpload = {
+  path: string;
+  token: string;
+  publicUrl: string;
 };
 
 type Props = {
@@ -72,106 +83,6 @@ export function ReportMediaPicker({
   const uploadSlotsRemaining = Math.max(0, maxUploads - uploadedImages.length);
   const selectionSlotsRemaining = Math.max(0, maxSelected - selected.length);
 
-  async function getImageDimensions(file: File) {
-    return new Promise<{ width: number; height: number }>((resolve, reject) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        resolve({
-          width: img.naturalWidth || img.width,
-          height: img.naturalHeight || img.height,
-        });
-        URL.revokeObjectURL(url);
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error("Unable to read image dimensions"));
-      };
-      img.src = url;
-    });
-  }
-
-  async function optimizeImageIfNeeded(file: File) {
-    if (!file.type.startsWith("image/")) {
-      return { file, optimized: false, width: 0, height: 0 };
-    }
-
-    const { width, height } = await getImageDimensions(file);
-    const longEdge = Math.max(width, height);
-    const shouldCompress = file.size >= COMPRESS_IF_BYTES || longEdge > MAX_UPLOAD_LONG_EDGE;
-
-    if (!shouldCompress) {
-      return { file, optimized: false, width, height };
-    }
-
-    const scale = longEdge > MAX_UPLOAD_LONG_EDGE ? MAX_UPLOAD_LONG_EDGE / longEdge : 1;
-    const targetWidth = Math.max(1, Math.round(width * scale));
-    const targetHeight = Math.max(1, Math.round(height * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    const ctx = canvas.getContext("2d");
-
-    if (!ctx) {
-      return { file, optimized: false, width, height };
-    }
-
-    const imageBitmap = await createImageBitmap(file);
-    ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
-    imageBitmap.close();
-
-    const outputType =
-      file.type === "image/jpeg" || file.type === "image/webp" || file.type === "image/avif"
-        ? file.type
-        : "image/jpeg";
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, outputType, 0.88);
-    });
-
-    if (!blob || blob.size >= file.size * 0.98) {
-      return { file, optimized: false, width, height };
-    }
-
-    const optimizedFile = new File([blob], file.name, {
-      type: outputType,
-      lastModified: file.lastModified,
-    });
-
-    return {
-      file: optimizedFile,
-      optimized: true,
-      width: targetWidth,
-      height: targetHeight,
-    };
-  }
-
-  async function uploadAssetWithProgress(
-    formData: FormData,
-    onProgress: (percent: number) => void,
-  ) {
-    return new Promise<{ ok: boolean; status: number; payload: any }>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/reports/upload-asset");
-      xhr.responseType = "text";
-      xhr.upload.onprogress = (event) => {
-        if (!event.lengthComputable) return;
-        const percent = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)));
-        onProgress(percent);
-      };
-      xhr.onerror = () => reject(new Error("Image upload failed"));
-      xhr.onload = () => {
-        let payload: any = {};
-        try {
-          payload = xhr.responseText ? JSON.parse(xhr.responseText) : {};
-        } catch {
-          payload = {};
-        }
-        resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, payload });
-      };
-      xhr.send(formData);
-    });
-  }
-
   function toggleImage(image: string) {
     if (selected.includes(image)) {
       const nextSelected = selected.filter((item) => item !== image);
@@ -221,78 +132,142 @@ export function ReportMediaPicker({
     }
 
     setUploading(true);
-    setUploadStatus(null);
-    let nextUploaded = [...uploadedImages];
-    let nextSelected = [...selected];
-    let nextHero = heroImageUrl;
-    let optimizedCount = 0;
-    let lowResCount = 0;
+    setUploadStatus({ total: filesToUpload.length, completed: 0, optimizedCount: 0 });
 
-    for (const [index, originalFile] of filesToUpload.entries()) {
-      const { file, optimized, width, height } = await optimizeImageIfNeeded(originalFile);
-      if (optimized) {
-        optimizedCount += 1;
-      }
-      if (Math.max(width, height) < PRINT_SAFE_LONG_EDGE) {
-        lowResCount += 1;
-      }
-
-      setUploadStatus({
-        currentName: originalFile.name,
-        currentSizeBytes: file.size,
-        currentIndex: index + 1,
-        total: filesToUpload.length,
-        progressPercent: 0,
-        optimizedCount,
+    try {
+      const signRes = await fetch("/api/reports/upload-asset/sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          report_id: reportId,
+          listing_id: listingId,
+          files: filesToUpload.map((file) => ({ name: file.name, type: file.type })),
+        }),
       });
+      const signPayload = await signRes.json().catch(() => ({}));
 
-      const formData = new FormData();
-      formData.append("file", file);
-      if (reportId) {
-        formData.append("report_id", reportId);
-      }
-      if (listingId) {
-        formData.append("listing_id", listingId);
+      if (!signRes.ok) {
+        toast.error(signPayload.error ?? "Upload failed");
+        return;
       }
 
-      const { ok, payload } = await uploadAssetWithProgress(formData, (progressPercent) => {
-        setUploadStatus((current) =>
-          current
-            ? {
-                ...current,
-                progressPercent,
-              }
-            : current,
-        );
+      const signedUploads: SignedUpload[] = signPayload.uploads ?? [];
+      if (signedUploads.length !== filesToUpload.length) {
+        toast.error("Upload failed");
+        return;
+      }
+
+      const supabase = createClient();
+      const concurrency = Math.min(UPLOAD_CONCURRENCY, filesToUpload.length);
+      const workers = Array.from({ length: concurrency }, () => createOptimizerWorker());
+
+      // Results are stored by original index so newly added photos keep their
+      // upload order regardless of which lane finished first.
+      const results: (SignedUpload | null)[] = new Array(filesToUpload.length).fill(null);
+      let cursor = 0;
+      let completed = 0;
+      let optimizedCount = 0;
+      let lowResCount = 0;
+      let firstError: string | null = null;
+
+      const runLane = async (worker: Worker | null) => {
+        while (true) {
+          const index = cursor;
+          cursor += 1;
+          if (index >= filesToUpload.length) return;
+
+          const originalFile = filesToUpload[index];
+          const target = signedUploads[index];
+
+          try {
+            const { file, optimized, width, height } = worker
+              ? await optimizeWithWorker(worker, originalFile).catch(() =>
+                  optimizeOnMainThread(originalFile),
+                )
+              : await optimizeOnMainThread(originalFile);
+
+            if (optimized) {
+              optimizedCount += 1;
+            }
+            if (width > 0 && Math.max(width, height) < PRINT_SAFE_LONG_EDGE) {
+              lowResCount += 1;
+            }
+
+            const { error } = await supabase.storage
+              .from("report-assets")
+              .uploadToSignedUrl(target.path, target.token, file, {
+                contentType: file.type || "image/jpeg",
+              });
+
+            if (error) {
+              throw error;
+            }
+
+            results[index] = target;
+          } catch (error) {
+            if (!firstError) {
+              firstError = error instanceof Error ? error.message : "Image upload failed";
+            }
+          } finally {
+            completed += 1;
+            const completedSoFar = completed;
+            const optimizedSoFar = optimizedCount;
+            setUploadStatus((current) =>
+              current
+                ? { ...current, completed: completedSoFar, optimizedCount: optimizedSoFar }
+                : current,
+            );
+          }
+        }
+      };
+
+      try {
+        await Promise.all(workers.map((worker) => runLane(worker)));
+      } finally {
+        workers.forEach((worker) => worker?.terminate());
+      }
+
+      const succeeded = results.filter((result): result is SignedUpload => result !== null);
+
+      if (succeeded.length === 0) {
+        toast.error(firstError ?? "Image upload failed");
+        return;
+      }
+
+      const finalizeRes = await fetch("/api/reports/upload-asset/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          report_id: reportId,
+          listing_id: listingId,
+          paths: succeeded.map((upload) => upload.path),
+        }),
       });
+      const finalizePayload = await finalizeRes.json().catch(() => ({}));
 
-      if (!ok) {
-        toast.error(payload.error ?? "Image upload failed");
-        break;
+      if (!finalizeRes.ok) {
+        toast.error(finalizePayload.error ?? "Failed to save uploads");
+        return;
       }
 
-      if (!nextUploaded.includes(payload.url)) {
-        nextUploaded = [...nextUploaded, payload.url];
-      }
+      const serverUrls: string[] = finalizePayload.uploaded_image_urls ?? [];
+      let nextSelected = [...selected];
+      let nextHero = heroImageUrl;
 
-      if (
-        nextSelected.length < maxSelected &&
-        !nextSelected.includes(payload.url)
-      ) {
-        nextSelected = [...nextSelected, payload.url];
-        if (!nextHero) {
-          nextHero = payload.url;
+      for (const upload of succeeded) {
+        if (nextSelected.length < maxSelected && !nextSelected.includes(upload.publicUrl)) {
+          nextSelected = [...nextSelected, upload.publicUrl];
+          if (!nextHero) {
+            nextHero = upload.publicUrl;
+          }
         }
       }
-    }
 
-    if (nextUploaded.length > uploadedImages.length) {
-      onUploaded(nextUploaded);
+      onUploaded(serverUrls);
       onChange(nextHero, nextSelected);
+
       toast.success(
-        nextUploaded.length - uploadedImages.length === 1
-          ? "Photo uploaded"
-          : `${nextUploaded.length - uploadedImages.length} photos uploaded`,
+        succeeded.length === 1 ? "Photo uploaded" : `${succeeded.length} photos uploaded`,
       );
       if (optimizedCount > 0) {
         toast.message(
@@ -304,10 +279,19 @@ export function ReportMediaPicker({
           `${lowResCount} photo${lowResCount === 1 ? "" : "s"} may look soft in A4 print due to low resolution.`,
         );
       }
+      if (firstError) {
+        toast.error(
+          `${filesToUpload.length - succeeded.length} photo${
+            filesToUpload.length - succeeded.length === 1 ? "" : "s"
+          } failed to upload`,
+        );
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Image upload failed");
+    } finally {
+      setUploadStatus(null);
+      setUploading(false);
     }
-
-    setUploadStatus(null);
-    setUploading(false);
   }
 
   function handleFiles(files: FileList | File[]) {
@@ -394,17 +378,29 @@ export function ReportMediaPicker({
         {uploadStatus ? (
           <div className="mx-auto mt-3 max-w-md space-y-2 text-left">
             <p className="text-xs text-muted-foreground">
-              Uploading {uploadStatus.currentIndex} of {uploadStatus.total}:{" "}
-              <span className="font-medium text-foreground">{uploadStatus.currentName}</span>
+              Uploading{" "}
+              <span className="font-medium text-foreground">
+                {uploadStatus.completed} of {uploadStatus.total}
+              </span>{" "}
+              photo{uploadStatus.total === 1 ? "" : "s"}
             </p>
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-primary transition-all duration-150"
-                style={{ width: `${uploadStatus.progressPercent}%` }}
+                style={{
+                  width: `${
+                    uploadStatus.total
+                      ? Math.round((uploadStatus.completed / uploadStatus.total) * 100)
+                      : 0
+                  }%`,
+                }}
               />
             </div>
             <p className="text-[11px] text-muted-foreground">
-              {uploadStatus.progressPercent}% · {(uploadStatus.currentSizeBytes / (1024 * 1024)).toFixed(1)}MB
+              {uploadStatus.total
+                ? Math.round((uploadStatus.completed / uploadStatus.total) * 100)
+                : 0}
+              %
               {uploadStatus.optimizedCount > 0
                 ? ` · ${uploadStatus.optimizedCount} optimized`
                 : ""}
