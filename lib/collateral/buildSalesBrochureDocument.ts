@@ -128,8 +128,19 @@ export function getMockSalesBrochureCopy(
 ): SalesBrochureCopyJson {
   const address = listing.property_address ?? "this property";
 
+  const purposeLabel = listing.listing_purpose === "lease" ? "for lease" : "for sale";
+  const descriptor = [
+    listing.bedrooms ? `${listing.bedrooms} bedroom` : null,
+    listing.property_type?.trim().toLowerCase() || null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const heading = descriptor
+    ? `${descriptor.charAt(0).toUpperCase()}${descriptor.slice(1)} ${purposeLabel}`
+    : "Your next home awaits";
+
   return {
-    heading: agency.default_report_title || "Your next home awaits",
+    heading,
     blurb: `Discover ${address} — a well-presented opportunity in a sought-after pocket. Arrange an inspection to experience the layout, natural light and lifestyle appeal for yourself.`,
     appeal_points: [
       "Practical floor plan suited to everyday living.",
