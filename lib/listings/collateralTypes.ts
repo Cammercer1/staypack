@@ -53,3 +53,22 @@ export const COLLATERAL_TYPE_META: Record<
     comingSoon: true,
   },
 };
+
+/** In-app editor route after first-time create, when one exists. */
+export function collateralEditorPath(
+  listingId: string,
+  type: CollateralType,
+): string | null {
+  switch (type) {
+    case "sales_brochure":
+      return `/listings/${listingId}/brochure`;
+    case "social_posts":
+      return `/listings/${listingId}/social`;
+    default:
+      return null;
+  }
+}
+
+export function reportEditorPath(listingId: string, reportId: string): string {
+  return `/listings/${listingId}/reports/${reportId}`;
+}

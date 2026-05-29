@@ -1,11 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CollateralPdfButton } from "@/components/collateral/CollateralPdfButton";
-import { COLLATERAL_TYPE_META } from "@/lib/listings/collateralTypes";
+import {
+  COLLATERAL_TYPE_META,
+  collateralEditorPath,
+} from "@/lib/listings/collateralTypes";
 import type { CollateralPhotoRequirement } from "@/lib/listings/collateralPhotoRequirements";
 import type { CollateralItem, CollateralType } from "@/lib/types";
 
@@ -24,6 +28,7 @@ export function CollateralItemActions({
   photoRequirement,
   onRefresh,
 }: Props) {
+  const router = useRouter();
   const [localItem, setLocalItem] = useState(item);
   const [generating, setGenerating] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -49,6 +54,14 @@ export function CollateralItemActions({
         throw new Error(payload.error ?? "Unable to create collateral");
       }
       setLocalItem(payload.collateral as CollateralItem);
+
+      const editorPath = collateralEditorPath(listingId, type);
+      if (editorPath) {
+        router.push(editorPath);
+        router.refresh();
+        return;
+      }
+
       toast.success(`${meta.label} draft created`);
       onRefresh();
     } catch (error) {

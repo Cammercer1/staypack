@@ -5,7 +5,10 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { STR_REPORT_LABEL } from "@/lib/listings/collateralTypes";
+import {
+  STR_REPORT_LABEL,
+  reportEditorPath,
+} from "@/lib/listings/collateralTypes";
 import type { CollateralPhotoRequirement } from "@/lib/listings/collateralPhotoRequirements";
 
 type Props = {
@@ -34,7 +37,7 @@ export function CreateStrReportButton({ listingId, photoRequirement }: Props) {
         throw new Error(payload.error ?? `Unable to create ${STR_REPORT_LABEL}`);
       }
 
-      router.push(`/listings/${listingId}/reports/${payload.report.id}`);
+      router.push(reportEditorPath(listingId, payload.report.id));
       router.refresh();
     } catch (error) {
       toast.error(

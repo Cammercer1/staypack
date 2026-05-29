@@ -45,6 +45,7 @@ import { resolveEffectiveListingPageUrl } from "@/lib/listings/listingUrls";
 import { getCollateralPhotoRequirement } from "@/lib/listings/collateralPhotoRequirements";
 import {
   COLLATERAL_TYPE_META,
+  collateralEditorPath,
   collateralOrderForPurpose,
 } from "@/lib/listings/collateralTypes";
 import { formatCurrency } from "@/lib/reports/formatters";
@@ -402,6 +403,7 @@ function CreateCollateralDraftButton({
   photoRequirement: ReturnType<typeof getCollateralPhotoRequirement>;
   onCreated: () => void;
 }) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   async function createDraft() {
@@ -421,13 +423,20 @@ function CreateCollateralDraftButton({
         throw new Error(payload.error ?? "Unable to create collateral");
       }
 
+      const editorPath = collateralEditorPath(listingId, type);
+      if (editorPath) {
+        router.push(editorPath);
+        router.refresh();
+        return;
+      }
+
       toast.success(`${COLLATERAL_TYPE_META[type].label} draft created`);
-      setLoading(false);
       onCreated();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Unable to create collateral",
       );
+    } finally {
       setLoading(false);
     }
   }
