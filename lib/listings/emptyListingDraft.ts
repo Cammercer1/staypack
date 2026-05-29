@@ -37,6 +37,7 @@ export function createEmptyListingDraft(
     custom_landing_url: null,
     landing_qr_code_url: null,
     landing_published_at: null,
+    landing_template: null,
     created_at: now,
     updated_at: now,
     ...overrides,
