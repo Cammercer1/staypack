@@ -84,7 +84,10 @@ export function BrandPreviewCard({ preview }: { preview: AgencyInput }) {
           </div>
           <div
             className="rounded-2xl p-4"
-            style={{ backgroundColor: preview.accent_colour || "#e8efe3" }}
+            style={{
+              backgroundColor: preview.accent_colour || "#e8efe3",
+              color: preview.callout_text_colour || preview.text_colour || "#333333",
+            }}
           >
             <p className="text-sm font-medium">Buyer note</p>
             <p className="mt-2 text-sm leading-6 opacity-80">

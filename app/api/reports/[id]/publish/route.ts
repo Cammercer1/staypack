@@ -58,7 +58,8 @@ export async function POST(
     }
 
     const qrBuffer = await generateQrCodeBuffer(qrTrackingUrl);
-    const qrPath = `${agency.id}/${report.id}/qr.png`;
+    const qrVersion = Date.now();
+    const qrPath = `${agency.id}/${report.id}/qr-${qrVersion}.png`;
 
     const { error: uploadError } = await admin.storage
       .from("report-assets")

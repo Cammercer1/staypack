@@ -59,6 +59,7 @@ export const agencySchema = z.object({
   secondary_colour: z.string(),
   accent_colour: z.string(),
   text_colour: z.string(),
+  callout_text_colour: z.string().optional(),
   background_colour: z.string(),
   heading_font_family: z.string(),
   body_font_family: z.string(),

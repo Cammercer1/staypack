@@ -9,6 +9,7 @@ export type ReportBrandColours = {
   headline: string;
   text: string;
   softHighlight: string;
+  calloutText: string;
   pageBackground: string;
 };
 
@@ -19,6 +20,7 @@ export function getReportBrandColours(
     headline: agency.primary_colour,
     text: agency.text_colour || "#1a1a1a",
     softHighlight: agency.accent_colour || "#f3f4f6",
+    calloutText: agency.callout_text_colour || agency.text_colour || "#1a1a1a",
     pageBackground: agency.background_colour || agency.secondary_colour || "#ffffff",
   };
 }
@@ -28,6 +30,7 @@ export function getReportBrandColourVars(colours: ReportBrandColours) {
     ["--report-headline-colour" as string]: colours.headline,
     ["--report-text-colour" as string]: colours.text,
     ["--report-soft-highlight" as string]: colours.softHighlight,
+    ["--report-callout-text" as string]: colours.calloutText,
     ["--report-page-background" as string]: colours.pageBackground,
   };
 }

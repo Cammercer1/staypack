@@ -30,7 +30,8 @@ async function uploadListingLandingQr(
   const trackingUrl = buildListingQrTrackingUrl(agency.slug, publicSlug);
   const admin = createAdminClient();
   const qrBuffer = await generateQrCodeBuffer(trackingUrl);
-  const qrPath = `${agency.id}/${listingId}/landing-qr.png`;
+  const qrVersion = Date.now();
+  const qrPath = `${agency.id}/${listingId}/landing-qr-${qrVersion}.png`;
 
   const { error: uploadError } = await admin.storage
     .from("report-assets")

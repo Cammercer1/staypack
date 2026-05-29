@@ -49,7 +49,8 @@ export async function POST(
   const trackingUrl = buildListingQrTrackingUrl(agency.slug, listing.public_slug);
   const publicUrl = buildPublicListingUrl(agency.slug, listing.public_slug);
   const qrBuffer = await generateQrCodeBuffer(trackingUrl);
-  const qrPath = `${agency.id}/${listing.id}/landing-qr.png`;
+  const qrVersion = Date.now();
+  const qrPath = `${agency.id}/${listing.id}/landing-qr-${qrVersion}.png`;
 
   const { error: uploadError } = await admin.storage
     .from("report-assets")

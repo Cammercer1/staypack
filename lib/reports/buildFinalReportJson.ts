@@ -76,6 +76,7 @@ export function buildFinalReportJson({
       secondary_colour: agency.background_colour ?? agency.secondary_colour,
       accent_colour: agency.accent_colour,
       text_colour: agency.text_colour ?? agency.primary_colour,
+      callout_text_colour: agency.callout_text_colour ?? undefined,
       background_colour: agency.background_colour ?? agency.secondary_colour,
       heading_font_family: agency.heading_font_family ?? agency.font_family,
       body_font_family: agency.body_font_family ?? agency.font_family,

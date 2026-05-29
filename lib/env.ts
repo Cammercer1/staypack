@@ -3,6 +3,7 @@ const LEGACY_SITE_HOSTS = new Set([
   "staypack.netlify.app",
   "localhost",
 ]);
+const CANONICAL_PUBLIC_SITE_URL = "https://staypack.app";
 
 function normalizeSiteUrl(url: string) {
   return url.trim().replace(/\/$/, "");
@@ -61,9 +62,10 @@ export function getSiteUrl() {
   }
 
   const normalized = normalizeSiteUrl(resolved);
+  const normalizedHost = hostFromUrl(normalized);
 
   // If we fell back to a legacy Netlify host but explicit env points at production, prefer production.
-  const resolvedHost = hostFromUrl(normalized);
+  const resolvedHost = normalizedHost;
   if (
     resolvedHost &&
     LEGACY_SITE_HOSTS.has(resolvedHost) === false &&
@@ -74,7 +76,16 @@ export function getSiteUrl() {
     resolved = nextPublic;
   }
 
-  return normalized;
+  let finalUrl = normalizeSiteUrl(resolved);
+  const finalHost = hostFromUrl(finalUrl);
+  const isLegacyHost =
+    Boolean(finalHost && LEGACY_SITE_HOSTS.has(finalHost)) ||
+    Boolean(finalHost?.startsWith("127."));
+  if (isLegacyHost) {
+    finalUrl = CANONICAL_PUBLIC_SITE_URL;
+  }
+
+  return finalUrl;
 }
 
 export function getReportsUrl() {

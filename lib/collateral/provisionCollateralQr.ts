@@ -37,7 +37,8 @@ export async function provisionCollateralQr({
 
   const admin = createAdminClient();
   const qrBuffer = await generateQrCodeBuffer(qrTrackingUrl);
-  const qrPath = `${agency.id}/${listing.id}/collateral-${collateral.id}-qr.png`;
+  const qrVersion = Date.now();
+  const qrPath = `${agency.id}/${listing.id}/collateral-${collateral.id}-qr-${qrVersion}.png`;
 
   const { error: uploadError } = await admin.storage
     .from("report-assets")

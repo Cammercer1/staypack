@@ -123,6 +123,12 @@ export const BRAND_COLOUR_FIELDS = [
     helper: "Used for callouts, cards and secondary sections.",
     example: "#e8efe3",
   },
+  {
+    key: "callout_text_colour" as const,
+    label: "Callout text colour",
+    helper: "Text colour inside soft highlight boxes. Change this when your callout background is dark.",
+    example: "#ffffff",
+  },
 ] as const;
 
 export function getHeadingFontPreset(id: string) {

@@ -17,6 +17,7 @@ export type CollateralBrandSlice = {
   secondary_colour: string;
   accent_colour: string;
   text_colour: string;
+  callout_text_colour?: string | null;
   background_colour: string;
   heading_font_family: string;
   body_font_family: string;
