@@ -100,16 +100,14 @@ function BlockInsertPicker({
   onPick,
   onClose,
 }: {
-  insertState: InsertState;
+  insertState: NonNullable<InsertState>;
   onPick: (type: BrochureBlurbBlock["type"]) => void;
   onClose: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!insertState) {
-      return;
-    }
+    const { anchorEl } = insertState;
 
     function handlePointerDown(event: MouseEvent) {
       const target = event.target as Node;
@@ -117,7 +115,7 @@ function BlockInsertPicker({
         return;
       }
       if (
-        insertState.anchorEl.contains(target) ||
+        anchorEl.contains(target) ||
         (target instanceof Element && target.closest("[data-blurb-insert]"))
       ) {
         return;
@@ -139,7 +137,7 @@ function BlockInsertPicker({
     };
   }, [insertState, onClose]);
 
-  if (!insertState || typeof document === "undefined") {
+  if (typeof document === "undefined") {
     return null;
   }
 
@@ -487,11 +485,13 @@ export function InlineBlurbEditor({
           onCaretChange={handleCaretChange}
           onEnterNewLine={handleEnterNewLine}
         />
-        <BlockInsertPicker
-          insertState={insertState}
-          onPick={(type) => insertBlock(insertState?.afterIndex ?? -1, type)}
-          onClose={() => setInsertState(null)}
-        />
+        {insertState ? (
+          <BlockInsertPicker
+            insertState={insertState}
+            onPick={(type) => insertBlock(insertState.afterIndex, type)}
+            onClose={() => setInsertState(null)}
+          />
+        ) : null}
       </div>
     );
   }
@@ -536,15 +536,13 @@ export function InlineBlurbEditor({
         })}
       </div>
 
-      <BlockInsertPicker
-        insertState={insertState}
-        onPick={(type) => {
-          if (insertState) {
-            insertBlock(insertState.afterIndex, type);
-          }
-        }}
-        onClose={() => setInsertState(null)}
-      />
+      {insertState ? (
+        <BlockInsertPicker
+          insertState={insertState}
+          onPick={(type) => insertBlock(insertState.afterIndex, type)}
+          onClose={() => setInsertState(null)}
+        />
+      ) : null}
     </div>
   );
 }
