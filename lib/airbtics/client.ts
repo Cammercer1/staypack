@@ -28,6 +28,8 @@ export type AirbticsEstimateResult = {
 type AirbticsReportMessage = Record<string, unknown> & {
   id?: string;
   report_id?: string;
+  report_type?: string;
+  comps?: unknown[];
   comps_status?: string;
   revenue?: number;
   occupancy_rate?: number;
@@ -185,6 +187,16 @@ function isReportReady(message: AirbticsReportMessage, tier: AirbticsTier) {
 
   // Summary (/report/summary) returns headline KPIs with an empty comps_status.
   if (tier === "summary") {
+    return "success" as const;
+  }
+
+  // Some /report/all responses include full comps+KPIs with empty comps_status.
+  const hasFullPayload =
+    message.report_type === "all" &&
+    Array.isArray(message.comps) &&
+    message.kpis != null &&
+    typeof message.kpis === "object";
+  if (tier === "full" && hasFullPayload) {
     return "success" as const;
   }
 
