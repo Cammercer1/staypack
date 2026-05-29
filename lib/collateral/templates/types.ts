@@ -17,6 +17,7 @@ export type CollateralBrandSlice = {
   secondary_colour: string;
   accent_colour: string;
   text_colour: string;
+  callout_heading_colour?: string | null;
   callout_text_colour?: string | null;
   background_colour: string;
   heading_font_family: string;
@@ -251,6 +252,8 @@ export type SalesBrochureCopyJson = {
   feature_highlights: string[];
   inspection_cta: string;
   disclaimer: string;
+  /** Optional extra paragraph shown at the foot of the page-two gallery. */
+  page_two_note?: string;
 };
 
 export type SalesBrochurePropertySlice = {

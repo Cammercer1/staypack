@@ -68,7 +68,7 @@ function BoldStatPill({
 
 function BoldStatStrip({ document }: { document: SalesBrochureDocumentJson }) {
   const { property } = document;
-  const accent = document.agency.primary_colour || "#1a1a2e";
+  const accent = document.agency.accent_colour || document.agency.primary_colour || "#1a1a2e";
 
   const stats: Array<{ value: string; label: string }> = [];
   if (property.bedrooms) stats.push({ value: formatNumber(property.bedrooms), label: "Bed" });
@@ -313,7 +313,7 @@ function BoldBody({
 }
 
 export function BoldFooterBand({ document }: { document: SalesBrochureDocumentJson }) {
-  const footerBg = document.agency.primary_colour || "#1a1a2e";
+  const footerBg = document.agency.accent_colour || document.agency.primary_colour || "#1a1a2e";
   const logoUrl = getAgencyLogoUrl(document.agency, "dark");
 
   return (

@@ -293,6 +293,15 @@ export function GeneratedBrochureCopyEditor({
                 onChange={(value) => updateField("inspection_cta", value)}
               />
               <CopyField
+                id="page_two_note"
+                label={limits.page_two_note.label}
+                hint={limits.page_two_note.hint}
+                value={copy.page_two_note ?? ""}
+                maxLength={limits.page_two_note.max}
+                multiline
+                onChange={(value) => updateField("page_two_note", value)}
+              />
+              <CopyField
                 id="disclaimer"
                 label={limits.disclaimer.label}
                 hint={limits.disclaimer.hint}

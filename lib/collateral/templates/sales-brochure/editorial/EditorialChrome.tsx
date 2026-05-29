@@ -166,12 +166,16 @@ export function EditorialNumberedList({
   items,
   title,
   max = 4,
+  columns = 1,
 }: {
   items: string[];
   title?: string;
   max?: number;
+  columns?: 1 | 2;
 }) {
   if (!items.length) return null;
+
+  const visible = items.slice(0, max);
 
   return (
     <div>
@@ -183,8 +187,14 @@ export function EditorialNumberedList({
           {title}
         </p>
       ) : null}
-      <ol className="space-y-3">
-        {items.slice(0, max).map((point, index) => (
+      <ol
+        className={
+          columns === 2
+            ? "grid grid-cols-2 gap-x-8 gap-y-3"
+            : "space-y-3"
+        }
+      >
+        {visible.map((point, index) => (
           <li key={point} className="flex gap-4">
             <span
               className="w-6 shrink-0 text-sm font-semibold tabular-nums text-neutral-400"
@@ -218,6 +228,135 @@ export function EditorialBlurb({ text }: { text: string }) {
   );
 }
 
+/** Small-caps section eyebrow with a short rule — editorial section marker. */
+export function EditorialKicker({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-neutral-500"
+        style={{ fontFamily: headingFont }}
+      >
+        {children}
+      </span>
+      <span className="h-px flex-1 bg-neutral-200" aria-hidden />
+    </div>
+  );
+}
+
+/** Lead paragraph with a serif drop cap — the editorial "standfirst". */
+export function EditorialLede({ text }: { text: string }) {
+  if (!text) return null;
+
+  const trimmed = text.trim();
+  const firstLetter = trimmed.slice(0, 1);
+  const rest = trimmed.slice(1);
+
+  return (
+    <p
+      className="text-[0.96rem] leading-[1.85] text-neutral-700"
+      style={{ fontFamily: bodyFont }}
+    >
+      <span
+        className="float-left mr-2.5 mt-1 text-[3.6rem] font-semibold leading-[0.72]"
+        style={{
+          fontFamily: headingFont,
+          color: "var(--report-headline-colour, inherit)",
+        }}
+      >
+        {firstLetter}
+      </span>
+      {rest}
+    </p>
+  );
+}
+
+/** Refined feature index — serif numerals, hairline rule per row. */
+export function EditorialFeatureIndex({
+  items,
+  max = 6,
+}: {
+  items: string[];
+  max?: number;
+}) {
+  if (!items.length) return null;
+
+  return (
+    <ol className="grid grid-cols-2 gap-x-10">
+      {items.slice(0, max).map((point, index) => (
+        <li
+          key={point}
+          className="flex gap-3 py-2.5"
+        >
+          <span
+            className="shrink-0 text-[0.85rem] font-semibold tabular-nums"
+            style={{
+              fontFamily: headingFont,
+              color: "var(--report-headline-colour, inherit)",
+            }}
+          >
+            {String(index + 1).padStart(2, "0")}
+          </span>
+          <span
+            className="text-[0.82rem] leading-snug text-neutral-700"
+            style={{ fontFamily: bodyFont }}
+          >
+            {point}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** Vertical specifications list with hairline dividers — sidebar element. */
+export function EditorialSpecSidebar({
+  document,
+}: {
+  document: SalesBrochureDocumentJson;
+}) {
+  const { property } = document;
+  const items = [
+    property.bedrooms
+      ? { label: "Bedrooms", value: formatNumber(property.bedrooms) }
+      : null,
+    property.bathrooms
+      ? { label: "Bathrooms", value: formatNumber(property.bathrooms) }
+      : null,
+    property.car_spaces
+      ? { label: "Parking", value: formatNumber(property.car_spaces) }
+      : null,
+    property.land_area_sqm
+      ? { label: "Land", value: `${formatNumber(property.land_area_sqm)} m²` }
+      : null,
+  ].filter((item): item is { label: string; value: string } => Boolean(item));
+
+  if (!items.length) return null;
+
+  return (
+    <dl className="divide-y divide-neutral-200">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="flex items-baseline justify-between py-2.5"
+        >
+          <dt
+            className="text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-neutral-500"
+            style={{ fontFamily: headingFont }}
+          >
+            {item.label}
+          </dt>
+          <dd
+            className="text-[1.05rem] font-semibold leading-none text-neutral-900"
+            style={{ fontFamily: headingFont }}
+          >
+            {item.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 export function EditorialCta({ text }: { text: string }) {
   if (!text) return null;
 
@@ -237,7 +376,7 @@ export function EditorialPricePanel({ document }: { document: SalesBrochureDocum
   if (!document.property.display_price) return null;
 
   return (
-    <div className="border-l-2 border-neutral-900 pl-5">
+    <div>
       <p
         className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-neutral-500"
         style={{ fontFamily: headingFont }}

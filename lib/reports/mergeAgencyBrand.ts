@@ -17,6 +17,7 @@ export function mergeAgencyBrandIntoFinalReport(
       secondary_colour: agency.background_colour ?? agency.secondary_colour,
       accent_colour: agency.accent_colour,
       text_colour: agency.text_colour ?? agency.primary_colour,
+      callout_heading_colour: agency.callout_heading_colour ?? undefined,
       callout_text_colour: agency.callout_text_colour ?? undefined,
       background_colour: agency.background_colour ?? agency.secondary_colour,
       heading_font_family: agency.heading_font_family ?? agency.font_family,

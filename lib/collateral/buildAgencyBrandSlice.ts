@@ -15,6 +15,7 @@ export function buildAgencyBrandSlice(agency: Agency): CollateralBrandSlice {
     secondary_colour: agency.secondary_colour,
     accent_colour: agency.accent_colour,
     text_colour: agency.text_colour,
+    callout_heading_colour: agency.callout_heading_colour ?? null,
     callout_text_colour: agency.callout_text_colour ?? null,
     background_colour: agency.background_colour,
     heading_font_family: agency.heading_font_family ?? agency.font_family,

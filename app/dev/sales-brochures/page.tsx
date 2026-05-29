@@ -102,6 +102,8 @@ export default async function DevSalesBrochuresPage({
         secondary_colour: document.agency.secondary_colour,
         accent_colour: document.agency.accent_colour,
         text_colour: document.agency.text_colour,
+        callout_heading_colour: document.agency.callout_heading_colour ?? null,
+        callout_text_colour: document.agency.callout_text_colour ?? null,
         background_colour: document.agency.background_colour,
         heading_font_family: document.agency.heading_font_family,
         body_font_family: document.agency.body_font_family,

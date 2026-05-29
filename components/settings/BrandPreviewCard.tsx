@@ -84,13 +84,18 @@ export function BrandPreviewCard({ preview }: { preview: AgencyInput }) {
           </div>
           <div
             className="rounded-2xl p-4"
-            style={{
-              backgroundColor: preview.accent_colour || "#e8efe3",
-              color: preview.callout_text_colour || preview.text_colour || "#333333",
-            }}
+            style={{ backgroundColor: preview.accent_colour || "#e8efe3" }}
           >
-            <p className="text-sm font-medium">Buyer note</p>
-            <p className="mt-2 text-sm leading-6 opacity-80">
+            <p
+              className="text-sm font-medium"
+              style={{ color: preview.callout_heading_colour || preview.text_colour || "#333333" }}
+            >
+              Buyer note
+            </p>
+            <p
+              className="mt-2 text-sm leading-6 opacity-80"
+              style={{ color: preview.callout_text_colour || preview.text_colour || "#333333" }}
+            >
               {preview.default_cta ||
                 "Speak with the agent for the full buyer pack and property details."}
             </p>

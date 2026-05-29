@@ -286,7 +286,7 @@ export function GalleryDetailsRow({
               className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-neutral-500"
               style={{ fontFamily: headingFont }}
             >
-              {document.copy.heading?.trim() || "Price"}
+              Sale
             </p>
             <p
               className="mt-1 text-[1.05rem] font-bold text-neutral-900"

@@ -113,20 +113,26 @@ export const BRAND_COLOUR_FIELDS = [
   },
   {
     key: "primary_colour" as const,
-    label: "Brand highlight",
+    label: "Header text",
     helper: "Used for key numbers, headers and important buttons.",
     example: "#002e36",
   },
   {
     key: "accent_colour" as const,
-    label: "Soft highlight boxes",
+    label: "Highlight box",
     helper: "Used for callouts, cards and secondary sections.",
     example: "#e8efe3",
   },
   {
+    key: "callout_heading_colour" as const,
+    label: "Highlight box heading colour",
+    helper: "Heading colour inside highlight boxes.",
+    example: "#ffffff",
+  },
+  {
     key: "callout_text_colour" as const,
-    label: "Callout text colour",
-    helper: "Text colour inside soft highlight boxes. Change this when your callout background is dark.",
+    label: "Highlight box text colour",
+    helper: "Body text colour inside highlight boxes. Change this when your callout background is dark.",
     example: "#ffffff",
   },
 ] as const;

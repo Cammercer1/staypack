@@ -121,6 +121,7 @@ export type FinalReportJson = {
     secondary_colour: string;
     accent_colour: string;
     text_colour: string;
+    callout_heading_colour?: string;
     callout_text_colour?: string;
     background_colour: string;
     heading_font_family: string;
@@ -222,6 +223,7 @@ export type Agency = {
   secondary_colour: string;
   accent_colour: string;
   text_colour: string;
+  callout_heading_colour: string | null;
   callout_text_colour: string | null;
   background_colour: string;
   heading_font_family: string;

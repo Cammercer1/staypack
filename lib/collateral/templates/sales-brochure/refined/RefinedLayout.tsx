@@ -40,17 +40,15 @@ function formatSpecsLine(document: SalesBrochureDocumentJson) {
   return parts.join("  |  ");
 }
 
-/** Dev/preview floor plan stand-in for refined right column. */
-export const REFINED_PREVIEW_FLOOR_PLAN_URL = "/collateral/refined-floor-plan-preview.png";
-
 function resolveRefinedImages(document: SalesBrochureDocumentJson) {
   const urls = document.property.page_one_image_urls.filter(Boolean);
   const hero = urls[0] ?? document.property.hero_image_url ?? "";
   const footer = urls[2] ?? urls[1] ?? hero;
-  const floorPlan =
-    urls.find((url) => url.includes("floor-plan")) ?? REFINED_PREVIEW_FLOOR_PLAN_URL;
+  // Use a real floor plan only if one was uploaded; otherwise show a property photo.
+  const floorPlan = urls.find((url) => url.includes("floor-plan"));
+  const side = floorPlan ?? urls[1] ?? urls[2] ?? hero;
 
-  return { hero, floorPlan, footer };
+  return { hero, side, sideIsFloorPlan: Boolean(floorPlan), footer };
 }
 
 export function RefinedHeader({
@@ -59,7 +57,7 @@ export function RefinedHeader({
   document: SalesBrochureDocumentJson;
 }) {
   const specs = formatSpecsLine(document);
-  const highlight = document.agency.primary_colour;
+  const highlight = document.agency.accent_colour || document.agency.primary_colour;
   const logoUrl = getAgencyLogoUrl(document.agency, "dark");
 
   return (
@@ -111,7 +109,13 @@ export function RefinedBody({
   document: SalesBrochureDocumentJson;
 }) {
   const features = buildRefinedFeatures(document);
-  const { floorPlan } = resolveRefinedImages(document);
+  const { side, sideIsFloorPlan } = resolveRefinedImages(document);
+  const priceBoxBg = document.agency.accent_colour || "#f3f4f6";
+  const priceBoxText =
+    document.agency.callout_heading_colour ||
+    document.agency.callout_text_colour ||
+    document.agency.text_colour ||
+    "#111111";
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[1.05fr_0.95fr] gap-6 overflow-hidden px-10 pb-5 pt-10">
@@ -159,10 +163,13 @@ export function RefinedBody({
             >
               Asking price
             </p>
-            <div className="mt-1.5 inline-block bg-neutral-100 px-4 py-2.5">
+            <div
+              className="mt-1.5 inline-block px-4 py-2.5"
+              style={{ backgroundColor: priceBoxBg }}
+            >
               <p
-                className="text-[1.5rem] font-bold leading-none text-neutral-900"
-                style={{ fontFamily: headingFont }}
+                className="text-[1.5rem] font-bold leading-none"
+                style={{ fontFamily: headingFont, color: priceBoxText }}
               >
                 {document.property.display_price}
               </p>
@@ -172,13 +179,17 @@ export function RefinedBody({
       </div>
 
       <div className="flex min-h-0 flex-col overflow-hidden">
-        {floorPlan ? (
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-white">
+        {side ? (
+          <div
+            className={`flex min-h-0 flex-1 items-center justify-center overflow-hidden ${
+              sideIsFloorPlan ? "bg-white" : "bg-neutral-200"
+            }`}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={floorPlan}
-              alt="Floor plan"
-              className="h-full w-full object-contain"
+              src={side}
+              alt={sideIsFloorPlan ? "Floor plan" : ""}
+              className={`h-full w-full ${sideIsFloorPlan ? "object-contain" : "object-cover"}`}
             />
           </div>
         ) : (

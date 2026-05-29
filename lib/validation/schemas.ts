@@ -59,6 +59,7 @@ export const agencySchema = z.object({
   secondary_colour: z.string(),
   accent_colour: z.string(),
   text_colour: z.string(),
+  callout_heading_colour: z.string().optional(),
   callout_text_colour: z.string().optional(),
   background_colour: z.string(),
   heading_font_family: z.string(),
@@ -249,6 +250,7 @@ export const salesBrochureCopySchema = z.object({
   feature_highlights: z.array(z.string()),
   inspection_cta: z.string(),
   disclaimer: z.string(),
+  page_two_note: z.string().optional(),
 });
 
 export const updateSalesBrochureDocumentSchema = z

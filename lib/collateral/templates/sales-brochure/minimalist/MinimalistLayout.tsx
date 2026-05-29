@@ -1,3 +1,5 @@
+import { Bath, BedDouble, Car } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
 import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
@@ -127,32 +129,18 @@ function MinimalistBlurb({
   );
 }
 
-function StatIcon({ type }: { type: "bed" | "bath" | "car" }) {
-  const paths = {
-    bed: "M3 14V9h4V7h10v2h4v5h-2v5H5v-5H3zm4-5v3h10V9H7zm-2 5v3h14v-3H5z",
-    bath: "M4 12h16v2H4v-2zm2-4h12v2H6V8zm1 8h10v2H7v-2zM8 6V4h8v2H8z",
-    car: "M5 11l1.5-4h11L19 11v6h-2v-2H7v2H5v-6zm2.2-2h9.6L16.5 11h-9L7.2 9zM8 14h8v1H8v-1z",
-  };
-
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5 fill-neutral-800" aria-hidden>
-      <path d={paths[type]} />
-    </svg>
-  );
-}
-
 function MinimalistStatsIcons({ document }: { document: SalesBrochureDocumentJson }) {
   const { property } = document;
-  const stats: Array<{ type: "bed" | "bath" | "car"; value: string }> = [];
+  const stats: Array<{ id: string; icon: LucideIcon; value: string }> = [];
 
   if (property.bedrooms) {
-    stats.push({ type: "bed", value: formatNumber(property.bedrooms) });
+    stats.push({ id: "bed", icon: BedDouble, value: formatNumber(property.bedrooms) });
   }
   if (property.bathrooms) {
-    stats.push({ type: "bath", value: formatNumber(property.bathrooms) });
+    stats.push({ id: "bath", icon: Bath, value: formatNumber(property.bathrooms) });
   }
   if (property.car_spaces) {
-    stats.push({ type: "car", value: formatNumber(property.car_spaces) });
+    stats.push({ id: "car", icon: Car, value: formatNumber(property.car_spaces) });
   }
 
   if (!stats.length) return null;
@@ -160,8 +148,8 @@ function MinimalistStatsIcons({ document }: { document: SalesBrochureDocumentJso
   return (
     <div className="flex items-end gap-6 pb-1">
       {stats.map((stat) => (
-        <div key={stat.type} className="flex flex-col items-center gap-1">
-          <StatIcon type={stat.type} />
+        <div key={stat.id} className="flex flex-col items-center gap-1.5">
+          <stat.icon className="h-5 w-5 text-neutral-800" strokeWidth={1.75} aria-hidden />
           <span
             className="text-[0.95rem] font-medium leading-none text-neutral-900"
             style={{ fontFamily: bodyFont }}
@@ -401,6 +389,8 @@ export function MinimalistPageTwo({
 }) {
   const features = buildFeatureItems(document);
   const { pageTwoGallery } = resolveMinimalistImages(document);
+  const rightStack = pageTwoGallery.slice(0, 3);
+  const bottomImage = pageTwoGallery[3] ?? pageTwoGallery[0] ?? "";
   const agent = report.agent;
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
   const pageBg = document.agency.background_colour?.trim() || MINIMALIST_CREAM;
@@ -495,8 +485,17 @@ export function MinimalistPageTwo({
           </div>
         </div>
 
-        <MinimalistPageTwoGallery urls={pageTwoGallery} />
+        <MinimalistPageTwoGallery urls={rightStack} />
       </div>
+
+      {bottomImage ? (
+        <div className="shrink-0 px-8">
+          <div className="h-[72mm] overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={bottomImage} alt="" className="h-full w-full object-cover" />
+          </div>
+        </div>
+      ) : null}
 
       <footer className="flex shrink-0 items-end justify-between gap-8 px-8 pb-6 pt-2">
         <MinimalistDisclaimer text={document.copy.disclaimer} className="max-w-[70%]" />

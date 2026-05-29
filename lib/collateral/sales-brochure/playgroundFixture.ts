@@ -2,7 +2,6 @@ import type {
   SalesBrochureCopyJson,
   SalesBrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
-import { REFINED_PREVIEW_FLOOR_PLAN_URL } from "@/lib/collateral/templates/sales-brochure/refined/RefinedLayout";
 import { SALES_BROCHURE_CLASSIC_2PG_TEMPLATE_ID } from "@/lib/collateral/templates/ids";
 import { DEFAULT_BRAND_VALUES } from "@/lib/branding/normalize";
 
@@ -74,12 +73,7 @@ export function createPlaygroundSalesBrochureDocument(
   templateId: string = SALES_BROCHURE_CLASSIC_2PG_TEMPLATE_ID,
 ): SalesBrochureDocumentJson {
   const images = [...PLAYGROUND_BROCHURE_IMAGES];
-  const pageOneImages = [
-    images[0],
-    REFINED_PREVIEW_FLOOR_PLAN_URL,
-    images[2],
-    images[3],
-  ];
+  const pageOneImages = [images[0], images[1], images[2], images[3]];
 
   return {
     version: "sales_brochure_v1",

@@ -22,6 +22,7 @@ export function normalizeSalesBrochureCopy(
     disclaimer: stringField(
       data.disclaimer ?? agency.default_disclaimer ?? DEFAULT_DISCLAIMER,
     ),
+    page_two_note: stringField(data.page_two_note),
   };
 }
 
