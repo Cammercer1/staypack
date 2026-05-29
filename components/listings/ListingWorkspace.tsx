@@ -35,7 +35,6 @@ import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
 import { ScrapedListingReviewStep } from "@/components/reports/ScrapedListingReviewStep";
 import { CreateStrReportButton } from "@/components/listings/CreateStrReportButton";
 import { ListingAgentsStrip } from "@/components/listings/ListingAgentsStrip";
-import { CollateralItemActions } from "@/components/collateral/CollateralItemActions";
 import { CollateralPdfButton } from "@/components/collateral/CollateralPdfButton";
 import { CollateralImageEditor } from "@/components/listings/CollateralImageEditor";
 import { CollateralPhotoRequirementNotice } from "@/components/listings/CollateralPhotoRequirementNotice";
@@ -46,7 +45,7 @@ import { resolveEffectiveListingPageUrl } from "@/lib/listings/listingUrls";
 import { getCollateralPhotoRequirement } from "@/lib/listings/collateralPhotoRequirements";
 import {
   COLLATERAL_TYPE_META,
-  COLLATERAL_TYPE_ORDER,
+  collateralOrderForPurpose,
 } from "@/lib/listings/collateralTypes";
 import { formatCurrency } from "@/lib/reports/formatters";
 import type {
@@ -481,7 +480,7 @@ function CollateralTab({
       <LandingPageCard listing={listing} agencySlug={agencySlug} />
 
       <div className="grid gap-4 md:grid-cols-2">
-        {COLLATERAL_TYPE_ORDER.map((type) => {
+        {collateralOrderForPurpose(listing.listing_purpose).map((type) => {
           const meta = COLLATERAL_TYPE_META[type];
           const item = collateralByType.get(type);
           const Icon = COLLATERAL_ICONS[type];
@@ -491,6 +490,12 @@ function CollateralTab({
               : type === "str_report"
                 ? reports.find((report) => report.status !== "archived") ?? null
                 : null;
+          const hasCollateral =
+            type === "str_report" ? Boolean(strReport) : Boolean(item);
+          const photosRemaining = Math.max(
+            photoRequirement.minimum - photoRequirement.count,
+            1,
+          );
 
           return (
             <div key={type} className="surface-card p-6">
@@ -556,25 +561,40 @@ function CollateralTab({
                 </p>
               ) : null}
 
-              {!meta.comingSoon ? <div className="mt-6 flex flex-wrap gap-2">
+              {!meta.comingSoon ? (
+                !photoRequirement.met && !hasCollateral ? (
+                <div className="mt-6">
+                  <p className="text-sm text-muted-foreground">
+                    Add {photosRemaining} more photo
+                    {photosRemaining === 1 ? "" : "s"} to use this feature.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="mt-3"
+                    onClick={onGoToPhotos}
+                  >
+                    Add photos
+                  </Button>
+                </div>
+                ) : (
+                <div className="mt-6 flex flex-wrap gap-2">
                 {type === "str_report" ? (
                   strReport ? (
                     <>
                       <Link href={`/listings/${listing.id}/reports/${strReport.id}`}>
-                        <Button size="sm">
-                          {strReport.status === "published" ? "Open" : "Continue"}
-                        </Button>
+                        <Button size="sm">Edit</Button>
                       </Link>
-                      <CopyLinkButton url={strReport.public_url} />
-                      <DownloadPdfButton
-                        url={strReport.pdf_url}
-                        reportId={strReport.id}
-                        cacheVersion={strReport.updated_at}
-                        canGenerate={
-                          strReport.status === "published" &&
-                          Boolean(strReport.public_slug)
-                        }
-                      />
+                      {strReport.pdf_url ? (
+                        <DownloadPdfButton
+                          url={strReport.pdf_url}
+                          reportId={strReport.id}
+                          cacheVersion={strReport.updated_at}
+                          canGenerate={false}
+                          downloadLabel="Download asset"
+                        />
+                      ) : null}
                     </>
                   ) : (
                     <CreateStrReportButton
@@ -582,57 +602,54 @@ function CollateralTab({
                       photoRequirement={photoRequirement}
                     />
                   )
-                ) : type === "agent_business_card" ||
-                  type === "social_posts" ||
-                  type === "sales_brochure" ? (
-                  <>
-                    {type !== "sales_brochure" ? (
-                      <CollateralItemActions
-                        listingId={listing.id}
-                        type={type}
-                        item={item ?? null}
-                        photoRequirement={photoRequirement}
-                        onRefresh={onRefresh}
-                      />
-                    ) : null}
-                    {type === "social_posts" && item ? (
-                      <Link href={`/listings/${listing.id}/social`}>
-                        <Button size="sm" variant="outline">
-                          {item.document_json ? "Edit social posts" : "Open editor"}
-                        </Button>
+                ) : type === "sales_brochure" ? (
+                  item ? (
+                    <>
+                      <Link href={`/listings/${listing.id}/brochure`}>
+                        <Button size="sm">Edit</Button>
                       </Link>
-                    ) : null}
-                    {type === "sales_brochure" ? (
-                      item ? (
-                        <>
-                          <Link href={`/listings/${listing.id}/brochure`}>
-                            <Button size="sm">
-                              {item.document_json ? "Open" : "Continue"}
-                            </Button>
-                          </Link>
-                          {item.public_url ? (
-                            <CopyLinkButton url={item.public_url} />
-                          ) : null}
-                          {item.document_json ? (
-                            <CollateralPdfButton
-                              collateralId={item.id}
-                              url={item.pdf_url}
-                              canGenerate
-                              cacheVersion={item.updated_at}
-                              onUpdated={() => onRefresh()}
-                            />
-                          ) : null}
-                        </>
-                      ) : (
-                        <CreateCollateralDraftButton
-                          listingId={listing.id}
-                          type={type}
-                          photoRequirement={photoRequirement}
-                          onCreated={onRefresh}
+                      {item.pdf_url ? (
+                        <CollateralPdfButton
+                          collateralId={item.id}
+                          url={item.pdf_url}
+                          canGenerate={false}
+                          cacheVersion={item.updated_at}
+                          downloadLabel="Download asset"
                         />
-                      )
-                    ) : null}
-                  </>
+                      ) : null}
+                    </>
+                  ) : (
+                    <CreateCollateralDraftButton
+                      listingId={listing.id}
+                      type={type}
+                      photoRequirement={photoRequirement}
+                      onCreated={onRefresh}
+                    />
+                  )
+                ) : type === "social_posts" ? (
+                  item ? (
+                    <>
+                      <Link href={`/listings/${listing.id}/social`}>
+                        <Button size="sm">Edit</Button>
+                      </Link>
+                      {item.pdf_url ? (
+                        <CollateralPdfButton
+                          collateralId={item.id}
+                          url={item.pdf_url}
+                          canGenerate={false}
+                          cacheVersion={item.updated_at}
+                          downloadLabel="Download asset"
+                        />
+                      ) : null}
+                    </>
+                  ) : (
+                    <CreateCollateralDraftButton
+                      listingId={listing.id}
+                      type={type}
+                      photoRequirement={photoRequirement}
+                      onCreated={onRefresh}
+                    />
+                  )
                 ) : item ? (
                   <Badge variant="outline">Draft saved</Badge>
                 ) : (
@@ -643,7 +660,9 @@ function CollateralTab({
                     onCreated={onRefresh}
                   />
                 )}
-              </div> : null}
+                </div>
+                )
+              ) : null}
 
               {type === "str_report" ? (
                 <div className="mt-4 flex justify-end">

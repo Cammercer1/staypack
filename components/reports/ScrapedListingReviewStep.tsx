@@ -49,6 +49,7 @@ export function ScrapedListingReviewStep({
     listing.uploaded_image_urls ?? [],
   );
   const [form, setForm] = useState({
+    listing_purpose: listing.listing_purpose ?? "sale",
     property_address: listing.property_address ?? "",
     suburb: listing.suburb ?? "",
     state: listing.state ?? "",
@@ -258,6 +259,26 @@ export function ScrapedListingReviewStep({
         </div>
       )}
 
+      <div className="space-y-2">
+        <Label>This listing is for</Label>
+        <div className="inline-flex rounded-lg border border-border/70 p-1">
+          {(["sale", "lease"] as const).map((purpose) => (
+            <Button
+              key={purpose}
+              type="button"
+              size="sm"
+              variant={form.listing_purpose === purpose ? "default" : "ghost"}
+              onClick={() => updateField("listing_purpose", purpose)}
+            >
+              {purpose === "sale" ? "Sale" : "Lease"}
+            </Button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Lease listings skip the short-term rental report.
+        </p>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
         {[
           ["property_address", "Address"],
@@ -273,7 +294,13 @@ export function ScrapedListingReviewStep({
           ["listing_title", "Title"],
         ].map(([field, label]) => (
           <div key={field} className="space-y-2">
-            <Label htmlFor={field}>{label}</Label>
+            <Label htmlFor={field}>
+              {field === "display_price"
+                ? form.listing_purpose === "lease"
+                  ? "Rent (per week)"
+                  : "Sale price"
+                : label}
+            </Label>
             <Input
               id={field}
               value={String(form[field as keyof typeof form] ?? "")}

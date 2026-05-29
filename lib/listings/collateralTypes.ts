@@ -1,15 +1,25 @@
-import type { CollateralType } from "@/lib/types";
+import type { CollateralType, ListingPurpose } from "@/lib/types";
 
 export const STR_REPORT_LABEL = "Short-Term Rental Report";
 
 export const COLLATERAL_TYPE_ORDER: CollateralType[] = [
   "sales_brochure",
-  "str_report",
   "rental_brochure",
-  "social_posts",
   "investor_snapshot",
+  "str_report",
+  "social_posts",
   "agent_business_card",
 ];
+
+export function collateralOrderForPurpose(
+  purpose: ListingPurpose,
+): CollateralType[] {
+  return COLLATERAL_TYPE_ORDER.filter((type) =>
+    purpose === "lease"
+      ? type !== "str_report" && type !== "sales_brochure"
+      : type !== "rental_brochure",
+  );
+}
 
 export const COLLATERAL_TYPE_META: Record<
   CollateralType,
@@ -21,11 +31,11 @@ export const COLLATERAL_TYPE_META: Record<
   },
   sales_brochure: {
     label: "Sales brochure",
-    description: "Print-ready property brochure for open homes.",
+    description: "Print-ready brochure for open homes and property sales.",
   },
   rental_brochure: {
-    label: "Rental brochure",
-    description: "Branded brochure showcasing the property as a short-term rental.",
+    label: "Lease brochure",
+    description: "Branded brochure for properties for lease.",
     comingSoon: true,
   },
   social_posts: {
@@ -34,11 +44,11 @@ export const COLLATERAL_TYPE_META: Record<
   },
   investor_snapshot: {
     label: "Investor snapshot",
-    description: "One-page investment summary for serious buyers.",
+    description: "Suburb report and one-page investment summary for serious buyers.",
     comingSoon: true,
   },
   agent_business_card: {
-    label: "Agent business card",
+    label: "Business card",
     description: "Branded contact card linked to this listing.",
     comingSoon: true,
   },

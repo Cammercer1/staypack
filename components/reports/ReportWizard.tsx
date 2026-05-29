@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { StrEstimateStep } from "@/components/reports/StrEstimateStep";
 import { GeneratedCopyEditor } from "@/components/reports/GeneratedCopyEditor";
 import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
+import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
@@ -223,6 +224,9 @@ export function ReportWizard({
                 }
               }}
             />
+            {report.public_url ? (
+              <CopyLinkButton url={report.public_url} />
+            ) : null}
             <Button onClick={publishReport} disabled={loading || !finalReport}>
               {loading ? (
                 <>

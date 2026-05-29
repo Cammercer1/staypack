@@ -11,6 +11,7 @@ export function createEmptyListingDraft(
     created_by: null,
     agent_profile_id: null,
     status: "active",
+    listing_purpose: "sale",
     listing_url: null,
     property_address: null,
     suburb: null,

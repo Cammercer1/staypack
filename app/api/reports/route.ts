@@ -53,6 +53,13 @@ export async function POST(request: Request) {
 
     const { listing } = await requireListingAccess(body.listing_id);
 
+    if (listing.listing_purpose === "lease") {
+      return NextResponse.json(
+        { error: "Short-term rental reports are only available for listings for sale" },
+        { status: 400 },
+      );
+    }
+
     const photoError = collateralPhotoRequirementError(listing);
     if (photoError) {
       return NextResponse.json({ error: photoError }, { status: 400 });

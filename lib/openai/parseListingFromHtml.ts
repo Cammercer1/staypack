@@ -18,6 +18,7 @@ Return JSON only with this shape:
   "state": string | null,
   "postcode": string | null,
   "propertyType": string | null,
+  "purpose": "sale" | "lease" | null,
   "bedrooms": number | null,
   "bathrooms": number | null,
   "carSpaces": number | null,
@@ -34,6 +35,7 @@ Rules:
 - Do not invent amenities, prices, bed/bath counts, or images.
 - Prefer full street addresses when available.
 - Australian states should be 2-3 letter codes when possible (QLD, NSW, VIC, etc).
+- purpose is "lease" when the property is advertised for rent/lease (e.g. weekly rent, "for lease", "to rent"), otherwise "sale". Use null only when genuinely unclear.
 - images must be absolute URLs from the supplied image list or page content.
 - Exclude logos, icons, and tiny thumbnails when possible.
 - For agents, use full phone numbers from tel: links or structured data. Never return masked numbers containing asterisks (e.g. "0497***").
@@ -56,6 +58,7 @@ function normalizeAiListing(raw: ParsedListingInput): ParsedListing {
     state: raw.state ?? undefined,
     postcode: raw.postcode ?? undefined,
     propertyType: raw.propertyType ?? undefined,
+    purpose: raw.purpose ?? undefined,
     bedrooms: raw.bedrooms ?? undefined,
     bathrooms: raw.bathrooms ?? undefined,
     carSpaces: raw.carSpaces ?? undefined,

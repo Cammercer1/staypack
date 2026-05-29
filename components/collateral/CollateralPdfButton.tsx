@@ -16,6 +16,7 @@ type Props = {
   canGenerate?: boolean;
   cacheVersion?: string | null;
   size?: VariantProps<typeof buttonVariants>["size"];
+  downloadLabel?: string;
   onUpdated?: (collateral: CollateralItem) => void;
 };
 
@@ -25,6 +26,7 @@ export function CollateralPdfButton({
   canGenerate = false,
   cacheVersion = null,
   size = "sm",
+  downloadLabel = "Download PDF",
   onUpdated,
 }: Props) {
   const [pdfUrl, setPdfUrl] = useState(url);
@@ -68,7 +70,7 @@ export function CollateralPdfButton({
       <div className="flex flex-wrap gap-2">
         <Link href={downloadUrl} target="_blank">
           <Button variant="outline" size={size}>
-            Download PDF
+            {downloadLabel}
           </Button>
         </Link>
         {canGenerate ? (

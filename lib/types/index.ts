@@ -18,6 +18,7 @@ export type ParsedListing = {
   state?: string;
   postcode?: string;
   propertyType?: string;
+  purpose?: "sale" | "lease";
   bedrooms?: number;
   bathrooms?: number;
   carSpaces?: number;
@@ -252,12 +253,15 @@ export type AgentProfile = {
 
 export type ListingStatus = "active" | "archived";
 
+export type ListingPurpose = "sale" | "lease";
+
 export type Listing = {
   id: string;
   agency_id: string;
   created_by: string | null;
   agent_profile_id: string | null;
   status: ListingStatus;
+  listing_purpose: ListingPurpose;
   listing_url: string | null;
   property_address: string | null;
   suburb: string | null;

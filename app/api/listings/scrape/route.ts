@@ -12,6 +12,7 @@ import {
 } from "@/lib/listings/provisionLandingPage";
 import { mergeScrapeMasterSelection } from "@/lib/listings/collateralImages";
 import { expandListingDescriptionAfterScrape } from "@/lib/listings/expandListingDescriptionAfterScrape";
+import { detectListingPurpose } from "@/lib/listings/detectListingPurpose";
 import type { Listing, ParsedListing } from "@/lib/types";
 
 function buildScrapedListingFields(
@@ -34,6 +35,13 @@ function buildScrapedListingFields(
 
   return {
     listing_url: listingUrl,
+    listing_purpose:
+      existing?.listing_purpose ??
+      detectListingPurpose({
+        url: listingUrl,
+        displayPrice: listing.displayPrice,
+        aiPurpose: listing.purpose ?? null,
+      }),
     property_address: listing.address ?? existing?.property_address ?? null,
     suburb: listing.suburb ?? existing?.suburb ?? null,
     state: listing.state ?? existing?.state ?? null,

@@ -99,6 +99,7 @@ export const parsedListingSchema = z.object({
   state: z.string().nullable().optional(),
   postcode: z.string().nullable().optional(),
   propertyType: z.string().nullable().optional(),
+  purpose: z.enum(["sale", "lease"]).nullable().optional(),
   bedrooms: z.coerce.number().nullable().optional(),
   bathrooms: z.coerce.number().nullable().optional(),
   carSpaces: z.coerce.number().nullable().optional(),
@@ -139,6 +140,7 @@ const collateralImageChannelSchema = z.enum([
 
 const listingPropertyFields = {
   agent_profile_id: z.string().uuid().nullable().optional(),
+  listing_purpose: z.enum(["sale", "lease"]).optional(),
   listing_url: z.string().url().nullable().optional(),
   property_address: z.string().nullable().optional(),
   suburb: z.string().nullable().optional(),

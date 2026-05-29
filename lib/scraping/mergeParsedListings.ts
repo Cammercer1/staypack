@@ -10,6 +10,7 @@ export function mergeParsedListings(base: ParsedListing, next: ParsedListing): P
     state: next.state ?? base.state,
     postcode: next.postcode ?? base.postcode,
     propertyType: next.propertyType ?? base.propertyType,
+    purpose: next.purpose ?? base.purpose,
     bedrooms: next.bedrooms ?? base.bedrooms,
     bathrooms: next.bathrooms ?? base.bathrooms,
     carSpaces: next.carSpaces ?? base.carSpaces,
