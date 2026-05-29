@@ -11,7 +11,9 @@ type ColourKey =
   | "background_colour"
   | "text_colour"
   | "primary_colour"
-  | "accent_colour";
+  | "accent_colour"
+  | "callout_heading_colour"
+  | "callout_text_colour";
 
 type Props = {
   form: UseFormReturn<AgencyInput>;
