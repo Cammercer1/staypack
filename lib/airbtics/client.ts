@@ -173,12 +173,22 @@ function getReportRevenue(message: AirbticsReportMessage) {
   return null;
 }
 
-function isReportReady(message: AirbticsReportMessage) {
+function isReportReady(message: AirbticsReportMessage, tier: AirbticsTier) {
   if (message.comps_status === "failed") {
     return "failed" as const;
   }
 
-  if (message.comps_status === "success" && getReportRevenue(message) != null) {
+  const revenue = getReportRevenue(message);
+  if (revenue == null) {
+    return "pending" as const;
+  }
+
+  // Summary (/report/summary) returns headline KPIs with an empty comps_status.
+  if (tier === "summary") {
+    return "success" as const;
+  }
+
+  if (message.comps_status === "success") {
     return "success" as const;
   }
 
@@ -205,7 +215,7 @@ async function pollAirbticsReport(
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const message = await readAirbticsReport(reportId, apiKey, baseUrl);
-    const status = isReportReady(message);
+    const status = isReportReady(message, tier);
 
     if (status === "failed") {
       throw new Error("Could not find enough comparable short-term rentals nearby");
