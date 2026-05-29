@@ -22,6 +22,7 @@ import {
   resolveBrandAdvanced,
   type AgencyBrandAdvanced,
 } from "@/lib/branding/advanced";
+import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
 import { agencySchema, type AgencyInput } from "@/lib/validation/schemas";
 import type { Agency } from "@/lib/types";
 
@@ -137,7 +138,7 @@ export function BrandSettingsForm({ agency: initialAgency }: { agency: Agency })
       default_report_title: agency.default_report_title,
       default_cta: agency.default_cta,
       default_disclaimer: agency.default_disclaimer ?? "",
-      report_template_id: agency.report_template_id ?? "classic-light",
+      report_template_id: agency.report_template_id ?? DEFAULT_REPORT_TEMPLATE_ID,
       brand_advanced_json: parseAgencyBrandAdvanced(agency.brand_advanced_json),
     },
   });

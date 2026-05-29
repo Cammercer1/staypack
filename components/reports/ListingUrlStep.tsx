@@ -12,6 +12,13 @@ import { isPersistedListing } from "@/lib/listings/emptyListingDraft";
 import type { Listing, ParsedListing } from "@/lib/types";
 
 type UnknownAgent = ParsedListing["agents"][number] & { name: string };
+type UnknownAgentsCompletion = {
+  saved: Array<{
+    originalName: string;
+    agent: UnknownAgent;
+  }>;
+  skippedNames: string[];
+};
 
 type Props = {
   listing: Listing;
@@ -40,9 +47,29 @@ export function ListingUrlStep({ listing, onComplete, onManualEntry }: Props) {
     onComplete(importedListing);
   }
 
-  function handleUnknownAgentsComplete() {
+  function handleUnknownAgentsComplete(result: UnknownAgentsCompletion) {
     if (pendingListing) {
-      finishScrape(pendingListing);
+      const skipped = new Set(result.skippedNames);
+      const savedByOriginalName = new Map(
+        result.saved.map((entry) => [entry.originalName, entry.agent]),
+      );
+      const currentAgents = pendingListing.scraped_listing_json?.agents ?? [];
+      const nextAgents = currentAgents
+        .filter((agent) => !skipped.has(agent.name ?? ""))
+        .map((agent) => {
+          const replacement = savedByOriginalName.get(agent.name ?? "");
+          return replacement ?? agent;
+        });
+
+      finishScrape({
+        ...pendingListing,
+        scraped_listing_json: pendingListing.scraped_listing_json
+          ? {
+              ...pendingListing.scraped_listing_json,
+              agents: nextAgents,
+            }
+          : pendingListing.scraped_listing_json,
+      });
     }
   }
 

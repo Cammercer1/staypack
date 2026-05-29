@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { BrandLogoSurface } from "@/lib/branding/logos";
 
@@ -45,11 +44,6 @@ export function AgencyLogoUploader({ variant, value, onChange, agencyId }: Props
   const copy = VARIANT_COPY[variant];
 
   async function uploadLogo(file: File) {
-    if (!agencyId) {
-      toast.error("Paste a logo link for now. After onboarding you can upload a file in Settings.");
-      return;
-    }
-
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image file for your logo.");
       return;
@@ -96,34 +90,27 @@ export function AgencyLogoUploader({ variant, value, onChange, agencyId }: Props
         </div>
       )}
 
-      <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-        <Input
+      <div>
+        <input
           id={copy.fieldId}
-          placeholder="https://your-agency.com/logo.png"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) uploadLogo(file);
+          }}
         />
-        <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) uploadLogo(file);
-            }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={uploading}
-            onClick={() => inputRef.current?.click()}
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            {uploading ? "Uploading..." : "Upload"}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+        >
+          <Upload className="mr-2 h-4 w-4" />
+          {uploading ? "Uploading..." : "Upload"}
+        </Button>
       </div>
     </div>
   );

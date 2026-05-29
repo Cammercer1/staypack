@@ -26,10 +26,18 @@ type AgentDraft = {
   is_default: boolean;
 };
 
+type CompletionPayload = {
+  saved: Array<{
+    originalName: string;
+    agent: UnknownAgent;
+  }>;
+  skippedNames: string[];
+};
+
 type Props = {
   open: boolean;
   agents: UnknownAgent[];
-  onComplete: () => void;
+  onComplete: (payload: CompletionPayload) => void;
 };
 
 function toDraft(agent: UnknownAgent): AgentDraft {
@@ -61,6 +69,7 @@ export function UnknownAgentsAfterScrapeModal({
   const [drafts, setDrafts] = useState<Record<string, AgentDraft>>({});
   const [savedNames, setSavedNames] = useState<Set<string>>(new Set());
   const [skippedNames, setSkippedNames] = useState<Set<string>>(new Set());
+  const [attemptedNames, setAttemptedNames] = useState<Set<string>>(new Set());
   const [savingName, setSavingName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,6 +80,7 @@ export function UnknownAgentsAfterScrapeModal({
     setDrafts(Object.fromEntries(agents.map((agent) => [agent.name, toDraft(agent)])));
     setSavedNames(new Set());
     setSkippedNames(new Set());
+    setAttemptedNames(new Set());
     setSavingName(null);
   }, [open, agents]);
 
@@ -81,19 +91,60 @@ export function UnknownAgentsAfterScrapeModal({
     }));
   }
 
+  function buildCompletionPayload(
+    nextSaved: Set<string>,
+    nextSkipped: Set<string>,
+  ): CompletionPayload {
+    const saved = [...nextSaved]
+      .map((originalName) => {
+        const draft = drafts[originalName];
+        if (!draft) return null;
+        return {
+          originalName,
+          agent: {
+            name: draft.name.trim(),
+            email: draft.email.trim(),
+            phone: draft.phone.trim(),
+            role_title: draft.role_title.trim(),
+            photo_url: draft.photo_url.trim(),
+          } as UnknownAgent,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+    return {
+      saved,
+      skippedNames: [...nextSkipped],
+    };
+  }
+
   function maybeComplete(
     nextSaved: Set<string>,
     nextSkipped: Set<string>,
   ) {
     if (allAgentsHandled(agents, nextSaved, nextSkipped)) {
-      onComplete();
+      onComplete(buildCompletionPayload(nextSaved, nextSkipped));
     }
+  }
+
+  function missingRequiredFields(draft: AgentDraft) {
+    const missing: string[] = [];
+    if (!draft.name.trim()) missing.push("name");
+    if (!draft.role_title.trim()) missing.push("role title");
+    if (!draft.phone.trim()) missing.push("phone");
+    if (!draft.email.trim()) missing.push("email");
+    if (!draft.photo_url.trim()) missing.push("photo URL");
+    return missing;
   }
 
   async function saveAgent(name: string) {
     const draft = drafts[name];
-    if (!draft?.name.trim()) {
-      toast.error("Agent name is required");
+    if (!draft) return;
+
+    setAttemptedNames((current) => new Set(current).add(name));
+    const missing = missingRequiredFields(draft);
+    if (missing.length > 0) {
+      toast.error(`Please complete all required fields: ${missing.join(", ")}`);
       return;
     }
 
@@ -103,10 +154,10 @@ export function UnknownAgentsAfterScrapeModal({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: draft.name.trim(),
-        email: draft.email.trim() || undefined,
-        phone: draft.phone.trim() || undefined,
-        role_title: draft.role_title.trim() || undefined,
-        photo_url: draft.photo_url.trim() || undefined,
+        email: draft.email.trim(),
+        phone: draft.phone.trim(),
+        role_title: draft.role_title.trim(),
+        photo_url: draft.photo_url.trim(),
         is_default: draft.is_default,
       }),
     });
@@ -131,12 +182,14 @@ export function UnknownAgentsAfterScrapeModal({
     maybeComplete(savedNames, nextSkipped);
   }
 
+  const allHandled = allAgentsHandled(agents, savedNames, skippedNames);
+
   return (
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
-          onComplete();
+          onComplete(buildCompletionPayload(savedNames, skippedNames));
         }
       }}
     >
@@ -148,6 +201,9 @@ export function UnknownAgentsAfterScrapeModal({
             now to use their details and photos on reports, or continue without
             adding.
           </DialogDescription>
+          <p className="text-xs font-medium text-muted-foreground">
+            All fields are required to add an agent.
+          </p>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -155,6 +211,9 @@ export function UnknownAgentsAfterScrapeModal({
             const draft = drafts[agent.name] ?? toDraft(agent);
             const isSaved = savedNames.has(agent.name);
             const isSkipped = skippedNames.has(agent.name);
+            const attempted = attemptedNames.has(agent.name);
+            const missing = missingRequiredFields(draft);
+            const showMissing = attempted && !isSaved && !isSkipped;
 
             return (
               <div
@@ -176,10 +235,11 @@ export function UnknownAgentsAfterScrapeModal({
                   )}
                   <div className="min-w-0 flex-1 space-y-3">
                     <div className="space-y-2">
-                      <Label htmlFor={`agent-name-${agent.name}`}>Name</Label>
+                      <Label htmlFor={`agent-name-${agent.name}`}>Name *</Label>
                       <Input
                         id={`agent-name-${agent.name}`}
                         value={draft.name}
+                        aria-invalid={showMissing && !draft.name.trim()}
                         disabled={isSaved || isSkipped}
                         onChange={(event) =>
                           updateDraft(agent.name, { name: event.target.value })
@@ -188,10 +248,11 @@ export function UnknownAgentsAfterScrapeModal({
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor={`agent-role-${agent.name}`}>Role title</Label>
+                        <Label htmlFor={`agent-role-${agent.name}`}>Role title *</Label>
                         <Input
                           id={`agent-role-${agent.name}`}
                           value={draft.role_title}
+                          aria-invalid={showMissing && !draft.role_title.trim()}
                           disabled={isSaved || isSkipped}
                           onChange={(event) =>
                             updateDraft(agent.name, { role_title: event.target.value })
@@ -199,10 +260,11 @@ export function UnknownAgentsAfterScrapeModal({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor={`agent-phone-${agent.name}`}>Phone</Label>
+                        <Label htmlFor={`agent-phone-${agent.name}`}>Phone *</Label>
                         <Input
                           id={`agent-phone-${agent.name}`}
                           value={draft.phone}
+                          aria-invalid={showMissing && !draft.phone.trim()}
                           disabled={isSaved || isSkipped}
                           onChange={(event) =>
                             updateDraft(agent.name, { phone: event.target.value })
@@ -211,11 +273,12 @@ export function UnknownAgentsAfterScrapeModal({
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`agent-email-${agent.name}`}>Email</Label>
+                      <Label htmlFor={`agent-email-${agent.name}`}>Email *</Label>
                       <Input
                         id={`agent-email-${agent.name}`}
                         type="email"
                         value={draft.email}
+                        aria-invalid={showMissing && !draft.email.trim()}
                         disabled={isSaved || isSkipped}
                         onChange={(event) =>
                           updateDraft(agent.name, { email: event.target.value })
@@ -223,16 +286,22 @@ export function UnknownAgentsAfterScrapeModal({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`agent-photo-${agent.name}`}>Photo URL</Label>
+                      <Label htmlFor={`agent-photo-${agent.name}`}>Photo URL *</Label>
                       <Input
                         id={`agent-photo-${agent.name}`}
                         value={draft.photo_url}
+                        aria-invalid={showMissing && !draft.photo_url.trim()}
                         disabled={isSaved || isSkipped}
                         onChange={(event) =>
                           updateDraft(agent.name, { photo_url: event.target.value })
                         }
                       />
                     </div>
+                    {showMissing && missing.length > 0 ? (
+                      <p className="text-xs text-destructive">
+                        Complete required fields: {missing.join(", ")}.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -265,7 +334,11 @@ export function UnknownAgentsAfterScrapeModal({
         </div>
 
         <DialogFooter showCloseButton={false}>
-          <Button variant="outline" onClick={onComplete}>
+          <Button
+            variant="outline"
+            disabled={!allHandled}
+            onClick={() => onComplete(buildCompletionPayload(savedNames, skippedNames))}
+          >
             Continue to listing review
           </Button>
         </DialogFooter>

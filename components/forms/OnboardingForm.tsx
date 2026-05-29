@@ -8,9 +8,16 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { BrandPreviewCard } from "@/components/settings/BrandPreviewCard";
 import { BrandKitEditor } from "@/components/settings/BrandKitEditor";
-import { DEFAULT_BRAND_VALUES } from "@/lib/branding/normalize";
+import { AdvancedStylesEditor } from "@/components/settings/AdvancedStylesEditor";
+import {
+  getBrandButtonInlineStyle,
+  getBrandCardInlineStyle,
+  resolveBrandAdvanced,
+} from "@/lib/branding/advanced";
+import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
+import { agencyToFormInput, DEFAULT_BRAND_VALUES } from "@/lib/branding/normalize";
 import { agencySchema, type AgencyInput } from "@/lib/validation/schemas";
 import { slugifyAgencyName } from "@/lib/reports/slugs";
 import { DEFAULT_DISCLAIMER } from "@/lib/types";
@@ -24,18 +31,28 @@ const steps = [
     fields: ["name", "slug", "website_url", "email", "phone"] as const,
   },
   {
-    id: "branding",
-    label: "Branding",
-    description: "Logo, colours and fonts for buyer-facing collateral.",
+    id: "logos",
+    label: "Logos",
+    description: "Upload logo versions for light and dark backgrounds.",
+    fields: ["logo_url", "logo_light_url", "logo_dark_url"] as const,
+  },
+  {
+    id: "colours",
+    label: "Colours",
+    description: "Choose the core colours buyers will see in reports and collateral.",
     fields: [
-      "logo_url",
-      "logo_light_url",
-      "logo_dark_url",
       "primary_colour",
       "secondary_colour",
       "accent_colour",
       "text_colour",
       "background_colour",
+    ] as const,
+  },
+  {
+    id: "fonts",
+    label: "Fonts",
+    description: "Choose heading and body fonts for a consistent look.",
+    fields: [
       "heading_font_family",
       "body_font_family",
       "heading_font_file_url",
@@ -45,10 +62,10 @@ const steps = [
     ] as const,
   },
   {
-    id: "defaults",
-    label: "Report defaults",
-    description: "Default title, call to action and disclaimer for every report.",
-    fields: ["default_report_title", "default_cta", "default_disclaimer"] as const,
+    id: "advanced",
+    label: "Advanced styles",
+    description: "Fine-tune buttons, corners, links and panel styles.",
+    fields: ["brand_advanced_json"] as const,
   },
 ] as const;
 
@@ -136,6 +153,8 @@ function OnboardingStepIndicator({
 
 export function OnboardingForm() {
   const [loading, setLoading] = useState(false);
+  const [stepLoading, setStepLoading] = useState(false);
+  const [agencyId, setAgencyId] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const form = useForm<AgencyInput>({
     resolver: zodResolver(agencySchema),
@@ -155,7 +174,7 @@ export function OnboardingForm() {
       default_cta:
         "Speak with the agent for the full buyer pack and property details.",
       default_disclaimer: DEFAULT_DISCLAIMER,
-      report_template_id: "classic-light",
+      report_template_id: DEFAULT_REPORT_TEMPLATE_ID,
     } as AgencyInput,
   });
 
@@ -169,14 +188,54 @@ export function OnboardingForm() {
   } = form;
 
   const name = watch("name");
+  const preview = watch();
   const step = steps[currentStep];
   const isLastStep = currentStep === steps.length - 1;
+  const resolvedAdvanced = resolveBrandAdvanced({
+    primary_colour: preview.primary_colour || "#2563eb",
+    text_colour: preview.text_colour || "#333333",
+    brand_advanced_json: preview.brand_advanced_json,
+  });
 
   useEffect(() => {
     if (name) {
       setValue("slug", slugifyAgencyName(name), { shouldValidate: true });
     }
   }, [name, setValue]);
+
+  useEffect(() => {
+    void (async () => {
+      const response = await fetch("/api/agencies");
+      if (!response.ok) return;
+
+      const payload = await response.json();
+      if (!payload.agency) return;
+
+      setAgencyId(payload.agency.id);
+      form.reset(agencyToFormInput(payload.agency));
+    })();
+    // Load any in-progress agency once on mount (e.g. after refresh mid-onboarding).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function persistAgency(values: AgencyInput) {
+    const response = await fetch("/api/agencies", {
+      method: agencyId ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values),
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error ?? "Failed to save agency");
+    }
+
+    if (!agencyId && payload.agency?.id) {
+      setAgencyId(payload.agency.id);
+    }
+
+    return payload.agency;
+  }
 
   async function validateStep(stepIndex: number) {
     const fields = steps[stepIndex].fields as readonly FieldPath<AgencyInput>[];
@@ -190,6 +249,18 @@ export function OnboardingForm() {
         toast.error("Please fix the highlighted fields before continuing.");
         return;
       }
+
+      setStepLoading(true);
+      try {
+        await persistAgency(form.getValues());
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to save agency details",
+        );
+        setStepLoading(false);
+        return;
+      }
+      setStepLoading(false);
     }
 
     setCurrentStep(nextStep);
@@ -200,24 +271,13 @@ export function OnboardingForm() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/agencies", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        toast.error(payload.error ?? "Failed to create agency");
-        setLoading(false);
-        return;
-      }
-
-      toast.success("Agency created");
+      await persistAgency(values);
+      toast.success("Brand setup saved");
       window.location.href = "/dashboard";
-    } catch {
-      toast.error("Something went wrong. Please try again.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Something went wrong. Please try again.",
+      );
       setLoading(false);
     }
   }
@@ -270,7 +330,6 @@ export function OnboardingForm() {
                 <Label htmlFor="website_url">Website</Label>
                 <Input
                   id="website_url"
-                  placeholder="mercerindustries.com"
                   aria-invalid={!!errors.website_url}
                   {...register("website_url")}
                 />
@@ -293,34 +352,87 @@ export function OnboardingForm() {
             </div>
           ) : null}
 
-          {step.id === "branding" ? (
-            <BrandKitEditor form={form} showPreview numberedSections={false} />
+          {step.id === "logos" ? (
+            <BrandKitEditor
+              form={form}
+              agencyId={agencyId ?? undefined}
+              showPreview={false}
+              numberedSections={false}
+              showSectionHeaders={false}
+              showLogos
+              showColours={false}
+              showFonts={false}
+            />
           ) : null}
 
-          {step.id === "defaults" ? (
-            <div className="grid gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="default_report_title">Default report title</Label>
-                <Input
-                  id="default_report_title"
-                  {...register("default_report_title")}
-                />
-                <FieldError message={errors.default_report_title?.message} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="default_cta">Default call to action</Label>
-                <Textarea id="default_cta" rows={3} {...register("default_cta")} />
-                <FieldError message={errors.default_cta?.message} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="default_disclaimer">Default disclaimer</Label>
-                <Textarea
-                  id="default_disclaimer"
-                  rows={5}
-                  {...register("default_disclaimer")}
-                />
-                <FieldError message={errors.default_disclaimer?.message} />
-              </div>
+          {step.id === "colours" ? (
+            <BrandKitEditor
+              form={form}
+              agencyId={agencyId ?? undefined}
+              showPreview={false}
+              numberedSections={false}
+              showSectionHeaders={false}
+              showLogos={false}
+              showColours
+              showFonts={false}
+            />
+          ) : null}
+
+          {step.id === "fonts" ? (
+            <BrandKitEditor
+              form={form}
+              agencyId={agencyId ?? undefined}
+              showPreview={false}
+              numberedSections={false}
+              showSectionHeaders={false}
+              showLogos={false}
+              showColours={false}
+              showFonts
+            />
+          ) : null}
+
+          {step.id === "advanced" ? (
+            <div className="space-y-8">
+              <AdvancedStylesEditor form={form} />
+
+              <section className="space-y-4">
+                <div>
+                  <h3 className="font-display text-xl tracking-tight">Live preview</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Final check of your full brand setup before continuing to dashboard.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <BrandPreviewCard preview={preview} />
+                  <div className="rounded-xl border border-dashed border-border p-4">
+                    <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Button & panel preview
+                    </p>
+                    <div
+                      className="space-y-3 p-4"
+                      style={getBrandCardInlineStyle(resolvedAdvanced)}
+                    >
+                      <p className="text-sm font-semibold" style={{ color: resolvedAdvanced.linkColour }}>
+                        Sample link colour
+                      </p>
+                      <Input
+                        readOnly
+                        value="Sample input"
+                        className="bg-white"
+                        style={{ borderRadius: resolvedAdvanced.inputBorderRadiusPx }}
+                      />
+                      <button
+                        type="button"
+                        className="px-5 py-2.5 text-sm font-semibold shadow-sm"
+                        style={getBrandButtonInlineStyle(resolvedAdvanced)}
+                      >
+                        Sample button
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
           ) : null}
 
@@ -328,7 +440,7 @@ export function OnboardingForm() {
             <Button
               type="button"
               variant="ghost"
-              disabled={currentStep === 0 || loading}
+              disabled={currentStep === 0 || loading || stepLoading}
               onClick={() => {
                 setCurrentStep((value) => Math.max(0, value - 1));
                 window.scrollTo({ top: 0, behavior: "smooth" });
@@ -340,17 +452,18 @@ export function OnboardingForm() {
 
             {isLastStep ? (
               <Button type="submit" size="lg" disabled={loading}>
-                {loading ? "Creating agency..." : "Continue to dashboard"}
+                {loading ? "Saving..." : "Continue to dashboard"}
               </Button>
             ) : (
               <Button
                 type="button"
                 size="lg"
+                disabled={stepLoading}
                 onClick={() => {
                   void goToStep(currentStep + 1);
                 }}
               >
-                Continue
+                {stepLoading ? "Saving..." : "Continue"}
                 <ChevronRight className="h-4 w-4" />
               </Button>
             )}

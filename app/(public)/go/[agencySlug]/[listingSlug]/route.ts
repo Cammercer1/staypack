@@ -13,25 +13,6 @@ export async function GET(
 ) {
   const { agencySlug, listingSlug } = await params;
 
-  // #region agent log
-  fetch("http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "a515ca",
-    },
-    body: JSON.stringify({
-      sessionId: "a515ca",
-      location: "go/route.ts:GET:entry",
-      message: "QR redirect",
-      data: { agencySlug, listingSlug, hasServiceRole: hasServiceRoleKey() },
-      timestamp: Date.now(),
-      hypothesisId: "H8",
-      runId: "post-fix-2",
-    }),
-  }).catch(() => {});
-  // #endregion
-
   if (!hasServiceRoleKey()) {
     return NextResponse.json(
       { error: "Service role not configured" },
@@ -79,25 +60,6 @@ export async function GET(
         { status: 404 },
       );
     }
-
-    // #region agent log
-    fetch("http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "a515ca",
-      },
-      body: JSON.stringify({
-        sessionId: "a515ca",
-        location: "go/route.ts:GET:redirect",
-        message: "Redirecting",
-        data: { destination, listingId: listing.id },
-        timestamp: Date.now(),
-        hypothesisId: "H8",
-        runId: "post-fix-2",
-      }),
-    }).catch(() => {});
-    // #endregion
 
     try {
       await recordListingPageView({

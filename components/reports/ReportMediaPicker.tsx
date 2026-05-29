@@ -11,6 +11,19 @@ import {
 import { cn } from "@/lib/utils";
 import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
 
+const COMPRESS_IF_BYTES = 4 * 1024 * 1024;
+const MAX_UPLOAD_LONG_EDGE = 4000;
+const PRINT_SAFE_LONG_EDGE = 2500;
+
+type UploadStatus = {
+  currentName: string;
+  currentSizeBytes: number;
+  currentIndex: number;
+  total: number;
+  progressPercent: number;
+  optimizedCount: number;
+};
+
 type Props = {
   scrapedImages?: string[];
   rawScrapedCount?: number;
@@ -48,6 +61,7 @@ export function ReportMediaPicker({
   const uploadRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
 
   const selected = selectedImageUrls.length
     ? selectedImageUrls
@@ -57,6 +71,106 @@ export function ReportMediaPicker({
 
   const uploadSlotsRemaining = Math.max(0, maxUploads - uploadedImages.length);
   const selectionSlotsRemaining = Math.max(0, maxSelected - selected.length);
+
+  async function getImageDimensions(file: File) {
+    return new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        resolve({
+          width: img.naturalWidth || img.width,
+          height: img.naturalHeight || img.height,
+        });
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("Unable to read image dimensions"));
+      };
+      img.src = url;
+    });
+  }
+
+  async function optimizeImageIfNeeded(file: File) {
+    if (!file.type.startsWith("image/")) {
+      return { file, optimized: false, width: 0, height: 0 };
+    }
+
+    const { width, height } = await getImageDimensions(file);
+    const longEdge = Math.max(width, height);
+    const shouldCompress = file.size >= COMPRESS_IF_BYTES || longEdge > MAX_UPLOAD_LONG_EDGE;
+
+    if (!shouldCompress) {
+      return { file, optimized: false, width, height };
+    }
+
+    const scale = longEdge > MAX_UPLOAD_LONG_EDGE ? MAX_UPLOAD_LONG_EDGE / longEdge : 1;
+    const targetWidth = Math.max(1, Math.round(width * scale));
+    const targetHeight = Math.max(1, Math.round(height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      return { file, optimized: false, width, height };
+    }
+
+    const imageBitmap = await createImageBitmap(file);
+    ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
+    imageBitmap.close();
+
+    const outputType =
+      file.type === "image/jpeg" || file.type === "image/webp" || file.type === "image/avif"
+        ? file.type
+        : "image/jpeg";
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, outputType, 0.88);
+    });
+
+    if (!blob || blob.size >= file.size * 0.98) {
+      return { file, optimized: false, width, height };
+    }
+
+    const optimizedFile = new File([blob], file.name, {
+      type: outputType,
+      lastModified: file.lastModified,
+    });
+
+    return {
+      file: optimizedFile,
+      optimized: true,
+      width: targetWidth,
+      height: targetHeight,
+    };
+  }
+
+  async function uploadAssetWithProgress(
+    formData: FormData,
+    onProgress: (percent: number) => void,
+  ) {
+    return new Promise<{ ok: boolean; status: number; payload: any }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/reports/upload-asset");
+      xhr.responseType = "text";
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) return;
+        const percent = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)));
+        onProgress(percent);
+      };
+      xhr.onerror = () => reject(new Error("Image upload failed"));
+      xhr.onload = () => {
+        let payload: any = {};
+        try {
+          payload = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+        } catch {
+          payload = {};
+        }
+        resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, payload });
+      };
+      xhr.send(formData);
+    });
+  }
 
   function toggleImage(image: string) {
     if (selected.includes(image)) {
@@ -107,11 +221,31 @@ export function ReportMediaPicker({
     }
 
     setUploading(true);
+    setUploadStatus(null);
     let nextUploaded = [...uploadedImages];
     let nextSelected = [...selected];
     let nextHero = heroImageUrl;
+    let optimizedCount = 0;
+    let lowResCount = 0;
 
-    for (const file of filesToUpload) {
+    for (const [index, originalFile] of filesToUpload.entries()) {
+      const { file, optimized, width, height } = await optimizeImageIfNeeded(originalFile);
+      if (optimized) {
+        optimizedCount += 1;
+      }
+      if (Math.max(width, height) < PRINT_SAFE_LONG_EDGE) {
+        lowResCount += 1;
+      }
+
+      setUploadStatus({
+        currentName: originalFile.name,
+        currentSizeBytes: file.size,
+        currentIndex: index + 1,
+        total: filesToUpload.length,
+        progressPercent: 0,
+        optimizedCount,
+      });
+
       const formData = new FormData();
       formData.append("file", file);
       if (reportId) {
@@ -121,13 +255,18 @@ export function ReportMediaPicker({
         formData.append("listing_id", listingId);
       }
 
-      const response = await fetch("/api/reports/upload-asset", {
-        method: "POST",
-        body: formData,
+      const { ok, payload } = await uploadAssetWithProgress(formData, (progressPercent) => {
+        setUploadStatus((current) =>
+          current
+            ? {
+                ...current,
+                progressPercent,
+              }
+            : current,
+        );
       });
-      const payload = await response.json();
 
-      if (!response.ok) {
+      if (!ok) {
         toast.error(payload.error ?? "Image upload failed");
         break;
       }
@@ -155,8 +294,19 @@ export function ReportMediaPicker({
           ? "Photo uploaded"
           : `${nextUploaded.length - uploadedImages.length} photos uploaded`,
       );
+      if (optimizedCount > 0) {
+        toast.message(
+          `Optimized ${optimizedCount} photo${optimizedCount === 1 ? "" : "s"} for faster upload while keeping print-safe quality.`,
+        );
+      }
+      if (lowResCount > 0) {
+        toast.message(
+          `${lowResCount} photo${lowResCount === 1 ? "" : "s"} may look soft in A4 print due to low resolution.`,
+        );
+      }
     }
 
+    setUploadStatus(null);
     setUploading(false);
   }
 
@@ -241,6 +391,26 @@ export function ReportMediaPicker({
         >
           {uploading ? "Uploading..." : "Browse photos"}
         </Button>
+        {uploadStatus ? (
+          <div className="mx-auto mt-3 max-w-md space-y-2 text-left">
+            <p className="text-xs text-muted-foreground">
+              Uploading {uploadStatus.currentIndex} of {uploadStatus.total}:{" "}
+              <span className="font-medium text-foreground">{uploadStatus.currentName}</span>
+            </p>
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-150"
+                style={{ width: `${uploadStatus.progressPercent}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {uploadStatus.progressPercent}% · {(uploadStatus.currentSizeBytes / (1024 * 1024)).toFixed(1)}MB
+              {uploadStatus.optimizedCount > 0
+                ? ` · ${uploadStatus.optimizedCount} optimized`
+                : ""}
+            </p>
+          </div>
+        ) : null}
       </div>
 
       {displayScrapedImages.length ? (

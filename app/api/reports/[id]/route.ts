@@ -5,6 +5,7 @@ import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/
 import { normalizeAiCopy } from "@/lib/reports/normalizeAiCopy";
 import { enforceTemplateCopyLimits } from "@/lib/reports/enforceTemplateCopyLimits";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
+import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
 import { aiCopySchema, updateReportSchema, type UpdateReportInput } from "@/lib/validation/schemas";
 import type { Agency, AiCopyJson, Listing, Report } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -100,7 +101,10 @@ export async function PATCH(
 
       const limitedCopy = enforceTemplateCopyLimits(
         parsedCopy.data,
-        body.template_id ?? report.template_id ?? agency.report_template_id ?? "classic-light",
+        body.template_id ??
+          report.template_id ??
+          agency.report_template_id ??
+          DEFAULT_REPORT_TEMPLATE_ID,
       );
 
       body.ai_copy_json = limitedCopy;

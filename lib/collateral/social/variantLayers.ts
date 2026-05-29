@@ -212,32 +212,33 @@ export function getLayersForVariant(
   });
 }
 
-/** Copy only content fields onto a variant; layout/style stays per format. */
+/**
+ * Copy only content fields onto a variant; layout, style, and visibility
+ * (`enabled`) stay per format. Text and feature selection are shared so the
+ * same listing copy appears across every format.
+ */
 function syncSharedLayerContent(
   layers: SocialPostLayers,
   source: SocialPostLayers,
 ): SocialPostLayers {
   return {
-    logo: { ...layers.logo, enabled: source.logo.enabled },
+    logo: { ...layers.logo },
     title: {
       ...layers.title,
-      enabled: source.title.enabled,
       text: source.title.text,
     },
     subcopy: {
       ...layers.subcopy,
-      enabled: source.subcopy.enabled,
       text: source.subcopy.text,
     },
     features: {
       ...layers.features,
-      enabled: source.features.enabled,
       show_bedrooms: source.features.show_bedrooms,
       show_bathrooms: source.features.show_bathrooms,
       show_car_spaces: source.features.show_car_spaces,
       show_land_area: source.features.show_land_area,
     },
-    agent: { ...layers.agent, enabled: source.agent.enabled },
+    agent: { ...layers.agent },
   };
 }
 
@@ -295,31 +296,22 @@ export function syncSharedContentAcrossVariants(
 }
 
 const FEATURES_CONTENT_KEYS = [
-  "enabled",
   "show_bedrooms",
   "show_bathrooms",
   "show_car_spaces",
   "show_land_area",
 ] as const satisfies readonly (keyof SocialPostFeaturesLayer)[];
 
+/**
+ * Shared content syncs across every format. Visibility (`enabled`) is
+ * intentionally excluded so each format can show/hide layers independently.
+ */
 function layerPatchTouchesSharedContent(
   patch: Partial<SocialPostLayers>,
 ): boolean {
-  if (patch.logo && "enabled" in patch.logo) return true;
+  if (patch.title && "text" in patch.title) return true;
 
-  if (
-    patch.title &&
-    ("enabled" in patch.title || "text" in patch.title)
-  ) {
-    return true;
-  }
-
-  if (
-    patch.subcopy &&
-    ("enabled" in patch.subcopy || "text" in patch.subcopy)
-  ) {
-    return true;
-  }
+  if (patch.subcopy && "text" in patch.subcopy) return true;
 
   if (
     patch.features &&
@@ -327,8 +319,6 @@ function layerPatchTouchesSharedContent(
   ) {
     return true;
   }
-
-  if (patch.agent && "enabled" in patch.agent) return true;
 
   return false;
 }

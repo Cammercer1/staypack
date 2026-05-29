@@ -2,15 +2,13 @@ import { NextResponse } from "next/server";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildCollateralPreviewPrintUrl } from "@/lib/collateral/printAccessToken";
-import { buildPublicCollateralPrintUrl } from "@/lib/collateral/slugs";
 import { getCollateralTemplate } from "@/lib/collateral/templates/registry";
 import { renderPdfFromUrl, buildPdfImagePath, buildPdfStylesheetPath } from "@/lib/browserless/pdf";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
-import { getSiteUrl } from "@/lib/env";
 import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -26,11 +24,11 @@ export async function POST(
 
     const document = collateral.document_json as CollateralDocumentJson;
     const template = getCollateralTemplate(document.template_id);
-    const siteUrl = getSiteUrl();
+    const requestOrigin = new URL(request.url).origin;
     const printUrl =
       collateral.public_slug && collateral.status === "published"
-        ? buildPublicCollateralPrintUrl(agency.slug, collateral.public_slug)
-        : buildCollateralPreviewPrintUrl(collateral.id, siteUrl);
+        ? `${requestOrigin}/${agency.slug}/c/${collateral.public_slug}/print`
+        : buildCollateralPreviewPrintUrl(collateral.id, requestOrigin);
 
     const admin = createAdminClient();
     const pdfBuffer = await renderPdfFromUrl(printUrl, {

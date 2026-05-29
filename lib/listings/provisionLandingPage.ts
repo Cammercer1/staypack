@@ -83,31 +83,6 @@ export async function provisionListingLanding(
     !canonicalHost ||
     isLegacyPublicUrlHost(storedHost, canonicalHost);
   const publicUrl = needsUrlRefresh ? canonicalPublicUrl : storedPublicUrl;
-  // #region agent log
-  fetch("http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "a515ca",
-    },
-    body: JSON.stringify({
-      sessionId: "a515ca",
-      location: "provisionLandingPage.ts:provision",
-      message: "Resolved public URL for listing",
-      data: {
-        listingId: listing.id,
-        storedPublicUrl,
-        storedHost,
-        canonicalPublicUrl,
-        canonicalHost,
-        publicUrl,
-        needsUrlRefresh,
-      },
-      timestamp: Date.now(),
-      hypothesisId: "H1",
-    }),
-  }).catch(() => {});
-  // #endregion
   const landingQrCodeUrl = await uploadListingLandingQr(
     agency,
     listing.id,

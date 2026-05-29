@@ -77,20 +77,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (user && pathname === "/onboarding") {
-    const { data: membership } = await supabase
-      .from("agency_members")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (membership) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
-    }
-  }
-
   return supabaseResponse;
 }
 

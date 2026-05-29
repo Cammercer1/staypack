@@ -36,36 +36,28 @@ export function isLegacyPublicUrlHost(hostname: string, canonicalHostname: strin
  */
 export function getSiteUrl() {
   let resolved: string;
-  let source: string;
 
   const siteUrl = process.env.SITE_URL?.trim();
   const nextPublic = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 
   if (siteUrl) {
     resolved = siteUrl;
-    source = "SITE_URL";
   } else if (nextPublic) {
     resolved = nextPublic;
-    source = "NEXT_PUBLIC_SITE_URL";
   } else if (process.env.DEPLOY_PRIME_URL) {
     resolved = process.env.DEPLOY_PRIME_URL.startsWith("http")
       ? process.env.DEPLOY_PRIME_URL
       : `https://${process.env.DEPLOY_PRIME_URL}`;
-    source = "DEPLOY_PRIME_URL";
   } else if (process.env.URL) {
     resolved = process.env.URL.startsWith("http")
       ? process.env.URL
       : `https://${process.env.URL}`;
-    source = "URL";
   } else if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     resolved = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
-    source = "VERCEL_PROJECT_PRODUCTION_URL";
   } else if (process.env.VERCEL_URL) {
     resolved = `https://${process.env.VERCEL_URL}`;
-    source = "VERCEL_URL";
   } else {
     resolved = "http://localhost:3000";
-    source = "fallback";
   }
 
   const normalized = normalizeSiteUrl(resolved);
@@ -80,33 +72,7 @@ export function getSiteUrl() {
     !hostFromUrl(nextPublic)?.endsWith(".netlify.app")
   ) {
     resolved = nextPublic;
-    source = "NEXT_PUBLIC_SITE_URL_override_netlify";
   }
-
-  // #region agent log
-  fetch("http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "a515ca",
-    },
-    body: JSON.stringify({
-      sessionId: "a515ca",
-      location: "lib/env.ts:getSiteUrl",
-      message: "getSiteUrl resolved",
-      data: {
-        source,
-        resolved: normalized,
-        siteUrl: siteUrl ?? null,
-        nextPublic: nextPublic ?? null,
-        deployPrimeUrl: process.env.DEPLOY_PRIME_URL ?? null,
-        urlEnv: process.env.URL ?? null,
-      },
-      timestamp: Date.now(),
-      hypothesisId: "H6",
-    }),
-  }).catch(() => {});
-  // #endregion
 
   return normalized;
 }

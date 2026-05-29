@@ -169,8 +169,11 @@ export function SalesBrochureWizard({
               collateralId={collateral.id}
               url={collateral.pdf_url}
               canGenerate={Boolean(previewDocument) && !loading}
+              generatedAt={collateral.generated_at}
+              updatedAt={collateral.updated_at}
               cacheVersion={collateral.updated_at}
               size="default"
+              downloadLabel="Download asset"
               onUpdated={setCollateral}
             />
             {collateral.public_url ? (

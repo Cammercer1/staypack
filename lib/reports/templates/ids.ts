@@ -1,6 +1,5 @@
 export const CLASSIC_LIGHT_TEMPLATE_ID = "classic-light";
 export const CLASSIC_DETAILED_TEMPLATE_ID = "classic-detailed";
-export const DEFAULT_REPORT_TEMPLATE_ID = CLASSIC_LIGHT_TEMPLATE_ID;
 
 /** @deprecated Use classic-light */
 export const LEGACY_CLASSIC_TEMPLATE_ID = "classic";
@@ -22,6 +21,7 @@ export const REFINED_DETAILED_TEMPLATE_ID = "refined-detailed";
 
 export const MINIMALIST_LIGHT_TEMPLATE_ID = "minimalist-light";
 export const MINIMALIST_DETAILED_TEMPLATE_ID = "minimalist-detailed";
+export const DEFAULT_REPORT_TEMPLATE_ID = MINIMALIST_LIGHT_TEMPLATE_ID;
 
 export const LANDMARK_LIGHT_TEMPLATE_ID = "landmark-light";
 export const LANDMARK_DETAILED_TEMPLATE_ID = "landmark-detailed";

@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { Search, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   BODY_FONT_PRESETS,
@@ -14,9 +15,9 @@ import {
   getFontDisplayName,
   POPULAR_BODY_FONTS,
   POPULAR_HEADING_FONTS,
+  type GoogleFontListItem,
 } from "@/lib/branding/google-fonts";
 import { BrandFontLoader, useBrandFontStyles } from "@/components/settings/BrandFontLoader";
-import { GoogleFontPickerModal } from "@/components/settings/GoogleFontPickerModal";
 import type { AgencyInput } from "@/lib/validation/schemas";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +32,6 @@ function FontField({
   value,
   popularPresets,
   presets,
-  onBrowse,
   onQuickPick,
 }: {
   label: string;
@@ -39,9 +39,54 @@ function FontField({
   value: string;
   popularPresets: string[];
   presets: typeof HEADING_FONT_PRESETS;
-  onBrowse: () => void;
   onQuickPick: (fontId: string) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<GoogleFontListItem[]>([]);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setResults([]);
+      setOpen(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          q: trimmed,
+          limit: "10",
+        });
+        const response = await fetch(`/api/google-fonts?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Unable to search fonts");
+        }
+        setResults(payload.fonts ?? []);
+        setOpen(true);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setResults([]);
+          setOpen(false);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }, 200);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [query]);
+
   return (
     <div className="space-y-3 rounded-xl border border-border/70 bg-background/80 p-4">
       <div>
@@ -49,17 +94,51 @@ function FontField({
         <p className="mt-1 text-sm leading-6 text-muted-foreground">{helper}</p>
       </div>
 
-      <button
-        type="button"
-        onClick={onBrowse}
-        className="flex w-full items-center justify-between rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors hover:bg-muted/40"
-      >
-        <div>
-          <p className="text-sm text-muted-foreground">Current font</p>
-          <p className="mt-1 text-base font-medium">{getFontDisplayName(value)}</p>
-        </div>
-        <Search className="h-4 w-4 text-muted-foreground" />
-      </button>
+      <div>
+        <p className="text-sm text-muted-foreground">Current font</p>
+        <p className="mt-1 text-base font-medium">{getFontDisplayName(value)}</p>
+      </div>
+
+      <div className="relative">
+        <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onFocus={() => {
+            if (results.length > 0) setOpen(true);
+          }}
+          onBlur={() => {
+            window.setTimeout(() => setOpen(false), 100);
+          }}
+          placeholder="Type 2+ letters to search Google Fonts"
+          className="pl-9"
+        />
+        {open ? (
+          <div className="absolute z-20 mt-2 max-h-56 w-full overflow-y-auto rounded-xl border border-border bg-white p-1 shadow-md">
+            {loading ? (
+              <div className="px-3 py-2 text-sm text-muted-foreground">Searching fonts...</div>
+            ) : results.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-muted-foreground">No fonts found.</div>
+            ) : (
+              results.map((font) => (
+                <button
+                  key={font.family}
+                  type="button"
+                  className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/60"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    onQuickPick(font.family);
+                    setQuery("");
+                    setOpen(false);
+                  }}
+                >
+                  {font.family}
+                </button>
+              ))
+            )}
+          </div>
+        ) : null}
+      </div>
 
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -86,11 +165,6 @@ function FontField({
           })}
         </div>
       </div>
-
-      <Button type="button" variant="outline" className="w-full" onClick={onBrowse}>
-        <Search className="mr-2 h-4 w-4" />
-        Browse all Google Fonts
-      </Button>
     </div>
   );
 }
@@ -99,8 +173,6 @@ export function FontPicker({ form, agencyId }: Props) {
   const headingUploadRef = useRef<HTMLInputElement>(null);
   const bodyUploadRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<"heading" | "body" | null>(null);
-  const [headingModalOpen, setHeadingModalOpen] = useState(false);
-  const [bodyModalOpen, setBodyModalOpen] = useState(false);
 
   const fonts = {
     heading_font_family: form.watch("heading_font_family") || "fraunces",
@@ -112,11 +184,6 @@ export function FontPicker({ form, agencyId }: Props) {
   const { headingFamily, bodyFamily } = useBrandFontStyles(fonts);
 
   async function uploadFont(file: File, target: "heading" | "body") {
-    if (!agencyId) {
-      toast.error("Finish onboarding first, then upload custom fonts in Settings.");
-      return;
-    }
-
     const allowed = [".woff", ".woff2", ".ttf", ".otf"];
     const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
     if (!allowed.includes(extension)) {
@@ -169,7 +236,6 @@ export function FontPicker({ form, agencyId }: Props) {
           value={fonts.heading_font_family}
           popularPresets={POPULAR_HEADING_FONTS}
           presets={HEADING_FONT_PRESETS}
-          onBrowse={() => setHeadingModalOpen(true)}
           onQuickPick={(fontId) =>
             form.setValue("heading_font_family", fontId, { shouldDirty: true })
           }
@@ -180,34 +246,11 @@ export function FontPicker({ form, agencyId }: Props) {
           value={fonts.body_font_family}
           popularPresets={POPULAR_BODY_FONTS}
           presets={BODY_FONT_PRESETS}
-          onBrowse={() => setBodyModalOpen(true)}
           onQuickPick={(fontId) =>
             form.setValue("body_font_family", fontId, { shouldDirty: true })
           }
         />
       </div>
-
-      <GoogleFontPickerModal
-        open={headingModalOpen}
-        onOpenChange={setHeadingModalOpen}
-        title="Choose a heading font"
-        description="Browse the full Google Fonts catalog. Headings look best in serif or display styles."
-        value={fonts.heading_font_family}
-        onSelect={(fontId) =>
-          form.setValue("heading_font_family", fontId, { shouldDirty: true })
-        }
-      />
-
-      <GoogleFontPickerModal
-        open={bodyModalOpen}
-        onOpenChange={setBodyModalOpen}
-        title="Choose a body font"
-        description="Browse the full Google Fonts catalog. Body text should stay clean and easy to read."
-        value={fonts.body_font_family}
-        onSelect={(fontId) =>
-          form.setValue("body_font_family", fontId, { shouldDirty: true })
-        }
-      />
 
       <div
         className="rounded-xl border border-dashed border-border p-4"

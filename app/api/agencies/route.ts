@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  requireAgency,
   requireAgencyAdmin,
   requireUser,
+  getAgencyMembership,
 } from "@/lib/auth/requireUser";
 import { agencySchema } from "@/lib/validation/schemas";
 import {
@@ -15,6 +15,15 @@ import { normalizeAgencyBrandPayload } from "@/lib/branding/normalize";
 export async function POST(request: Request) {
   try {
     const { user } = await requireUser();
+    const existing = await getAgencyMembership(user.id);
+
+    if (existing) {
+      return NextResponse.json(
+        { error: "Agency already exists. Update your existing agency instead." },
+        { status: 409 },
+      );
+    }
+
     const body = agencySchema.parse(await request.json());
     const admin = createAdminClient();
     const payload = normalizeAgencyBrandPayload(body);
@@ -99,8 +108,14 @@ export async function PATCH(request: Request) {
 
 export async function GET() {
   try {
-    const { agency } = await requireAgency();
-    return NextResponse.json({ agency });
+    const { user } = await requireUser();
+    const membership = await getAgencyMembership(user.id);
+
+    if (!membership) {
+      return NextResponse.json({ agency: null });
+    }
+
+    return NextResponse.json({ agency: membership.agency });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to load agency" },

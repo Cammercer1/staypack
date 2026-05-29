@@ -14,6 +14,8 @@ type Props = {
   collateralId: string;
   url?: string | null;
   canGenerate?: boolean;
+  generatedAt?: string | null;
+  updatedAt?: string | null;
   cacheVersion?: string | null;
   size?: VariantProps<typeof buttonVariants>["size"];
   downloadLabel?: string;
@@ -24,9 +26,11 @@ export function CollateralPdfButton({
   collateralId,
   url,
   canGenerate = false,
+  generatedAt = null,
+  updatedAt = null,
   cacheVersion = null,
   size = "sm",
-  downloadLabel = "Download PDF",
+  downloadLabel = "Download asset",
   onUpdated,
 }: Props) {
   const [pdfUrl, setPdfUrl] = useState(url);
@@ -42,6 +46,12 @@ export function CollateralPdfButton({
   useEffect(() => {
     setPdfUrl(url);
   }, [url]);
+
+  const hasPdf = Boolean(downloadUrl);
+  const isStale =
+    Boolean(hasPdf && generatedAt && updatedAt) &&
+    new Date(updatedAt as string).getTime() > new Date(generatedAt as string).getTime();
+  const needsGeneration = !hasPdf || isStale;
 
   async function generatePdf() {
     setLoading(true);
@@ -65,27 +75,28 @@ export function CollateralPdfButton({
     setLoading(false);
   }
 
+  if (canGenerate && needsGeneration) {
+    return (
+      <Button variant="outline" size={size} disabled={loading} onClick={generatePdf}>
+        {loading ? (
+          <>
+            <Loader2 className="animate-spin" />
+            {hasPdf ? "Regenerating..." : "Generating..."}
+          </>
+        ) : (
+          hasPdf ? "Regenerate PDF" : "Generate PDF"
+        )}
+      </Button>
+    );
+  }
+
   if (downloadUrl) {
     return (
-      <div className="flex flex-wrap gap-2">
-        <Link href={downloadUrl} target="_blank">
-          <Button variant="outline" size={size}>
-            {downloadLabel}
-          </Button>
-        </Link>
-        {canGenerate ? (
-          <Button variant="outline" size={size} disabled={loading} onClick={generatePdf}>
-            {loading ? (
-              <>
-                <Loader2 className="animate-spin" />
-                Regenerating...
-              </>
-            ) : (
-              "Regenerate PDF"
-            )}
-          </Button>
-        ) : null}
-      </div>
+      <Link href={downloadUrl} target="_blank">
+        <Button variant="outline" size={size}>
+          {downloadLabel}
+        </Button>
+      </Link>
     );
   }
 

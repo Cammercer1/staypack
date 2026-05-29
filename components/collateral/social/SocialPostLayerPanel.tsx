@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Users } from "lucide-react";
+import { Eye, EyeOff, Plus, Trash2, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { SocialPostAgentPickerDialog } from "@/components/collateral/social/SocialPostAgentPickerDialog";
 import { LayerSection } from "@/components/collateral/social/LayerSection";
 import { Button } from "@/components/ui/button";
@@ -85,11 +86,15 @@ import {
 import type { SocialPostsDocumentJson } from "@/lib/collateral/templates/types";
 import type { AgentProfile, Listing } from "@/lib/types";
 
+type DocumentUpdater =
+  | SocialPostsDocumentJson
+  | ((prev: SocialPostsDocumentJson) => SocialPostsDocumentJson);
+
 type Props = {
   document: SocialPostsDocumentJson;
   listing: Listing;
   backgroundOptions: string[];
-  onChange: (document: SocialPostsDocumentJson) => void;
+  onChange: (next: DocumentUpdater) => void;
 };
 
 type LayerSectionId =
@@ -129,6 +134,50 @@ function LayerToggle({
       />
       {label}
     </label>
+  );
+}
+
+function LayerVisibilityToggle({
+  enabled,
+  disabled,
+  disabledHint,
+  onToggle,
+  label,
+}: {
+  enabled: boolean;
+  disabled?: boolean;
+  disabledHint?: string;
+  onToggle: (next: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      aria-label={`${label}: ${enabled ? "visible" : "hidden"}`}
+      title={disabled ? disabledHint : undefined}
+      disabled={disabled}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle(!enabled);
+      }}
+      className={cn(
+        "flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition",
+        disabled
+          ? "cursor-not-allowed border-border/50 text-muted-foreground/50"
+          : enabled
+            ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15"
+            : "border-border/70 text-muted-foreground hover:bg-muted",
+      )}
+    >
+      {enabled ? (
+        <Eye className="h-3.5 w-3.5" />
+      ) : (
+        <EyeOff className="h-3.5 w-3.5" />
+      )}
+      <span>{enabled ? "Shown" : "Hidden"}</span>
+    </button>
   );
 }
 
@@ -202,20 +251,20 @@ export function SocialPostLayerPanel({
   function updateLayers(
     patch: Partial<SocialPostsDocumentJson["layers"]>,
   ) {
-    onChange(applyDocumentLayerUpdate(document, patch));
+    onChange((prev) => applyDocumentLayerUpdate(prev, patch));
   }
 
   function updateAgent(patch: Partial<SocialPostsDocumentJson["agent"]>) {
-    onChange(patchDocumentAgent(document, patch));
+    onChange((prev) => patchDocumentAgent(prev, patch));
   }
 
   function updateListing(patch: Partial<SocialPostsDocumentJson["listing"]>) {
-    onChange(patchDocumentListing(document, patch));
+    onChange((prev) => patchDocumentListing(prev, patch));
   }
 
   function refreshListingStats() {
-    onChange(
-      patchDocumentListing(document, mergeListingSliceStats(document.listing, listing)),
+    onChange((prev) =>
+      patchDocumentListing(prev, mergeListingSliceStats(prev.listing, listing)),
     );
   }
 
@@ -230,28 +279,34 @@ export function SocialPostLayerPanel({
     layers.features.enabled;
 
   function loadAgentFromOrg(nextAgent: CollateralAgentSlice) {
-    const withAgent = patchDocumentAgent(document, nextAgent);
-    onChange(
-      applyDocumentLayerUpdate(withAgent, {
-        agent: { ...agentLayer, enabled: true },
-      }),
-    );
+    onChange((prev) => {
+      const withAgent = patchDocumentAgent(prev, nextAgent);
+      const currentAgentLayer = getLayersForVariant(
+        withAgent,
+        withAgent.active_variant_id,
+      ).agent;
+      return applyDocumentLayerUpdate(withAgent, {
+        agent: { ...currentAgentLayer, enabled: true },
+      });
+    });
   }
 
   function updateVariantBackground(
     patch: Parameters<typeof patchVariantBackground>[1],
   ) {
-    const activeId = document.active_variant_id;
-    const current = document.variants[activeId];
-    if (!current) return;
+    onChange((prev) => {
+      const activeId = prev.active_variant_id;
+      const current = prev.variants[activeId];
+      if (!current) return prev;
 
-    const nextVariant = patchVariantBackground(current, patch, imagePool);
-    onChange({
-      ...document,
-      variants: {
-        ...document.variants,
-        [activeId]: nextVariant,
-      },
+      const nextVariant = patchVariantBackground(current, patch, imagePool);
+      return {
+        ...prev,
+        variants: {
+          ...prev.variants,
+          [activeId]: nextVariant,
+        },
+      };
     });
   }
 
@@ -355,11 +410,12 @@ export function SocialPostLayerPanel({
         open={isSectionOpen("logo")}
         onOpenChange={(open) => setSectionOpen("logo", open)}
         trailing={
-          <LayerToggle
-            label="Show"
-            checked={layers.logo.enabled}
+          <LayerVisibilityToggle
+            label="Logo"
+            enabled={layers.logo.enabled}
             disabled={!agency.logo_url}
-            onChange={(enabled) =>
+            disabledHint="Add a logo in brand settings first"
+            onToggle={(enabled) =>
               updateLayers({ logo: { ...layers.logo, enabled } })
             }
           />
@@ -405,10 +461,10 @@ export function SocialPostLayerPanel({
         open={isSectionOpen("headline")}
         onOpenChange={(open) => setSectionOpen("headline", open)}
         trailing={
-          <LayerToggle
-            label="Show"
-            checked={layers.title.enabled}
-            onChange={(enabled) =>
+          <LayerVisibilityToggle
+            label="Headline"
+            enabled={layers.title.enabled}
+            onToggle={(enabled) =>
               updateLayers({ title: { ...layers.title, enabled } })
             }
           />
@@ -427,6 +483,12 @@ export function SocialPostLayerPanel({
                   updateLayers({ title: { ...layers.title, text: e.target.value } })
                 }
               />
+              {layers.title.text.trim() ? null : (
+                <p className="text-xs text-amber-600 dark:text-amber-500">
+                  Add text — the headline won&apos;t appear on the post while
+                  it&apos;s empty.
+                </p>
+              )}
             </div>
             <LayerScaleControl
               id="social-title-scale"
@@ -462,10 +524,10 @@ export function SocialPostLayerPanel({
         open={isSectionOpen("subcopy")}
         onOpenChange={(open) => setSectionOpen("subcopy", open)}
         trailing={
-          <LayerToggle
-            label="Show"
-            checked={layers.subcopy.enabled}
-            onChange={(enabled) =>
+          <LayerVisibilityToggle
+            label="Subcopy"
+            enabled={layers.subcopy.enabled}
+            onToggle={(enabled) =>
               updateLayers({
                 subcopy: {
                   ...layers.subcopy,
@@ -498,6 +560,12 @@ export function SocialPostLayerPanel({
                   })
                 }
               />
+              {layers.subcopy.text.trim() ? null : (
+                <p className="text-xs text-amber-600 dark:text-amber-500">
+                  Add text — the subcopy won&apos;t appear on the post while
+                  it&apos;s empty.
+                </p>
+              )}
             </div>
             <LayerScaleControl
               id="social-subcopy-scale"
@@ -535,11 +603,12 @@ export function SocialPostLayerPanel({
         open={isSectionOpen("features")}
         onOpenChange={(open) => setSectionOpen("features", open)}
         trailing={
-          <LayerToggle
-            label="Show"
-            checked={layers.features.enabled}
+          <LayerVisibilityToggle
+            label="Property details"
+            enabled={layers.features.enabled}
             disabled={!listingHasStats && !document.listing.land_area_sqm}
-            onChange={(enabled) =>
+            disabledHint="Add beds, baths, parking or land area first"
+            onToggle={(enabled) =>
               updateLayers({ features: { ...layers.features, enabled } })
             }
           />
