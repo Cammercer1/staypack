@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
+import { getSiteUrl } from "@/lib/env";
 import { signupSchema } from "@/lib/validation/schemas";
 
 type SignupForm = {
@@ -32,6 +33,9 @@ export function SignupForm() {
     const { error } = await supabase.auth.signUp({
       email: values.email,
       password: values.password,
+      options: {
+        emailRedirectTo: `${getSiteUrl()}/callback?next=/dashboard`,
+      },
     });
 
     if (error) {
