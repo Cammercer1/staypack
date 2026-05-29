@@ -1,5 +1,6 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
+import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
 import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
@@ -87,12 +88,14 @@ export function BrochureClosingBand({
       </div>
 
       {disclaimer ? (
-        <p
+        <Editable
+          as="p"
+          path="copy.disclaimer"
           className="px-10 pb-4 text-[0.54rem] leading-relaxed text-neutral-400"
           style={{ fontFamily: bodyFont }}
         >
           {disclaimer}
-        </p>
+        </Editable>
       ) : null}
     </footer>
   );

@@ -2,7 +2,20 @@ import { Bath, BedDouble, Car } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
+import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
+import {
+  getBlurbBlocks,
+  sliceBlurbBlocksByParagraphs,
+} from "@/lib/collateral/sales-brochure/blurbBlocks";
+import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
+import {
+  resolveBrochurePrice,
+  resolveBrochurePriceLabel,
+  type SalesBrochureDocumentJson,
+} from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
@@ -21,18 +34,7 @@ function MinimalistSectionLabel({ children }: { children: string }) {
 }
 
 function buildFeatureItems(document: SalesBrochureDocumentJson) {
-  const items: string[] = [];
-
-  for (const point of document.copy.feature_highlights) {
-    if (items.length >= 10) break;
-    items.push(point);
-  }
-  for (const point of document.copy.appeal_points) {
-    if (items.length >= 10) break;
-    if (!items.includes(point)) items.push(point);
-  }
-
-  return items;
+  return getPropertyHighlights(document.copy).slice(0, 10);
 }
 
 function resolveMinimalistImages(document: SalesBrochureDocumentJson) {
@@ -83,50 +85,16 @@ function resolvePageTwoGallery(
   return unique.slice(0, 5);
 }
 
-function splitBlurbParagraphs(text: string) {
-  return text.split(/\n\n+/).filter(Boolean).map((p) => p.trim());
-}
-
 function buildClosingParagraph(
   document: SalesBrochureDocumentJson,
   agent: FinalReportJson["agent"],
 ) {
-  const tail = document.copy.appeal_points.at(-1)?.trim();
+  const tail = getPropertyHighlights(document.copy).at(-1)?.trim();
   if (agent.name && agent.phone) {
     const lead = tail ? `${tail} ` : "";
     return `${lead}Contact ${agent.name} on ${agent.phone} to discuss further.`;
   }
   return tail || null;
-}
-
-function MinimalistBlurb({
-  text,
-  maxParagraphs,
-  className = "",
-}: {
-  text: string;
-  maxParagraphs?: number;
-  className?: string;
-}) {
-  if (!text.trim()) return null;
-
-  const paragraphs = text.split(/\n\n+/).filter(Boolean);
-  const visible =
-    maxParagraphs != null ? paragraphs.slice(0, maxParagraphs) : paragraphs;
-
-  return (
-    <div className={`space-y-3 ${className}`}>
-      {visible.map((paragraph) => (
-        <p
-          key={paragraph.slice(0, 48)}
-          className="text-[0.74rem] leading-[1.72] text-neutral-800"
-          style={{ fontFamily: bodyFont }}
-        >
-          {paragraph.trim()}
-        </p>
-      ))}
-    </div>
-  );
 }
 
 function MinimalistStatsIcons({ document }: { document: SalesBrochureDocumentJson }) {
@@ -178,26 +146,32 @@ function MinimalistSidebar({
       <MinimalistStatsIcons document={document} />
 
       <div className="space-y-1.5">
-        <MinimalistSectionLabel>For sale</MinimalistSectionLabel>
-        {document.property.display_price ? (
-          <p
+        <Editable as="p" path="copy.price_label" className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+          {resolveBrochurePriceLabel(document)}
+        </Editable>
+        {resolveBrochurePrice(document) ? (
+          <Editable
+            as="p"
+            path="copy.price_value"
             className="text-[0.82rem] font-semibold leading-snug text-neutral-900"
             style={{ fontFamily: bodyFont }}
           >
-            {document.property.display_price}
-          </p>
+            {resolveBrochurePrice(document)}
+          </Editable>
         ) : null}
       </div>
 
       <div className="space-y-1.5">
         <MinimalistSectionLabel>View</MinimalistSectionLabel>
         {document.copy.inspection_cta ? (
-          <p
+          <Editable
+            as="p"
+            path="copy.inspection_cta"
             className="text-[0.74rem] leading-snug text-neutral-800"
             style={{ fontFamily: bodyFont }}
           >
             {document.copy.inspection_cta}
-          </p>
+          </Editable>
         ) : null}
       </div>
 
@@ -263,8 +237,12 @@ function MinimalistPhotoStrip({
       <div className="flex min-h-0 flex-1 flex-col gap-[3px]">
         {hero ? (
           <div className="min-h-0 flex-[7] overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={hero} alt="" className="h-full w-full object-cover" />
+            <EditableImage
+              slot="hero"
+              src={hero}
+              className="h-full w-full"
+              imgClassName="h-full w-full object-cover"
+            />
           </div>
         ) : (
           <div className="min-h-0 flex-[7] bg-neutral-300" />
@@ -274,8 +252,12 @@ function MinimalistPhotoStrip({
           <div className="grid min-h-0 flex-[3] grid-cols-3 gap-[3px]">
             {gallery.map((url, index) => (
               <div key={`${url}-${index}`} className="min-h-0 overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt="" className="h-full w-full object-cover" />
+                <EditableImage
+                  slot={{ kind: "page_one", index: index + 1 }}
+                  src={url}
+                  className="h-full w-full"
+                  imgClassName="h-full w-full object-cover"
+                />
               </div>
             ))}
           </div>
@@ -289,12 +271,14 @@ function MinimalistDisclaimer({ text, className = "" }: { text: string; classNam
   if (!text.trim()) return null;
 
   return (
-    <p
+    <Editable
+      as="p"
+      path="copy.disclaimer"
       className={`text-[0.56rem] leading-relaxed text-neutral-400 ${className}`}
       style={{ fontFamily: bodyFont }}
     >
       {text}
-    </p>
+    </Editable>
   );
 }
 
@@ -337,19 +321,23 @@ export function MinimalistPageOne({
           </p>
 
           {headline ? (
-            <h1
+            <Editable
+              as="h1"
+              path="copy.heading"
               className={`font-bold leading-[1.12] ${
                 compact ? "text-[1.25rem]" : "text-[1.45rem]"
               }`}
               style={{ color: accent, fontFamily: headingFont }}
             >
               {headline}
-            </h1>
+            </Editable>
           ) : null}
 
-          <MinimalistBlurb
-            text={document.copy.blurb}
+          <BrochureBlurbContent
+            document={document}
             maxParagraphs={blurbLimit}
+            paragraphClassName="text-[0.74rem] leading-[1.72] text-neutral-800"
+            headingClassName="text-[0.72rem] font-bold uppercase tracking-wide text-neutral-900"
           />
 
           <MinimalistDisclaimer
@@ -394,8 +382,10 @@ export function MinimalistPageTwo({
   const agent = report.agent;
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
   const pageBg = document.agency.background_colour?.trim() || MINIMALIST_CREAM;
-  const blurbParagraphs = splitBlurbParagraphs(document.copy.blurb);
-  const continuation = blurbParagraphs.slice(PAGE_ONE_BLURB_PARAGRAPHS).join("\n\n");
+  const { remainder: continuationBlocks } = sliceBlurbBlocksByParagraphs(
+    getBlurbBlocks(document.copy),
+    PAGE_ONE_BLURB_PARAGRAPHS,
+  );
   const closingParagraph = buildClosingParagraph(document, agent);
 
   return (
@@ -405,7 +395,14 @@ export function MinimalistPageTwo({
     >
       <div className="grid min-h-0 flex-1 grid-cols-[1.55fr_1fr] gap-6 px-8 pb-4 pt-8">
         <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
-          {continuation ? <MinimalistBlurb text={continuation} /> : null}
+          {continuationBlocks.length > 0 ? (
+            <BrochureBlurbContent
+              document={document}
+              blocks={continuationBlocks}
+              paragraphClassName="text-[0.74rem] leading-[1.72] text-neutral-800"
+              headingClassName="text-[0.72rem] font-bold uppercase tracking-wide text-neutral-900"
+            />
+          ) : null}
 
           {features.length > 0 ? (
             <div>
@@ -416,14 +413,20 @@ export function MinimalistPageTwo({
                 Features include:
               </p>
               <ul className="mt-2.5 space-y-1.5">
-                {features.map((item) => (
+                {features.map((item, index) => (
                   <li
-                    key={item}
+                    key={`highlight-${index}`}
                     className="flex gap-2 text-[0.72rem] leading-snug text-neutral-800"
                     style={{ fontFamily: bodyFont }}
                   >
                     <span className="mt-[0.35rem] h-1 w-1 shrink-0 rounded-full bg-neutral-700" />
-                    <span>{item}</span>
+                    <Editable
+                      as="span"
+                      path={`copy.property_highlights.${index}`}
+                      className="min-w-0"
+                    >
+                      {item}
+                    </Editable>
                   </li>
                 ))}
               </ul>

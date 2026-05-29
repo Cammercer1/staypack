@@ -1,6 +1,15 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
+import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
+import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
+import {
+  resolveBrochurePrice,
+  resolveBrochurePriceLabel,
+  type SalesBrochureDocumentJson,
+} from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
@@ -29,16 +38,7 @@ function resolveBoldAgents(report: FinalReportJson) {
 }
 
 function buildBoldFeatureItems(document: SalesBrochureDocumentJson) {
-  const items: string[] = [];
-  for (const point of document.copy.appeal_points) {
-    if (items.length >= 9) break;
-    items.push(point);
-  }
-  for (const point of document.copy.feature_highlights) {
-    if (items.length >= 9) break;
-    if (!items.includes(point)) items.push(point);
-  }
-  return items;
+  return getPropertyHighlights(document.copy).slice(0, 8);
 }
 
 function BoldStatPill({
@@ -88,13 +88,25 @@ function BoldStatStrip({ document }: { document: SalesBrochureDocumentJson }) {
           <BoldStatPill key={s.label} value={s.value} label={s.label} />
         ))}
       </div>
-      {property.display_price ? (
-        <p
-          className="text-[1rem] font-bold text-white"
-          style={{ fontFamily: headingFont }}
-        >
-          {property.display_price}
-        </p>
+      {resolveBrochurePrice(document) ? (
+        <div className="flex items-baseline gap-1.5">
+          <Editable
+            as="span"
+            path="copy.price_label"
+            className="text-[0.62rem] font-medium uppercase tracking-[0.08em] text-white/70"
+            style={{ fontFamily: headingFont }}
+          >
+            {resolveBrochurePriceLabel(document)}
+          </Editable>
+          <Editable
+            as="span"
+            path="copy.price_value"
+            className="text-[1rem] font-bold text-white"
+            style={{ fontFamily: headingFont }}
+          >
+            {resolveBrochurePrice(document)}
+          </Editable>
+        </div>
       ) : null}
     </div>
   );
@@ -108,8 +120,12 @@ function BoldHero({ document }: { document: SalesBrochureDocumentJson }) {
   return (
     <div className="relative h-[140mm] shrink-0 overflow-hidden">
       {hero ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={hero} alt="" className="h-full w-full object-cover" />
+        <EditableImage
+          slot="hero"
+          src={hero}
+          className="h-full w-full"
+          imgClassName="h-full w-full object-cover"
+        />
       ) : (
         <div className="h-full bg-neutral-300" />
       )}
@@ -162,12 +178,14 @@ function BoldHero({ document }: { document: SalesBrochureDocumentJson }) {
           {document.property.address}
         </h1>
         {headline !== document.property.address ? (
-          <p
+          <Editable
+            as="p"
+            path="copy.heading"
             className="mt-2 text-[0.9rem] font-medium leading-snug text-white/90"
             style={{ fontFamily: headingFont }}
           >
             {headline}
-          </p>
+          </Editable>
         ) : null}
       </div>
     </div>
@@ -240,20 +258,17 @@ function BoldBody({
     <div className="grid min-h-0 flex-1 grid-cols-[1.45fr_1fr] gap-8 overflow-hidden px-8 py-6">
       {/* Left — blurb + features */}
       <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
-        {document.copy.blurb ? (
-          <p
-            className="text-[0.74rem] leading-[1.7] text-neutral-700"
-            style={{ fontFamily: bodyFont }}
-          >
-            {document.copy.blurb}
-          </p>
-        ) : null}
+        <BrochureBlurbContent
+          document={document}
+          paragraphClassName="text-[0.74rem] leading-[1.7] text-neutral-700"
+          headingClassName="text-[0.72rem] font-bold uppercase tracking-wide text-neutral-900"
+        />
 
         {features.length > 0 ? (
           <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-            {features.map((item) => (
+            {features.map((item, index) => (
               <li
-                key={item}
+                key={`highlight-${index}`}
                 className="flex gap-2 text-[0.7rem] leading-snug text-neutral-800"
                 style={{ fontFamily: bodyFont }}
               >
@@ -261,7 +276,12 @@ function BoldBody({
                   className="mt-[0.3rem] h-[5px] w-[5px] shrink-0 rounded-full"
                   style={{ backgroundColor: accent }}
                 />
-                <span>{item}</span>
+                <Editable
+                  as="span"
+                  path={`copy.property_highlights.${index}`}
+                >
+                  {item}
+                </Editable>
               </li>
             ))}
           </ul>
@@ -282,12 +302,14 @@ function BoldBody({
 
         <div className="flex items-end justify-between gap-4">
           {document.copy.inspection_cta ? (
-            <p
+            <Editable
+              as="p"
+              path="copy.inspection_cta"
               className="text-[0.72rem] leading-snug text-neutral-700"
               style={{ fontFamily: bodyFont }}
             >
               {document.copy.inspection_cta}
-            </p>
+            </Editable>
           ) : null}
           {document.assets.qr_code_url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -300,12 +322,14 @@ function BoldBody({
         </div>
 
         {document.copy.disclaimer ? (
-          <p
+          <Editable
+            as="p"
+            path="copy.disclaimer"
             className="text-[0.56rem] leading-relaxed text-neutral-400"
             style={{ fontFamily: bodyFont }}
           >
             {document.copy.disclaimer}
-          </p>
+          </Editable>
         ) : null}
       </div>
     </div>

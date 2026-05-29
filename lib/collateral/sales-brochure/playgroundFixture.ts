@@ -1,3 +1,7 @@
+import {
+  blurbBlocksFromRaw,
+  blurbBlocksToPlainText,
+} from "@/lib/collateral/sales-brochure/blurbBlocks";
 import type {
   SalesBrochureCopyJson,
   SalesBrochureDocumentJson,
@@ -17,18 +21,21 @@ export const PLAYGROUND_BROCHURE_IMAGES = [
   "https://images.unsplash.com/photo-1600210492486-724fe41c20aa?w=1200&q=80",
 ] as const;
 
+const PLAYGROUND_BLURB =
+  "A well-presented four-bedroom home combining open-plan living, a covered alfresco and a practical floor plan for everyday family life. Moments from schools, parks and local village shops.\n\nSet across a generous level block, the home flows from a light-filled lounge to dining and kitchen, with seamless access to covered outdoor entertaining. Ideal for families seeking space, storage and a calm neighbourhood setting.";
+
+const PLAYGROUND_BLURB_BLOCKS = blurbBlocksFromRaw({ blurb: PLAYGROUND_BLURB });
+
 const PLAYGROUND_COPY: SalesBrochureCopyJson = {
   heading: "Open house",
-  blurb:
-    "A well-presented four-bedroom home combining open-plan living, a covered alfresco and a practical floor plan for everyday family life. Moments from schools, parks and local village shops.\n\nSet across a generous level block, the home flows from a light-filled lounge to dining and kitchen, with seamless access to covered outdoor entertaining. Ideal for families seeking space, storage and a calm neighbourhood setting.",
-  appeal_points: [
+  blurb: blurbBlocksToPlainText(PLAYGROUND_BLURB_BLOCKS),
+  blurb_blocks: PLAYGROUND_BLURB_BLOCKS,
+  property_highlights: [
     "North-facing living zones with garden outlook",
     "Updated kitchen with stone benchtops",
     "Master suite with walk-in robe and ensuite",
     "Ducted air conditioning throughout",
     "Double garage with internal access",
-  ],
-  feature_highlights: [
     "Low-maintenance landscaped gardens",
     "Separate study or fifth bedroom option",
     "Covered alfresco ideal for year-round entertaining",

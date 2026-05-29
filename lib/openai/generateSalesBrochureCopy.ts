@@ -1,11 +1,15 @@
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { enforceSalesBrochureCopyLimits } from "@/lib/collateral/sales-brochure/copyLimits";
+import { coerceSalesBrochureCopy } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import { getSalesBrochureCopyPromptLimits } from "@/lib/collateral/sales-brochure/copyLimits";
 import { normalizeSalesBrochureCopy } from "@/lib/collateral/sales-brochure/normalizeSalesBrochureCopy";
 import { getMockSalesBrochureCopy } from "@/lib/collateral/buildSalesBrochureDocument";
 import type { SalesBrochureCopyJson } from "@/lib/collateral/templates/types";
-import { salesBrochureCopySchema } from "@/lib/validation/schemas";
+import {
+  salesBrochureCopyAiSchema,
+  salesBrochureCopySchema,
+} from "@/lib/validation/schemas";
 import { isDevelopment } from "@/lib/env";
 import type { Agency, Listing } from "@/lib/types";
 import { DEFAULT_DISCLAIMER } from "@/lib/types";
@@ -26,8 +30,7 @@ Rules:
 const JSON_CONTRACT = `Return JSON with exactly these snake_case fields:
 - heading: string
 - blurb: string
-- appeal_points: string[]
-- feature_highlights: string[]
+- property_highlights: string[]
 - inspection_cta: string
 - disclaimer: string`;
 
@@ -115,9 +118,8 @@ function buildUserPayload({ agency, listing }: { agency: Agency; listing: Listin
 }
 
 function parseCopyResponse(raw: unknown, agency: Agency) {
-  const parsed = salesBrochureCopySchema.safeParse(
-    normalizeSalesBrochureCopy(raw, agency),
-  );
+  const coerced = coerceSalesBrochureCopy(normalizeSalesBrochureCopy(raw, agency));
+  const parsed = salesBrochureCopySchema.safeParse(coerced);
 
   if (!parsed.success) {
     return parsed;
@@ -125,7 +127,7 @@ function parseCopyResponse(raw: unknown, agency: Agency) {
 
   return {
     success: true as const,
-    data: enforceSalesBrochureCopyLimits(parsed.data),
+    data: enforceSalesBrochureCopyLimits(coerced),
   };
 }
 
@@ -149,7 +151,7 @@ async function requestCopy(
 
     const response = await client.chat.completions.create({
       model: "gpt-4.1-mini",
-      response_format: zodResponseFormat(salesBrochureCopySchema, "sales_brochure_copy"),
+      response_format: zodResponseFormat(salesBrochureCopyAiSchema, "sales_brochure_copy"),
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {

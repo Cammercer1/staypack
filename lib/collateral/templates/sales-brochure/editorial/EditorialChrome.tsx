@@ -1,6 +1,12 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
+import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
+import {
+  resolveBrochurePrice,
+  resolveBrochurePriceLabel,
+  type SalesBrochureDocumentJson,
+} from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
@@ -105,19 +111,21 @@ export function EditorialHeroOverlay({
           {property.address}
         </h1>
         {copy.heading ? (
-          <p
+          <Editable
+            as="p"
+            path="copy.heading"
             className="mt-3 max-w-[36rem] text-lg font-medium leading-snug text-white/95"
             style={{ fontFamily: headingFont }}
           >
             {copy.heading}
-          </p>
+          </Editable>
         ) : null}
-        {showPrice && property.display_price ? (
+        {showPrice && resolveBrochurePrice(document) ? (
           <p
             className="mt-4 inline-block border border-white/30 bg-white/10 px-4 py-2 text-xl font-semibold text-white backdrop-blur-sm"
             style={{ fontFamily: headingFont }}
           >
-            {property.display_price}
+            {resolveBrochurePrice(document)}
           </p>
         ) : null}
       </div>
@@ -247,26 +255,18 @@ export function EditorialKicker({ children }: { children: React.ReactNode }) {
 export function EditorialLede({ text }: { text: string }) {
   if (!text) return null;
 
-  const trimmed = text.trim();
-  const firstLetter = trimmed.slice(0, 1);
-  const rest = trimmed.slice(1);
-
   return (
-    <p
-      className="text-[0.96rem] leading-[1.85] text-neutral-700"
-      style={{ fontFamily: bodyFont }}
+    <Editable
+      as="p"
+      path="copy.blurb"
+      className="text-[0.96rem] leading-[1.85] text-neutral-700 [&::first-letter]:float-left [&::first-letter]:mr-2.5 [&::first-letter]:mt-1 [&::first-letter]:font-semibold [&::first-letter]:text-[3.6rem] [&::first-letter]:leading-[0.72]"
+      style={{
+        fontFamily: bodyFont,
+        ["--report-headline-colour" as string]: "inherit",
+      }}
     >
-      <span
-        className="float-left mr-2.5 mt-1 text-[3.6rem] font-semibold leading-[0.72]"
-        style={{
-          fontFamily: headingFont,
-          color: "var(--report-headline-colour, inherit)",
-        }}
-      >
-        {firstLetter}
-      </span>
-      {rest}
-    </p>
+      {text.trim()}
+    </Editable>
   );
 }
 
@@ -274,36 +274,52 @@ export function EditorialLede({ text }: { text: string }) {
 export function EditorialFeatureIndex({
   items,
   max = 6,
+  document,
 }: {
   items: string[];
   max?: number;
+  document?: SalesBrochureDocumentJson;
 }) {
   if (!items.length) return null;
 
   return (
     <ol className="grid grid-cols-2 gap-x-10">
-      {items.slice(0, max).map((point, index) => (
-        <li
-          key={point}
-          className="flex gap-3 py-2.5"
-        >
-          <span
-            className="shrink-0 text-[0.85rem] font-semibold tabular-nums"
-            style={{
-              fontFamily: headingFont,
-              color: "var(--report-headline-colour, inherit)",
-            }}
-          >
-            {String(index + 1).padStart(2, "0")}
-          </span>
-          <span
-            className="text-[0.82rem] leading-snug text-neutral-700"
-            style={{ fontFamily: bodyFont }}
-          >
-            {point}
-          </span>
-        </li>
-      ))}
+      {items.slice(0, max).map((point, index) => {
+        const path: BrochureCopyFieldPath | undefined = document
+          ? `copy.property_highlights.${index}`
+          : undefined;
+
+        return (
+          <li key={path ?? `${point}-${index}`} className="flex gap-3 py-2.5">
+            <span
+              className="shrink-0 text-[0.85rem] font-semibold tabular-nums"
+              style={{
+                fontFamily: headingFont,
+                color: "var(--report-headline-colour, inherit)",
+              }}
+            >
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            {path ? (
+              <Editable
+                as="span"
+                path={path}
+                className="text-[0.82rem] leading-snug text-neutral-700"
+                style={{ fontFamily: bodyFont }}
+              >
+                {point}
+              </Editable>
+            ) : (
+              <span
+                className="text-[0.82rem] leading-snug text-neutral-700"
+                style={{ fontFamily: bodyFont }}
+              >
+                {point}
+              </span>
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -362,33 +378,39 @@ export function EditorialCta({ text }: { text: string }) {
 
   return (
     <div className="border-t border-neutral-200 pt-5">
-      <p
+      <Editable
+        as="p"
+        path="copy.inspection_cta"
         className="text-base font-semibold text-neutral-900"
         style={{ fontFamily: headingFont, color: "var(--report-headline-colour, inherit)" }}
       >
         {text}
-      </p>
+      </Editable>
     </div>
   );
 }
 
 export function EditorialPricePanel({ document }: { document: SalesBrochureDocumentJson }) {
-  if (!document.property.display_price) return null;
+  if (!resolveBrochurePrice(document)) return null;
 
   return (
     <div>
-      <p
+      <Editable
+        as="p"
+        path="copy.price_label"
         className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-neutral-500"
         style={{ fontFamily: headingFont }}
       >
-        Guide price
-      </p>
-      <p
+        {resolveBrochurePriceLabel(document)}
+      </Editable>
+      <Editable
+        as="p"
+        path="copy.price_value"
         className="mt-2 text-[2.25rem] font-semibold leading-none text-neutral-900"
         style={{ fontFamily: headingFont, color: "var(--report-headline-colour, inherit)" }}
       >
-        {document.property.display_price}
-      </p>
+        {resolveBrochurePrice(document)}
+      </Editable>
     </div>
   );
 }
@@ -397,6 +419,12 @@ export function EditorialDisclaimer({ text }: { text: string }) {
   if (!text) return null;
 
   return (
-    <p className="text-[0.62rem] leading-relaxed text-neutral-500">{text}</p>
+    <Editable
+      as="p"
+      path="copy.disclaimer"
+      className="text-[0.62rem] leading-relaxed text-neutral-500"
+    >
+      {text}
+    </Editable>
   );
 }

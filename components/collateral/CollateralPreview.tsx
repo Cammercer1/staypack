@@ -14,6 +14,7 @@ import {
   getDefaultSocialPostVariantId,
   normalizeSocialPostVariantId,
 } from "@/lib/collateral/social/formats";
+import { coerceSalesBrochureDocument } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import { salesBrochureToReportShape } from "@/lib/collateral/sales-brochure/toReportShape";
 import {
   isSalesBrochureDocument,
@@ -56,17 +57,22 @@ export function CollateralPreview({
   printMode?: boolean;
   variantId?: string;
 }) {
-  const templateId = resolveTemplateIdFromDocument(document, collateralType);
+  const previewDocument =
+    collateralType === "sales_brochure" && isSalesBrochureDocument(document)
+      ? coerceSalesBrochureDocument(document)
+      : document;
+
+  const templateId = resolveTemplateIdFromDocument(previewDocument, collateralType);
   const template = getCollateralTemplate(templateId);
   const Template = template.Component;
 
-  const socialVariantId = isSocialPostsDocument(document)
+  const socialVariantId = isSocialPostsDocument(previewDocument)
     ? variantId
       ? normalizeSocialPostVariantId(variantId)
-      : normalizeSocialPostVariantId(document.active_variant_id)
+      : normalizeSocialPostVariantId(previewDocument.active_variant_id)
     : null;
   const businessCardVariantId =
-    isBusinessCardDocument(document) && (variantId === "front" || variantId === "back")
+    isBusinessCardDocument(previewDocument) && (variantId === "front" || variantId === "back")
       ? (normalizeBusinessCardVariantId(variantId) as BusinessCardVariantId)
       : null;
 
@@ -74,7 +80,7 @@ export function CollateralPreview({
     socialVariantId != null
       ? getSocialPostPageFormat(socialVariantId)
       : getCollateralPageFormat(template.pageFormat);
-  const agency = document.agency;
+  const agency = previewDocument.agency;
 
   const headingFontId = agency.heading_font_family || agency.font_family || "fraunces";
   const bodyFontId = agency.body_font_family || agency.font_family || "inter";
@@ -92,8 +98,8 @@ export function CollateralPreview({
     brand_advanced_json: agency.brand_advanced ?? null,
   });
 
-  const salesBrochureReport = isSalesBrochureDocument(document)
-    ? salesBrochureToReportShape(document)
+  const salesBrochureReport = isSalesBrochureDocument(previewDocument)
+    ? salesBrochureToReportShape(previewDocument)
     : null;
   const reportBrand = salesBrochureReport
     ? getReportBrandColours(salesBrochureReport.agency)
@@ -176,7 +182,7 @@ export function CollateralPreview({
         }}
       />
       <Template
-        document={document}
+        document={previewDocument}
         {...(socialVariantId
           ? { variantId: socialVariantId }
           : businessCardVariantId

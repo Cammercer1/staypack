@@ -1,7 +1,17 @@
+"use client";
+
 import { Bath, BedDouble, Car, Ruler } from "lucide-react";
+import { useEditableContext } from "@/components/collateral/sales-brochure/inline/EditableContext";
 import type { LucideIcon } from "lucide-react";
-import { resolveDisplayPricePresentation } from "@/lib/scraping/normalizeDisplayPrice";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { hasBlurbContent } from "@/lib/collateral/sales-brochure/blurbBlocks";
+import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
+import {
+  resolveBrochurePrice,
+  resolveBrochurePriceLabel,
+  type SalesBrochureDocumentJson,
+} from "@/lib/collateral/templates/types";
+import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
 import { formatNumber } from "@/lib/reports/formatters";
 
 type Props = {
@@ -11,6 +21,7 @@ type Props = {
 };
 
 export function SalesBrochurePropertySection({ document, compact = false }: Props) {
+  const { editable } = useEditableContext();
   const { property, copy } = document;
 
   const propertyStats: {
@@ -48,13 +59,10 @@ export function SalesBrochurePropertySection({ document, compact = false }: Prop
     });
   }
 
-  const pricePresentation = property.display_price
-    ? resolveDisplayPricePresentation(property.display_price)
-    : null;
-
-  const blurbText = copy.blurb || property.summary || "";
-  const appealPoints = copy.appeal_points.slice(0, compact ? 3 : 4);
-  const showTwoColumnBody = Boolean(blurbText && appealPoints.length);
+  const highlights = getPropertyHighlights(copy).slice(0, compact ? 4 : 6);
+  const showTwoColumnBody = Boolean(
+    editable || hasBlurbContent(copy) || highlights.length,
+  );
 
   return (
     <div className="shrink-0 px-10">
@@ -79,7 +87,9 @@ export function SalesBrochurePropertySection({ document, compact = false }: Prop
             </p>
           ) : null}
           {copy.heading ? (
-            <p
+            <Editable
+              as="p"
+              path="copy.heading"
               className="mt-3 text-base font-semibold leading-snug"
               style={{
                 fontFamily: "var(--report-heading-font, var(--collateral-heading-font, inherit))",
@@ -87,7 +97,7 @@ export function SalesBrochurePropertySection({ document, compact = false }: Prop
               }}
             >
               {copy.heading}
-            </p>
+            </Editable>
           ) : null}
         </div>
 
@@ -108,55 +118,65 @@ export function SalesBrochurePropertySection({ document, compact = false }: Prop
             ))}
           </div>
 
-          {pricePresentation ? (
+          {resolveBrochurePrice(document) ? (
             <div>
-              {pricePresentation.label ? (
-                <p
-                  className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-neutral-500"
-                  style={{
-                    fontFamily: "var(--report-heading-font, var(--collateral-heading-font, inherit))",
-                  }}
-                >
-                  {pricePresentation.label}
-                </p>
-              ) : null}
-              <p
-                className={`${pricePresentation.label ? "mt-1" : ""} text-[1.9rem] font-semibold leading-none tracking-tight`}
+              <Editable
+                as="p"
+                path="copy.price_label"
+                className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-neutral-500"
+                style={{
+                  fontFamily: "var(--report-heading-font, var(--collateral-heading-font, inherit))",
+                }}
+              >
+                {resolveBrochurePriceLabel(document)}
+              </Editable>
+              <Editable
+                as="p"
+                path="copy.price_value"
+                className="mt-1 text-[1.9rem] font-semibold leading-none tracking-tight"
                 style={{
                   fontFamily: "var(--report-heading-font, var(--collateral-heading-font, inherit))",
                   color: "var(--report-text-colour, inherit)",
                 }}
               >
-                {pricePresentation.amount}
-              </p>
+                {resolveBrochurePrice(document)}
+              </Editable>
             </div>
           ) : null}
         </div>
       </div>
 
       {/* ── Body row: blurb left, bullets right ── */}
-      {blurbText || appealPoints.length ? (
+      {showTwoColumnBody ? (
         <div
           className={`grid items-start gap-x-10 pt-6 pb-7 ${
-            showTwoColumnBody ? "grid-cols-2" : "grid-cols-1"
+            highlights.length > 0 ? "grid-cols-2" : "grid-cols-1"
           }`}
         >
-          {blurbText ? (
-            <p className="min-w-0 text-[0.9rem] leading-[1.75] text-neutral-700">{blurbText}</p>
-          ) : null}
+          <BrochureBlurbContent
+            document={document}
+            paragraphClassName="min-w-0 text-[0.9rem] leading-[1.75] text-neutral-700"
+            headingClassName="text-sm font-semibold text-neutral-900"
+          />
 
-          {appealPoints.length ? (
+          {highlights.length ? (
             <ul className={`min-w-0 flex flex-col ${compact ? "gap-2" : "gap-3"}`}>
-              {appealPoints.map((point) => (
+              {highlights.map((point, index) => (
                 <li
-                  key={point}
+                  key={`highlight-${index}`}
                   className="flex gap-2.5 text-[0.82rem] leading-snug text-neutral-700"
                 >
                   <span
                     className="mt-[0.3rem] h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-400"
                     aria-hidden
                   />
-                  <span>{point}</span>
+                  <Editable
+                    as="span"
+                    path={`copy.property_highlights.${index}`}
+                    className="min-w-0"
+                  >
+                    {point}
+                  </Editable>
                 </li>
               ))}
             </ul>

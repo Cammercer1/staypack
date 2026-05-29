@@ -2,7 +2,14 @@ import { Bath, BedDouble, Car, Ruler } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
+import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import {
+  resolveBrochurePrice,
+  resolveBrochurePriceLabel,
+  type SalesBrochureDocumentJson,
+} from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
@@ -155,8 +162,12 @@ export function GalleryPhotoMosaic({ document }: { document: SalesBrochureDocume
     <div className="relative flex h-[70%] min-h-0 shrink-0 flex-col gap-[6px]">
       <div className="relative min-h-0 flex-[1.5] overflow-hidden bg-neutral-200">
         {hero ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={hero} alt="" className="h-full w-full object-cover" />
+          <EditableImage
+            slot="hero"
+            src={hero}
+            className="h-full w-full"
+            imgClassName="h-full w-full object-cover"
+          />
         ) : null}
         {logoUrl ? (
           <div
@@ -177,8 +188,12 @@ export function GalleryPhotoMosaic({ document }: { document: SalesBrochureDocume
         {thumbs.map((url, index) => (
           <div key={`${url}-${index}`} className="min-h-0 overflow-hidden bg-neutral-200">
             {url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={url} alt="" className="h-full w-full object-cover" />
+              <EditableImage
+                slot={{ kind: "page_one", index: index + 1 }}
+                src={url}
+                className="h-full w-full"
+                imgClassName="h-full w-full object-cover"
+              />
             ) : null}
           </div>
         ))}
@@ -269,40 +284,44 @@ export function GalleryDetailsRow({
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[1.2fr_0.75fr_0.85fr] gap-6 overflow-hidden px-8 py-5">
       <div className="min-w-0">
-        {document.copy.blurb ? (
-          <p
-            className="line-clamp-6 text-[0.76rem] leading-[1.65] text-neutral-700"
-            style={{ fontFamily: bodyFont }}
-          >
-            {document.copy.blurb}
-          </p>
-        ) : null}
+        <BrochureBlurbContent
+          document={document}
+          className="line-clamp-6"
+          paragraphClassName="text-[0.76rem] leading-[1.65] text-neutral-700"
+          headingClassName="text-[0.72rem] font-bold uppercase tracking-wide text-neutral-900"
+        />
       </div>
 
       <div className="flex min-w-0 flex-col gap-3">
-        {document.property.display_price ? (
+        {resolveBrochurePrice(document) ? (
           <div>
-            <p
+            <Editable
+              as="p"
+              path="copy.price_label"
               className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-neutral-500"
               style={{ fontFamily: headingFont }}
             >
-              Sale
-            </p>
-            <p
+              {resolveBrochurePriceLabel(document)}
+            </Editable>
+            <Editable
+              as="p"
+              path="copy.price_value"
               className="mt-1 text-[1.05rem] font-bold text-neutral-900"
               style={{ fontFamily: headingFont }}
             >
-              {document.property.display_price}
-            </p>
+              {resolveBrochurePrice(document)}
+            </Editable>
           </div>
         ) : null}
         {document.copy.inspection_cta ? (
-          <p
+          <Editable
+            as="p"
+            path="copy.inspection_cta"
             className="text-[0.74rem] leading-snug text-neutral-700"
             style={{ fontFamily: bodyFont }}
           >
             {document.copy.inspection_cta}
-          </p>
+          </Editable>
         ) : null}
       </div>
 

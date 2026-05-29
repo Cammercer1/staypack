@@ -243,24 +243,44 @@ export const aiCopySchema = z.object({
   confidence_notes: z.string(),
 });
 
-export const salesBrochureCopySchema = z.object({
+/** OpenAI structured output — every field required (no `.optional()`). */
+export const brochureBlurbBlockSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("heading"), text: z.string() }),
+  z.object({ type: z.literal("paragraph"), text: z.string() }),
+]);
+
+export const salesBrochureCopyAiSchema = z.object({
   heading: z.string(),
   blurb: z.string(),
-  appeal_points: z.array(z.string()),
-  feature_highlights: z.array(z.string()),
+  property_highlights: z.array(z.string()),
   inspection_cta: z.string(),
   disclaimer: z.string(),
+});
+
+export const salesBrochureCopySchema = salesBrochureCopyAiSchema.extend({
+  blurb_blocks: z.array(brochureBlurbBlockSchema).optional(),
   page_two_note: z.string().optional(),
+  price_label: z.string().optional(),
+  price_value: z.string().optional(),
+});
+
+export const salesBrochurePropertyImagesSchema = z.object({
+  hero_image_url: z.string().optional(),
+  selected_image_urls: z.array(z.string()).optional(),
+  page_one_image_urls: z.array(z.string()).optional(),
+  page_two_image_urls: z.array(z.string()).optional(),
 });
 
 export const updateSalesBrochureDocumentSchema = z
   .object({
     copy: salesBrochureCopySchema.partial().optional(),
+    property: salesBrochurePropertyImagesSchema.optional(),
     template_id: z.string().optional(),
   })
   .refine(
-    (data) => data.copy != null || data.template_id != null,
-    { message: "Provide copy or template_id" },
+    (data) =>
+      data.copy != null || data.template_id != null || data.property != null,
+    { message: "Provide copy, property images, or template_id" },
   );
 
 export const loginSchema = z.object({

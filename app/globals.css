@@ -288,6 +288,23 @@
   }
 }
 
+/* Brochure inline TipTap blurb (pages stay fixed for pagination) */
+.sales-brochure-inline-edit .brochure-blurb-editor .tiptap {
+  display: block;
+  min-height: 2.5em;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.sales-brochure-inline-edit .brochure-blurb-editor .tiptap p {
+  line-height: 1.5;
+}
+
+.sales-brochure-inline-edit .brochure-blurb-editor .tiptap > * + * {
+  margin-top: 0.5rem;
+}
+
 /* Tiptap placeholder */
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

@@ -13,12 +13,24 @@ import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
 import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
 import { mmToPx } from "@/lib/reports/pageFormat";
 import { cn } from "@/lib/utils";
+import {
+  EditableProvider,
+  type BrochureImageSlot,
+} from "@/components/collateral/sales-brochure/inline/EditableContext";
+import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
+import type { BrochureBlurbBlock } from "@/lib/collateral/templates/types";
 
 type Props = {
   document: SalesBrochureDocumentJson;
   className?: string;
   maxHeight?: string;
   fitToWidth?: boolean;
+  editable?: {
+    blurbBlocks: BrochureBlurbBlock[];
+    setField: (path: BrochureCopyFieldPath, value: string) => void;
+    setBlurbBlocks: (blocks: BrochureBlurbBlock[]) => void;
+    openImagePicker: (slot: BrochureImageSlot) => void;
+  };
 };
 
 export function FittedBrochurePreview({
@@ -26,6 +38,7 @@ export function FittedBrochurePreview({
   className,
   maxHeight = "min(80vh, 900px)",
   fitToWidth = true,
+  editable,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const template = getCollateralTemplate(document.template_id);
@@ -109,8 +122,9 @@ export function FittedBrochurePreview({
     paginated,
   ]);
 
-  const scaledWidth = pageWidthPx * scale;
-  const scaledHeight = (paginated ? pageHeightPx : contentHeightPx) * scale;
+  const displayScale = scale;
+  const scaledWidth = pageWidthPx * displayScale;
+  const scaledHeight = (paginated ? pageHeightPx : contentHeightPx) * displayScale;
   const canGoBack = currentPage > 0;
   const canGoForward = currentPage < pageCount - 1;
 
@@ -178,6 +192,7 @@ export function FittedBrochurePreview({
         )}
       >
         <div
+          className={editable ? "sales-brochure-inline-edit" : undefined}
           style={{
             width: scaledWidth,
             height: scaledHeight,
@@ -186,7 +201,7 @@ export function FittedBrochurePreview({
         >
           <div
             style={{
-              transform: `scale(${scale})`,
+              transform: `scale(${displayScale})`,
               transformOrigin: "top left",
               width: pageWidthPx,
               height: contentHeightPx,
@@ -199,11 +214,29 @@ export function FittedBrochurePreview({
                   : undefined,
               }}
             >
-              <CollateralPreview
-                document={previewDocument}
-                collateralType="sales_brochure"
-                printMode
-              />
+              {editable ? (
+                <EditableProvider
+                  blurbBlocks={editable.blurbBlocks}
+                  brandPrimaryColour={
+                    previewDocument.agency.primary_colour || "#095b42"
+                  }
+                  setField={editable.setField}
+                  setBlurbBlocks={editable.setBlurbBlocks}
+                  openImagePicker={editable.openImagePicker}
+                >
+                  <CollateralPreview
+                    document={previewDocument}
+                    collateralType="sales_brochure"
+                    printMode
+                  />
+                </EditableProvider>
+              ) : (
+                <CollateralPreview
+                  document={previewDocument}
+                  collateralType="sales_brochure"
+                  printMode
+                />
+              )}
             </div>
           </div>
         </div>

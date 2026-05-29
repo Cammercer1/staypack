@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
 import { buildSalesBrochureDocument } from "@/lib/collateral/buildSalesBrochureDocument";
+import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
 import { provisionCollateralQr } from "@/lib/collateral/provisionCollateralQr";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
 import {
@@ -43,7 +44,7 @@ export async function POST(
       });
 
     const templateId = resolveCollateralTemplateId(agency, collateral);
-    const documentJson = buildSalesBrochureDocument({
+    const built = buildSalesBrochureDocument({
       agency,
       listing: provisionedListing,
       collateral: { ...collateral, template_id: templateId },
@@ -53,6 +54,21 @@ export async function POST(
       qrCodeUrl,
       qrTargetUrl,
     });
+
+    const existing = collateral.document_json;
+    const documentJson =
+      existing && isSalesBrochureDocument(existing)
+        ? {
+            ...built,
+            property: {
+              ...built.property,
+              hero_image_url: existing.property.hero_image_url,
+              selected_image_urls: existing.property.selected_image_urls,
+              page_one_image_urls: existing.property.page_one_image_urls,
+              page_two_image_urls: existing.property.page_two_image_urls,
+            },
+          }
+        : built;
 
     const generatedAt = new Date().toISOString();
 

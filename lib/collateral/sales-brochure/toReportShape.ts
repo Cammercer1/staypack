@@ -1,4 +1,9 @@
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { blurbBlocksToPlainText, getBlurbBlocks } from "@/lib/collateral/sales-brochure/blurbBlocks";
+import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
+import {
+  resolveBrochurePrice,
+  type SalesBrochureDocumentJson,
+} from "@/lib/collateral/templates/types";
 import type { FinalReportJson } from "@/lib/types";
 
 /** Maps brochure document to report preview shape for shared Classic layout components. */
@@ -50,7 +55,7 @@ export function salesBrochureToReportShape(
       selected_image_urls: property.page_one_image_urls.filter(
         (url) => url !== property.hero_image_url,
       ),
-      display_price: property.display_price,
+      display_price: resolveBrochurePrice(document),
     },
     str: {
       annual_revenue: null,
@@ -70,10 +75,10 @@ export function salesBrochureToReportShape(
     },
     copy: {
       heading: copy.heading,
-      blurb: copy.blurb,
+      blurb: blurbBlocksToPlainText(getBlurbBlocks(copy)) || copy.blurb,
       key_metrics_line: "",
-      appeal_points: copy.appeal_points,
-      supporting_factors: copy.feature_highlights,
+      appeal_points: getPropertyHighlights(copy),
+      supporting_factors: [],
       buyer_checks: [],
       methodology_note: "",
       disclaimer: copy.disclaimer,

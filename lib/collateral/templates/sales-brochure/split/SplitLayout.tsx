@@ -1,6 +1,18 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
+import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import {
+  getBlurbBlocks,
+  sliceBlurbBlocksByParagraphs,
+} from "@/lib/collateral/sales-brochure/blurbBlocks";
+import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
+import {
+  resolveBrochurePrice,
+  resolveBrochurePriceLabel,
+  type SalesBrochureDocumentJson,
+} from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
@@ -126,8 +138,12 @@ export function SplitPhotoColumn({ document }: { document: SalesBrochureDocument
     <div className="grid h-full grid-rows-[1.05fr_0.55fr_0.65fr] gap-[3px] bg-white">
       {photos.top ? (
         <div className="min-h-0 overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photos.top} alt="" className="h-full w-full object-cover" />
+          <EditableImage
+            slot={{ kind: "page_one", index: 0 }}
+            src={photos.top}
+            className="h-full w-full"
+            imgClassName="h-full w-full object-cover"
+          />
         </div>
       ) : (
         <div className="bg-neutral-200" />
@@ -136,8 +152,12 @@ export function SplitPhotoColumn({ document }: { document: SalesBrochureDocument
         {[photos.middleLeft, photos.middleRight].map((url, index) =>
           url ? (
             <div key={`${url}-${index}`} className="min-h-0 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="h-full w-full object-cover" />
+              <EditableImage
+                slot={{ kind: "page_one", index: index + 1 }}
+                src={url}
+                className="h-full w-full"
+                imgClassName="h-full w-full object-cover"
+              />
             </div>
           ) : (
             <div key={index} className="bg-neutral-200" />
@@ -146,8 +166,12 @@ export function SplitPhotoColumn({ document }: { document: SalesBrochureDocument
       </div>
       {photos.bottom ? (
         <div className="min-h-0 overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photos.bottom} alt="" className="h-full w-full object-cover" />
+          <EditableImage
+            slot={{ kind: "page_one", index: 3 }}
+            src={photos.bottom}
+            className="h-full w-full"
+            imgClassName="h-full w-full object-cover"
+          />
         </div>
       ) : (
         <div className="bg-neutral-200" />
@@ -172,8 +196,10 @@ export function SplitContentColumn({
   const showAddressLine = !headlineIncludesAddress(headline, document.property.address);
   const subline = document.copy.inspection_cta?.trim() || "";
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
-  const blurbParagraphs = document.copy.blurb.split(/\n\n+/).filter(Boolean);
-  const blurbPreview = blurbParagraphs.slice(0, compact ? 2 : 3).join("\n\n");
+  const { visible: blurbPreviewBlocks } = sliceBlurbBlocksByParagraphs(
+    getBlurbBlocks(document.copy),
+    compact ? 2 : 3,
+  );
 
   return (
     <div
@@ -190,32 +216,33 @@ export function SplitContentColumn({
           </p>
         ) : null}
 
-        <h1
+        <Editable
+          as="h1"
+          path="copy.heading"
           className="line-clamp-4 text-[1.2rem] font-bold leading-[1.15] text-neutral-900"
           style={{ fontFamily: headingFont }}
         >
           {headline}
-        </h1>
+        </Editable>
 
         {subline ? (
-          <p
+          <Editable
+            as="p"
+            path="copy.inspection_cta"
             className="line-clamp-2 text-[0.78rem] font-semibold leading-snug text-neutral-800"
             style={{ fontFamily: headingFont }}
           >
             {subline}
-          </p>
+          </Editable>
         ) : null}
 
-        {blurbPreview ? (
-          <p
-            className={`line-clamp-5 text-[0.72rem] leading-[1.65] text-neutral-600 ${
-              compact ? "line-clamp-4" : ""
-            }`}
-            style={{ fontFamily: bodyFont }}
-          >
-            {blurbPreview}
-          </p>
-        ) : null}
+        <BrochureBlurbContent
+          document={document}
+          blocks={blurbPreviewBlocks}
+          className={compact ? "line-clamp-4" : "line-clamp-5"}
+          paragraphClassName="text-[0.72rem] leading-[1.65] text-neutral-600"
+          headingClassName="text-[0.7rem] font-bold uppercase tracking-wide text-neutral-800"
+        />
 
         {features.length > 0 ? (
           <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5">
@@ -234,20 +261,24 @@ export function SplitContentColumn({
       </div>
 
       <div className="mt-auto shrink-0">
-        {document.property.display_price ? (
+        {resolveBrochurePrice(document) ? (
           <div className="mb-3">
-            <p
+            <Editable
+              as="p"
+              path="copy.price_label"
               className="text-[0.65rem] font-medium uppercase tracking-wide text-neutral-500"
               style={{ fontFamily: headingFont }}
             >
-              Offered at
-            </p>
-            <p
+              {resolveBrochurePriceLabel(document)}
+            </Editable>
+            <Editable
+              as="p"
+              path="copy.price_value"
               className="mt-1 text-[1.45rem] font-bold leading-none text-neutral-900"
               style={{ fontFamily: headingFont, color: accent }}
             >
-              {document.property.display_price}
-            </p>
+              {resolveBrochurePrice(document)}
+            </Editable>
           </div>
         ) : null}
 
@@ -301,17 +332,12 @@ export function SplitSpreadLayout({
   );
 }
 
-/** Page 2 feature list — includes appeal points and highlights. */
+/** Page 2 feature list — property highlights plus page-one stats when needed. */
 export function buildSplitFeatureItems(document: SalesBrochureDocumentJson) {
   const { property, copy } = document;
   const items = buildSplitPageOneFeatures(document);
 
-  for (const point of copy.appeal_points) {
-    if (items.length >= 8) break;
-    if (!items.includes(point)) items.push(point);
-  }
-
-  for (const point of copy.feature_highlights) {
+  for (const point of getPropertyHighlights(copy)) {
     if (items.length >= 8) break;
     if (!items.includes(point)) items.push(point);
   }

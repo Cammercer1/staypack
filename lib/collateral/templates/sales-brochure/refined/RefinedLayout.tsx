@@ -1,24 +1,22 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
+import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
+import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
+import {
+  resolveBrochurePrice,
+  resolveBrochurePriceLabel,
+  type SalesBrochureDocumentJson,
+} from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
 
 function buildRefinedFeatures(document: SalesBrochureDocumentJson) {
-  const items: string[] = [];
-
-  for (const point of document.copy.appeal_points) {
-    if (items.length >= 6) break;
-    items.push(point);
-  }
-  for (const point of document.copy.feature_highlights) {
-    if (items.length >= 5) break;
-    if (!items.includes(point)) items.push(point);
-  }
-
-  return items;
+  return getPropertyHighlights(document.copy).slice(0, 6);
 }
 
 function formatSpecsLine(document: SalesBrochureDocumentJson) {
@@ -120,17 +118,11 @@ export function RefinedBody({
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[1.05fr_0.95fr] gap-6 overflow-hidden px-10 pb-5 pt-10">
       <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
-        {document.copy.blurb
-          ? document.copy.blurb.split(/\n\n+/).map((paragraph) => (
-              <p
-                key={paragraph.slice(0, 48)}
-                className="text-[0.76rem] leading-[1.65] text-neutral-700"
-                style={{ fontFamily: bodyFont }}
-              >
-                {paragraph.trim()}
-              </p>
-            ))
-          : null}
+        <BrochureBlurbContent
+          document={document}
+          paragraphClassName="text-[0.76rem] leading-[1.65] text-neutral-700"
+          headingClassName="text-[0.8rem] font-bold uppercase tracking-wide text-neutral-900"
+        />
 
         {features.length > 0 ? (
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -138,41 +130,51 @@ export function RefinedBody({
               className="text-[1rem] font-bold uppercase tracking-wide text-neutral-900"
               style={{ fontFamily: headingFont }}
             >
-              Key features
+              Property highlights
             </h2>
             <ul className="mt-2 space-y-1.5">
-              {features.map((item) => (
+              {features.map((item, index) => (
                 <li
-                  key={item}
+                  key={`highlight-${index}`}
                   className="flex gap-2 text-[0.72rem] leading-snug text-neutral-700"
                   style={{ fontFamily: bodyFont }}
                 >
                   <span className="mt-[0.35rem] h-1 w-1 shrink-0 rounded-full bg-neutral-800" />
-                  <span className="min-w-0">{item}</span>
+                  <Editable
+                    as="span"
+                    path={`copy.property_highlights.${index}`}
+                    className="min-w-0"
+                  >
+                    {item}
+                  </Editable>
                 </li>
               ))}
             </ul>
           </div>
         ) : null}
 
-        {document.property.display_price ? (
+        {resolveBrochurePrice(document) ? (
           <div className="shrink-0 pt-1">
-            <p
+            <Editable
+              as="p"
+              path="copy.price_label"
               className="text-[0.65rem] font-medium uppercase tracking-[0.22em] text-neutral-500"
               style={{ fontFamily: headingFont }}
             >
-              Asking price
-            </p>
+              {resolveBrochurePriceLabel(document)}
+            </Editable>
             <div
               className="mt-1.5 inline-block px-4 py-2.5"
               style={{ backgroundColor: priceBoxBg }}
             >
-              <p
+              <Editable
+                as="p"
+                path="copy.price_value"
                 className="text-[1.5rem] font-bold leading-none"
                 style={{ fontFamily: headingFont, color: priceBoxText }}
               >
-                {document.property.display_price}
-              </p>
+                {resolveBrochurePrice(document)}
+              </Editable>
             </div>
           </div>
         ) : null}
@@ -185,34 +187,48 @@ export function RefinedBody({
               sideIsFloorPlan ? "bg-white" : "bg-neutral-200"
             }`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <EditableImage
+              slot={{ kind: "page_one", index: 1 }}
               src={side}
-              alt={sideIsFloorPlan ? "Floor plan" : ""}
-              className={`h-full w-full ${sideIsFloorPlan ? "object-contain" : "object-cover"}`}
+              className="h-full w-full"
+              imgClassName={`h-full w-full ${sideIsFloorPlan ? "object-contain" : "object-cover"}`}
             />
           </div>
         ) : (
           <div className="min-h-0 flex-1 bg-neutral-50" />
         )}
         {document.copy.inspection_cta ? (
-          <p
+          <Editable
+            as="p"
+            path="copy.inspection_cta"
             className="mt-2 shrink-0 text-center text-[0.65rem] font-medium uppercase tracking-[0.12em] text-neutral-500"
             style={{ fontFamily: headingFont }}
           >
             {document.copy.inspection_cta}
-          </p>
+          </Editable>
         ) : null}
       </div>
     </div>
   );
 }
 
-function RefinedGalleryCell({ url, className = "" }: { url: string; className?: string }) {
+function RefinedGalleryCell({
+  url,
+  className = "",
+  galleryIndex,
+}: {
+  url: string;
+  className?: string;
+  galleryIndex: number;
+}) {
   return (
     <div className={`min-h-0 overflow-hidden bg-neutral-200 ${className}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="" className="h-full w-full object-cover" />
+      <EditableImage
+        slot={{ kind: "gallery", index: galleryIndex }}
+        src={url}
+        className="h-full w-full"
+        imgClassName="h-full w-full object-cover"
+      />
     </div>
   );
 }
@@ -223,14 +239,14 @@ export function RefinedPageTwoGallery({ urls }: { urls: string[] }) {
   if (images.length === 0) return null;
 
   if (images.length === 1) {
-    return <RefinedGalleryCell url={images[0]} className="h-full" />;
+    return <RefinedGalleryCell url={images[0]} className="h-full" galleryIndex={0} />;
   }
 
   if (images.length === 2) {
     return (
       <div className="grid h-full grid-cols-2 gap-[3px]">
-        {images.map((url) => (
-          <RefinedGalleryCell key={url} url={url} />
+        {images.map((url, index) => (
+          <RefinedGalleryCell key={url} url={url} galleryIndex={index} />
         ))}
       </div>
     );
@@ -239,9 +255,9 @@ export function RefinedPageTwoGallery({ urls }: { urls: string[] }) {
   if (images.length === 3) {
     return (
       <div className="grid h-full grid-cols-2 gap-[3px]">
-        <RefinedGalleryCell url={images[0]} className="row-span-2" />
-        <RefinedGalleryCell url={images[1]} />
-        <RefinedGalleryCell url={images[2]} />
+        <RefinedGalleryCell url={images[0]} className="row-span-2" galleryIndex={0} />
+        <RefinedGalleryCell url={images[1]} galleryIndex={1} />
+        <RefinedGalleryCell url={images[2]} galleryIndex={2} />
       </div>
     );
   }
@@ -249,8 +265,8 @@ export function RefinedPageTwoGallery({ urls }: { urls: string[] }) {
   if (images.length === 4) {
     return (
       <div className="grid h-full grid-cols-2 grid-rows-2 gap-[3px]">
-        {images.map((url) => (
-          <RefinedGalleryCell key={url} url={url} />
+        {images.map((url, index) => (
+          <RefinedGalleryCell key={url} url={url} galleryIndex={index} />
         ))}
       </div>
     );
@@ -259,23 +275,23 @@ export function RefinedPageTwoGallery({ urls }: { urls: string[] }) {
   if (images.length === 5) {
     return (
       <div className="grid h-full grid-cols-6 grid-rows-2 gap-[3px]">
-        <RefinedGalleryCell url={images[0]} className="col-span-3 row-span-2" />
-        <RefinedGalleryCell url={images[1]} className="col-span-3" />
-        <RefinedGalleryCell url={images[2]} className="col-span-3" />
-        <RefinedGalleryCell url={images[3]} className="col-span-2" />
-        <RefinedGalleryCell url={images[4]} className="col-span-2" />
+        <RefinedGalleryCell url={images[0]} className="col-span-3 row-span-2" galleryIndex={0} />
+        <RefinedGalleryCell url={images[1]} className="col-span-3" galleryIndex={1} />
+        <RefinedGalleryCell url={images[2]} className="col-span-3" galleryIndex={2} />
+        <RefinedGalleryCell url={images[3]} className="col-span-2" galleryIndex={3} />
+        <RefinedGalleryCell url={images[4]} className="col-span-2" galleryIndex={4} />
       </div>
     );
   }
 
   return (
     <div className="grid h-full grid-cols-12 grid-rows-6 gap-[3px]">
-      <RefinedGalleryCell url={images[0]} className="col-span-7 row-span-4" />
-      <RefinedGalleryCell url={images[1]} className="col-span-5 row-span-3" />
-      <RefinedGalleryCell url={images[2]} className="col-span-5 row-span-3" />
-      <RefinedGalleryCell url={images[3]} className="col-span-4 row-span-2" />
-      <RefinedGalleryCell url={images[4]} className="col-span-4 row-span-2" />
-      <RefinedGalleryCell url={images[5]} className="col-span-4 row-span-2" />
+      <RefinedGalleryCell url={images[0]} className="col-span-7 row-span-4" galleryIndex={0} />
+      <RefinedGalleryCell url={images[1]} className="col-span-5 row-span-3" galleryIndex={1} />
+      <RefinedGalleryCell url={images[2]} className="col-span-5 row-span-3" galleryIndex={2} />
+      <RefinedGalleryCell url={images[3]} className="col-span-4 row-span-2" galleryIndex={3} />
+      <RefinedGalleryCell url={images[4]} className="col-span-4 row-span-2" galleryIndex={4} />
+      <RefinedGalleryCell url={images[5]} className="col-span-4 row-span-2" galleryIndex={5} />
     </div>
   );
 }
@@ -287,8 +303,12 @@ export function RefinedFooterImage({ document }: { document: SalesBrochureDocume
 
   return (
     <div className="h-[88mm] shrink-0 overflow-hidden">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={footer} alt="" className="h-full w-full object-cover" />
+      <EditableImage
+        slot={{ kind: "page_one", index: 2 }}
+        src={footer}
+        className="h-full w-full"
+        imgClassName="h-full w-full object-cover"
+      />
     </div>
   );
 }

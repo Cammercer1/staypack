@@ -3,7 +3,6 @@ import { requireCollateralAccess } from "@/lib/auth/requireUser";
 import { buildBusinessCardListingSlice } from "@/lib/collateral/buildBusinessCardDocument";
 import { ensureBusinessCardDocument } from "@/lib/collateral/business-card/normalizeBusinessCardDocument";
 import { BUSINESS_CARD_VARIANT_IDS } from "@/lib/collateral/business-card/formats";
-import { enforceSalesBrochureCopyLimits } from "@/lib/collateral/sales-brochure/copyLimits";
 import { provisionCollateralQr } from "@/lib/collateral/provisionCollateralQr";
 import { SOCIAL_POST_VARIANT_IDS } from "@/lib/collateral/social/formats";
 import {
@@ -11,6 +10,10 @@ import {
   setVariantLayers,
   syncSharedContentAcrossVariants,
 } from "@/lib/collateral/social/variantLayers";
+import {
+  coerceSalesBrochureCopy,
+  coerceSalesBrochureCopyForEditor,
+} from "@/lib/collateral/sales-brochure/propertyHighlights";
 import { normalizeListingSlice } from "@/lib/collateral/social/listingFeatures";
 import { ensureSocialPostsDocument, normalizeSocialLayers } from "@/lib/collateral/social/normalizeSocialDocument";
 import {
@@ -242,8 +245,25 @@ async function patchSalesBrochure(
     ...current,
     template_id: nextTemplateId,
     copy: body.copy
-      ? enforceSalesBrochureCopyLimits({ ...current.copy, ...body.copy })
-      : current.copy,
+      ? coerceSalesBrochureCopyForEditor({ ...current.copy, ...body.copy })
+      : coerceSalesBrochureCopy(current.copy),
+    property: body.property
+      ? {
+          ...current.property,
+          ...(body.property.hero_image_url != null
+            ? { hero_image_url: body.property.hero_image_url }
+            : {}),
+          ...(body.property.selected_image_urls != null
+            ? { selected_image_urls: body.property.selected_image_urls }
+            : {}),
+          ...(body.property.page_one_image_urls != null
+            ? { page_one_image_urls: body.property.page_one_image_urls }
+            : {}),
+          ...(body.property.page_two_image_urls != null
+            ? { page_two_image_urls: body.property.page_two_image_urls }
+            : {}),
+        }
+      : current.property,
   };
 
   const { data, error } = await supabase

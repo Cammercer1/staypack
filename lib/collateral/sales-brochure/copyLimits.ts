@@ -1,4 +1,15 @@
+import {
+  BLURB_BLOCKS_MAX,
+  BLURB_HEADING_MAX,
+  BLURB_PARAGRAPH_MAX,
+  blurbBlocksToPlainText,
+  normalizeBlurbBlocks,
+} from "@/lib/collateral/sales-brochure/blurbBlocks";
 import type { SalesBrochureCopyJson } from "@/lib/collateral/templates/types";
+import {
+  PROPERTY_HIGHLIGHTS_ITEM_MAX,
+  PROPERTY_HIGHLIGHTS_MAX,
+} from "@/lib/collateral/sales-brochure/propertyHighlights";
 
 export const SALES_BROCHURE_COPY_LIMITS = {
   heading: {
@@ -8,25 +19,29 @@ export const SALES_BROCHURE_COPY_LIMITS = {
   },
   blurb: {
     max: 340,
-    label: "Blurb",
-    hint: "About 4–5 lines on page 1.",
+    label: "Property description",
+    hint: "Use paragraphs and optional section headings. Add or remove blocks as needed.",
   },
-  appeal_points: {
-    max: 4,
-    itemMax: 120,
-    label: "Appeal points",
-    hint: "Up to 4 short bullets on page 1.",
-  },
-  feature_highlights: {
-    max: 6,
-    itemMax: 140,
-    label: "Feature highlights",
-    hint: "Up to 6 bullets on page 2.",
+  property_highlights: {
+    max: PROPERTY_HIGHLIGHTS_MAX,
+    itemMax: PROPERTY_HIGHLIGHTS_ITEM_MAX,
+    label: "Property highlights",
+    hint: "Optional bullet list (up to 8). Leave empty for description-only brochures.",
   },
   inspection_cta: {
     max: 120,
     label: "Inspection CTA",
     hint: "Open-home or contact call-to-action.",
+  },
+  price_label: {
+    max: 24,
+    label: "Price label",
+    hint: 'Wording shown above the price (e.g. "Price", "Guide", "Offers over"). Leave blank for "Price".',
+  },
+  price_value: {
+    max: 60,
+    label: "Price",
+    hint: "Overrides the price shown on this brochure only. Leave blank to use the listing price.",
   },
   disclaimer: {
     max: 500,
@@ -44,8 +59,7 @@ export const SALES_BROCHURE_COPY_LIMITS = {
 const AI_GENERATED_COPY_KEYS = [
   "heading",
   "blurb",
-  "appeal_points",
-  "feature_highlights",
+  "property_highlights",
   "inspection_cta",
   "disclaimer",
 ] as const;
@@ -64,23 +78,40 @@ export function getSalesBrochureCopyPromptLimits() {
     .join("\n");
 }
 
+/** Clamps AI-generated copy to layout-friendly lengths. User edits are not clamped. */
 export function enforceSalesBrochureCopyLimits(
   copy: SalesBrochureCopyJson,
 ): SalesBrochureCopyJson {
   const limits = SALES_BROCHURE_COPY_LIMITS;
 
+  const blurb_blocks = normalizeBlurbBlocks(copy.blurb_blocks ?? []).map((block) =>
+    block.type === "heading"
+      ? { type: "heading" as const, text: truncate(block.text, BLURB_HEADING_MAX) }
+      : {
+          type: "paragraph" as const,
+          text: truncate(block.text, BLURB_PARAGRAPH_MAX),
+        },
+  ).slice(0, BLURB_BLOCKS_MAX);
+  const blurb = blurbBlocksToPlainText(blurb_blocks);
+
   return {
     heading: truncate(copy.heading, limits.heading.max),
-    blurb: truncate(copy.blurb, limits.blurb.max),
-    appeal_points: copy.appeal_points
-      .slice(0, limits.appeal_points.max)
-      .map((item) => truncate(item, limits.appeal_points.itemMax)),
-    feature_highlights: copy.feature_highlights
-      .slice(0, limits.feature_highlights.max)
-      .map((item) => truncate(item, limits.feature_highlights.itemMax)),
+    blurb: truncate(blurb, limits.blurb.max),
+    blurb_blocks,
+    property_highlights: (copy.property_highlights ?? [])
+      .slice(0, limits.property_highlights.max)
+      .map((item) => truncate(item, limits.property_highlights.itemMax)),
     inspection_cta: truncate(copy.inspection_cta, limits.inspection_cta.max),
     disclaimer: truncate(copy.disclaimer, limits.disclaimer.max),
     page_two_note: truncate(copy.page_two_note ?? "", limits.page_two_note.max),
+    price_label:
+      copy.price_label != null
+        ? truncate(copy.price_label, limits.price_label.max)
+        : undefined,
+    price_value:
+      copy.price_value != null
+        ? truncate(copy.price_value, limits.price_value.max)
+        : undefined,
   };
 }
 

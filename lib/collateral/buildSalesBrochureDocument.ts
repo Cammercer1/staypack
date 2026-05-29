@@ -5,6 +5,7 @@ import type {
   SalesBrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
+import { coerceSalesBrochureCopy } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
 import {
   primaryReportAgent,
@@ -114,7 +115,7 @@ export function buildSalesBrochureDocument({
       page_one_image_urls: images.page_one_image_urls,
       page_two_image_urls: images.page_two_image_urls,
     },
-    copy,
+    copy: coerceSalesBrochureCopy(copy),
     qr_target_url: qrTargetUrl,
     assets: {
       qr_code_url: qrCodeUrl,
@@ -139,15 +140,16 @@ export function getMockSalesBrochureCopy(
     ? `${descriptor.charAt(0).toUpperCase()}${descriptor.slice(1)} ${purposeLabel}`
     : "Your next home awaits";
 
+  const blurb = `Discover ${address} — a well-presented opportunity in a sought-after pocket. Arrange an inspection to experience the layout, natural light and lifestyle appeal for yourself.`;
+
   return {
     heading,
-    blurb: `Discover ${address} — a well-presented opportunity in a sought-after pocket. Arrange an inspection to experience the layout, natural light and lifestyle appeal for yourself.`,
-    appeal_points: [
+    blurb,
+    blurb_blocks: [{ type: "paragraph", text: blurb }],
+    property_highlights: [
       "Practical floor plan suited to everyday living.",
       "Convenient access to local amenities and transport.",
       "Presented for buyers seeking quality and location.",
-    ],
-    feature_highlights: [
       "Generous living zones with flexible accommodation.",
       "Low-maintenance outdoor areas for relaxed entertaining.",
       "Secure parking and storage where applicable.",

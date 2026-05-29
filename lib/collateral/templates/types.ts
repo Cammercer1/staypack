@@ -245,15 +245,29 @@ export type SocialPostsDocumentJson = {
   >;
 };
 
+export type BrochureBlurbBlock =
+  | { type: "heading"; text: string }
+  | { type: "paragraph"; text: string };
+
 export type SalesBrochureCopyJson = {
   heading: string;
+  /** Plain-text fallback; kept in sync with `blurb_blocks` for AI and legacy readers. */
   blurb: string;
-  appeal_points: string[];
-  feature_highlights: string[];
+  /** Structured description — preferred for editing and layout. */
+  blurb_blocks: BrochureBlurbBlock[];
+  /** Up to 8 short bullets — layout may show fewer depending on template. */
+  property_highlights: string[];
   inspection_cta: string;
   disclaimer: string;
   /** Optional extra paragraph shown at the foot of the page-two gallery. */
   page_two_note?: string;
+  /** Label shown above the price across every brochure layout. Defaults to "Price". */
+  price_label?: string;
+  /**
+   * Brochure-only override for the displayed price. When blank, the brochure
+   * falls back to the listing's scraped price (`property.display_price`).
+   */
+  price_value?: string;
 };
 
 export type SalesBrochurePropertySlice = {
@@ -299,6 +313,26 @@ export function isSalesBrochureDocument(
   document: CollateralDocumentJson,
 ): document is SalesBrochureDocumentJson {
   return document.type === "sales_brochure";
+}
+
+/** Default wording shown above the price when the user hasn't customised it. */
+export const DEFAULT_BROCHURE_PRICE_LABEL = "Price";
+
+/** Resolves the price label for a brochure, falling back to the default. */
+export function resolveBrochurePriceLabel(
+  document: SalesBrochureDocumentJson,
+): string {
+  return document.copy.price_label?.trim() || DEFAULT_BROCHURE_PRICE_LABEL;
+}
+
+/**
+ * Resolves the price shown on a brochure: a user override when set, otherwise
+ * the listing's scraped price.
+ */
+export function resolveBrochurePrice(
+  document: SalesBrochureDocumentJson,
+): string {
+  return document.copy.price_value?.trim() || document.property.display_price;
 }
 
 export function isSocialPostsDocument(

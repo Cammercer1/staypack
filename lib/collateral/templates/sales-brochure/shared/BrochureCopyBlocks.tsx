@@ -1,4 +1,10 @@
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
+import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
+import {
+  resolveBrochurePrice,
+  resolveBrochurePriceLabel,
+  type SalesBrochureDocumentJson,
+} from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
 
 export function BrochureAddressBlock({
@@ -26,12 +32,14 @@ export function BrochureAddressBlock({
         {[property.suburb, property.state, property.postcode].filter(Boolean).join(", ")}
       </p>
       {copy.heading ? (
-        <p
+        <Editable
+          as="p"
+          path="copy.heading"
           className={`mt-3 font-semibold leading-snug ${large ? "text-xl" : "text-lg"} ${textClass}`}
           style={{ fontFamily: "var(--report-heading-font, inherit)" }}
         >
           {copy.heading}
-        </p>
+        </Editable>
       ) : null}
     </div>
   );
@@ -74,7 +82,7 @@ export function BrochurePriceBlock({
   document: SalesBrochureDocumentJson;
   inverted?: boolean;
 }) {
-  if (!document.property.display_price) return null;
+  if (!resolveBrochurePrice(document)) return null;
 
   return (
     <div
@@ -85,19 +93,23 @@ export function BrochurePriceBlock({
           : { backgroundColor: "var(--report-soft-highlight, #f3f4f6)" }
       }
     >
-      <p
+      <Editable
+        as="p"
+        path="copy.price_label"
         className={`text-[0.7rem] font-semibold uppercase tracking-[0.14em] ${
           inverted ? "text-white/90" : "text-neutral-600"
         }`}
       >
-        Guide price
-      </p>
-      <p
+        {resolveBrochurePriceLabel(document)}
+      </Editable>
+      <Editable
+        as="p"
+        path="copy.price_value"
         className={`mt-2 text-[2rem] font-semibold leading-none ${inverted ? "text-white" : ""}`}
         style={{ fontFamily: "var(--report-heading-font, inherit)" }}
       >
-        {document.property.display_price}
-      </p>
+        {resolveBrochurePrice(document)}
+      </Editable>
     </div>
   );
 }
@@ -106,10 +118,12 @@ export function BrochureBulletList({
   items,
   title,
   max = 6,
+  pathPrefix,
 }: {
   items: string[];
   title?: string;
   max?: number;
+  pathPrefix?: "copy.property_highlights";
 }) {
   if (!items.length) return null;
 
@@ -124,13 +138,22 @@ export function BrochureBulletList({
         </h3>
       ) : null}
       <ul className={`flex flex-col gap-2.5 ${title ? "mt-4" : ""}`}>
-        {items.slice(0, max).map((point) => (
+        {items.slice(0, max).map((point, index) => (
           <li
-            key={point}
+            key={pathPrefix ? `${pathPrefix}-${index}` : point}
             className="flex gap-2.5 text-[0.85rem] leading-relaxed text-neutral-700"
           >
             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-400" />
-            <span>{point}</span>
+            {pathPrefix ? (
+              <Editable
+                as="span"
+                path={`${pathPrefix}.${index}` as BrochureCopyFieldPath}
+              >
+                {point}
+              </Editable>
+            ) : (
+              <span>{point}</span>
+            )}
           </li>
         ))}
       </ul>

@@ -1,4 +1,4 @@
-import { ClassicHeroGallery } from "@/lib/reports/templates/classic/ClassicHeroGallery";
+import { BrochurePageOneHeroGallery } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageOneHeroGallery";
 import { ClassicPageHeader } from "@/lib/reports/templates/classic/ClassicPageHeader";
 import { salesBrochureToReportShape } from "@/lib/collateral/sales-brochure/toReportShape";
 import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
@@ -12,12 +12,6 @@ type Props = {
 export function ClassicSalesBrochurePageOne({ document }: Props) {
   const report = salesBrochureToReportShape(document);
   const brand = getReportBrandColours(report.agency);
-  const pageOneProperty = {
-    ...report.property,
-    hero_image_url: document.property.page_one_image_urls[0] ?? report.property.hero_image_url,
-    selected_image_urls: document.property.page_one_image_urls.slice(1),
-  };
-
   return (
     <section
       className="report-page mx-auto flex flex-col overflow-hidden shadow-sm"
@@ -30,7 +24,7 @@ export function ClassicSalesBrochurePageOne({ document }: Props) {
     >
       <ClassicPageHeader report={report} />
       <div className="min-h-0 flex-1">
-        <ClassicHeroGallery property={pageOneProperty} />
+        <BrochurePageOneHeroGallery document={document} />
       </div>
       <SalesBrochurePropertySection document={document} />
     </section>

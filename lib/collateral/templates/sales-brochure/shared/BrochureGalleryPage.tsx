@@ -1,4 +1,5 @@
 import type { FinalReportJson } from "@/lib/types";
+import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
 import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
 import { BrochureClosingBand } from "@/lib/collateral/templates/sales-brochure/shared/BrochureClosingBand";
 import { BrochurePhotoCollage } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePhotoCollage";
@@ -26,12 +27,14 @@ export function getBrochureGalleryPhotos(
 function GalleryNote({ text }: { text: string }) {
   return (
     <div className="shrink-0 px-10 pt-5">
-      <p
+      <Editable
+        as="p"
+        path="copy.page_two_note"
         className="text-[0.8rem] leading-relaxed text-neutral-700"
         style={{ fontFamily: bodyFont }}
       >
         {text}
-      </p>
+      </Editable>
     </div>
   );
 }

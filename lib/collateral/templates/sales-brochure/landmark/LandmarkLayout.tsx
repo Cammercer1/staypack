@@ -1,6 +1,15 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
+import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
+import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
+import {
+  resolveBrochurePrice,
+  resolveBrochurePriceLabel,
+  type SalesBrochureDocumentJson,
+} from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
@@ -145,15 +154,19 @@ function LandmarkRightColumn({
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-hidden pl-6">
-      {document.property.display_price ? (
+      {resolveBrochurePrice(document) ? (
         <div className="space-y-1">
-          <LandmarkSectionLabel accent={accent}>Price</LandmarkSectionLabel>
-          <p
+          <Editable as="p" path="copy.price_label" className="text-[0.65rem] font-semibold uppercase tracking-[0.12em]" style={{ color: accent, fontFamily: headingFont }}>
+            {resolveBrochurePriceLabel(document)}
+          </Editable>
+          <Editable
+            as="p"
+            path="copy.price_value"
             className="text-[0.78rem] font-semibold text-neutral-900"
             style={{ fontFamily: bodyFont }}
           >
-            {document.property.display_price}
-          </p>
+            {resolveBrochurePrice(document)}
+          </Editable>
         </div>
       ) : null}
 
@@ -250,45 +263,44 @@ function LandmarkLeftColumn({
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
   const headline =
     document.copy.heading?.trim() || document.property.summary?.trim() || "";
-  const paragraphs = document.copy.blurb.split(/\n\n+/).filter(Boolean);
 
-  const bullets = [
-    ...document.copy.appeal_points,
-    ...document.copy.feature_highlights,
-  ].filter((v, i, arr) => arr.indexOf(v) === i);
+  const bullets = getPropertyHighlights(document.copy);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {headline ? (
-        <h1
+        <Editable
+          as="h1"
+          path="copy.heading"
           className="mb-3 text-[1.1rem] font-bold leading-[1.2] text-neutral-900"
           style={{ fontFamily: headingFont }}
         >
           {headline}
-        </h1>
+        </Editable>
       ) : null}
 
       <div className="min-h-0 flex-1 space-y-2.5 overflow-hidden">
-        {paragraphs.map((para) => (
-          <p
-            key={para.slice(0, 48)}
-            className="text-[0.7rem] leading-[1.68] text-neutral-700"
-            style={{ fontFamily: bodyFont }}
-          >
-            {para.trim()}
-          </p>
-        ))}
+        <BrochureBlurbContent
+          document={document}
+          paragraphClassName="text-[0.7rem] leading-[1.68] text-neutral-700"
+          headingClassName="text-[0.68rem] font-bold uppercase tracking-wide text-neutral-900"
+        />
 
         {bullets.length > 0 ? (
           <ul className="space-y-1.5 pt-1">
-            {bullets.slice(0, 5).map((item) => (
+            {bullets.slice(0, 5).map((item, index) => (
               <li
-                key={item}
+                key={`highlight-${index}`}
                 className="flex gap-2 text-[0.7rem] leading-snug text-neutral-700"
                 style={{ fontFamily: bodyFont }}
               >
                 <span className="mt-[0.3rem] h-[5px] w-[5px] shrink-0 rounded-full bg-neutral-500" />
-                <span>{item}</span>
+                <Editable
+                  as="span"
+                  path={`copy.property_highlights.${index}`}
+                >
+                  {item}
+                </Editable>
               </li>
             ))}
           </ul>
@@ -322,12 +334,14 @@ function LandmarkLeftColumn({
           ) : null}
         </div>
         {document.copy.disclaimer ? (
-          <p
+          <Editable
+            as="p"
+            path="copy.disclaimer"
             className="mt-1.5 text-[0.56rem] leading-relaxed text-neutral-400"
             style={{ fontFamily: bodyFont }}
           >
             {document.copy.disclaimer}
-          </p>
+          </Editable>
         ) : null}
       </div>
     </div>
@@ -353,8 +367,12 @@ export function LandmarkSpread({
       {/* Hero — ~42% of page */}
       <div className="relative h-[125mm] shrink-0 overflow-hidden">
         {hero ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={hero} alt="" className="h-full w-full object-cover" />
+          <EditableImage
+            slot="hero"
+            src={hero}
+            className="h-full w-full"
+            imgClassName="h-full w-full object-cover"
+          />
         ) : (
           <div className="h-full bg-neutral-300" />
         )}
