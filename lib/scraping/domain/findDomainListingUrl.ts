@@ -117,21 +117,23 @@ function extractListingsFromSearchHtml(html: string): DomainSearchListing[] {
       return [];
     }
 
-    return Object.values(listingsMap)
-      .map((entry) => {
-        const model = entry?.listingModel;
-        if (!model?.url) {
-          return null;
-        }
+    const listings: DomainSearchListing[] = [];
 
-        return {
-          url: model.url.startsWith("http")
-            ? model.url
-            : `https://www.domain.com.au${model.url}`,
-          address: model.address,
-        };
-      })
-      .filter((entry): entry is DomainSearchListing => Boolean(entry));
+    for (const entry of Object.values(listingsMap)) {
+      const model = entry?.listingModel;
+      if (!model?.url) {
+        continue;
+      }
+
+      listings.push({
+        url: model.url.startsWith("http")
+          ? model.url
+          : `https://www.domain.com.au${model.url}`,
+        address: model.address,
+      });
+    }
+
+    return listings;
   } catch {
     return [];
   }
