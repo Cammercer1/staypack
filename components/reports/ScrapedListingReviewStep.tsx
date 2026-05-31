@@ -63,6 +63,7 @@ export function ScrapedListingReviewStep({
     listing_title: listing.listing_title ?? "",
     listing_description: listing.listing_description ?? "",
     display_price: normalizeDisplayPrice(listing.display_price) ?? "",
+    bond: normalizeDisplayPrice(listing.bond) ?? "",
     hero_image_url:
       masterSelection.hero_image_url ?? scrapedImages[0] ?? "",
     selected_image_urls: masterSelection.selected_image_urls.length
@@ -116,14 +117,16 @@ export function ScrapedListingReviewStep({
       form.accommodates === "" ? null : Number(form.accommodates),
     );
 
+    const listingAgents = listingAgentsToParsed(
+      initialListingAgents(listing.scraped_listing_json?.agents),
+    );
+
     const payloadBody = {
       ...form,
+      listing_agents: listingAgents,
       ...(listingSetup
         ? {}
         : {
-            listing_agents: listingAgentsToParsed(
-              initialListingAgents(listing.scraped_listing_json?.agents),
-            ),
             hero_image_url: form.hero_image_url || selected[0] || null,
             selected_image_urls: selected.slice(0, MAX_LANDING_IMAGES),
             uploaded_image_urls: uploadedImages,
@@ -199,6 +202,10 @@ export function ScrapedListingReviewStep({
     setForm((current) => {
       const next = { ...current, [field]: value };
 
+      if (field === "listing_purpose" && value === "sale") {
+        next.bond = "";
+      }
+
       if (field === "bedrooms" && !accommodatesTouched) {
         const bedrooms = value === "" ? null : Number(value);
         next.accommodates = bedrooms
@@ -258,17 +265,10 @@ export function ScrapedListingReviewStep({
           ["bathrooms", "Bathrooms"],
           ["car_spaces", "Car spaces"],
           ["accommodates", "Accommodates"],
-          ["display_price", "Display price"],
           ["listing_title", "Title"],
         ].map(([field, label]) => (
           <div key={field} className="space-y-2">
-            <Label htmlFor={field}>
-              {field === "display_price"
-                ? form.listing_purpose === "lease"
-                  ? "Rent (per week)"
-                  : "Sale price"
-                : label}
-            </Label>
+            <Label htmlFor={field}>{label}</Label>
             <Input
               id={field}
               value={String(form[field as keyof typeof form] ?? "")}
@@ -281,6 +281,31 @@ export function ScrapedListingReviewStep({
             ) : null}
           </div>
         ))}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="display_price">
+            {form.listing_purpose === "lease" ? "Rent (per week)" : "Sale price"}
+          </Label>
+          <Input
+            id="display_price"
+            value={form.display_price}
+            onChange={(event) => updateField("display_price", event.target.value)}
+            placeholder={form.listing_purpose === "lease" ? "e.g. $850" : "e.g. $750,000"}
+          />
+        </div>
+        {form.listing_purpose === "lease" ? (
+          <div className="space-y-2">
+            <Label htmlFor="bond">Bond</Label>
+            <Input
+              id="bond"
+              value={form.bond}
+              onChange={(event) => updateField("bond", event.target.value)}
+              placeholder="e.g. $3,400"
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-2">

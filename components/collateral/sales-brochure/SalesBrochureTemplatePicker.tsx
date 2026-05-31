@@ -4,30 +4,45 @@ import { useEffect, useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getCollateralPageFormatLabel } from "@/lib/collateral/pageFormat";
 import { getSalesBrochureTemplatesByPageCount } from "@/lib/collateral/templates/sales-brochure/registry";
+import { getRentalBrochureTemplatesByPageCount } from "@/lib/collateral/templates/rental-brochure/registry";
 import type { CollateralTemplateDefinition } from "@/lib/collateral/templates/types";
+import type { CollateralType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type PageTab = "1" | "2";
+
+type BrochureCollateralType = Extract<
+  CollateralType,
+  "sales_brochure" | "rental_brochure"
+>;
 
 type Props = {
   value: string;
   onChange: (templateId: string) => void;
   defaultTemplateId?: string;
+  collateralType?: BrochureCollateralType;
 };
 
 export function SalesBrochureTemplatePicker({
   value,
   onChange,
   defaultTemplateId,
+  collateralType = "sales_brochure",
 }: Props) {
-  const onePageTemplates = useMemo(
-    () => getSalesBrochureTemplatesByPageCount(1),
-    [],
-  );
-  const twoPageTemplates = useMemo(
-    () => getSalesBrochureTemplatesByPageCount(2),
-    [],
-  );
+  const onePageTemplates = useMemo(() => {
+    const getTemplates =
+      collateralType === "rental_brochure"
+        ? getRentalBrochureTemplatesByPageCount
+        : getSalesBrochureTemplatesByPageCount;
+    return getTemplates(1);
+  }, [collateralType]);
+  const twoPageTemplates = useMemo(() => {
+    const getTemplates =
+      collateralType === "rental_brochure"
+        ? getRentalBrochureTemplatesByPageCount
+        : getSalesBrochureTemplatesByPageCount;
+    return getTemplates(2);
+  }, [collateralType]);
 
   const selectedPages = useMemo(() => {
     const match =

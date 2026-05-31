@@ -5,17 +5,18 @@ import { useEditableContext } from "@/components/collateral/sales-brochure/inlin
 import type { LucideIcon } from "lucide-react";
 import { hasBlurbContent } from "@/lib/collateral/sales-brochure/blurbBlocks";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { BrochureRentalBondInline } from "@/lib/collateral/templates/sales-brochure/shared/BrochureCopyBlocks";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import {
   resolveBrochurePrice,
   resolveBrochurePriceLabel,
-  type SalesBrochureDocumentJson,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
 import { formatNumber } from "@/lib/reports/formatters";
 
 type Props = {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   /** Tighter layout for single-page brochure. */
   compact?: boolean;
 };
@@ -141,6 +142,7 @@ export function SalesBrochurePropertySection({ document, compact = false }: Prop
               >
                 {resolveBrochurePrice(document)}
               </Editable>
+              <BrochureRentalBondInline document={document} compact />
             </div>
           ) : null}
         </div>

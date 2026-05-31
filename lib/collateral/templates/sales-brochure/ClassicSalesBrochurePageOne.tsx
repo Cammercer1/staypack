@@ -1,12 +1,12 @@
 import { BrochurePageOneHeroGallery } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageOneHeroGallery";
 import { ClassicPageHeader } from "@/lib/reports/templates/classic/ClassicPageHeader";
 import { salesBrochureToReportShape } from "@/lib/collateral/sales-brochure/toReportShape";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
 import { getReportBrandColours } from "@/lib/reports/brandColours";
 import { SalesBrochurePropertySection } from "@/lib/collateral/templates/sales-brochure/SalesBrochurePropertySection";
 
 type Props = {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
 };
 
 export function ClassicSalesBrochurePageOne({ document }: Props) {

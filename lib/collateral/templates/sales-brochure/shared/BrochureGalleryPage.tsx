@@ -1,7 +1,6 @@
-import { isBrochureFloorPlanUrl } from "@/lib/collateral/sales-brochure/brochureImageFit";
 import type { FinalReportJson } from "@/lib/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
 import { BrochureClosingBand } from "@/lib/collateral/templates/sales-brochure/shared/BrochureClosingBand";
 import { BrochurePhotoCollage } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePhotoCollage";
 
@@ -12,7 +11,7 @@ const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))"
  * selected photos, with floor-plans and the page-one hero excluded, deduped.
  */
 export function getBrochureGalleryPhotos(
-  document: SalesBrochureDocumentJson,
+  document: BrochureDocumentJson,
 ): string[] {
   const hero = document.property.page_one_image_urls[0];
   return [
@@ -21,7 +20,7 @@ export function getBrochureGalleryPhotos(
     ...document.property.selected_image_urls,
   ]
     .filter(Boolean)
-    .filter((url) => !isBrochureFloorPlanUrl(url) && url !== hero)
+    .filter((url) => url !== hero)
     .filter((url, i, arr) => arr.indexOf(url) === i);
 }
 
@@ -50,7 +49,7 @@ export function BrochureGalleryPage({
   report,
   photos,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
   photos?: string[];
 }) {
@@ -59,7 +58,11 @@ export function BrochureGalleryPage({
 
   return (
     <>
-      <BrochurePhotoCollage photos={gallery} className="min-h-0 flex-1" />
+      <BrochurePhotoCollage
+        photos={gallery}
+        className="min-h-0 flex-1"
+        listingImageMeta={document.listing_image_meta}
+      />
       {note ? <GalleryNote text={note} /> : null}
       <BrochureClosingBand document={document} report={report} />
     </>

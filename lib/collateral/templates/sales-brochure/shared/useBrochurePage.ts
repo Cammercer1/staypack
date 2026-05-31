@@ -1,8 +1,8 @@
 import { salesBrochureToReportShape } from "@/lib/collateral/sales-brochure/toReportShape";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
 import { getReportBrandColours } from "@/lib/reports/brandColours";
 
-export function useBrochurePage(document: SalesBrochureDocumentJson) {
+export function useBrochurePage(document: BrochureDocumentJson) {
   const report = salesBrochureToReportShape(document);
   const brand = getReportBrandColours(report.agency);
 

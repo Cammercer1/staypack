@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { BrandFontLoader } from "@/components/settings/BrandFontLoader";
 import {
   getCollateralPageFormat,
@@ -14,10 +15,13 @@ import {
   getDefaultSocialPostVariantId,
   normalizeSocialPostVariantId,
 } from "@/lib/collateral/social/formats";
-import { coerceSalesBrochureDocument } from "@/lib/collateral/sales-brochure/propertyHighlights";
+import {
+  coerceSalesBrochureDocument,
+  coerceSalesBrochureCopyForEditor,
+} from "@/lib/collateral/sales-brochure/propertyHighlights";
 import { salesBrochureToReportShape } from "@/lib/collateral/sales-brochure/toReportShape";
 import {
-  isSalesBrochureDocument,
+  isBrochureDocument,
   isSocialPostsDocument,
   isBusinessCardDocument,
 } from "@/lib/collateral/templates/types";
@@ -43,6 +47,8 @@ import {
   resolveBodyFontFamily,
   resolveHeadingFontFamily,
 } from "@/lib/branding/google-fonts";
+import { BrochureImageMetaProvider } from "@/components/collateral/sales-brochure/inline/BrochureImageMetaContext";
+import { useEditableContext } from "@/components/collateral/sales-brochure/inline/EditableContext";
 import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
 import type { CollateralType } from "@/lib/types";
 
@@ -57,10 +63,23 @@ export function CollateralPreview({
   printMode?: boolean;
   variantId?: string;
 }) {
-  const previewDocument =
-    collateralType === "sales_brochure" && isSalesBrochureDocument(document)
-      ? coerceSalesBrochureDocument(document)
-      : document;
+  const { showFullBlurb } = useEditableContext();
+
+  const previewDocument = useMemo(() => {
+    if (
+      (collateralType === "sales_brochure" || collateralType === "rental_brochure") &&
+      isBrochureDocument(document)
+    ) {
+      if (showFullBlurb) {
+        return {
+          ...document,
+          copy: coerceSalesBrochureCopyForEditor(document.copy),
+        };
+      }
+      return coerceSalesBrochureDocument(document);
+    }
+    return document;
+  }, [collateralType, document, showFullBlurb]);
 
   const templateId = resolveTemplateIdFromDocument(previewDocument, collateralType);
   const template = getCollateralTemplate(templateId);
@@ -98,7 +117,7 @@ export function CollateralPreview({
     brand_advanced_json: agency.brand_advanced ?? null,
   });
 
-  const salesBrochureReport = isSalesBrochureDocument(previewDocument)
+  const salesBrochureReport = isBrochureDocument(previewDocument)
     ? salesBrochureToReportShape(previewDocument)
     : null;
   const reportBrand = salesBrochureReport
@@ -181,16 +200,31 @@ export function CollateralPreview({
           `,
         }}
       />
-      <Template
-        document={previewDocument}
-        {...(socialVariantId
-          ? { variantId: socialVariantId }
-          : businessCardVariantId
-            ? { variantId: businessCardVariantId }
-          : collateralType === "social_posts"
-            ? { variantId: getDefaultSocialPostVariantId() }
-            : {})}
-      />
+      {isBrochureDocument(previewDocument) ? (
+        <BrochureImageMetaProvider meta={previewDocument.listing_image_meta}>
+          <Template
+            document={previewDocument}
+            {...(socialVariantId
+              ? { variantId: socialVariantId }
+              : businessCardVariantId
+                ? { variantId: businessCardVariantId }
+                : collateralType === "social_posts"
+                  ? { variantId: getDefaultSocialPostVariantId() }
+                  : {})}
+          />
+        </BrochureImageMetaProvider>
+      ) : (
+        <Template
+          document={previewDocument}
+          {...(socialVariantId
+            ? { variantId: socialVariantId }
+            : businessCardVariantId
+              ? { variantId: businessCardVariantId }
+              : collateralType === "social_posts"
+                ? { variantId: getDefaultSocialPostVariantId() }
+                : {})}
+        />
+      )}
     </div>
   );
 }

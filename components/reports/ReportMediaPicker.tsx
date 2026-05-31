@@ -10,6 +10,12 @@ import {
 } from "@/lib/reports/constants";
 import { cn } from "@/lib/utils";
 import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
+import { resolveBrochureImagePresentation } from "@/lib/collateral/sales-brochure/brochureImageFit";
+import {
+  ListingImageMetaBadge,
+  ListingImageMetaControls,
+} from "@/components/listings/ListingImageMetaControls";
+import type { ListingImageMetaMap } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import {
   PRINT_SAFE_LONG_EDGE,
@@ -49,6 +55,8 @@ type Props = {
   selectionHint?: string;
   onUploaded: (uploadedImageUrls: string[]) => void;
   onChange: (heroImageUrl: string, selectedImageUrls: string[]) => void;
+  listingImageMeta?: ListingImageMetaMap;
+  onListingImageMetaChange?: (meta: ListingImageMetaMap) => void;
 };
 
 export function ReportMediaPicker({
@@ -65,6 +73,8 @@ export function ReportMediaPicker({
   selectionHint,
   onUploaded,
   onChange,
+  listingImageMeta,
+  onListingImageMetaChange,
 }: Props) {
   const displayScrapedImages = dedupeImageUrls(scrapedImages);
   const importedTotal = rawScrapedCount ?? scrapedImages.length;
@@ -422,6 +432,8 @@ export function ReportMediaPicker({
           heroImageUrl={heroImageUrl}
           onToggle={toggleImage}
           onSetHero={setHero}
+          listingImageMeta={listingImageMeta}
+          onListingImageMetaChange={onListingImageMetaChange}
         />
       ) : null}
 
@@ -434,6 +446,8 @@ export function ReportMediaPicker({
           heroImageUrl={heroImageUrl}
           onToggle={toggleImage}
           onSetHero={setHero}
+          listingImageMeta={listingImageMeta}
+          onListingImageMetaChange={onListingImageMetaChange}
         />
       ) : null}
 
@@ -459,6 +473,8 @@ function MediaSection({
   heroImageUrl,
   onToggle,
   onSetHero,
+  listingImageMeta,
+  onListingImageMetaChange,
 }: {
   title: string;
   subtitle: string;
@@ -467,7 +483,11 @@ function MediaSection({
   heroImageUrl: string;
   onToggle: (image: string) => void;
   onSetHero: (image: string) => void;
+  listingImageMeta?: ListingImageMetaMap;
+  onListingImageMetaChange?: (meta: ListingImageMetaMap) => void;
 }) {
+  const showMeta = Boolean(listingImageMeta && onListingImageMetaChange);
+
   return (
     <div className="space-y-3">
       <div>
@@ -478,32 +498,53 @@ function MediaSection({
         {images.map((image) => {
           const isSelected = selected.includes(image);
           const isHero = heroImageUrl === image;
+          const presentation = resolveBrochureImagePresentation(
+            image,
+            null,
+            listingImageMeta,
+          );
 
           return (
-            <button
-              key={image}
-              type="button"
-              onClick={() => onToggle(image)}
-              onDoubleClick={() => onSetHero(image)}
-              className={cn(
-                "relative overflow-hidden rounded-lg border",
-                isSelected && "ring-2 ring-primary",
-                isHero && "ring-2 ring-foreground",
-              )}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image} alt="" className="aspect-[4/3] w-full object-cover" />
-              {isHero ? (
-                <span className="absolute top-2 left-2 rounded-full bg-foreground px-2 py-0.5 text-[10px] font-medium text-background">
-                  Hero
-                </span>
+            <div key={image} className="space-y-2">
+              <button
+                type="button"
+                onClick={() => onToggle(image)}
+                onDoubleClick={() => onSetHero(image)}
+                className={cn(
+                  "relative w-full overflow-hidden rounded-lg border",
+                  isSelected && "ring-2 ring-primary",
+                  isHero && "ring-2 ring-foreground",
+                  presentation.frameClassName,
+                )}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={image}
+                  alt=""
+                  className={cn("aspect-[4/3] w-full", presentation.imgClassName)}
+                />
+                {isHero ? (
+                  <span className="absolute top-2 left-2 rounded-full bg-foreground px-2 py-0.5 text-[10px] font-medium text-background">
+                    Hero
+                  </span>
+                ) : null}
+                {isSelected && !isHero ? (
+                  <span className="absolute top-2 right-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
+                    Selected
+                  </span>
+                ) : null}
+                {showMeta && listingImageMeta ? (
+                  <ListingImageMetaBadge url={image} meta={listingImageMeta} />
+                ) : null}
+              </button>
+              {showMeta && listingImageMeta && onListingImageMetaChange ? (
+                <ListingImageMetaControls
+                  url={image}
+                  meta={listingImageMeta}
+                  onChange={onListingImageMetaChange}
+                />
               ) : null}
-              {isSelected && !isHero ? (
-                <span className="absolute top-2 right-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
-                  Selected
-                </span>
-              ) : null}
-            </button>
+            </div>
           );
         })}
       </div>

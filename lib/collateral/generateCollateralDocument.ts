@@ -1,14 +1,16 @@
 import { buildBusinessCardDocument } from "@/lib/collateral/buildBusinessCardDocument";
 import {
+  buildRentalBrochureDocument,
   buildSalesBrochureDocument,
+  getMockRentalBrochureCopy,
   getMockSalesBrochureCopy,
 } from "@/lib/collateral/buildSalesBrochureDocument";
 import { buildSocialPostsDocument } from "@/lib/collateral/buildSocialPostsDocument";
 import { provisionCollateralQr } from "@/lib/collateral/provisionCollateralQr";
 import {
-  isSalesBrochureDocument,
+  isBrochureDocument,
+  type BrochureCopyJson,
   type CollateralDocumentJson,
-  type SalesBrochureCopyJson,
 } from "@/lib/collateral/templates/types";
 import type {
   Agency,
@@ -77,13 +79,36 @@ export async function generateCollateralDocument({
       }
 
       const existingCopy =
-        collateral.document_json && isSalesBrochureDocument(collateral.document_json)
+        collateral.document_json && isBrochureDocument(collateral.document_json)
           ? collateral.document_json.copy
           : null;
-      const copy: SalesBrochureCopyJson =
+      const copy: BrochureCopyJson =
         existingCopy ?? getMockSalesBrochureCopy(qr.provisionedListing, agency);
 
       return buildSalesBrochureDocument({
+        agency,
+        listing: qr.provisionedListing,
+        collateral,
+        copy,
+        agentProfile,
+        agencyAgents,
+        qrCodeUrl: qr.qrCodeUrl,
+        qrTargetUrl: qr.qrTargetUrl,
+      });
+    }
+    case "rental_brochure": {
+      if (!qr) {
+        throw new Error("Lease brochures require a listing");
+      }
+
+      const existingCopy =
+        collateral.document_json && isBrochureDocument(collateral.document_json)
+          ? collateral.document_json.copy
+          : null;
+      const copy: BrochureCopyJson =
+        existingCopy ?? getMockRentalBrochureCopy(qr.provisionedListing, agency);
+
+      return buildRentalBrochureDocument({
         agency,
         listing: qr.provisionedListing,
         collateral,

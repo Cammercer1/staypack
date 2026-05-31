@@ -1,9 +1,9 @@
-import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
-import {
-  brochurePropertyPhotoClassName,
-  brochurePropertyPhotoFrameClassName,
-} from "@/lib/collateral/sales-brochure/brochureImageFit";
+"use client";
+
+import { BrochureSlotImage } from "@/components/collateral/sales-brochure/inline/BrochureSlotImage";
 import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
+import type { ListingImageMetaMap } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const GAP = "gap-[3px]";
 
@@ -12,22 +12,21 @@ function Frame({
   src,
   className = "",
   galleryIndex,
+  listingImageMeta,
 }: {
   src: string;
   className?: string;
   galleryIndex: number;
+  listingImageMeta?: ListingImageMetaMap;
 }) {
   return (
-    <div
-      className={`min-h-0 h-full overflow-hidden ${brochurePropertyPhotoFrameClassName(src)} ${className}`}
-    >
-      <EditableImage
-        slot={{ kind: "gallery", index: galleryIndex }}
-        src={src}
-        className="h-full w-full"
-        imgClassName={brochurePropertyPhotoClassName(src)}
-      />
-    </div>
+    <BrochureSlotImage
+      url={src}
+      slot={{ kind: "gallery", index: galleryIndex }}
+      listingImageMeta={listingImageMeta}
+      className={cn("min-h-0 h-full", className)}
+      imageWrapperClassName="min-h-0 h-full flex-1"
+    />
   );
 }
 
@@ -38,9 +37,11 @@ function Frame({
 export function BrochurePhotoCollage({
   photos,
   className = "",
+  listingImageMeta,
 }: {
   photos: string[];
   className?: string;
+  listingImageMeta?: ListingImageMetaMap;
 }) {
   const imgs = dedupeImageUrls(photos).slice(0, 6);
   if (!imgs.length) return null;
@@ -48,7 +49,7 @@ export function BrochurePhotoCollage({
   if (imgs.length === 1) {
     return (
       <div className={`h-full ${className}`}>
-        <Frame src={imgs[0]} galleryIndex={0} />
+        <Frame src={imgs[0]} galleryIndex={0} listingImageMeta={listingImageMeta} />
       </div>
     );
   }
@@ -56,8 +57,8 @@ export function BrochurePhotoCollage({
   if (imgs.length === 2) {
     return (
       <div className={`grid h-full grid-rows-2 ${GAP} ${className}`}>
-        <Frame src={imgs[0]} galleryIndex={0} />
-        <Frame src={imgs[1]} galleryIndex={1} />
+        <Frame src={imgs[0]} galleryIndex={0} listingImageMeta={listingImageMeta} />
+        <Frame src={imgs[1]} galleryIndex={1} listingImageMeta={listingImageMeta} />
       </div>
     );
   }
@@ -66,11 +67,11 @@ export function BrochurePhotoCollage({
     return (
       <div className={`flex h-full flex-col ${GAP} ${className}`}>
         <div className="min-h-0 flex-[1.5]">
-          <Frame src={imgs[0]} galleryIndex={0} />
+          <Frame src={imgs[0]} galleryIndex={0} listingImageMeta={listingImageMeta} />
         </div>
         <div className={`grid min-h-0 flex-1 grid-cols-2 ${GAP}`}>
-          <Frame src={imgs[1]} galleryIndex={1} />
-          <Frame src={imgs[2]} galleryIndex={2} />
+          <Frame src={imgs[1]} galleryIndex={1} listingImageMeta={listingImageMeta} />
+          <Frame src={imgs[2]} galleryIndex={2} listingImageMeta={listingImageMeta} />
         </div>
       </div>
     );
@@ -80,12 +81,12 @@ export function BrochurePhotoCollage({
     return (
       <div className={`flex h-full flex-col ${GAP} ${className}`}>
         <div className="min-h-0 flex-[1.45]">
-          <Frame src={imgs[0]} galleryIndex={0} />
+          <Frame src={imgs[0]} galleryIndex={0} listingImageMeta={listingImageMeta} />
         </div>
         <div className={`grid min-h-0 flex-1 grid-cols-3 ${GAP}`}>
-          <Frame src={imgs[1]} galleryIndex={1} />
-          <Frame src={imgs[2]} galleryIndex={2} />
-          <Frame src={imgs[3]} galleryIndex={3} />
+          <Frame src={imgs[1]} galleryIndex={1} listingImageMeta={listingImageMeta} />
+          <Frame src={imgs[2]} galleryIndex={2} listingImageMeta={listingImageMeta} />
+          <Frame src={imgs[3]} galleryIndex={3} listingImageMeta={listingImageMeta} />
         </div>
       </div>
     );
@@ -95,13 +96,13 @@ export function BrochurePhotoCollage({
     return (
       <div className={`flex h-full flex-col ${GAP} ${className}`}>
         <div className={`grid min-h-0 flex-[1.3] grid-cols-2 ${GAP}`}>
-          <Frame src={imgs[0]} galleryIndex={0} />
-          <Frame src={imgs[1]} galleryIndex={1} />
+          <Frame src={imgs[0]} galleryIndex={0} listingImageMeta={listingImageMeta} />
+          <Frame src={imgs[1]} galleryIndex={1} listingImageMeta={listingImageMeta} />
         </div>
         <div className={`grid min-h-0 flex-1 grid-cols-3 ${GAP}`}>
-          <Frame src={imgs[2]} galleryIndex={2} />
-          <Frame src={imgs[3]} galleryIndex={3} />
-          <Frame src={imgs[4]} galleryIndex={4} />
+          <Frame src={imgs[2]} galleryIndex={2} listingImageMeta={listingImageMeta} />
+          <Frame src={imgs[3]} galleryIndex={3} listingImageMeta={listingImageMeta} />
+          <Frame src={imgs[4]} galleryIndex={4} listingImageMeta={listingImageMeta} />
         </div>
       </div>
     );
@@ -112,14 +113,19 @@ export function BrochurePhotoCollage({
   return (
     <div className={`flex h-full flex-col ${GAP} ${className}`}>
       <div className={`grid min-h-0 flex-[1.6] grid-cols-3 grid-rows-2 ${GAP}`}>
-        <Frame src={feature} className="col-span-2 row-span-2" galleryIndex={0} />
-        <Frame src={b} galleryIndex={1} />
-        <Frame src={c} galleryIndex={2} />
+        <Frame
+          src={feature}
+          className="col-span-2 row-span-2"
+          galleryIndex={0}
+          listingImageMeta={listingImageMeta}
+        />
+        <Frame src={b} galleryIndex={1} listingImageMeta={listingImageMeta} />
+        <Frame src={c} galleryIndex={2} listingImageMeta={listingImageMeta} />
       </div>
       <div className={`grid min-h-0 flex-1 grid-cols-3 ${GAP}`}>
-        <Frame src={d} galleryIndex={3} />
-        <Frame src={e} galleryIndex={4} />
-        <Frame src={f} galleryIndex={5} />
+        <Frame src={d} galleryIndex={3} listingImageMeta={listingImageMeta} />
+        <Frame src={e} galleryIndex={4} listingImageMeta={listingImageMeta} />
+        <Frame src={f} galleryIndex={5} listingImageMeta={listingImageMeta} />
       </div>
     </div>
   );

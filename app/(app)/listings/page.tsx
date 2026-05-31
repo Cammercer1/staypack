@@ -4,27 +4,42 @@ import { requireAgency } from "@/lib/auth/requireUser";
 import { PageHeader } from "@/components/app-shell/PageHeader";
 import { Button } from "@/components/ui/button";
 import { ListingLibrary } from "@/components/listings/ListingLibrary";
-import type { Listing, ListingWithReport, Report } from "@/lib/types";
+import type { Listing, ListingLibraryRow } from "@/lib/types";
 
 export default async function ListingsPage() {
   const { supabase, agency } = await requireAgency();
 
   const { data: listings } = await supabase
     .from("listings")
-    .select("*, reports(*)")
+    .select("*")
     .eq("agency_id", agency.id)
     .neq("status", "archived")
     .order("created_at", { ascending: false });
 
-  const listingRows = (listings ?? []).map((row) => {
-    const reports = (row.reports ?? []) as Report[];
-    const { reports: _reports, ...listing } = row;
-    return {
-      ...(listing as Listing),
-      str_report:
-        reports.find((report) => report.status !== "archived") ?? reports[0] ?? null,
-    } satisfies ListingWithReport;
-  });
+  const listingRows = (listings ?? []) as Listing[];
+  const listingIds = listingRows.map((listing) => listing.id);
+
+  const leadCountByListingId = new Map<string, number>();
+
+  if (listingIds.length > 0) {
+    const { data: leads } = await supabase
+      .from("leads")
+      .select("listing_id")
+      .in("listing_id", listingIds);
+
+    for (const lead of leads ?? []) {
+      if (!lead.listing_id) continue;
+      leadCountByListingId.set(
+        lead.listing_id,
+        (leadCountByListingId.get(lead.listing_id) ?? 0) + 1,
+      );
+    }
+  }
+
+  const libraryRows: ListingLibraryRow[] = listingRows.map((listing) => ({
+    ...listing,
+    total_leads: leadCountByListingId.get(listing.id) ?? 0,
+  }));
 
   return (
     <div className="space-y-10">
@@ -32,7 +47,7 @@ export default async function ListingsPage() {
         eyebrow="Listings"
         highlight="Your"
         title="open house library."
-        description="Browse listings and open each property to manage short-term rental reports, links, and PDFs."
+        description="Browse listings and open each property to manage collateral, leads, and listing details."
         action={
           <Link href="/listings/new" prefetch={false}>
             <Button size="lg">
@@ -42,7 +57,7 @@ export default async function ListingsPage() {
           </Link>
         }
       />
-      <ListingLibrary listings={listingRows} />
+      <ListingLibrary listings={libraryRows} />
     </div>
   );
 }

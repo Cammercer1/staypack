@@ -1,6 +1,6 @@
 import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
 import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
-import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
+import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import {
   RefinedAgentBar,
   RefinedPageTwoGallery,
@@ -11,7 +11,7 @@ import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/share
 
 /** Refined · 2 pages — page 1 property overview; page 2 photo mosaic + agent. */
 export function RefinedBrochure({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
-  if (!isSalesBrochureDocument(document)) return null;
+  if (!isBrochureDocument(document)) return null;
 
   const { report, brand, pageTwoImages } = useBrochurePage(document);
   const pageTwo = pageTwoImages.filter(Boolean);

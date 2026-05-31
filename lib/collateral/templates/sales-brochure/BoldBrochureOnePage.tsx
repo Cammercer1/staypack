@@ -1,13 +1,13 @@
 import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
 import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
-import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
+import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { BoldPageOneSpread } from "@/lib/collateral/templates/sales-brochure/bold/BoldLayout";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
 import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
 
 /** Bold · 1 page — branded header, photo strip, features + agents, footer band. */
 export function BoldBrochureOnePage({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
-  if (!isSalesBrochureDocument(document)) return null;
+  if (!isBrochureDocument(document)) return null;
 
   const { report, brand } = useBrochurePage(document);
   const fmt = getCollateralPageFormat(pageFormat);

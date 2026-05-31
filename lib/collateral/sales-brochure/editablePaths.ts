@@ -86,6 +86,12 @@ export function setCopyValueAtPath(
   if (field === "price_value") {
     return { ...copy, price_value: nextValue };
   }
+  if (field === "bond_label") {
+    return { ...copy, bond_label: nextValue };
+  }
+  if (field === "bond_value") {
+    return { ...copy, bond_value: nextValue };
+  }
 
   return copy;
 }

@@ -1,10 +1,10 @@
 import { salesBrochureToReportShape } from "@/lib/collateral/sales-brochure/toReportShape";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
 import { getReportBrandColours } from "@/lib/reports/brandColours";
 import { BrochureGalleryPage } from "@/lib/collateral/templates/sales-brochure/shared/BrochureGalleryPage";
 
 type Props = {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
 };
 
 /** Page 2 — standardised photo collage (scaled to image count) + optional note + contact/QR. */

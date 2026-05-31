@@ -7,8 +7,8 @@ import {
 } from "@/lib/collateral/slugs";
 import { withBrochureContentSaved } from "@/lib/collateral/sales-brochure/brochurePublishSync";
 import {
-  isSalesBrochureDocument,
-  type SalesBrochureDocumentJson,
+  isBrochureDocument,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { getSiteUrl } from "@/lib/env";
 import type { Listing } from "@/lib/types";
@@ -22,9 +22,9 @@ export async function POST(
     const { supabase, agency, collateral, listing } =
       await requireCollateralAccess(id);
 
-    if (collateral.type !== "sales_brochure") {
+    if (collateral.type !== "sales_brochure" && collateral.type !== "rental_brochure") {
       return NextResponse.json(
-        { error: "Only sales brochures can be published with this endpoint" },
+        { error: "Only brochures can be published with this endpoint" },
         { status: 400 },
       );
     }
@@ -46,8 +46,8 @@ export async function POST(
     const publicSlug = collateral.public_slug ?? generateCollateralSlug();
     const publicUrl = buildPublicCollateralUrl(agency.slug, publicSlug);
 
-    const existingDocument = collateral.document_json as SalesBrochureDocumentJson;
-    const documentJson: SalesBrochureDocumentJson = isSalesBrochureDocument(
+    const existingDocument = collateral.document_json as BrochureDocumentJson;
+    const documentJson: BrochureDocumentJson = isBrochureDocument(
       existingDocument,
     )
       ? withBrochureContentSaved({

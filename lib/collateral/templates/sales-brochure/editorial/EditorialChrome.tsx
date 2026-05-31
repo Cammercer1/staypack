@@ -5,8 +5,10 @@ import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/edit
 import {
   resolveBrochurePrice,
   resolveBrochurePriceLabel,
-  type SalesBrochureDocumentJson,
+  resolveBrochureBond,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
+import { BrochureRentalBondInline } from "@/lib/collateral/templates/sales-brochure/shared/BrochureCopyBlocks";
 import { formatNumber } from "@/lib/reports/formatters";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
@@ -17,7 +19,7 @@ export function EditorialLogoOverlay({
   document,
   report,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
 }) {
   const logoUrl = getAgencyLogoUrl(document.agency, "dark");
@@ -53,7 +55,7 @@ export function EditorialMasthead({
   document,
   report,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
 }) {
   const logoUrl = getAgencyLogoUrl(report.agency, "light");
@@ -86,7 +88,7 @@ export function EditorialHeroOverlay({
   document,
   showPrice = true,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   showPrice?: boolean;
 }) {
   const { property, copy } = document;
@@ -133,7 +135,7 @@ export function EditorialHeroOverlay({
   );
 }
 
-export function EditorialStatsLine({ document }: { document: SalesBrochureDocumentJson }) {
+export function EditorialStatsLine({ document }: { document: BrochureDocumentJson }) {
   const { property } = document;
   const items = [
     { label: "Bedrooms", value: formatNumber(property.bedrooms) },
@@ -278,7 +280,7 @@ export function EditorialFeatureIndex({
 }: {
   items: string[];
   max?: number;
-  document?: SalesBrochureDocumentJson;
+  document?: BrochureDocumentJson;
 }) {
   if (!items.length) return null;
 
@@ -328,7 +330,7 @@ export function EditorialFeatureIndex({
 export function EditorialSpecSidebar({
   document,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
 }) {
   const { property } = document;
   const items = [
@@ -390,27 +392,32 @@ export function EditorialCta({ text }: { text: string }) {
   );
 }
 
-export function EditorialPricePanel({ document }: { document: SalesBrochureDocumentJson }) {
-  if (!resolveBrochurePrice(document)) return null;
+export function EditorialPricePanel({ document }: { document: BrochureDocumentJson }) {
+  if (!resolveBrochurePrice(document) && !resolveBrochureBond(document)) return null;
 
   return (
     <div>
-      <Editable
-        as="p"
-        path="copy.price_label"
-        className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-neutral-500"
-        style={{ fontFamily: headingFont }}
-      >
-        {resolveBrochurePriceLabel(document)}
-      </Editable>
-      <Editable
-        as="p"
-        path="copy.price_value"
-        className="mt-2 text-[2.25rem] font-semibold leading-none text-neutral-900"
-        style={{ fontFamily: headingFont, color: "var(--report-headline-colour, inherit)" }}
-      >
-        {resolveBrochurePrice(document)}
-      </Editable>
+      {resolveBrochurePrice(document) ? (
+        <>
+          <Editable
+            as="p"
+            path="copy.price_label"
+            className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-neutral-500"
+            style={{ fontFamily: headingFont }}
+          >
+            {resolveBrochurePriceLabel(document)}
+          </Editable>
+          <Editable
+            as="p"
+            path="copy.price_value"
+            className="mt-2 text-[2.25rem] font-semibold leading-none text-neutral-900"
+            style={{ fontFamily: headingFont, color: "var(--report-headline-colour, inherit)" }}
+          >
+            {resolveBrochurePrice(document)}
+          </Editable>
+        </>
+      ) : null}
+      <BrochureRentalBondInline document={document} />
     </div>
   );
 }

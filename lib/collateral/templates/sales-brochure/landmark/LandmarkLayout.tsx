@@ -1,20 +1,20 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
-import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import { BrochureSlotImage } from "@/components/collateral/sales-brochure/inline/BrochureSlotImage";
 import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { BrochureRentalBondInline } from "@/lib/collateral/templates/sales-brochure/shared/BrochureCopyBlocks";
 import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import {
   resolveBrochurePrice,
   resolveBrochurePriceLabel,
-  type SalesBrochureDocumentJson,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
 import {
-  brochurePropertyPhotoClassName,
-  isBrochureFloorPlanUrl,
+  isBrochureFloorPlanImage,
 } from "@/lib/collateral/sales-brochure/brochureImageFit";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
@@ -83,7 +83,7 @@ function StatBadge({
 function LandmarkStatsBanner({
   document,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
 }) {
   const { property } = document;
   const accent = document.agency.primary_colour || "#1a1a2e";
@@ -150,7 +150,7 @@ function LandmarkRightColumn({
   document,
   report,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
 }) {
   const accent = document.agency.primary_colour || "#c0392b";
@@ -171,6 +171,7 @@ function LandmarkRightColumn({
           >
             {resolveBrochurePrice(document)}
           </Editable>
+          <BrochureRentalBondInline document={document} compact accent={accent} />
         </div>
       ) : null}
 
@@ -262,7 +263,7 @@ function LandmarkRightColumn({
 function LandmarkLeftColumn({
   document,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
 }) {
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
   const headline =
@@ -357,12 +358,12 @@ export function LandmarkSpread({
   document,
   report,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
 }) {
   const images = document.property.page_one_image_urls
     .filter(Boolean)
-    .filter((url) => !isBrochureFloorPlanUrl(url));
+    .filter((url) => !isBrochureFloorPlanImage(url, document.listing_image_meta));
   const hero = images[0] ?? document.property.hero_image_url ?? "";
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
 
@@ -371,11 +372,13 @@ export function LandmarkSpread({
       {/* Hero — ~42% of page */}
       <div className="relative h-[125mm] shrink-0 overflow-hidden">
         {hero ? (
-          <EditableImage
+          <BrochureSlotImage
+            url={hero}
             slot="hero"
-            src={hero}
-            className="h-full w-full"
-            imgClassName={brochurePropertyPhotoClassName(hero)}
+            className="absolute inset-0"
+            listingImageMeta={document.listing_image_meta}
+            imageWrapperClassName="h-full w-full"
+            showCaption={false}
           />
         ) : (
           <div className="h-full bg-neutral-300" />

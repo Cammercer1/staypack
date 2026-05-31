@@ -34,6 +34,8 @@ export function normalizeSalesBrochureCopy(
     page_two_note: stringField(data.page_two_note),
     price_label: stringField(data.price_label) || undefined,
     price_value: stringField(data.price_value) || undefined,
+    bond_label: stringField(data.bond_label) || undefined,
+    bond_value: stringField(data.bond_value) || undefined,
   };
 }
 

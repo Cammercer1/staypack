@@ -18,15 +18,16 @@ import {
 import { normalizeListingSlice } from "@/lib/collateral/social/listingFeatures";
 import { ensureSocialPostsDocument, normalizeSocialLayers } from "@/lib/collateral/social/normalizeSocialDocument";
 import {
-  isSalesBrochureDocument,
+  isBrochureDocument,
   isSocialPostsDocument,
   isBusinessCardDocument,
   type BusinessCardDocumentJson,
-  type SalesBrochureDocumentJson,
+  type BrochureDocumentJson,
   type SocialPostsDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { isValidCollateralTemplateId } from "@/lib/collateral/templates/ids";
 import {
+  updateRentalBrochureDocumentSchema,
   updateSalesBrochureDocumentSchema,
   updateBusinessCardDocumentSchema,
   updateSocialPostsDocumentSchema,
@@ -40,8 +41,8 @@ export async function PATCH(
     const { id } = await params;
     const { supabase, agency, collateral } = await requireCollateralAccess(id);
 
-    if (collateral.type === "sales_brochure") {
-      return patchSalesBrochure(request, supabase, collateral);
+    if (collateral.type === "sales_brochure" || collateral.type === "rental_brochure") {
+      return patchBrochure(request, supabase, collateral);
     }
 
     if (collateral.type === "social_posts") {
@@ -199,12 +200,16 @@ async function patchBusinessCard(
   return NextResponse.json({ collateral: data });
 }
 
-async function patchSalesBrochure(
+async function patchBrochure(
   request: Request,
   supabase: Awaited<ReturnType<typeof requireCollateralAccess>>["supabase"],
   collateral: Awaited<ReturnType<typeof requireCollateralAccess>>["collateral"],
 ) {
-  const body = updateSalesBrochureDocumentSchema.parse(await request.json());
+  const schema =
+    collateral.type === "rental_brochure"
+      ? updateRentalBrochureDocumentSchema
+      : updateSalesBrochureDocumentSchema;
+  const body = schema.parse(await request.json());
 
   if (
     body.template_id != null &&
@@ -237,7 +242,7 @@ async function patchSalesBrochure(
 
   const current = collateral.document_json;
 
-  if (!isSalesBrochureDocument(current)) {
+  if (!isBrochureDocument(current)) {
     return NextResponse.json({ error: "Invalid document" }, { status: 400 });
   }
 

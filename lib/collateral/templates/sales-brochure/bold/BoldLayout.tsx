@@ -1,37 +1,34 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
-import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import { BrochureSlotImage } from "@/components/collateral/sales-brochure/inline/BrochureSlotImage";
 import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { BrochureRentalBondInline } from "@/lib/collateral/templates/sales-brochure/shared/BrochureCopyBlocks";
 import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import {
   resolveBrochurePrice,
   resolveBrochurePriceLabel,
-  type SalesBrochureDocumentJson,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
-import {
-  brochurePropertyPhotoClassName,
-  brochurePropertyPhotoFrameClassName,
-  isBrochureFloorPlanUrl,
-} from "@/lib/collateral/sales-brochure/brochureImageFit";
+import { isBrochureFloorPlanImage } from "@/lib/collateral/sales-brochure/brochureImageFit";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
 
-function resolveBoldPhotos(document: SalesBrochureDocumentJson) {
+function resolveBoldPhotos(document: BrochureDocumentJson) {
   const urls = document.property.page_one_image_urls
     .filter(Boolean)
-    .filter((url) => !isBrochureFloorPlanUrl(url));
+    .filter((url) => !isBrochureFloorPlanImage(url, document.listing_image_meta));
   return {
     hero: urls[0] ?? document.property.hero_image_url ?? "",
     secondary: urls.slice(1, 4),
   };
 }
 
-function buildBoldFeatureItems(document: SalesBrochureDocumentJson) {
+function buildBoldFeatureItems(document: BrochureDocumentJson) {
   return getPropertyHighlights(document.copy).slice(0, 8);
 }
 
@@ -60,7 +57,7 @@ function BoldStatPill({
   );
 }
 
-function BoldStatStrip({ document }: { document: SalesBrochureDocumentJson }) {
+function BoldStatStrip({ document }: { document: BrochureDocumentJson }) {
   const { property } = document;
   const accent = document.agency.accent_colour || document.agency.primary_colour || "#1a1a2e";
 
@@ -100,13 +97,14 @@ function BoldStatStrip({ document }: { document: SalesBrochureDocumentJson }) {
           >
             {resolveBrochurePrice(document)}
           </Editable>
+          <BrochureRentalBondInline document={document} inverted compact />
         </div>
       ) : null}
     </div>
   );
 }
 
-function BoldHero({ document }: { document: SalesBrochureDocumentJson }) {
+function BoldHero({ document }: { document: BrochureDocumentJson }) {
   const { hero } = resolveBoldPhotos(document);
   const logoUrl = getAgencyLogoUrl(document.agency, "dark");
   const headline = document.copy.heading?.trim() || document.property.address;
@@ -114,11 +112,12 @@ function BoldHero({ document }: { document: SalesBrochureDocumentJson }) {
   return (
     <div className="relative h-[140mm] shrink-0 overflow-hidden">
       {hero ? (
-        <EditableImage
+        <BrochureSlotImage
+          url={hero}
           slot="hero"
-          src={hero}
-          className="h-full w-full"
-          imgClassName={brochurePropertyPhotoClassName(hero)}
+          className="absolute inset-0"
+          imageWrapperClassName="h-full w-full"
+          showCaption={false}
         />
       ) : (
         <div className="h-full bg-neutral-300" />
@@ -241,7 +240,7 @@ function BoldBody({
   document,
   report,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
 }) {
   const features = buildBoldFeatureItems(document);
@@ -330,7 +329,7 @@ function BoldBody({
   );
 }
 
-export function BoldFooterBand({ document }: { document: SalesBrochureDocumentJson }) {
+export function BoldFooterBand({ document }: { document: BrochureDocumentJson }) {
   const footerBg = document.agency.accent_colour || document.agency.primary_colour || "#1a1a2e";
   const logoUrl = getAgencyLogoUrl(document.agency, "dark");
 
@@ -371,7 +370,7 @@ export function BoldPageOneSpread({
   document,
   report,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
 }) {
   return (
@@ -387,4 +386,4 @@ export function BoldPageOneSpread({
 // Keep old exports so page 2 (BoldBrochure.tsx) still compiles
 export { resolveBoldPhotos };
 export type { BoldBodyProps };
-type BoldBodyProps = { document: SalesBrochureDocumentJson; report: FinalReportJson };
+type BoldBodyProps = { document: BrochureDocumentJson; report: FinalReportJson };

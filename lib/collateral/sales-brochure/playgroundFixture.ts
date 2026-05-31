@@ -4,7 +4,7 @@ import {
 } from "@/lib/collateral/sales-brochure/blurbBlocks";
 import type {
   SalesBrochureCopyJson,
-  SalesBrochureDocumentJson,
+  BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { SALES_BROCHURE_CLASSIC_2PG_TEMPLATE_ID } from "@/lib/collateral/templates/ids";
 import { DEFAULT_BRAND_VALUES } from "@/lib/branding/normalize";
@@ -78,7 +78,7 @@ const PLAYGROUND_AGENT = {
 
 export function createPlaygroundSalesBrochureDocument(
   templateId: string = SALES_BROCHURE_CLASSIC_2PG_TEMPLATE_ID,
-): SalesBrochureDocumentJson {
+): BrochureDocumentJson {
   const images = [...PLAYGROUND_BROCHURE_IMAGES];
   const pageOneImages = [images[0], images[1], images[2], images[3]];
 

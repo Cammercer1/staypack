@@ -1,32 +1,30 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
-import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import { BrochureSlotImage } from "@/components/collateral/sales-brochure/inline/BrochureSlotImage";
 import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { BrochureRentalBondInline } from "@/lib/collateral/templates/sales-brochure/shared/BrochureCopyBlocks";
 import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import {
   resolveBrochurePrice,
   resolveBrochurePriceLabel,
-  type SalesBrochureDocumentJson,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
-import {
-  brochurePropertyPhotoClassName,
-  brochurePropertyPhotoFrameClassName,
-  isBrochureFloorPlanUrl,
-} from "@/lib/collateral/sales-brochure/brochureImageFit";
+import { isBrochureFloorPlanImage } from "@/lib/collateral/sales-brochure/brochureImageFit";
 import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
+import { cn } from "@/lib/utils";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
 
-function buildRefinedFeatures(document: SalesBrochureDocumentJson) {
+function buildRefinedFeatures(document: BrochureDocumentJson) {
   return getPropertyHighlights(document.copy).slice(0, 6);
 }
 
-function formatSpecsLine(document: SalesBrochureDocumentJson) {
+function formatSpecsLine(document: BrochureDocumentJson) {
   const { property } = document;
   const parts: string[] = [];
 
@@ -45,12 +43,14 @@ function formatSpecsLine(document: SalesBrochureDocumentJson) {
   return parts.join("  |  ");
 }
 
-function resolveRefinedImages(document: SalesBrochureDocumentJson) {
+function resolveRefinedImages(document: BrochureDocumentJson) {
   const urls = document.property.page_one_image_urls.filter(Boolean);
   const hero = urls[0] ?? document.property.hero_image_url ?? "";
   const footer = urls[2] ?? urls[1] ?? hero;
   // Use a real floor plan only if one was uploaded; otherwise show a property photo.
-  const floorPlan = urls.find((url) => isBrochureFloorPlanUrl(url));
+  const floorPlan = urls.find((url) =>
+    isBrochureFloorPlanImage(url, document.listing_image_meta),
+  );
   const side = floorPlan ?? urls[1] ?? urls[2] ?? hero;
 
   return { hero, side, footer };
@@ -59,7 +59,7 @@ function resolveRefinedImages(document: SalesBrochureDocumentJson) {
 export function RefinedHeader({
   document,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
 }) {
   const specs = formatSpecsLine(document);
   const highlight = document.agency.accent_colour || document.agency.primary_colour;
@@ -111,7 +111,7 @@ export function RefinedHeader({
 export function RefinedBody({
   document,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
 }) {
   const features = buildRefinedFeatures(document);
   const { side } = resolveRefinedImages(document);
@@ -183,22 +183,19 @@ export function RefinedBody({
                 {resolveBrochurePrice(document)}
               </Editable>
             </div>
+            <BrochureRentalBondInline document={document} compact />
           </div>
         ) : null}
       </div>
 
       <div className="flex min-h-0 flex-col overflow-hidden">
         {side ? (
-          <div
-            className={`flex min-h-0 flex-1 items-center justify-center overflow-hidden ${brochurePropertyPhotoFrameClassName(side)}`}
-          >
-            <EditableImage
-              slot={{ kind: "page_one", index: 1 }}
-              src={side}
-              className="h-full w-full"
-              imgClassName={brochurePropertyPhotoClassName(side)}
-            />
-          </div>
+          <BrochureSlotImage
+            url={side}
+            slot={{ kind: "page_one", index: 1 }}
+            className="flex min-h-0 flex-1"
+            imageWrapperClassName="min-h-0 h-full flex-1"
+          />
         ) : (
           <div className="min-h-0 flex-1 bg-neutral-50" />
         )}
@@ -227,16 +224,12 @@ function RefinedGalleryCell({
   galleryIndex: number;
 }) {
   return (
-    <div
-      className={`min-h-0 overflow-hidden ${brochurePropertyPhotoFrameClassName(url)} ${className}`}
-    >
-      <EditableImage
-        slot={{ kind: "gallery", index: galleryIndex }}
-        src={url}
-        className="h-full w-full"
-        imgClassName={brochurePropertyPhotoClassName(url)}
-      />
-    </div>
+    <BrochureSlotImage
+      url={url}
+      slot={{ kind: "gallery", index: galleryIndex }}
+      className={cn("min-h-0 h-full", className)}
+      imageWrapperClassName="min-h-0 h-full flex-1"
+    />
   );
 }
 
@@ -303,22 +296,18 @@ export function RefinedPageTwoGallery({ urls }: { urls: string[] }) {
   );
 }
 
-export function RefinedFooterImage({ document }: { document: SalesBrochureDocumentJson }) {
+export function RefinedFooterImage({ document }: { document: BrochureDocumentJson }) {
   const { footer } = resolveRefinedImages(document);
 
   if (!footer) return null;
 
   return (
-    <div
-      className={`h-[88mm] shrink-0 overflow-hidden ${brochurePropertyPhotoFrameClassName(footer)}`}
-    >
-      <EditableImage
-        slot={{ kind: "page_one", index: 2 }}
-        src={footer}
-        className="h-full w-full"
-        imgClassName={brochurePropertyPhotoClassName(footer)}
-      />
-    </div>
+    <BrochureSlotImage
+      url={footer}
+      slot={{ kind: "page_one", index: 2 }}
+      className="h-[88mm] shrink-0"
+      imageWrapperClassName="min-h-0 h-full flex-1"
+    />
   );
 }
 
@@ -327,7 +316,7 @@ export function RefinedAgentBar({
   report,
   pinnedBottom = false,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
   /** Page 2: flush to page bottom, no top rule. */
   pinnedBottom?: boolean;
@@ -457,7 +446,7 @@ export function RefinedSpread({
   report,
   showAgentBar = false,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
   showAgentBar?: boolean;
 }) {

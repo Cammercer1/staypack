@@ -3,26 +3,23 @@ import type { LucideIcon } from "lucide-react";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
-import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import { BrochureSlotImage } from "@/components/collateral/sales-brochure/inline/BrochureSlotImage";
 import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
 import {
   getBlurbBlocks,
   sliceBlurbBlocksByParagraphs,
 } from "@/lib/collateral/sales-brochure/blurbBlocks";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { BrochureRentalBondInline } from "@/lib/collateral/templates/sales-brochure/shared/BrochureCopyBlocks";
 import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import {
   resolveBrochurePrice,
   resolveBrochurePriceLabel,
-  type SalesBrochureDocumentJson,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
-import {
-  brochurePropertyPhotoClassName,
-  brochurePropertyPhotoFrameClassName,
-  isBrochureFloorPlanUrl,
-} from "@/lib/collateral/sales-brochure/brochureImageFit";
+import { isBrochureFloorPlanImage } from "@/lib/collateral/sales-brochure/brochureImageFit";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
@@ -39,14 +36,14 @@ function MinimalistSectionLabel({ children }: { children: string }) {
   );
 }
 
-function buildFeatureItems(document: SalesBrochureDocumentJson) {
+function buildFeatureItems(document: BrochureDocumentJson) {
   return getPropertyHighlights(document.copy).slice(0, 10);
 }
 
-function resolveMinimalistImages(document: SalesBrochureDocumentJson) {
+function resolveMinimalistImages(document: BrochureDocumentJson) {
   const pageOne = document.property.page_one_image_urls
     .filter(Boolean)
-    .filter((url) => !isBrochureFloorPlanUrl(url));
+    .filter((url) => !isBrochureFloorPlanImage(url, document.listing_image_meta));
   const fallback = document.property.hero_image_url ?? "";
 
   const hero = pageOne[0] ?? fallback;
@@ -66,7 +63,7 @@ function resolveMinimalistImages(document: SalesBrochureDocumentJson) {
 const PAGE_ONE_BLURB_PARAGRAPHS = 3;
 
 function resolvePageTwoGallery(
-  document: SalesBrochureDocumentJson,
+  document: BrochureDocumentJson,
   pageOne: string[],
   fallback: string,
 ) {
@@ -75,7 +72,7 @@ function resolvePageTwoGallery(
   const unique: string[] = [];
 
   for (const url of pool) {
-    if (!url || isBrochureFloorPlanUrl(url) || unique.includes(url)) continue;
+    if (!url || unique.includes(url)) continue;
     unique.push(url);
     if (unique.length >= 5) break;
   }
@@ -92,7 +89,7 @@ function resolvePageTwoGallery(
 }
 
 function buildClosingParagraph(
-  document: SalesBrochureDocumentJson,
+  document: BrochureDocumentJson,
   agent: FinalReportJson["agent"],
 ) {
   const tail = getPropertyHighlights(document.copy).at(-1)?.trim();
@@ -103,7 +100,7 @@ function buildClosingParagraph(
   return tail || null;
 }
 
-function MinimalistStatsIcons({ document }: { document: SalesBrochureDocumentJson }) {
+function MinimalistStatsIcons({ document }: { document: BrochureDocumentJson }) {
   const { property } = document;
   const stats: Array<{ id: string; icon: LucideIcon; value: string }> = [];
 
@@ -140,7 +137,7 @@ function MinimalistSidebar({
   document,
   report,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
 }) {
   const agents = resolveBrochureAgents(report);
@@ -165,6 +162,7 @@ function MinimalistSidebar({
             {resolveBrochurePrice(document)}
           </Editable>
         ) : null}
+        <BrochureRentalBondInline document={document} compact />
       </div>
 
       <div className="space-y-1.5">
@@ -235,7 +233,7 @@ function MinimalistPhotoStrip({
   document,
   compact = false,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   compact?: boolean;
 }) {
   const { hero, gallery } = resolveMinimalistImages(document);
@@ -246,14 +244,12 @@ function MinimalistPhotoStrip({
     >
       <div className="flex min-h-0 flex-1 flex-col gap-[3px]">
         {hero ? (
-          <div className="min-h-0 flex-[7] overflow-hidden">
-            <EditableImage
-              slot="hero"
-              src={hero}
-              className="h-full w-full"
-              imgClassName={brochurePropertyPhotoClassName(hero)}
-            />
-          </div>
+          <BrochureSlotImage
+            url={hero}
+            slot="hero"
+            className="min-h-0 flex-[7]"
+            imageWrapperClassName="min-h-0 h-full flex-1"
+          />
         ) : (
           <div className="min-h-0 flex-[7] bg-neutral-300" />
         )}
@@ -261,14 +257,13 @@ function MinimalistPhotoStrip({
         {gallery.length > 0 ? (
           <div className="grid min-h-0 flex-[3] grid-cols-3 gap-[3px]">
             {gallery.map((url, index) => (
-              <div key={`${url}-${index}`} className="min-h-0 overflow-hidden">
-                <EditableImage
-                  slot={{ kind: "page_one", index: index + 1 }}
-                  src={url}
-                  className="h-full w-full"
-                  imgClassName={brochurePropertyPhotoClassName(url)}
-                />
-              </div>
+              <BrochureSlotImage
+                key={`${url}-${index}`}
+                url={url}
+                slot={{ kind: "page_one", index: index + 1 }}
+                className="min-h-0 h-full"
+                imageWrapperClassName="min-h-0 h-full flex-1"
+              />
             ))}
           </div>
         ) : null}
@@ -299,7 +294,7 @@ export function MinimalistPageOne({
   compact = false,
   blurbParagraphLimit,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
   compact?: boolean;
   /** When set (e.g. 3 for 2-page brochures), overflow continues on page 2. */
@@ -368,10 +363,13 @@ function MinimalistPageTwoGallery({ urls }: { urls: string[] }) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-[3px]">
       {urls.map((url, index) => (
-        <div key={`${url}-${index}`} className="min-h-0 flex-1 overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="" className={brochurePropertyPhotoClassName(url)} />
-        </div>
+        <BrochureSlotImage
+          key={`${url}-${index}`}
+          url={url}
+          slot={{ kind: "page_two", index }}
+          className="min-h-0 flex-1"
+          imageWrapperClassName="min-h-0 h-full flex-1"
+        />
       ))}
     </div>
   );
@@ -382,7 +380,7 @@ export function MinimalistPageTwo({
   document,
   report,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
 }) {
   const features = buildFeatureItems(document);
@@ -507,14 +505,12 @@ export function MinimalistPageTwo({
 
       {bottomImage ? (
         <div className="shrink-0 px-8">
-          <div className="h-[72mm] overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={bottomImage}
-              alt=""
-              className={brochurePropertyPhotoClassName(bottomImage)}
-            />
-          </div>
+          <BrochureSlotImage
+            url={bottomImage}
+            slot={{ kind: "page_two", index: 3 }}
+            className="h-[72mm]"
+            imageWrapperClassName="min-h-0 h-full flex-1"
+          />
         </div>
       ) : null}
 
@@ -545,7 +541,7 @@ export function MinimalistSpread({
   document,
   report,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
 }) {
   return <MinimalistPageOne document={document} report={report} compact />;

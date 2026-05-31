@@ -1,11 +1,11 @@
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
-import type { CollateralTemplateProps, SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
-import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
+import type { CollateralTemplateProps, BrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import type { FinalReportJson } from "@/lib/types";
 import { ClassicAgentFooter } from "@/lib/reports/templates/classic/ClassicAgentFooter";
-import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import { BrochureSlotImage } from "@/components/collateral/sales-brochure/inline/BrochureSlotImage";
 import {
   EditorialCta,
   EditorialFeatureIndex,
@@ -19,7 +19,6 @@ import {
 } from "@/lib/collateral/templates/sales-brochure/editorial/EditorialChrome";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
 import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
-import { brochurePropertyPhotoClassName } from "@/lib/collateral/sales-brochure/brochureImageFit";
 
 /**
  * Editorial page-1 spread — overlay hero + drop-cap narrative column + hairline
@@ -30,7 +29,7 @@ export function EditorialPageOneSpread({
   report,
   hero,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
   hero: string;
 }) {
@@ -40,11 +39,13 @@ export function EditorialPageOneSpread({
     <>
       {hero ? (
         <div className="relative min-h-0 flex-[1] overflow-hidden">
-          <EditableImage
+          <BrochureSlotImage
+            url={hero}
             slot="hero"
-            src={hero}
-            className="h-full w-full"
-            imgClassName={brochurePropertyPhotoClassName(hero)}
+            className="absolute inset-0"
+            listingImageMeta={document.listing_image_meta}
+            imageWrapperClassName="h-full w-full"
+            showCaption={false}
           />
           <EditorialPhotoTopScrim />
           <EditorialLogoOverlay document={document} report={report} />
@@ -94,7 +95,7 @@ export function EditorialPageOneSpread({
  * Editorial · 1 page — hero flush to page top, logo over image, overlay typography below.
  */
 export function EditorialBrochureOnePage({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
-  if (!isSalesBrochureDocument(document)) return null;
+  if (!isBrochureDocument(document)) return null;
 
   const { report, brand, pageOneGallery } = useBrochurePage(document);
   const hero = pageOneGallery.hero_image_url;

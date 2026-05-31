@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import type { BusinessCardVariantId } from "@/lib/collateral/business-card/formats";
 import type { SocialPostVariantId } from "@/lib/collateral/social/formats";
-import type { AgencyBrandAdvanced, CollateralType } from "@/lib/types";
+import type { AgencyBrandAdvanced, CollateralType, ListingImageMetaMap } from "@/lib/types";
 
 export type CollateralPageFormatId =
   | "a4-portrait"
@@ -249,7 +249,7 @@ export type BrochureBlurbBlock =
   | { type: "heading"; text: string }
   | { type: "paragraph"; text: string };
 
-export type SalesBrochureCopyJson = {
+export type BrochureCopyJson = {
   heading: string;
   /** Plain-text fallback; kept in sync with `blurb_blocks` for AI and legacy readers. */
   blurb: string;
@@ -261,16 +261,23 @@ export type SalesBrochureCopyJson = {
   disclaimer: string;
   /** Optional extra paragraph shown at the foot of the page-two gallery. */
   page_two_note?: string;
-  /** Label shown above the price across every brochure layout. Defaults to "Price". */
+  /** Label shown above the price across every brochure layout. */
   price_label?: string;
   /**
    * Brochure-only override for the displayed price. When blank, the brochure
    * falls back to the listing's scraped price (`property.display_price`).
    */
   price_value?: string;
+  /** Label shown above the bond on lease brochures (e.g. "Bond"). */
+  bond_label?: string;
+  /** Bond amount shown on lease brochures only. */
+  bond_value?: string;
 };
 
-export type SalesBrochurePropertySlice = {
+/** @deprecated Use BrochureCopyJson */
+export type SalesBrochureCopyJson = BrochureCopyJson;
+
+export type BrochurePropertySlice = {
   address: string;
   suburb: string;
   state: string;
@@ -288,9 +295,10 @@ export type SalesBrochurePropertySlice = {
   page_two_image_urls: string[];
 };
 
-export type SalesBrochureDocumentJson = {
-  version: "sales_brochure_v1";
-  type: "sales_brochure";
+/** @deprecated Use BrochurePropertySlice */
+export type SalesBrochurePropertySlice = BrochurePropertySlice;
+
+type BrochureDocumentBase = {
   template_id: string;
   generated_at: string;
   /** Last time copy/images were saved in the editor. */
@@ -300,18 +308,34 @@ export type SalesBrochureDocumentJson = {
   agency: CollateralBrandSlice;
   agent: CollateralAgentSlice;
   agents: CollateralAgentSlice[];
-  property: SalesBrochurePropertySlice;
-  copy: SalesBrochureCopyJson;
+  property: BrochurePropertySlice;
+  /** Snapshot from listing at build time; used for floor plan fit in print/preview. */
+  listing_image_meta?: ListingImageMetaMap;
+  copy: BrochureCopyJson;
   qr_target_url: string;
   assets: {
     qr_code_url: string;
   };
 };
 
+export type SalesBrochureDocumentJson = BrochureDocumentBase & {
+  version: "sales_brochure_v1";
+  type: "sales_brochure";
+};
+
+export type RentalBrochureDocumentJson = BrochureDocumentBase & {
+  version: "rental_brochure_v1";
+  type: "rental_brochure";
+};
+
+export type BrochureDocumentJson =
+  | SalesBrochureDocumentJson
+  | RentalBrochureDocumentJson;
+
 export type CollateralDocumentJson =
   | BusinessCardDocumentJson
   | SocialPostsDocumentJson
-  | SalesBrochureDocumentJson;
+  | BrochureDocumentJson;
 
 export function isSalesBrochureDocument(
   document: CollateralDocumentJson,
@@ -319,24 +343,58 @@ export function isSalesBrochureDocument(
   return document.type === "sales_brochure";
 }
 
+export function isRentalBrochureDocument(
+  document: CollateralDocumentJson,
+): document is RentalBrochureDocumentJson {
+  return document.type === "rental_brochure";
+}
+
+export function isBrochureDocument(
+  document: CollateralDocumentJson,
+): document is BrochureDocumentJson {
+  return document.type === "sales_brochure" || document.type === "rental_brochure";
+}
+
 /** Default wording shown above the price when the user hasn't customised it. */
 export const DEFAULT_BROCHURE_PRICE_LABEL = "Price";
+export const DEFAULT_RENTAL_BROCHURE_PRICE_LABEL = "For lease";
+export const DEFAULT_RENTAL_BROCHURE_BOND_LABEL = "Bond";
+
+export function defaultBrochurePriceLabel(
+  document: BrochureDocumentJson,
+): string {
+  return document.type === "rental_brochure"
+    ? DEFAULT_RENTAL_BROCHURE_PRICE_LABEL
+    : DEFAULT_BROCHURE_PRICE_LABEL;
+}
 
 /** Resolves the price label for a brochure, falling back to the default. */
-export function resolveBrochurePriceLabel(
-  document: SalesBrochureDocumentJson,
-): string {
-  return document.copy.price_label?.trim() || DEFAULT_BROCHURE_PRICE_LABEL;
+export function resolveBrochurePriceLabel(document: BrochureDocumentJson): string {
+  return document.copy.price_label?.trim() || defaultBrochurePriceLabel(document);
 }
 
 /**
  * Resolves the price shown on a brochure: a user override when set, otherwise
  * the listing's scraped price.
  */
-export function resolveBrochurePrice(
-  document: SalesBrochureDocumentJson,
-): string {
+export function resolveBrochurePrice(document: BrochureDocumentJson): string {
   return document.copy.price_value?.trim() || document.property.display_price;
+}
+
+export function defaultBrochureBondLabel(_document: BrochureDocumentJson): string {
+  return DEFAULT_RENTAL_BROCHURE_BOND_LABEL;
+}
+
+export function resolveBrochureBondLabel(document: BrochureDocumentJson): string {
+  return document.copy.bond_label?.trim() || defaultBrochureBondLabel(document);
+}
+
+/** Bond amount on lease brochures. No listing fallback — user-entered only. */
+export function resolveBrochureBond(document: BrochureDocumentJson): string {
+  if (document.type !== "rental_brochure") {
+    return "";
+  }
+  return document.copy.bond_value?.trim() ?? "";
 }
 
 export function isSocialPostsDocument(

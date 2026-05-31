@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
-import { buildSalesBrochureDocument } from "@/lib/collateral/buildSalesBrochureDocument";
+import {
+  buildRentalBrochureDocument,
+  buildSalesBrochureDocument,
+} from "@/lib/collateral/buildSalesBrochureDocument";
 import { withBrochureContentSaved } from "@/lib/collateral/sales-brochure/brochurePublishSync";
-import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
+import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { provisionCollateralQr } from "@/lib/collateral/provisionCollateralQr";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
 import {
@@ -10,6 +13,11 @@ import {
   SalesBrochureCopyValidationError,
   generateSalesBrochureCopy,
 } from "@/lib/openai/generateSalesBrochureCopy";
+import {
+  RentalBrochureCopyOpenAIError,
+  RentalBrochureCopyValidationError,
+  generateRentalBrochureCopy,
+} from "@/lib/openai/generateRentalBrochureCopy";
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import type { Listing } from "@/lib/types";
 
@@ -22,19 +30,25 @@ export async function POST(
     const { supabase, agency, collateral, listing } =
       await requireCollateralAccess(id);
 
-    if (collateral.type !== "sales_brochure") {
+    if (collateral.type !== "sales_brochure" && collateral.type !== "rental_brochure") {
       return NextResponse.json(
-        { error: "Copy generation is only available for sales brochures" },
+        { error: "Copy generation is only available for brochures" },
         { status: 400 },
       );
     }
 
     const agentProfile = await loadListingAgentProfile(supabase, listing as Listing);
     const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
-    const copy = await generateSalesBrochureCopy({
-      agency,
-      listing: listing as Listing,
-    });
+    const copy =
+      collateral.type === "rental_brochure"
+        ? await generateRentalBrochureCopy({
+            agency,
+            listing: listing as Listing,
+          })
+        : await generateSalesBrochureCopy({
+            agency,
+            listing: listing as Listing,
+          });
 
     const { provisionedListing, qrCodeUrl, qrTargetUrl } =
       await provisionCollateralQr({
@@ -45,20 +59,32 @@ export async function POST(
       });
 
     const templateId = resolveCollateralTemplateId(agency, collateral);
-    const built = buildSalesBrochureDocument({
-      agency,
-      listing: provisionedListing,
-      collateral: { ...collateral, template_id: templateId },
-      copy,
-      agentProfile,
-      agencyAgents,
-      qrCodeUrl,
-      qrTargetUrl,
-    });
+    const built =
+      collateral.type === "rental_brochure"
+        ? buildRentalBrochureDocument({
+            agency,
+            listing: provisionedListing,
+            collateral: { ...collateral, template_id: templateId },
+            copy,
+            agentProfile,
+            agencyAgents,
+            qrCodeUrl,
+            qrTargetUrl,
+          })
+        : buildSalesBrochureDocument({
+            agency,
+            listing: provisionedListing,
+            collateral: { ...collateral, template_id: templateId },
+            copy,
+            agentProfile,
+            agencyAgents,
+            qrCodeUrl,
+            qrTargetUrl,
+          });
 
     const existing = collateral.document_json;
     const documentJson = withBrochureContentSaved(
-      existing && isSalesBrochureDocument(existing)
+      existing && isBrochureDocument(existing)
         ? {
             ...built,
             property: {
@@ -95,14 +121,20 @@ export async function POST(
 
     return NextResponse.json({ copy, collateral: data, listing: provisionedListing });
   } catch (error) {
-    if (error instanceof SalesBrochureCopyValidationError) {
+    if (
+      error instanceof SalesBrochureCopyValidationError ||
+      error instanceof RentalBrochureCopyValidationError
+    ) {
       return NextResponse.json(
         { error: error.message, code: error.code },
         { status: 400 },
       );
     }
 
-    if (error instanceof SalesBrochureCopyOpenAIError) {
+    if (
+      error instanceof SalesBrochureCopyOpenAIError ||
+      error instanceof RentalBrochureCopyOpenAIError
+    ) {
       return NextResponse.json(
         { error: error.message, code: error.code },
         { status: 400 },

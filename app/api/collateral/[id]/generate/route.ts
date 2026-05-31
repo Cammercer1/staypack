@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
 import { generateCollateralDocument } from "@/lib/collateral/generateCollateralDocument";
 import { collateralPhotoRequirementError } from "@/lib/listings/collateralPhotoRequirements";
+import { collateralPurposeMismatchError } from "@/lib/listings/collateralPurposeGuard";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
 import { isBusinessCardDocument } from "@/lib/collateral/templates/types";
 
@@ -22,6 +23,11 @@ export async function POST(
     }
 
     if (listing) {
+      const purposeError = collateralPurposeMismatchError(listing, collateral.type);
+      if (purposeError) {
+        return NextResponse.json({ error: purposeError }, { status: 400 });
+      }
+
       const photoError = collateralPhotoRequirementError(listing);
       if (photoError) {
         return NextResponse.json({ error: photoError }, { status: 400 });

@@ -3,25 +3,22 @@ import type { LucideIcon } from "lucide-react";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
-import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import { BrochureSlotImage } from "@/components/collateral/sales-brochure/inline/BrochureSlotImage";
 import { BrochureAgentContactStack } from "@/lib/collateral/templates/sales-brochure/shared/BrochureAgentContactStack";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { BrochureRentalBondInline } from "@/lib/collateral/templates/sales-brochure/shared/BrochureCopyBlocks";
 import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import {
   resolveBrochurePrice,
   resolveBrochurePriceLabel,
-  type SalesBrochureDocumentJson,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
-import {
-  brochurePropertyPhotoClassName,
-  brochurePropertyPhotoFrameClassName,
-} from "@/lib/collateral/sales-brochure/brochureImageFit";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
 
-function resolveGalleryPhotos(document: SalesBrochureDocumentJson) {
+function resolveGalleryPhotos(document: BrochureDocumentJson) {
   const urls = document.property.page_one_image_urls.filter(Boolean);
   return {
     hero: urls[0] ?? document.property.hero_image_url ?? "",
@@ -41,7 +38,7 @@ type GalleryAddressParts = {
 
 /** Street lowercase @ 400; suburb + state/postcode @ 600. */
 function parseGalleryAddressParts(
-  document: SalesBrochureDocumentJson,
+  document: BrochureDocumentJson,
 ): GalleryAddressParts {
   const { property } = document;
   const suburb = property.suburb?.trim() ?? "";
@@ -91,7 +88,7 @@ function parseGalleryAddressParts(
   };
 }
 
-function GalleryAddressTitle({ document }: { document: SalesBrochureDocumentJson }) {
+function GalleryAddressTitle({ document }: { document: BrochureDocumentJson }) {
   const { street, suburb, statePostcode } = parseGalleryAddressParts(document);
 
   if (!street && !suburb && !statePostcode) {
@@ -140,24 +137,24 @@ function GallerySpecItem({
   );
 }
 
-export function GalleryPhotoMosaic({ document }: { document: SalesBrochureDocumentJson }) {
+export function GalleryPhotoMosaic({ document }: { document: BrochureDocumentJson }) {
   const { hero, thumbs } = resolveGalleryPhotos(document);
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
   const logoBg = document.agency.accent_colour || document.agency.primary_colour;
 
   return (
     <div className="relative flex h-[70%] min-h-0 shrink-0 flex-col gap-[6px]">
-      <div
-        className={`relative min-h-0 flex-[1.5] overflow-hidden ${hero ? brochurePropertyPhotoFrameClassName(hero) : "bg-neutral-200"}`}
-      >
+      <div className="relative min-h-0 flex-[1.5] overflow-hidden">
         {hero ? (
-          <EditableImage
+          <BrochureSlotImage
+            url={hero}
             slot="hero"
-            src={hero}
-            className="h-full w-full"
-            imgClassName={brochurePropertyPhotoClassName(hero)}
+            className="h-full"
+            imageWrapperClassName="min-h-0 h-full flex-1"
           />
-        ) : null}
+        ) : (
+          <div className="h-full bg-neutral-200" />
+        )}
         {logoUrl ? (
           <div
             className="absolute top-0 right-[5%] z-10 px-5 py-3"
@@ -174,27 +171,25 @@ export function GalleryPhotoMosaic({ document }: { document: SalesBrochureDocume
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-3 gap-[6px]">
-        {thumbs.map((url, index) => (
-          <div
-            key={`${url}-${index}`}
-            className={`min-h-0 overflow-hidden ${url ? brochurePropertyPhotoFrameClassName(url) : "bg-neutral-200"}`}
-          >
-            {url ? (
-              <EditableImage
-                slot={{ kind: "page_one", index: index + 1 }}
-                src={url}
-                className="h-full w-full"
-                imgClassName={brochurePropertyPhotoClassName(url)}
-              />
-            ) : null}
-          </div>
-        ))}
+        {thumbs.map((url, index) =>
+          url ? (
+            <BrochureSlotImage
+              key={`${url}-${index}`}
+              url={url}
+              slot={{ kind: "page_one", index: index + 1 }}
+              className="min-h-0 h-full"
+              imageWrapperClassName="min-h-0 h-full flex-1"
+            />
+          ) : (
+            <div key={index} className="bg-neutral-200" />
+          ),
+        )}
       </div>
     </div>
   );
 }
 
-export function GalleryInfoBar({ document }: { document: SalesBrochureDocumentJson }) {
+export function GalleryInfoBar({ document }: { document: BrochureDocumentJson }) {
   const { property } = document;
 
   const specs: { id: string; icon: LucideIcon; value: string }[] = [];
@@ -249,7 +244,7 @@ export function GalleryDetailsRow({
   document,
   report,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
 }) {
   return (
@@ -282,6 +277,7 @@ export function GalleryDetailsRow({
             >
               {resolveBrochurePrice(document)}
             </Editable>
+            <BrochureRentalBondInline document={document} compact />
           </div>
         ) : null}
         {document.copy.inspection_cta ? (
@@ -305,7 +301,7 @@ export function GalleryDetailsRow({
   );
 }
 
-export function GalleryBottomBar({ document }: { document: SalesBrochureDocumentJson }) {
+export function GalleryBottomBar({ document }: { document: BrochureDocumentJson }) {
   const website = document.agency.website_url?.trim();
 
   return (
@@ -338,7 +334,7 @@ export function GalleryMinimalAgentBar({
   report,
   pinnedBottom = false,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
   pinnedBottom?: boolean;
 }) {
@@ -386,7 +382,7 @@ export function GalleryPageOneSpread({
   document,
   report,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
 }) {
   return (

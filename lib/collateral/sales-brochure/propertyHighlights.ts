@@ -7,7 +7,7 @@ import {
 } from "@/lib/collateral/sales-brochure/blurbBlocks";
 import type {
   SalesBrochureCopyJson,
-  SalesBrochureDocumentJson,
+  BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 
 export const PROPERTY_HIGHLIGHTS_MAX = 8;
@@ -34,8 +34,8 @@ export function getPropertyHighlights(copy: LegacyBrochureCopy): string[] {
 }
 
 export function coerceSalesBrochureDocument(
-  document: SalesBrochureDocumentJson,
-): SalesBrochureDocumentJson {
+  document: BrochureDocumentJson,
+): BrochureDocumentJson {
   return {
     ...document,
     copy: coerceSalesBrochureCopy(document.copy as LegacyBrochureCopy),
@@ -71,6 +71,8 @@ export function coerceSalesBrochureCopy(
     page_two_note: copy.page_two_note,
     price_label: copy.price_label,
     price_value: copy.price_value,
+    bond_label: copy.bond_label,
+    bond_value: copy.bond_value,
   };
 }
 
@@ -103,6 +105,8 @@ export function coerceSalesBrochureCopyForEditor(
     page_two_note: copy.page_two_note,
     price_label: copy.price_label,
     price_value: copy.price_value,
+    bond_label: copy.bond_label,
+    bond_value: copy.bond_value,
   };
 }
 

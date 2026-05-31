@@ -5,13 +5,13 @@ import { ClassicPageHeader } from "@/lib/reports/templates/classic/ClassicPageHe
 import { salesBrochureToReportShape } from "@/lib/collateral/sales-brochure/toReportShape";
 import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
 import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
-import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
+import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { getReportBrandColours } from "@/lib/reports/brandColours";
 import { SalesBrochurePropertySection } from "@/lib/collateral/templates/sales-brochure/SalesBrochurePropertySection";
 
 /** Single-page Classic sales brochure (gallery, copy, agent + QR on one A4). */
 export function ClassicSalesBrochureOnePage({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
-  if (!isSalesBrochureDocument(document)) {
+  if (!isBrochureDocument(document)) {
     return null;
   }
 

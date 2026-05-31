@@ -130,6 +130,13 @@ const collateralImageSelectionSchema = z.object({
   selected_image_urls: z.array(z.string()).max(25).optional(),
 });
 
+const listingImageMetaEntrySchema = z.object({
+  role: z.enum(["photo", "floor_plan"]),
+  label: z.string().max(80).optional(),
+});
+
+const listingImageMetaSchema = z.record(z.string(), listingImageMetaEntrySchema);
+
 const collateralImageChannelSchema = z.enum([
   "landing",
   "str_report",
@@ -173,6 +180,21 @@ const listingPropertyFields = {
       const trimmed = value.trim();
       return trimmed === "" ? null : trimmed;
     }),
+  bond: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((value) => {
+      if (value == null) {
+        return value;
+      }
+      const normalized = normalizeDisplayPrice(value);
+      if (normalized) {
+        return normalized;
+      }
+      const trimmed = value.trim();
+      return trimmed === "" ? null : trimmed;
+    }),
   hero_image_url: z.string().nullable().optional(),
   selected_image_urls: z.array(z.string()).max(25).optional(),
   uploaded_image_urls: z.array(z.string()).max(20).optional(),
@@ -181,6 +203,7 @@ const listingPropertyFields = {
   collateral_image_selections: z
     .record(collateralImageChannelSchema, collateralImageSelectionSchema)
     .optional(),
+  listing_image_meta: listingImageMetaSchema.optional(),
   listing_agents: z.array(listingAgentSchema).max(2).optional(),
   scraped_listing_json: parsedListingSchema.optional(),
 };
@@ -262,6 +285,8 @@ export const salesBrochureCopySchema = salesBrochureCopyAiSchema.extend({
   page_two_note: z.string().optional(),
   price_label: z.string().optional(),
   price_value: z.string().optional(),
+  bond_label: z.string().optional(),
+  bond_value: z.string().optional(),
 });
 
 export const salesBrochurePropertyImagesSchema = z.object({
@@ -282,6 +307,8 @@ export const updateSalesBrochureDocumentSchema = z
       data.copy != null || data.template_id != null || data.property != null,
     { message: "Provide copy, property images, or template_id" },
   );
+
+export const updateRentalBrochureDocumentSchema = updateSalesBrochureDocumentSchema;
 
 export const loginSchema = z.object({
   email: z.string().email(),

@@ -36,7 +36,6 @@ export const COLLATERAL_TYPE_META: Record<
   rental_brochure: {
     label: "Lease brochure",
     description: "Branded brochure for properties for lease.",
-    comingSoon: true,
   },
   social_posts: {
     label: "Social posts",
@@ -62,6 +61,8 @@ export function collateralEditorPath(
   switch (type) {
     case "sales_brochure":
       return `/listings/${listingId}/brochure`;
+    case "rental_brochure":
+      return `/listings/${listingId}/lease-brochure`;
     case "social_posts":
       return `/listings/${listingId}/social`;
     default:

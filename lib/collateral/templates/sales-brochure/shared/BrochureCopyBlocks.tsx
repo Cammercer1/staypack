@@ -1,10 +1,12 @@
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
 import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
-import { brochurePropertyPhotoClassName } from "@/lib/collateral/sales-brochure/brochureImageFit";
+import { BrochureSlotImage } from "@/components/collateral/sales-brochure/inline/BrochureSlotImage";
 import {
   resolveBrochurePrice,
   resolveBrochurePriceLabel,
-  type SalesBrochureDocumentJson,
+  resolveBrochureBond,
+  resolveBrochureBondLabel,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
 import { formatNumber } from "@/lib/reports/formatters";
@@ -14,7 +16,7 @@ export function BrochureAddressBlock({
   large = false,
   inverted = false,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   large?: boolean;
   inverted?: boolean;
 }) {
@@ -47,7 +49,7 @@ export function BrochureAddressBlock({
   );
 }
 
-export function BrochureStatsRow({ document }: { document: SalesBrochureDocumentJson }) {
+export function BrochureStatsRow({ document }: { document: BrochureDocumentJson }) {
   const { property } = document;
   const stats = [
     { label: "Beds", value: formatNumber(property.bedrooms) },
@@ -81,10 +83,10 @@ export function BrochurePriceBlock({
   document,
   inverted = false,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   inverted?: boolean;
 }) {
-  if (!resolveBrochurePrice(document)) return null;
+  if (!resolveBrochurePrice(document) && !resolveBrochureBond(document)) return null;
 
   return (
     <div
@@ -95,22 +97,77 @@ export function BrochurePriceBlock({
           : { backgroundColor: "var(--report-soft-highlight, #f3f4f6)" }
       }
     >
+      {resolveBrochurePrice(document) ? (
+        <>
+          <Editable
+            as="p"
+            path="copy.price_label"
+            className={`text-[0.7rem] font-semibold uppercase tracking-[0.14em] ${
+              inverted ? "text-white/90" : "text-neutral-600"
+            }`}
+          >
+            {resolveBrochurePriceLabel(document)}
+          </Editable>
+          <Editable
+            as="p"
+            path="copy.price_value"
+            className={`mt-2 text-[2rem] font-semibold leading-none ${inverted ? "text-white" : ""}`}
+            style={{ fontFamily: "var(--report-heading-font, inherit)" }}
+          >
+            {resolveBrochurePrice(document)}
+          </Editable>
+        </>
+      ) : null}
+      <BrochureRentalBondInline document={document} inverted={inverted} />
+    </div>
+  );
+}
+
+/** Bond line for lease brochures — shown under rent/price when a bond is set. */
+export function BrochureRentalBondInline({
+  document,
+  inverted = false,
+  compact = false,
+  accent,
+}: {
+  document: BrochureDocumentJson;
+  inverted?: boolean;
+  compact?: boolean;
+  accent?: string;
+}) {
+  if (document.type !== "rental_brochure" || !resolveBrochureBond(document)) {
+    return null;
+  }
+
+  const labelClass = compact
+    ? "text-[0.65rem] font-medium uppercase tracking-wide text-neutral-500"
+    : `text-[0.7rem] font-semibold uppercase tracking-[0.14em] ${
+        inverted ? "text-white/90" : "text-neutral-600"
+      }`;
+  const valueClass = compact
+    ? "mt-1 text-[1.05rem] font-bold leading-none text-neutral-900"
+    : `mt-2 text-xl font-semibold leading-none ${inverted ? "text-white" : ""}`;
+
+  return (
+    <div className={compact ? "mt-2" : "mt-3 border-t border-neutral-200/60 pt-3"}>
       <Editable
         as="p"
-        path="copy.price_label"
-        className={`text-[0.7rem] font-semibold uppercase tracking-[0.14em] ${
-          inverted ? "text-white/90" : "text-neutral-600"
-        }`}
+        path="copy.bond_label"
+        className={labelClass}
+        style={compact ? { fontFamily: "var(--report-heading-font, inherit)" } : undefined}
       >
-        {resolveBrochurePriceLabel(document)}
+        {resolveBrochureBondLabel(document)}
       </Editable>
       <Editable
         as="p"
-        path="copy.price_value"
-        className={`mt-2 text-[2rem] font-semibold leading-none ${inverted ? "text-white" : ""}`}
-        style={{ fontFamily: "var(--report-heading-font, inherit)" }}
+        path="copy.bond_value"
+        className={valueClass}
+        style={{
+          fontFamily: "var(--report-heading-font, inherit)",
+          ...(accent ? { color: accent } : {}),
+        }}
       >
-        {resolveBrochurePrice(document)}
+        {resolveBrochureBond(document)}
       </Editable>
     </div>
   );
@@ -180,10 +237,12 @@ export function BrochurePhotoGrid({
   return (
     <div className={`grid gap-2 ${gridClass} ${className}`}>
       {dedupeImageUrls(urls).map((url, index) => (
-        <div key={`${index}-${url}`} className="min-h-0 overflow-hidden bg-neutral-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="" className={brochurePropertyPhotoClassName(url)} />
-        </div>
+        <BrochureSlotImage
+          key={`${index}-${url}`}
+          url={url}
+          className="min-h-0 bg-neutral-100"
+          imageWrapperClassName="min-h-0 aspect-[4/3] w-full"
+        />
       ))}
     </div>
   );

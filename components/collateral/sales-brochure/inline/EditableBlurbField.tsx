@@ -87,7 +87,7 @@ export function EditableBlurbField({
 }: Props) {
   const onChangeRef = useRef(onChange);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { onFieldFocus, brandPrimaryColour } = useEditableContext();
+  const { onFieldFocus, brandPrimaryColour, blurbFlushRef } = useEditableContext();
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -171,6 +171,16 @@ export function EditableBlurbField({
       onFieldFocus?.(null);
     },
   });
+
+  useEffect(() => {
+    if (!editor || !blurbFlushRef) {
+      return;
+    }
+    blurbFlushRef.current = () => tiptapDocToBlurbBlocks(editor.getJSON());
+    return () => {
+      blurbFlushRef.current = null;
+    };
+  }, [blurbFlushRef, editor]);
 
   useEffect(() => {
     if (!editor || editor.isFocused) {

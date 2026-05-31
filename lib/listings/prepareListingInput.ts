@@ -1,5 +1,9 @@
 import { geocodeReportAddress, hasGeocodableAddress } from "@/lib/geocoding";
 import {
+  normalizeListingImageMetaInput,
+  resolveListingImageMetaForPool,
+} from "@/lib/listings/syncListingImageMeta";
+import {
   parsedListingSchema,
   type UpdateListingInput,
 } from "@/lib/validation/schemas";
@@ -62,8 +66,45 @@ export async function prepareListingInput(body: UpdateListingInput) {
   }
 
   syncLegacyLandingImages(prepared);
+  syncListingImageMetaFields(prepared, {
+    scraped_listing_json: (prepared.scraped_listing_json ??
+      null) as Listing["scraped_listing_json"],
+    uploaded_image_urls: prepared.uploaded_image_urls ?? [],
+    listing_image_meta: prepared.listing_image_meta ?? {},
+  });
 
   return { prepared, geocodeWarning };
+}
+
+function syncListingImageMetaFields(
+  prepared: UpdateListingInput,
+  existing: Pick<
+    Listing,
+    "scraped_listing_json" | "uploaded_image_urls" | "listing_image_meta"
+  >,
+) {
+  if (prepared.listing_image_meta !== undefined) {
+    prepared.listing_image_meta = normalizeListingImageMetaInput(
+      prepared.listing_image_meta,
+    );
+    return;
+  }
+
+  const poolTouched =
+    prepared.scraped_listing_json !== undefined ||
+    prepared.uploaded_image_urls !== undefined ||
+    prepared.selected_image_urls !== undefined;
+
+  if (poolTouched) {
+    prepared.listing_image_meta = resolveListingImageMetaForPool({
+      scraped_listing_json: (prepared.scraped_listing_json ??
+        existing.scraped_listing_json ??
+        null) as Listing["scraped_listing_json"],
+      uploaded_image_urls:
+        prepared.uploaded_image_urls ?? existing.uploaded_image_urls ?? [],
+      listing_image_meta: existing.listing_image_meta ?? {},
+    });
+  }
 }
 
 const ADDRESS_FIELDS = [
@@ -77,11 +118,14 @@ const ADDRESS_FIELDS = [
 export async function prepareListingPatch(
   body: UpdateListingInput,
   existing: Pick<
-    UpdateListingInput,
-    (typeof ADDRESS_FIELDS)[number] | "latitude" | "longitude"
-  > & {
-    scraped_listing_json?: ParsedListing | null;
-  },
+    Listing,
+    | (typeof ADDRESS_FIELDS)[number]
+    | "latitude"
+    | "longitude"
+    | "scraped_listing_json"
+    | "uploaded_image_urls"
+    | "listing_image_meta"
+  >,
 ) {
   const prepared = { ...body };
 
@@ -140,6 +184,7 @@ export async function prepareListingPatch(
   }
 
   syncLegacyLandingImages(prepared);
+  syncListingImageMetaFields(prepared, existing);
 
   return { prepared, geocodeWarning };
 }

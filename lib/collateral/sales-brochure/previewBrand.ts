@@ -3,7 +3,7 @@ import { DEFAULT_BRAND_VALUES } from "@/lib/branding/normalize";
 import type {
   CollateralAgentSlice,
   CollateralBrandSlice,
-  SalesBrochureDocumentJson,
+  BrochureDocumentJson,
   SocialPostAgentLayer,
 } from "@/lib/collateral/templates/types";
 import type { Agency } from "@/lib/types";
@@ -88,9 +88,9 @@ export function salesBrochurePreviewBrandFromAgency(
 
 /** Overlay logged-in agency brand on in-app brochure previews (not publish/PDF). */
 export function applySalesBrochurePreviewBrand(
-  document: SalesBrochureDocumentJson,
+  document: BrochureDocumentJson,
   preview: SalesBrochurePreviewBrand,
-): SalesBrochureDocumentJson {
+): BrochureDocumentJson {
   return {
     ...document,
     agency: preview.agency,

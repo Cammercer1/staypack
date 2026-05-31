@@ -6,14 +6,20 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FittedBrochurePreview } from "@/components/collateral/sales-brochure/FittedBrochurePreview";
 import { SalesBrochureTemplatePicker } from "@/components/collateral/sales-brochure/SalesBrochureTemplatePicker";
-import { buildSalesBrochureTemplatePreview } from "@/lib/collateral/sales-brochure/templatePreviewDocument";
+import { buildBrochureTemplatePreview } from "@/lib/collateral/sales-brochure/templatePreviewDocument";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
-import type { Agency, CollateralItem, Listing } from "@/lib/types";
+import type { Agency, CollateralItem, CollateralType, Listing } from "@/lib/types";
+
+type BrochureCollateralType = Extract<
+  CollateralType,
+  "sales_brochure" | "rental_brochure"
+>;
 
 type Props = {
   agency: Agency;
   listing: Listing;
   collateral: CollateralItem;
+  collateralType?: BrochureCollateralType;
   onCollateralChange: (collateral: CollateralItem) => void;
   onContinue: () => void;
 };
@@ -26,6 +32,7 @@ export function SalesBrochureTemplateStep({
   agency,
   listing,
   collateral,
+  collateralType = "sales_brochure",
   onCollateralChange,
   onContinue,
 }: Props) {
@@ -37,13 +44,14 @@ export function SalesBrochureTemplateStep({
 
   const previewDocument = useMemo(
     () =>
-      buildSalesBrochureTemplatePreview({
+      buildBrochureTemplatePreview({
         agency,
         listing,
         collateral,
         templateId: selectedTemplateId,
+        collateralType,
       }),
-    [agency, listing, collateral, selectedTemplateId],
+    [agency, listing, collateral, selectedTemplateId, collateralType],
   );
 
   async function proceedToContentGeneration() {
@@ -88,6 +96,7 @@ export function SalesBrochureTemplateStep({
             value={selectedTemplateId}
             onChange={setSelectedTemplateId}
             defaultTemplateId={defaultTemplateId}
+            collateralType={collateralType}
           />
 
           <div className="flex flex-wrap gap-3">
@@ -108,6 +117,7 @@ export function SalesBrochureTemplateStep({
           <FittedBrochurePreview
             document={previewDocument}
             listing={listing}
+            collateralType={collateralType}
             maxHeight="min(85vh, 920px)"
           />
         </div>

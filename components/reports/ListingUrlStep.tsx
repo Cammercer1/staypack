@@ -9,6 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UnknownAgentsAfterScrapeModal } from "@/components/reports/UnknownAgentsAfterScrapeModal";
 import { isPersistedListing } from "@/lib/listings/emptyListingDraft";
+import {
+  initialListingAgents,
+  listingAgentsToParsed,
+} from "@/lib/reports/listingAgents";
 import type { Listing, ParsedListing } from "@/lib/types";
 
 type UnknownAgent = ParsedListing["agents"][number] & { name: string };
@@ -47,30 +51,54 @@ export function ListingUrlStep({ listing, onComplete, onManualEntry }: Props) {
     onComplete(importedListing);
   }
 
-  function handleUnknownAgentsComplete(result: UnknownAgentsCompletion) {
-    if (pendingListing) {
-      const skipped = new Set(result.skippedNames);
-      const savedByOriginalName = new Map(
-        result.saved.map((entry) => [entry.originalName, entry.agent]),
-      );
-      const currentAgents = pendingListing.scraped_listing_json?.agents ?? [];
-      const nextAgents = currentAgents
-        .filter((agent) => !skipped.has(agent.name ?? ""))
-        .map((agent) => {
-          const replacement = savedByOriginalName.get(agent.name ?? "");
-          return replacement ?? agent;
-        });
-
-      finishScrape({
-        ...pendingListing,
-        scraped_listing_json: pendingListing.scraped_listing_json
-          ? {
-              ...pendingListing.scraped_listing_json,
-              agents: nextAgents,
-            }
-          : pendingListing.scraped_listing_json,
-      });
+  async function handleUnknownAgentsComplete(result: UnknownAgentsCompletion) {
+    if (!pendingListing) {
+      return;
     }
+
+    const skipped = new Set(result.skippedNames);
+    const savedByOriginalName = new Map(
+      result.saved.map((entry) => [entry.originalName, entry.agent]),
+    );
+    const currentAgents = pendingListing.scraped_listing_json?.agents ?? [];
+    const nextAgents = currentAgents
+      .filter((agent) => !skipped.has(agent.name ?? ""))
+      .map((agent) => {
+        const replacement = savedByOriginalName.get(agent.name ?? "");
+        return replacement ?? agent;
+      });
+
+    let resolvedListing: Listing = {
+      ...pendingListing,
+      scraped_listing_json: pendingListing.scraped_listing_json
+        ? {
+            ...pendingListing.scraped_listing_json,
+            agents: nextAgents,
+          }
+        : pendingListing.scraped_listing_json,
+    };
+
+    if (isPersistedListing(resolvedListing)) {
+      try {
+        const response = await fetch(`/api/listings/${resolvedListing.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            listing_agents: listingAgentsToParsed(
+              initialListingAgents(nextAgents),
+            ),
+          }),
+        });
+        const payload = await response.json();
+        if (response.ok && payload.listing) {
+          resolvedListing = payload.listing as Listing;
+        }
+      } catch {
+        // Continue with the in-memory filtered listing.
+      }
+    }
+
+    finishScrape(resolvedListing);
   }
 
   async function handleScrape() {

@@ -1,29 +1,27 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
-import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import { BrochureSlotImage } from "@/components/collateral/sales-brochure/inline/BrochureSlotImage";
 import {
   getBlurbBlocks,
   sliceBlurbBlocksByParagraphs,
 } from "@/lib/collateral/sales-brochure/blurbBlocks";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { BrochureRentalBondInline } from "@/lib/collateral/templates/sales-brochure/shared/BrochureCopyBlocks";
 import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import {
   resolveBrochurePrice,
   resolveBrochurePriceLabel,
-  type SalesBrochureDocumentJson,
+  resolveBrochureBond,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
-import {
-  brochurePropertyPhotoClassName,
-  brochurePropertyPhotoFrameClassName,
-} from "@/lib/collateral/sales-brochure/brochureImageFit";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
 
-function resolveSplitPhotos(document: SalesBrochureDocumentJson) {
+function resolveSplitPhotos(document: BrochureDocumentJson) {
   const urls = document.property.page_one_image_urls.filter(Boolean);
   return {
     top: urls[0] ?? document.property.hero_image_url ?? "",
@@ -34,7 +32,7 @@ function resolveSplitPhotos(document: SalesBrochureDocumentJson) {
 }
 
 /** Property stats only — page 1 sidebar should not dump all appeal bullets. */
-function buildSplitPageOneFeatures(document: SalesBrochureDocumentJson) {
+function buildSplitPageOneFeatures(document: BrochureDocumentJson) {
   const { property } = document;
   const items: string[] = [];
 
@@ -64,7 +62,7 @@ function headlineIncludesAddress(heading: string, address: string) {
   return h.includes(a) || a.includes(h);
 }
 
-function formatAddressLine(document: SalesBrochureDocumentJson) {
+function formatAddressLine(document: BrochureDocumentJson) {
   const parts = [
     document.property.address,
     [document.property.suburb, document.property.state, document.property.postcode]
@@ -81,7 +79,7 @@ function SplitAgentBlock({
   compact = false,
 }: {
   agent: FinalReportJson["agent"];
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   compact?: boolean;
 }) {
   const accent = document.agency.accent_colour || document.agency.primary_colour;
@@ -135,55 +133,43 @@ function SplitAgentBlock({
 }
 
 /** Right column — 1 large, 2 mid, 1 wide (reference grid). */
-export function SplitPhotoColumn({ document }: { document: SalesBrochureDocumentJson }) {
+export function SplitPhotoColumn({ document }: { document: BrochureDocumentJson }) {
   const photos = resolveSplitPhotos(document);
 
   return (
     <div className="grid h-full grid-rows-[1.05fr_0.55fr_0.65fr] gap-[3px] bg-white">
       {photos.top ? (
-        <div
-          className={`min-h-0 overflow-hidden ${brochurePropertyPhotoFrameClassName(photos.top)}`}
-        >
-          <EditableImage
-            slot={{ kind: "page_one", index: 0 }}
-            src={photos.top}
-            className="h-full w-full"
-            imgClassName={brochurePropertyPhotoClassName(photos.top)}
-          />
-        </div>
+        <BrochureSlotImage
+          url={photos.top}
+          slot={{ kind: "page_one", index: 0 }}
+          className="min-h-0 h-full"
+          imageWrapperClassName="min-h-0 h-full flex-1"
+        />
       ) : (
         <div className="bg-neutral-200" />
       )}
       <div className="grid min-h-0 grid-cols-2 gap-[3px]">
         {[photos.middleLeft, photos.middleRight].map((url, index) =>
           url ? (
-            <div
+            <BrochureSlotImage
               key={`${url}-${index}`}
-              className={`min-h-0 overflow-hidden ${brochurePropertyPhotoFrameClassName(url)}`}
-            >
-              <EditableImage
-                slot={{ kind: "page_one", index: index + 1 }}
-                src={url}
-                className="h-full w-full"
-                imgClassName={brochurePropertyPhotoClassName(url)}
-              />
-            </div>
+              url={url}
+              slot={{ kind: "page_one", index: index + 1 }}
+              className="min-h-0 h-full"
+              imageWrapperClassName="min-h-0 h-full flex-1"
+            />
           ) : (
             <div key={index} className="bg-neutral-200" />
           ),
         )}
       </div>
       {photos.bottom ? (
-        <div
-          className={`min-h-0 overflow-hidden ${brochurePropertyPhotoFrameClassName(photos.bottom)}`}
-        >
-          <EditableImage
-            slot={{ kind: "page_one", index: 3 }}
-            src={photos.bottom}
-            className="h-full w-full"
-            imgClassName={brochurePropertyPhotoClassName(photos.bottom)}
-          />
-        </div>
+        <BrochureSlotImage
+          url={photos.bottom}
+          slot={{ kind: "page_one", index: 3 }}
+          className="min-h-0 h-full"
+          imageWrapperClassName="min-h-0 h-full flex-1"
+        />
       ) : (
         <div className="bg-neutral-200" />
       )}
@@ -197,7 +183,7 @@ export function SplitContentColumn({
   report,
   compact = false,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
   compact?: boolean;
 }) {
@@ -272,24 +258,29 @@ export function SplitContentColumn({
       </div>
 
       <div className="mt-auto shrink-0">
-        {resolveBrochurePrice(document) ? (
+        {(resolveBrochurePrice(document) || resolveBrochureBond(document)) ? (
           <div className="mb-3">
-            <Editable
-              as="p"
-              path="copy.price_label"
-              className="text-[0.65rem] font-medium uppercase tracking-wide text-neutral-500"
-              style={{ fontFamily: headingFont }}
-            >
-              {resolveBrochurePriceLabel(document)}
-            </Editable>
-            <Editable
-              as="p"
-              path="copy.price_value"
-              className="mt-1 text-[1.45rem] font-bold leading-none text-neutral-900"
-              style={{ fontFamily: headingFont, color: accent }}
-            >
-              {resolveBrochurePrice(document)}
-            </Editable>
+            {resolveBrochurePrice(document) ? (
+              <>
+                <Editable
+                  as="p"
+                  path="copy.price_label"
+                  className="text-[0.65rem] font-medium uppercase tracking-wide text-neutral-500"
+                  style={{ fontFamily: headingFont }}
+                >
+                  {resolveBrochurePriceLabel(document)}
+                </Editable>
+                <Editable
+                  as="p"
+                  path="copy.price_value"
+                  className="mt-1 text-[1.45rem] font-bold leading-none text-neutral-900"
+                  style={{ fontFamily: headingFont, color: accent }}
+                >
+                  {resolveBrochurePrice(document)}
+                </Editable>
+              </>
+            ) : null}
+            <BrochureRentalBondInline document={document} compact accent={accent} />
           </div>
         ) : null}
 
@@ -341,7 +332,7 @@ export function SplitSpreadLayout({
   document,
   report,
 }: {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   report: FinalReportJson;
 }) {
   return (
@@ -353,7 +344,7 @@ export function SplitSpreadLayout({
 }
 
 /** Page 2 feature list — property highlights plus page-one stats when needed. */
-export function buildSplitFeatureItems(document: SalesBrochureDocumentJson) {
+export function buildSplitFeatureItems(document: BrochureDocumentJson) {
   const { property, copy } = document;
   const items = buildSplitPageOneFeatures(document);
 

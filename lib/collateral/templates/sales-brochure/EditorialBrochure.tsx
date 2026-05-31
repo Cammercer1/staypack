@@ -1,6 +1,6 @@
 import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
 import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
-import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
+import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { EditorialPageOneSpread } from "@/lib/collateral/templates/sales-brochure/EditorialBrochureOnePage";
 import { BrochureGalleryPage } from "@/lib/collateral/templates/sales-brochure/shared/BrochureGalleryPage";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
@@ -11,7 +11,7 @@ import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/share
  * standardised photo-collage gallery closing on agent contact and a QR.
  */
 export function EditorialBrochure({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
-  if (!isSalesBrochureDocument(document)) return null;
+  if (!isBrochureDocument(document)) return null;
 
   const { report, brand, pageOneGallery } = useBrochurePage(document);
   const hero = pageOneGallery.hero_image_url;

@@ -9,24 +9,34 @@ import {
 } from "@/lib/collateral/sales-brochure/previewBrand";
 import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
 import { getCollateralTemplate } from "@/lib/collateral/templates/registry";
-import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
+import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { enrichSalesBrochureDocumentAgents } from "@/lib/collateral/enrichSalesBrochureDocument";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
+import type { BrochureBlurbBlock } from "@/lib/collateral/templates/types";
 import { mmToPx } from "@/lib/reports/pageFormat";
 import { cn } from "@/lib/utils";
+import { resolveListingImageMetaForPool } from "@/lib/listings/syncListingImageMeta";
 import type { AgentProfile, Listing } from "@/lib/types";
 import {
   EditableProvider,
+  BrochureScreenPreviewProvider,
   type BrochureImageSlot,
 } from "@/components/collateral/sales-brochure/inline/EditableContext";
 import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
-import type { BrochureBlurbBlock } from "@/lib/collateral/templates/types";
+import type { MutableRefObject } from "react";
 
 type Props = {
-  document: SalesBrochureDocumentJson;
-  listing?: Pick<Listing, "scraped_listing_json" | "agent_profile_id"> | null;
+  document: BrochureDocumentJson;
+  listing?: Pick<
+    Listing,
+    | "scraped_listing_json"
+    | "agent_profile_id"
+    | "uploaded_image_urls"
+    | "listing_image_meta"
+  > | null;
   agencyAgents?: AgentProfile[];
   agentProfile?: AgentProfile | null;
+  collateralType?: BrochureDocumentJson["type"];
   className?: string;
   maxHeight?: string;
   fitToWidth?: boolean;
@@ -35,6 +45,7 @@ type Props = {
     setField: (path: BrochureCopyFieldPath, value: string) => void;
     setBlurbBlocks: (blocks: BrochureBlurbBlock[]) => void;
     openImagePicker: (slot: BrochureImageSlot) => void;
+    blurbFlushRef?: MutableRefObject<(() => BrochureBlurbBlock[] | null) | null>;
   };
 };
 
@@ -43,6 +54,7 @@ export function FittedBrochurePreview({
   listing = null,
   agencyAgents = [],
   agentProfile = null,
+  collateralType = document.type,
   className,
   maxHeight = "min(80vh, 900px)",
   fitToWidth = true,
@@ -86,7 +98,7 @@ export function FittedBrochurePreview({
     };
   }, []);
 
-  const previewDocument = useMemo((): SalesBrochureDocumentJson => {
+  const previewDocument = useMemo((): BrochureDocumentJson => {
     const withListingAgents = listing
       ? enrichSalesBrochureDocumentAgents(document, listing, {
           agencyAgents,
@@ -94,7 +106,18 @@ export function FittedBrochurePreview({
         })
       : document;
     const merged = applySalesBrochurePreviewBrand(withListingAgents, previewBrand);
-    return isSalesBrochureDocument(merged) ? merged : withListingAgents;
+    if (!isBrochureDocument(merged)) {
+      return withListingAgents;
+    }
+
+    const listingMeta = listing
+      ? resolveListingImageMetaForPool(listing)
+      : merged.listing_image_meta;
+
+    return {
+      ...merged,
+      listing_image_meta: listingMeta ?? merged.listing_image_meta ?? {},
+    };
   }, [document, listing, agencyAgents, agentProfile, previewBrand]);
 
   useLayoutEffect(() => {
@@ -237,19 +260,22 @@ export function FittedBrochurePreview({
                   setField={editable.setField}
                   setBlurbBlocks={editable.setBlurbBlocks}
                   openImagePicker={editable.openImagePicker}
+                  blurbFlushRef={editable.blurbFlushRef}
                 >
                   <CollateralPreview
                     document={previewDocument}
-                    collateralType="sales_brochure"
+                    collateralType={collateralType}
                     printMode
                   />
                 </EditableProvider>
               ) : (
-                <CollateralPreview
-                  document={previewDocument}
-                  collateralType="sales_brochure"
-                  printMode
-                />
+                <BrochureScreenPreviewProvider>
+                  <CollateralPreview
+                    document={previewDocument}
+                    collateralType={collateralType}
+                    printMode
+                  />
+                </BrochureScreenPreviewProvider>
               )}
             </div>
           </div>

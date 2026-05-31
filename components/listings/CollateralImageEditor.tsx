@@ -13,7 +13,8 @@ import {
   mergeNewPhotosIntoSelection,
   normalizeSelectionToPool,
 } from "@/lib/listings/collateralImages";
-import type { Listing } from "@/lib/types";
+import { resolveListingImageMetaForPool } from "@/lib/listings/syncListingImageMeta";
+import type { Listing, ListingImageMetaMap } from "@/lib/types";
 
 type Props = {
   listing: Listing;
@@ -29,6 +30,9 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
   );
   const [selectedImageUrls, setSelectedImageUrls] = useState(
     listing.selected_image_urls ?? [],
+  );
+  const [listingImageMeta, setListingImageMeta] = useState<ListingImageMetaMap>(
+    () => resolveListingImageMetaForPool(listing),
   );
   const [saving, setSaving] = useState(false);
 
@@ -76,6 +80,7 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
   async function saveSelection(body: {
     hero_image_url: string | null;
     selected_image_urls: string[];
+    listing_image_meta?: ListingImageMetaMap;
   }) {
     setSaving(true);
 
@@ -87,6 +92,9 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
           hero_image_url: body.hero_image_url,
           selected_image_urls: body.selected_image_urls,
           uploaded_image_urls: uploadedImages,
+          ...(body.listing_image_meta !== undefined
+            ? { listing_image_meta: body.listing_image_meta }
+            : {}),
         }),
       });
       const payload = await response.json();
@@ -98,6 +106,7 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
       const saved = payload.listing as Listing;
       setHeroImageUrl(saved.hero_image_url ?? "");
       setSelectedImageUrls(saved.selected_image_urls ?? []);
+      setListingImageMeta(resolveListingImageMetaForPool(saved));
       onUpdated(saved);
       toast.success("Photos saved");
     } catch (error) {
@@ -122,6 +131,7 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
     await saveSelection({
       hero_image_url: selectionToSave.hero_image_url,
       selected_image_urls: selectionToSave.selected_image_urls,
+      listing_image_meta: listingImageMeta,
     });
   }
 
@@ -136,8 +146,8 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
           Property photos
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          All photos are selected by default. Deselect any you don&apos;t want on
-          your collateral.
+          All photos are selected by default. Mark floor plans so brochures fit
+          them inside any image slot without cropping.
         </p>
       </div>
 
@@ -152,6 +162,8 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
         maxSelected={maxSelected}
         onUploaded={setUploadedImages}
         onChange={updateSelection}
+        listingImageMeta={listingImageMeta}
+        onListingImageMetaChange={setListingImageMeta}
       />
 
       <div className="flex flex-wrap gap-2">

@@ -1,7 +1,7 @@
 import { splitBrochureImages } from "@/lib/collateral/buildSalesBrochureDocument";
 import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
 import { getBrochureGalleryPhotos } from "@/lib/collateral/templates/sales-brochure/shared/BrochureGalleryPage";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
 import type { BrochureImageSlot } from "@/components/collateral/sales-brochure/inline/EditableContext";
 
 function replaceInList(urls: string[], oldUrl: string, newUrl: string) {
@@ -15,7 +15,7 @@ function replaceInList(urls: string[], oldUrl: string, newUrl: string) {
 }
 
 function replaceUrlInProperty(
-  property: SalesBrochureDocumentJson["property"],
+  property: BrochureDocumentJson["property"],
   oldUrl: string,
   newUrl: string,
 ) {
@@ -36,10 +36,10 @@ function replaceUrlInProperty(
 
 /** Replaces the image at a brochure layout slot with a new URL from the listing pool. */
 export function replaceBrochureImageAtSlot(
-  document: SalesBrochureDocumentJson,
+  document: BrochureDocumentJson,
   slot: BrochureImageSlot,
   newUrl: string,
-): SalesBrochureDocumentJson {
+): BrochureDocumentJson {
   const prop = document.property;
 
   if (slot === "hero") {
@@ -134,7 +134,7 @@ export function replaceBrochureImageAtSlot(
 }
 
 export function getBrochureImageUrlAtSlot(
-  document: SalesBrochureDocumentJson,
+  document: BrochureDocumentJson,
   slot: BrochureImageSlot,
 ): string {
   const prop = document.property;

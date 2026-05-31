@@ -30,6 +30,10 @@ export default async function ListingSalesBrochurePage({
     redirect(`/listings/${listingId}`);
   }
 
+  if (listing.listing_purpose === "lease") {
+    redirect(`/listings/${listingId}`);
+  }
+
   let { data: collateral } = await supabase
     .from("collateral_items")
     .select("*")

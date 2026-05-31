@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireListingAccess } from "@/lib/auth/requireUser";
 import { collateralPhotoRequirementError } from "@/lib/listings/collateralPhotoRequirements";
+import { collateralPurposeMismatchError } from "@/lib/listings/collateralPurposeGuard";
 import { createCollateralSchema } from "@/lib/validation/schemas";
 
 export async function GET(
@@ -48,6 +49,11 @@ export async function POST(
         { error: "Use the Short-Term Rental Report flow to create this report" },
         { status: 400 },
       );
+    }
+
+    const purposeError = collateralPurposeMismatchError(listing, body.type);
+    if (purposeError) {
+      return NextResponse.json({ error: purposeError }, { status: 400 });
     }
 
     const photoError = collateralPhotoRequirementError(listing);

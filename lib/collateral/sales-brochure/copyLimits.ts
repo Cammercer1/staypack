@@ -43,6 +43,16 @@ export const SALES_BROCHURE_COPY_LIMITS = {
     label: "Price",
     hint: "Overrides the price shown on this brochure only. Leave blank to use the listing price.",
   },
+  bond_label: {
+    max: 24,
+    label: "Bond label",
+    hint: 'Wording shown above the bond (e.g. "Bond", "Security deposit"). Leave blank for "Bond".',
+  },
+  bond_value: {
+    max: 60,
+    label: "Bond",
+    hint: "Bond amount shown on this lease brochure only.",
+  },
   disclaimer: {
     max: 500,
     label: "Disclaimer",
@@ -111,6 +121,14 @@ export function enforceSalesBrochureCopyLimits(
     price_value:
       copy.price_value != null
         ? truncate(copy.price_value, limits.price_value.max)
+        : undefined,
+    bond_label:
+      copy.bond_label != null
+        ? truncate(copy.bond_label, limits.bond_label.max)
+        : undefined,
+    bond_value:
+      copy.bond_value != null
+        ? truncate(copy.bond_value, limits.bond_value.max)
         : undefined,
   };
 }

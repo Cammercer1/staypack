@@ -1,11 +1,11 @@
 import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
 import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
-import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
+import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { ClassicSalesBrochurePageOne } from "@/lib/collateral/templates/sales-brochure/ClassicSalesBrochurePageOne";
 import { ClassicSalesBrochurePageTwo } from "@/lib/collateral/templates/sales-brochure/ClassicSalesBrochurePageTwo";
 
 export function ClassicSalesBrochure({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
-  if (!isSalesBrochureDocument(document)) {
+  if (!isBrochureDocument(document)) {
     return null;
   }
 

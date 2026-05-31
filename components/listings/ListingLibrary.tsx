@@ -11,25 +11,41 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/reports/StatusBadge";
+import { Badge } from "@/components/ui/badge";
 import { DeleteListingButton } from "@/components/listings/DeleteListingButton";
-import { formatCurrency } from "@/lib/reports/formatters";
-import type { ListingWithReport } from "@/lib/types";
+import { initialListingAgents } from "@/lib/reports/listingAgents";
+import type { ListingLibraryRow, ListingPurpose } from "@/lib/types";
 
 const cellClassName = "px-4 py-5 whitespace-normal";
 const headClassName = "h-auto px-4 py-4";
 
-export function ListingLibrary({ listings }: { listings: ListingWithReport[] }) {
+const PURPOSE_LABELS: Record<ListingPurpose, string> = {
+  sale: "Sale",
+  lease: "Lease",
+};
+
+function listingAgentsLabel(listing: ListingLibraryRow) {
+  const names = initialListingAgents(listing.scraped_listing_json?.agents)
+    .map((agent) => agent.name.trim())
+    .filter(Boolean);
+
+  if (!names.length) {
+    return null;
+  }
+
+  return names.join(", ");
+}
+
+export function ListingLibrary({ listings }: { listings: ListingLibraryRow[] }) {
   return (
     <div className="surface-card overflow-hidden p-6 md:p-8">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead className={headClassName}>Property</TableHead>
-            <TableHead className={headClassName}>Short-Term Rental Report</TableHead>
-            <TableHead className={headClassName}>
-              Estimated annual STR revenue
-            </TableHead>
+            <TableHead className={headClassName}>Type</TableHead>
+            <TableHead className={headClassName}>Agents</TableHead>
+            <TableHead className={headClassName}>Total leads</TableHead>
             <TableHead className={headClassName}>Created</TableHead>
             <TableHead className={headClassName}>Actions</TableHead>
           </TableRow>
@@ -38,7 +54,7 @@ export function ListingLibrary({ listings }: { listings: ListingWithReport[] }) 
           {listings.length === 0 ? (
             <TableRow className="hover:bg-transparent">
               <TableCell
-                colSpan={5}
+                colSpan={6}
                 className="px-4 py-10 text-center text-muted-foreground"
               >
                 No listings yet.
@@ -46,7 +62,8 @@ export function ListingLibrary({ listings }: { listings: ListingWithReport[] }) 
             </TableRow>
           ) : (
             listings.map((listing) => {
-              const report = listing.str_report;
+              const purpose = listing.listing_purpose ?? "sale";
+              const agentsLabel = listingAgentsLabel(listing);
 
               return (
                 <TableRow key={listing.id}>
@@ -61,14 +78,17 @@ export function ListingLibrary({ listings }: { listings: ListingWithReport[] }) 
                     </div>
                   </TableCell>
                   <TableCell className={cellClassName}>
-                    {report ? (
-                      <StatusBadge status={report.status} />
+                    <Badge variant="outline">{PURPOSE_LABELS[purpose]}</Badge>
+                  </TableCell>
+                  <TableCell className={cellClassName}>
+                    {agentsLabel ? (
+                      <span className="text-sm">{agentsLabel}</span>
                     ) : (
-                      <span className="text-sm text-muted-foreground">No report</span>
+                      <span className="text-sm text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell className={cellClassName}>
-                    {formatCurrency(report?.final_estimate_json?.annualRevenue)}
+                    <span className="tabular-nums">{listing.total_leads.toLocaleString()}</span>
                   </TableCell>
                   <TableCell className={cellClassName}>
                     {format(new Date(listing.created_at), "dd MMM yyyy")}

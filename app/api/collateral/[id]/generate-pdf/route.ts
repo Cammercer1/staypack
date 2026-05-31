@@ -3,8 +3,8 @@ import { requireCollateralAccess } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildCollateralPreviewPrintUrl } from "@/lib/collateral/printAccessToken";
 import {
-  isSalesBrochureDocument,
-  type SalesBrochureDocumentJson,
+  isBrochureDocument,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { withBrochurePdfSynced } from "@/lib/collateral/sales-brochure/brochurePublishSync";
 import { getCollateralTemplate } from "@/lib/collateral/templates/registry";
@@ -105,8 +105,8 @@ export async function POST(
 
     const existingDocument = collateral.document_json;
     const documentJson =
-      existingDocument && isSalesBrochureDocument(existingDocument)
-        ? withBrochurePdfSynced(existingDocument as SalesBrochureDocumentJson)
+      existingDocument && isBrochureDocument(existingDocument)
+        ? withBrochurePdfSynced(existingDocument as BrochureDocumentJson)
         : existingDocument;
 
     const { data, error } = await supabase

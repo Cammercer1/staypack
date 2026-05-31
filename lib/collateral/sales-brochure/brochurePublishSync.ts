@@ -1,14 +1,14 @@
 import {
-  isSalesBrochureDocument,
-  type SalesBrochureDocumentJson,
+  isBrochureDocument,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import type { CollateralItem } from "@/lib/types";
 
 /** Mark brochure content as edited (call on every content save). */
 export function withBrochureContentSaved(
-  document: SalesBrochureDocumentJson,
+  document: BrochureDocumentJson,
   savedAt = new Date().toISOString(),
-): SalesBrochureDocumentJson {
+): BrochureDocumentJson {
   return {
     ...document,
     content_saved_at: savedAt,
@@ -17,9 +17,9 @@ export function withBrochureContentSaved(
 
 /** Mark the current PDF as reflecting the saved brochure content. */
 export function withBrochurePdfSynced(
-  document: SalesBrochureDocumentJson,
+  document: BrochureDocumentJson,
   syncedAt?: string,
-): SalesBrochureDocumentJson {
+): BrochureDocumentJson {
   const at = syncedAt ?? document.content_saved_at ?? new Date().toISOString();
   return {
     ...document,
@@ -33,7 +33,7 @@ export function salesBrochureNeedsRepublish(collateral: CollateralItem): boolean
   }
 
   const document = collateral.document_json;
-  if (!document || !isSalesBrochureDocument(document)) {
+  if (!document || !isBrochureDocument(document)) {
     return false;
   }
 

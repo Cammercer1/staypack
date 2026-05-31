@@ -13,13 +13,13 @@ import {
   SALES_BROCHURE_TEMPLATES,
 } from "@/lib/collateral/templates/sales-brochure/registry";
 import { getCollateralTemplate } from "@/lib/collateral/templates/registry";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
 import type { Agency } from "@/lib/types";
 
 type PageFilter = "all" | "1" | "2";
 
 type Props = {
-  baseDocument: SalesBrochureDocumentJson;
+  baseDocument: BrochureDocumentJson;
   agency: Agency;
   listingId?: string | null;
   collateralId?: string | null;
@@ -39,7 +39,7 @@ export function SalesBrochurePlayground({
       ({
         ...baseDocument,
         template_id: templateId,
-      }) as SalesBrochureDocumentJson,
+      }) as BrochureDocumentJson,
     [baseDocument, templateId],
   );
 

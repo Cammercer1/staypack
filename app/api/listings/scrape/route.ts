@@ -13,6 +13,7 @@ import {
 import { mergeScrapeMasterSelection } from "@/lib/listings/collateralImages";
 import { expandListingDescriptionAfterScrape } from "@/lib/listings/expandListingDescriptionAfterScrape";
 import { detectListingPurpose } from "@/lib/listings/detectListingPurpose";
+import { listingImageMetaForScrapeUpdate } from "@/lib/listings/syncListingImageMeta";
 import type { Listing, ParsedListing } from "@/lib/types";
 
 function buildScrapedListingFields(
@@ -56,6 +57,14 @@ function buildScrapedListingFields(
     hero_image_url: master.hero_image_url,
     selected_image_urls: master.selected_image_urls,
     scraped_listing_json: listing,
+    listing_image_meta: listingImageMetaForScrapeUpdate(
+      {
+        scraped_listing_json: listing,
+        uploaded_image_urls: existing?.uploaded_image_urls ?? [],
+        listing_image_meta: existing?.listing_image_meta ?? {},
+      },
+      listing.images,
+    ),
   };
 }
 

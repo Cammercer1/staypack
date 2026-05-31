@@ -2,13 +2,13 @@ import { blurbBlocksToPlainText, getBlurbBlocks } from "@/lib/collateral/sales-b
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import {
   resolveBrochurePrice,
-  type SalesBrochureDocumentJson,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import type { FinalReportJson } from "@/lib/types";
 
 /** Maps brochure document to report preview shape for shared Classic layout components. */
 export function salesBrochureToReportShape(
-  document: SalesBrochureDocumentJson,
+  document: BrochureDocumentJson,
 ): FinalReportJson {
   const { agency, property, copy, agent, agents } = document;
 

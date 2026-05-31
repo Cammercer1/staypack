@@ -505,6 +505,7 @@ function CollateralTab({
             photoRequirement.minimum - photoRequirement.count,
             1,
           );
+          const editorPath = collateralEditorPath(listing.id, type);
 
           return (
             <div key={type} className="surface-card p-6">
@@ -555,7 +556,14 @@ function CollateralTab({
                   to your listing page.
                 </p>
               ) : null}
-              {type === "sales_brochure" && !item?.document_json ? (
+              {type === "rental_brochure" && item?.document_json ? (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Print-ready A4 lease brochure with property photos, copy and a QR
+                  code to your listing page.
+                </p>
+              ) : null}
+              {(type === "sales_brochure" || type === "rental_brochure") &&
+              !item?.document_json ? (
                 <p className="mt-4 text-sm text-muted-foreground">
                   {meta.description}
                 </p>
@@ -611,12 +619,14 @@ function CollateralTab({
                       photoRequirement={photoRequirement}
                     />
                   )
-                ) : type === "sales_brochure" ? (
+                ) : type === "sales_brochure" || type === "rental_brochure" ? (
                   item ? (
                     <>
-                      <Link href={`/listings/${listing.id}/brochure`}>
-                        <Button size="sm">Edit</Button>
-                      </Link>
+                      {editorPath ? (
+                        <Link href={editorPath}>
+                          <Button size="sm">Edit</Button>
+                        </Link>
+                      ) : null}
                       {item.pdf_url ? (
                         <CollateralPdfButton
                           collateralId={item.id}

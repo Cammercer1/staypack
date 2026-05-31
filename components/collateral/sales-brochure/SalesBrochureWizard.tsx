@@ -1,22 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { GeneratedBrochureCopyEditor } from "@/components/collateral/sales-brochure/GeneratedBrochureCopyEditor";
+import {
+  GeneratedBrochureCopyEditor,
+  type BrochureCopyEditorHandle,
+} from "@/components/collateral/sales-brochure/GeneratedBrochureCopyEditor";
 import { SalesBrochureTemplateStep } from "@/components/collateral/sales-brochure/SalesBrochureTemplateStep";
 import { FittedBrochurePreview } from "@/components/collateral/sales-brochure/FittedBrochurePreview";
 import { CollateralPdfButton } from "@/components/collateral/CollateralPdfButton";
 import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
 import { salesBrochureNeedsRepublish } from "@/lib/collateral/sales-brochure/brochurePublishSync";
 import {
-  isSalesBrochureDocument,
-  type SalesBrochureDocumentJson,
+  isBrochureDocument,
+  type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
-import type { Agency, AgentProfile, CollateralItem, Listing } from "@/lib/types";
+import type { Agency, AgentProfile, CollateralItem, CollateralType, Listing } from "@/lib/types";
+
+type BrochureCollateralType = Extract<
+  CollateralType,
+  "sales_brochure" | "rental_brochure"
+>;
+
+const BROCHURE_LABELS: Record<BrochureCollateralType, string> = {
+  sales_brochure: "Sales brochure",
+  rental_brochure: "Lease brochure",
+};
 
 const steps = [
   { id: "template", label: "Choose template" },
@@ -24,16 +37,21 @@ const steps = [
   { id: "preview", label: "Preview & publish" },
 ];
 
+/** Minimum time the preview sync overlay stays visible so the refresh is perceptible. */
+const PREVIEW_SYNC_MIN_MS = 400;
+
 type Props = {
   initialListing: Listing;
   initialCollateral: CollateralItem;
   agency: Agency;
+  collateralType?: BrochureCollateralType;
 };
 
 export function SalesBrochureWizard({
   initialListing,
   initialCollateral,
   agency,
+  collateralType = "sales_brochure",
 }: Props) {
   const [listing, setListing] = useState(initialListing);
   const [collateral, setCollateral] = useState(initialCollateral);
@@ -66,15 +84,73 @@ export function SalesBrochureWizard({
   const [publishStage, setPublishStage] = useState<
     "idle" | "publishing" | "generating-pdf"
   >("idle");
+  const copyEditorRef = useRef<BrochureCopyEditorHandle>(null);
+  const pendingPreviewSyncRef = useRef(false);
+  const previewSyncStartedAtRef = useRef(0);
+  const [previewSyncing, setPreviewSyncing] = useState(false);
+  const [previewDraftDocument, setPreviewDraftDocument] =
+    useState<BrochureDocumentJson | null>(() => {
+      const raw = initialCollateral.document_json;
+      return raw && isBrochureDocument(raw) ? raw : null;
+    });
 
-  const previewDocument = useMemo((): SalesBrochureDocumentJson | null => {
+  useEffect(() => {
     const raw = collateral.document_json;
-    if (!raw || !isSalesBrochureDocument(raw)) {
+    if (raw && isBrochureDocument(raw)) {
+      setPreviewDraftDocument(raw);
+    }
+  }, [collateral.document_json]);
+
+  useEffect(() => {
+    if (!pendingPreviewSyncRef.current || step !== "preview") {
+      return;
+    }
+
+    pendingPreviewSyncRef.current = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const frame = requestAnimationFrame(() => {
+      const elapsed = Date.now() - previewSyncStartedAtRef.current;
+      const remaining = Math.max(0, PREVIEW_SYNC_MIN_MS - elapsed);
+      timeoutId = setTimeout(() => {
+        setPreviewSyncing(false);
+      }, remaining);
+    });
+
+    return () => {
+      cancelAnimationFrame(frame);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [previewDraftDocument, step]);
+
+  function handleStepChange(next: string) {
+    if (next === "preview") {
+      pendingPreviewSyncRef.current = true;
+      previewSyncStartedAtRef.current = Date.now();
+      setPreviewSyncing(true);
+      copyEditorRef.current?.flushPendingEdits();
+      const liveDocument = copyEditorRef.current?.getPreviewDocument();
+      if (liveDocument) {
+        setPreviewDraftDocument(liveDocument);
+      }
+      setStep("preview");
+      return;
+    }
+
+    setPreviewSyncing(false);
+    setStep(next);
+  }
+
+  const previewDocument = useMemo((): BrochureDocumentJson | null => {
+    const doc = previewDraftDocument;
+    if (!doc || !isBrochureDocument(doc)) {
       return null;
     }
 
-    return raw;
-  }, [collateral.document_json]);
+    return doc;
+  }, [previewDraftDocument]);
 
   const hasDownloadablePdf = Boolean(collateral.pdf_url);
   const needsRepublish = salesBrochureNeedsRepublish(collateral);
@@ -118,14 +194,14 @@ export function SalesBrochureWizard({
       setCollateral(pdfPayload.collateral);
     }
 
-    toast.success("Sales brochure published");
+    toast.success(`${BROCHURE_LABELS[collateralType]} published`);
     setLoading(false);
     setPublishStage("idle");
   }
 
   return (
     <div className="space-y-6">
-      <Tabs value={step} onValueChange={setStep}>
+      <Tabs value={step} onValueChange={handleStepChange}>
         <TabsList className="grid w-full grid-cols-3">
           {steps.map((item) => (
             <TabsTrigger key={item.id} value={item.id}>
@@ -139,6 +215,7 @@ export function SalesBrochureWizard({
             agency={agency}
             listing={listing}
             collateral={collateral}
+            collateralType={collateralType}
             onCollateralChange={setCollateral}
             onContinue={() => setStep("copy")}
           />
@@ -147,13 +224,14 @@ export function SalesBrochureWizard({
         <TabsContent value="copy">
           {collateral.template_id ? (
             <GeneratedBrochureCopyEditor
+              ref={copyEditorRef}
               agency={agency}
               listing={listing}
               collateral={collateral}
               agencyAgents={agencyAgents}
               agentProfile={agentProfile}
               onCollateralChange={setCollateral}
-              onContinueToPreview={() => setStep("preview")}
+              onContinueToPreview={() => handleStepChange("preview")}
             />
           ) : (
             <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -171,24 +249,34 @@ export function SalesBrochureWizard({
 
         <TabsContent value="preview" className="space-y-6">
           <AsyncLoadingOverlay
-            active={loading}
+            active={loading || previewSyncing}
             title={
-              publishStage === "generating-pdf"
-                ? "Generating PDF"
-                : "Publishing brochure"
+              previewSyncing
+                ? "Preparing preview"
+                : publishStage === "generating-pdf"
+                  ? "Generating PDF"
+                  : "Publishing brochure"
             }
             description={
-              publishStage === "generating-pdf"
-                ? "Rendering your print-ready brochure. This can take 15–30 seconds."
-                : "Saving the published brochure."
+              previewSyncing
+                ? "Syncing your latest edits…"
+                : publishStage === "generating-pdf"
+                  ? "Rendering your print-ready brochure. This can take 15–30 seconds."
+                  : "Saving the published brochure."
             }
           >
-            {previewDocument ? (
+            {previewSyncing ? (
+              <div
+                className="min-h-[min(80vh,900px)] rounded-xl border border-transparent"
+                aria-hidden
+              />
+            ) : previewDocument ? (
               <FittedBrochurePreview
                 document={previewDocument}
                 listing={listing}
                 agencyAgents={agencyAgents}
                 agentProfile={agentProfile}
+                collateralType={collateralType}
                 maxHeight="min(80vh, 900px)"
                 fitToWidth
               />

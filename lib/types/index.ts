@@ -11,6 +11,15 @@ export type ReportStatus =
 
 export type ScrapeJobStatus = "pending" | "success" | "failed";
 
+export type ListingImageRole = "photo" | "floor_plan";
+
+export type ListingImageMeta = {
+  role: ListingImageRole;
+  label?: string;
+};
+
+export type ListingImageMetaMap = Record<string, ListingImageMeta>;
+
 export type ParsedListing = {
   title?: string;
   address?: string;
@@ -282,10 +291,13 @@ export type Listing = {
   listing_title: string | null;
   listing_description: string | null;
   display_price: string | null;
+  /** Security bond for lease listings (e.g. "$6,800"). */
+  bond: string | null;
   hero_image_url: string | null;
   selected_image_urls: string[] | null;
   uploaded_image_urls: string[] | null;
   collateral_image_selections: Record<string, { hero_image_url: string | null; selected_image_urls: string[] }>;
+  listing_image_meta: ListingImageMetaMap;
   scraped_listing_json: ParsedListing | null;
   public_slug: string | null;
   public_url: string | null;
@@ -363,6 +375,10 @@ export type CollateralDocumentJson = import("@/lib/collateral/templates/types").
 
 export type ListingWithReport = Listing & {
   str_report: Report | null;
+};
+
+export type ListingLibraryRow = Listing & {
+  total_leads: number;
 };
 
 export type ReportEditorState = {

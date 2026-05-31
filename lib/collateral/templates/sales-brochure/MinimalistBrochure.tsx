@@ -1,6 +1,6 @@
 import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
 import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
-import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
+import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import {
   MinimalistPageOne,
   MinimalistPageTwo,
@@ -10,7 +10,7 @@ import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/share
 
 /** Minimalist · 2 pages — hero cover; features sidebar with photo stack page 2. */
 export function MinimalistBrochure({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
-  if (!isSalesBrochureDocument(document)) return null;
+  if (!isBrochureDocument(document)) return null;
 
   const { report, brand } = useBrochurePage(document);
   const fmt = getCollateralPageFormat(pageFormat);

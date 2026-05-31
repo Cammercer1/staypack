@@ -2,8 +2,8 @@ import { buildSalesBrochureDocument } from "@/lib/collateral/buildSalesBrochureD
 import { getMockSalesBrochureCopy } from "@/lib/collateral/buildSalesBrochureDocument";
 import { createPlaygroundSalesBrochureDocument } from "@/lib/collateral/sales-brochure/playgroundFixture";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
-import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
-import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
+import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import type { Agency, CollateralItem, Listing } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -20,10 +20,10 @@ export async function resolvePlaygroundSalesBrochure({
   agency,
   listing,
   collateral,
-}: ResolveInput): Promise<SalesBrochureDocumentJson> {
+}: ResolveInput): Promise<BrochureDocumentJson> {
   if (
     collateral?.document_json &&
-    isSalesBrochureDocument(collateral.document_json)
+    isBrochureDocument(collateral.document_json)
   ) {
     return collateral.document_json;
   }

@@ -1,10 +1,15 @@
 import { buildAgencyBrandSlice } from "@/lib/collateral/buildAgencyBrandSlice";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
-import type {
-  SalesBrochureCopyJson,
-  SalesBrochureDocumentJson,
+import {
+  DEFAULT_RENTAL_BROCHURE_PRICE_LABEL,
+  DEFAULT_RENTAL_BROCHURE_BOND_LABEL,
+  type BrochureCopyJson,
+  type BrochureDocumentJson,
+  type RentalBrochureDocumentJson,
+  type SalesBrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
+import { resolveListingImageMetaForPool } from "@/lib/listings/syncListingImageMeta";
 import { coerceSalesBrochureCopy } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
 import {
@@ -16,14 +21,21 @@ import type {
   Agency,
   AgentProfile,
   CollateralItem,
+  CollateralType,
   Listing,
 } from "@/lib/types";
 
+type BrochureCollateralType = Extract<
+  CollateralType,
+  "sales_brochure" | "rental_brochure"
+>;
+
 type BuildInput = {
+  collateralType: BrochureCollateralType;
   agency: Agency;
   listing: Listing;
   collateral: CollateralItem;
-  copy: SalesBrochureCopyJson;
+  copy: BrochureCopyJson;
   agentProfile?: AgentProfile | null;
   agencyAgents?: AgentProfile[];
   qrCodeUrl: string;
@@ -44,7 +56,8 @@ export function splitBrochureImages(urls: string[]) {
   };
 }
 
-export function buildSalesBrochureDocument({
+export function buildBrochureDocument({
+  collateralType,
   agency,
   listing,
   collateral,
@@ -53,9 +66,9 @@ export function buildSalesBrochureDocument({
   agencyAgents,
   qrCodeUrl,
   qrTargetUrl,
-}: BuildInput): SalesBrochureDocumentJson {
+}: BuildInput): BrochureDocumentJson {
   const scraped = listing.scraped_listing_json;
-  const brochureImages = resolveCollateralImageSelection(listing, "sales_brochure");
+  const brochureImages = resolveCollateralImageSelection(listing, collateralType);
   const galleryUrls = [
     ...(brochureImages.hero_image_url ? [brochureImages.hero_image_url] : []),
     ...brochureImages.selected_image_urls.filter(
@@ -71,9 +84,7 @@ export function buildSalesBrochureDocument({
   const agent = primaryReportAgent(agents);
   const displayPrice = resolveReportDisplayPrice(listing, scraped);
 
-  return {
-    version: "sales_brochure_v1",
-    type: "sales_brochure",
+  const base = {
     template_id: resolveCollateralTemplateId(agency, collateral),
     generated_at: new Date().toISOString(),
     agency: buildAgencyBrandSlice(agency),
@@ -91,6 +102,7 @@ export function buildSalesBrochureDocument({
       email: entry.email,
       photo_url: entry.photo_url,
     })),
+    listing_image_meta: resolveListingImageMetaForPool(listing),
     property: {
       address:
         listing.property_address ??
@@ -122,15 +134,48 @@ export function buildSalesBrochureDocument({
       qr_code_url: qrCodeUrl,
     },
   };
+
+  if (collateralType === "rental_brochure") {
+    return {
+      ...base,
+      version: "rental_brochure_v1",
+      type: "rental_brochure",
+    } satisfies RentalBrochureDocumentJson;
+  }
+
+  return {
+    ...base,
+    version: "sales_brochure_v1",
+    type: "sales_brochure",
+  } satisfies SalesBrochureDocumentJson;
+}
+
+type SalesBuildInput = Omit<BuildInput, "collateralType">;
+
+export function buildSalesBrochureDocument(input: SalesBuildInput): SalesBrochureDocumentJson {
+  const document = buildBrochureDocument({ ...input, collateralType: "sales_brochure" });
+  if (document.type !== "sales_brochure") {
+    throw new Error("Expected sales brochure document");
+  }
+  return document;
+}
+
+export function buildRentalBrochureDocument(
+  input: SalesBuildInput,
+): RentalBrochureDocumentJson {
+  const document = buildBrochureDocument({ ...input, collateralType: "rental_brochure" });
+  if (document.type !== "rental_brochure") {
+    throw new Error("Expected rental brochure document");
+  }
+  return document;
 }
 
 export function getMockSalesBrochureCopy(
   listing: Listing,
   agency: Agency,
-): SalesBrochureCopyJson {
+): BrochureCopyJson {
   const address = listing.property_address ?? "this property";
 
-  const purposeLabel = listing.listing_purpose === "lease" ? "for lease" : "for sale";
   const descriptor = [
     listing.bedrooms ? `${listing.bedrooms} bedroom` : null,
     listing.property_type?.trim().toLowerCase() || null,
@@ -138,7 +183,7 @@ export function getMockSalesBrochureCopy(
     .filter(Boolean)
     .join(" ");
   const heading = descriptor
-    ? `${descriptor.charAt(0).toUpperCase()}${descriptor.slice(1)} ${purposeLabel}`
+    ? `${descriptor.charAt(0).toUpperCase()}${descriptor.slice(1)} for sale`
     : "Your next home awaits";
 
   const blurb = `Discover ${address} — a well-presented opportunity in a sought-after pocket. Arrange an inspection to experience the layout, natural light and lifestyle appeal for yourself.`;
@@ -160,5 +205,46 @@ export function getMockSalesBrochureCopy(
     disclaimer:
       agency.default_disclaimer ??
       "Information is general in nature. Buyers should make their own enquiries.",
+  };
+}
+
+export function getMockRentalBrochureCopy(
+  listing: Listing,
+  agency: Agency,
+): BrochureCopyJson {
+  const address = listing.property_address ?? "this property";
+
+  const descriptor = [
+    listing.bedrooms ? `${listing.bedrooms} bedroom` : null,
+    listing.property_type?.trim().toLowerCase() || null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const heading = descriptor
+    ? `${descriptor.charAt(0).toUpperCase()}${descriptor.slice(1)} for lease`
+    : "Your next rental awaits";
+
+  const blurb = `Discover ${address} — a well-presented rental in a sought-after pocket. Arrange an inspection to experience the layout, natural light and lifestyle appeal for yourself.`;
+
+  return {
+    heading,
+    blurb,
+    blurb_blocks: [{ type: "paragraph", text: blurb }],
+    property_highlights: [
+      "Practical floor plan suited to everyday living.",
+      "Convenient access to local amenities and transport.",
+      "Presented for tenants seeking quality and location.",
+      "Generous living zones with flexible accommodation.",
+      "Low-maintenance outdoor areas for relaxed entertaining.",
+      "Secure parking and storage where applicable.",
+    ],
+    inspection_cta:
+      agency.default_cta || "Contact us to arrange your inspection.",
+    disclaimer:
+      agency.default_disclaimer ??
+      "Information is general in nature. Applicants should make their own enquiries.",
+    price_label: DEFAULT_RENTAL_BROCHURE_PRICE_LABEL,
+    bond_label: DEFAULT_RENTAL_BROCHURE_BOND_LABEL,
+    bond_value: listing.bond?.trim() || undefined,
   };
 }

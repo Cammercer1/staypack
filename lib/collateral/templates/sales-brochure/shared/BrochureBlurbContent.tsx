@@ -3,11 +3,11 @@
 import { EditableBlurbField } from "@/components/collateral/sales-brochure/inline/EditableBlurbField";
 import { useEditableContext } from "@/components/collateral/sales-brochure/inline/EditableContext";
 import { cn } from "@/lib/utils";
-import { getBlurbBlocks, sliceBlurbBlocksByParagraphs } from "@/lib/collateral/sales-brochure/blurbBlocks";
-import type { BrochureBlurbBlock, SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { getBlurbBlocks, getBlurbBlocksForEditor, sliceBlurbBlocksByParagraphs } from "@/lib/collateral/sales-brochure/blurbBlocks";
+import type { BrochureBlurbBlock, BrochureDocumentJson } from "@/lib/collateral/templates/types";
 
 type Props = {
-  document: SalesBrochureDocumentJson;
+  document: BrochureDocumentJson;
   className?: string;
   headingClassName?: string;
   paragraphClassName?: string;
@@ -37,17 +37,22 @@ export function BrochureBlurbContent({
   maxParagraphs,
   blocks: blocksProp,
 }: Props) {
-  const { editable, blurbBlocks, setBlurbBlocks } = useEditableContext();
+  const { editable, showFullBlurb, blurbBlocks, setBlurbBlocks } = useEditableContext();
   const allBlocks = editable
     ? blurbBlocks
-    : (blocksProp ?? getBlurbBlocks(document.copy));
+    : showFullBlurb
+      ? getBlurbBlocksForEditor(document.copy)
+      : (blocksProp ?? getBlurbBlocks(document.copy));
+
+  const blurbClassName =
+    editable || showFullBlurb ? stripLineClampForEditor(className) : className;
 
   if (editable) {
     return (
       <div
         className={cn(
           "relative z-10 min-w-0 shrink-0 overflow-visible",
-          stripLineClampForEditor(className),
+          blurbClassName,
         )}
       >
         <EditableBlurbField
@@ -61,7 +66,7 @@ export function BrochureBlurbContent({
   }
 
   const { visible } =
-    maxParagraphs != null
+    maxParagraphs != null && !showFullBlurb
       ? sliceBlurbBlocksByParagraphs(allBlocks, maxParagraphs)
       : { visible: allBlocks };
 
@@ -72,9 +77,12 @@ export function BrochureBlurbContent({
   let firstParagraphDone = false;
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("space-y-3", blurbClassName)}>
       {visible.map((block, index) => {
         if (block.type === "heading") {
+          if (!block.text.trim()) {
+            return null;
+          }
           return (
             <h3
               key={`heading-${index}`}
@@ -83,6 +91,16 @@ export function BrochureBlurbContent({
             >
               {block.text}
             </h3>
+          );
+        }
+
+        if (!block.text.trim()) {
+          return (
+            <div
+              key={`spacer-${index}`}
+              className="h-[0.85rem] shrink-0"
+              aria-hidden
+            />
           );
         }
 
@@ -99,7 +117,12 @@ export function BrochureBlurbContent({
             )}
             style={{ fontFamily: "var(--report-body-font, inherit)" }}
           >
-            {block.text}
+            {block.text.split("\n").map((line, lineIndex, lines) => (
+              <span key={lineIndex}>
+                {lineIndex > 0 ? <br /> : null}
+                {line}
+              </span>
+            ))}
           </p>
         );
       })}
