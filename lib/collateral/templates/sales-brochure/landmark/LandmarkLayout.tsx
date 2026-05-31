@@ -4,6 +4,7 @@ import { Editable } from "@/components/collateral/sales-brochure/inline/Editable
 import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
 import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import {
   resolveBrochurePrice,
@@ -149,8 +150,7 @@ function LandmarkRightColumn({
   report: FinalReportJson;
 }) {
   const accent = document.agency.primary_colour || "#c0392b";
-  const agent = report.agent;
-  const allAgents = report.agents?.filter((a) => a.name || a.phone) ?? [agent];
+  const allAgents = resolveBrochureAgents(report);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-hidden pl-6">

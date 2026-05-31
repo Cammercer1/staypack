@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
@@ -11,11 +11,12 @@ import { SalesBrochureTemplateStep } from "@/components/collateral/sales-brochur
 import { FittedBrochurePreview } from "@/components/collateral/sales-brochure/FittedBrochurePreview";
 import { CollateralPdfButton } from "@/components/collateral/CollateralPdfButton";
 import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
+import { salesBrochureNeedsRepublish } from "@/lib/collateral/sales-brochure/brochurePublishSync";
 import {
   isSalesBrochureDocument,
   type SalesBrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
-import type { Agency, CollateralItem, Listing } from "@/lib/types";
+import type { Agency, AgentProfile, CollateralItem, Listing } from "@/lib/types";
 
 const steps = [
   { id: "template", label: "Choose template" },
@@ -34,8 +35,32 @@ export function SalesBrochureWizard({
   initialCollateral,
   agency,
 }: Props) {
-  const [listing] = useState(initialListing);
+  const [listing, setListing] = useState(initialListing);
   const [collateral, setCollateral] = useState(initialCollateral);
+  const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
+
+  useEffect(() => {
+    setListing(initialListing);
+  }, [initialListing]);
+
+  useEffect(() => {
+    fetch("/api/agents")
+      .then((response) => response.json())
+      .then((payload) => setAgencyAgents(payload.agents ?? []))
+      .catch(() => {
+        // Preview still works with listing agents only.
+      });
+  }, []);
+
+  const agentProfile = useMemo(() => {
+    if (listing.agent_profile_id != null) {
+      return (
+        agencyAgents.find((agent) => agent.id === listing.agent_profile_id) ?? null
+      );
+    }
+
+    return agencyAgents.find((agent) => agent.is_default) ?? agencyAgents[0] ?? null;
+  }, [agencyAgents, listing.agent_profile_id]);
   const [step, setStep] = useState(getInitialStep(initialCollateral));
   const [loading, setLoading] = useState(false);
   const [publishStage, setPublishStage] = useState<
@@ -50,6 +75,11 @@ export function SalesBrochureWizard({
 
     return raw;
   }, [collateral.document_json]);
+
+  const hasDownloadablePdf = Boolean(collateral.pdf_url);
+  const needsRepublish = salesBrochureNeedsRepublish(collateral);
+  const showDownload = hasDownloadablePdf && !needsRepublish;
+  const showPublish = !showDownload;
 
   async function publishBrochure() {
     setLoading(true);
@@ -120,6 +150,8 @@ export function SalesBrochureWizard({
               agency={agency}
               listing={listing}
               collateral={collateral}
+              agencyAgents={agencyAgents}
+              agentProfile={agentProfile}
               onCollateralChange={setCollateral}
               onContinueToPreview={() => setStep("preview")}
             />
@@ -154,6 +186,9 @@ export function SalesBrochureWizard({
             {previewDocument ? (
               <FittedBrochurePreview
                 document={previewDocument}
+                listing={listing}
+                agencyAgents={agencyAgents}
+                agentProfile={agentProfile}
                 maxHeight="min(80vh, 900px)"
                 fitToWidth
               />
@@ -165,37 +200,39 @@ export function SalesBrochureWizard({
           </AsyncLoadingOverlay>
 
           <div className="flex flex-wrap gap-3 no-print">
-            <CollateralPdfButton
-              collateralId={collateral.id}
-              url={collateral.pdf_url}
-              canGenerate={Boolean(previewDocument) && !loading}
-              generatedAt={collateral.generated_at}
-              updatedAt={collateral.updated_at}
-              cacheVersion={collateral.updated_at}
-              size="default"
-              downloadLabel="Download asset"
-              onUpdated={setCollateral}
-            />
-            {collateral.public_url ? (
+            {showDownload ? (
+              <CollateralPdfButton
+                collateralId={collateral.id}
+                url={collateral.pdf_url}
+                canGenerate={false}
+                cacheVersion={collateral.updated_at}
+                size="default"
+                downloadLabel="Download asset"
+                onUpdated={setCollateral}
+              />
+            ) : null}
+            {showDownload && collateral.public_url ? (
               <CopyLinkButton url={collateral.public_url} />
             ) : null}
-            <Button
-              onClick={publishBrochure}
-              disabled={loading || !previewDocument}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  {publishStage === "generating-pdf"
-                    ? "Generating PDF..."
-                    : "Publishing..."}
-                </>
-              ) : collateral.status === "published" ? (
-                "Republish brochure"
-              ) : (
-                "Publish brochure"
-              )}
-            </Button>
+            {showPublish ? (
+              <Button
+                onClick={publishBrochure}
+                disabled={loading || !previewDocument}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    {publishStage === "generating-pdf"
+                      ? "Generating PDF..."
+                      : "Publishing..."}
+                  </>
+                ) : collateral.status === "published" || needsRepublish ? (
+                  "Republish brochure"
+                ) : (
+                  "Publish brochure"
+                )}
+              </Button>
+            ) : null}
           </div>
         </TabsContent>
       </Tabs>

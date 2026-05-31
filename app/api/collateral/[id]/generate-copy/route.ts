@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
 import { buildSalesBrochureDocument } from "@/lib/collateral/buildSalesBrochureDocument";
+import { withBrochureContentSaved } from "@/lib/collateral/sales-brochure/brochurePublishSync";
 import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
 import { provisionCollateralQr } from "@/lib/collateral/provisionCollateralQr";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
@@ -56,7 +57,7 @@ export async function POST(
     });
 
     const existing = collateral.document_json;
-    const documentJson =
+    const documentJson = withBrochureContentSaved(
       existing && isSalesBrochureDocument(existing)
         ? {
             ...built,
@@ -68,7 +69,8 @@ export async function POST(
               page_two_image_urls: existing.property.page_two_image_urls,
             },
           }
-        : built;
+        : built,
+    );
 
     const generatedAt = new Date().toISOString();
 

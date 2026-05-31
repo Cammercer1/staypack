@@ -19,10 +19,17 @@ function extractFromText(text: string) {
   };
 }
 
-export function parseGenericListing(html: string, _url: string): ParsedListing {
+export function parseGenericListing(html: string, url: string): ParsedListing {
   const $ = cheerio.load(html);
   const listing = emptyListing();
   const bodyText = $("body").text().replace(/\s+/g, " ").trim();
+  const isDomainHost = (() => {
+    try {
+      return /domain\.com\.au$/i.test(new URL(url).hostname.replace(/^www\./i, ""));
+    } catch {
+      return false;
+    }
+  })();
 
   listing.title =
     $("h1").first().text().trim() ||
@@ -34,11 +41,13 @@ export function parseGenericListing(html: string, _url: string): ParsedListing {
     $("article p").first().text().trim() ??
     undefined;
 
-  const priceMatch = bodyText.match(
-    /\$[\d,]+(?:\.\d+)?(?:\s*(?:pw|per week|p\/w|pm|per month))?/i,
-  );
-  if (priceMatch) {
-    listing.displayPrice = normalizeDisplayPrice(priceMatch[0]);
+  if (!isDomainHost) {
+    const priceMatch = bodyText.match(
+      /\$[\d,]+(?:\.\d+)?(?:\s*(?:pw|per week|p\/w|pm|per month))?/i,
+    );
+    if (priceMatch) {
+      listing.displayPrice = normalizeDisplayPrice(priceMatch[0]);
+    }
   }
 
   const addressMatch = bodyText.match(

@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
 import { CollateralPreview } from "@/components/collateral/CollateralPreview";
 import { verifyCollateralPrintAccessToken } from "@/lib/collateral/printAccessToken";
-import { mergeAgencyBrandIntoCollateralDocument } from "@/lib/collateral/mergeAgencyBrand";
+import { resolveSalesBrochurePrintDocument } from "@/lib/collateral/enrichSalesBrochureDocument";
 import type { Agency, CollateralDocumentJson, CollateralType } from "@/lib/types";
 
 export default async function DraftCollateralPrintPage({
@@ -27,7 +27,7 @@ export default async function DraftCollateralPrintPage({
   const admin = createAdminClient();
   const { data: collateral } = await admin
     .from("collateral_items")
-    .select("document_json, type, agency_id")
+    .select("document_json, type, agency_id, listing_id")
     .eq("id", collateralId)
     .maybeSingle();
 
@@ -45,10 +45,15 @@ export default async function DraftCollateralPrintPage({
     notFound();
   }
 
-  const document = mergeAgencyBrandIntoCollateralDocument(
-    agency as Agency,
-    collateral.document_json as CollateralDocumentJson,
-  );
+  const document = await resolveSalesBrochurePrintDocument({
+    admin,
+    agency: agency as Agency,
+    collateral: {
+      document_json: collateral.document_json as CollateralDocumentJson,
+      listing_id: collateral.listing_id,
+      agency_id: collateral.agency_id,
+    },
+  });
 
   return (
     <>

@@ -1,6 +1,8 @@
 import { parseGenericListing } from "@/lib/scraping/parsers/generic";
 import { parseHarcourtsListing } from "@/lib/scraping/parsers/harcourts";
 import { parseJsonLdListing } from "@/lib/scraping/parsers/jsonLd";
+import { parseDomainListing } from "@/lib/scraping/parsers/domain";
+import { parseMcGrathListing } from "@/lib/scraping/parsers/mcgrath";
 import { parseOpenGraphListing } from "@/lib/scraping/parsers/openGraph";
 import { parseRayWhiteListing } from "@/lib/scraping/parsers/rayWhite";
 import type { ListingParser, SiteListingParser } from "@/lib/scraping/parsers/types";
@@ -30,6 +32,29 @@ export const SITE_PARSERS: SiteListingParser[] = [
     qaListingUrls: [
       "https://harcourts.net/au/office/adelaide-city/listing/l40847935-21-255-hindley-street-adelaide-sa-5000",
       "https://harcourtsnr.com.au/property/house-nsw-goonellabah-l37978463/",
+    ],
+  },
+  {
+    name: "mcgrath",
+    platform: "McGrath",
+    hosts: [/mcgrath\.com\.au$/i],
+    parse: parseMcGrathListing,
+    rolloutStatus: "in_review",
+    notes:
+      "Vercel bot checkpoint blocks HTML fetch; address/suburb/state/postcode parsed from /property/{slug} URL path.",
+    qaListingUrls: [
+      "https://www.mcgrath.com.au/property/42-suttor-road-moss-vale-nsw-2577-59P7099",
+    ],
+  },
+  {
+    name: "domain",
+    platform: "Domain",
+    hosts: [/domain\.com\.au$/i],
+    parse: parseDomainListing,
+    rolloutStatus: "in_review",
+    notes: "Next.js __NEXT_DATA__ componentProps on listing pages; search via listingsMap.",
+    qaListingUrls: [
+      "https://www.domain.com.au/4-ayrshire-parade-bowral-nsw-2576-2020787358",
     ],
   },
   // Examples for future parsers:

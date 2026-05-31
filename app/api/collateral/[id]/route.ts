@@ -10,6 +10,7 @@ import {
   setVariantLayers,
   syncSharedContentAcrossVariants,
 } from "@/lib/collateral/social/variantLayers";
+import { withBrochureContentSaved } from "@/lib/collateral/sales-brochure/brochurePublishSync";
 import {
   coerceSalesBrochureCopy,
   coerceSalesBrochureCopyForEditor,
@@ -241,7 +242,7 @@ async function patchSalesBrochure(
   }
 
   const nextTemplateId = body.template_id ?? current.template_id;
-  const nextDocument: SalesBrochureDocumentJson = {
+  const nextDocument = withBrochureContentSaved({
     ...current,
     template_id: nextTemplateId,
     copy: body.copy
@@ -264,7 +265,7 @@ async function patchSalesBrochure(
             : {}),
         }
       : current.property,
-  };
+  });
 
   const { data, error } = await supabase
     .from("collateral_items")

@@ -4,7 +4,9 @@ import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
 import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import { BrochureAgentContactStack } from "@/lib/collateral/templates/sales-brochure/shared/BrochureAgentContactStack";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import {
   resolveBrochurePrice,
   resolveBrochurePriceLabel,
@@ -112,25 +114,6 @@ function GalleryAddressTitle({ document }: { document: SalesBrochureDocumentJson
       ) : null}
     </p>
   );
-}
-
-function resolveGalleryAgents(report: FinalReportJson) {
-  if (report.agents?.length) {
-    return report.agents.filter(
-      (agent) => agent.name || agent.photo_url || agent.phone || agent.email,
-    );
-  }
-
-  if (
-    report.agent.name ||
-    report.agent.photo_url ||
-    report.agent.phone ||
-    report.agent.email
-  ) {
-    return [report.agent];
-  }
-
-  return [];
 }
 
 function GallerySpecItem({
@@ -253,25 +236,6 @@ export function GalleryInfoBar({ document }: { document: SalesBrochureDocumentJs
   );
 }
 
-function GalleryAgentContact({ agent }: { agent: FinalReportJson["agent"] }) {
-  return (
-    <div className="text-right text-[0.74rem] leading-snug text-neutral-700">
-      {agent.name ? (
-        <p
-          className="text-[0.82rem] font-bold uppercase tracking-wide text-neutral-900"
-          style={{ fontFamily: headingFont }}
-        >
-          {agent.name}
-        </p>
-      ) : null}
-      {agent.phone ? <p className="mt-2">{agent.phone}</p> : null}
-      {agent.email ? (
-        <p className="mt-1 break-all text-neutral-600">{agent.email}</p>
-      ) : null}
-    </div>
-  );
-}
-
 export function GalleryDetailsRow({
   document,
   report,
@@ -279,8 +243,6 @@ export function GalleryDetailsRow({
   document: SalesBrochureDocumentJson;
   report: FinalReportJson;
 }) {
-  const agent = resolveGalleryAgents(report)[0];
-
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[1.2fr_0.75fr_0.85fr] gap-6 overflow-hidden px-8 py-5">
       <div className="min-w-0">
@@ -325,7 +287,11 @@ export function GalleryDetailsRow({
         ) : null}
       </div>
 
-      {agent ? <GalleryAgentContact agent={agent} /> : <div />}
+      {resolveBrochureAgents(report).length > 0 ? (
+        <BrochureAgentContactStack report={report} uppercaseName />
+      ) : (
+        <div />
+      )}
     </div>
   );
 }
@@ -367,7 +333,6 @@ export function GalleryMinimalAgentBar({
   report: FinalReportJson;
   pinnedBottom?: boolean;
 }) {
-  const agent = resolveGalleryAgents(report)[0] ?? report.agent;
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
 
   return (
@@ -376,19 +341,11 @@ export function GalleryMinimalAgentBar({
         pinnedBottom ? "py-5" : "border-t border-neutral-200 py-4"
       }`}
     >
-      <div
-        className="min-w-0 text-[0.78rem] leading-snug text-neutral-700"
-        style={{ fontFamily: bodyFont }}
-      >
-        {agent.name ? (
-          <p className="text-[0.88rem] font-semibold text-neutral-900">{agent.name}</p>
-        ) : null}
-        {agent.role_title ? <p className="mt-0.5">{agent.role_title}</p> : null}
-        {agent.phone ? <p className="mt-1">{agent.phone}</p> : null}
-        {agent.email ? (
-          <p className="mt-0.5 break-all text-neutral-600">{agent.email}</p>
-        ) : null}
-      </div>
+      <BrochureAgentContactStack
+        report={report}
+        align="left"
+        className="min-w-0 flex-1"
+      />
 
       <div className="flex shrink-0 items-center gap-6">
         {logoUrl ? (

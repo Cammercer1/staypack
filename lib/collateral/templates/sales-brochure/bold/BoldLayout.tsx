@@ -4,6 +4,7 @@ import { Editable } from "@/components/collateral/sales-brochure/inline/Editable
 import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
 import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import {
   resolveBrochurePrice,
@@ -23,18 +24,6 @@ function resolveBoldPhotos(document: SalesBrochureDocumentJson) {
     hero: urls[0] ?? document.property.hero_image_url ?? "",
     secondary: urls.slice(1, 4),
   };
-}
-
-function resolveBoldAgents(report: FinalReportJson) {
-  if (report.agents?.length) {
-    return report.agents.filter(
-      (a) => a.name || a.photo_url || a.phone || a.email,
-    );
-  }
-  if (report.agent.name || report.agent.photo_url || report.agent.phone || report.agent.email) {
-    return [report.agent];
-  }
-  return [];
 }
 
 function buildBoldFeatureItems(document: SalesBrochureDocumentJson) {
@@ -251,7 +240,7 @@ function BoldBody({
   report: FinalReportJson;
 }) {
   const features = buildBoldFeatureItems(document);
-  const agents = resolveBoldAgents(report).slice(0, 2);
+  const agents = resolveBrochureAgents(report).slice(0, 2);
   const accent = document.agency.primary_colour || "#1a1a2e";
 
   return (

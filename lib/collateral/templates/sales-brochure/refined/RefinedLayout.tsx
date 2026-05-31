@@ -4,6 +4,7 @@ import { Editable } from "@/components/collateral/sales-brochure/inline/Editable
 import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
 import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import {
   resolveBrochurePrice,
@@ -323,9 +324,10 @@ export function RefinedAgentBar({
   /** Page 2: flush to page bottom, no top rule. */
   pinnedBottom?: boolean;
 }) {
-  const agent = report.agent;
+  const agents = resolveBrochureAgents(report);
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
   const accent = document.agency.primary_colour || "#1a1a2e";
+  const multiAgent = agents.length > 1;
 
   return (
     <div
@@ -333,52 +335,68 @@ export function RefinedAgentBar({
         pinnedBottom ? "py-5" : "border-t border-neutral-200 py-4"
       }`}
     >
-      {/* Agent — flat print style, no background card */}
-      <div className="flex items-center gap-4">
-        {agent.photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={agent.photo_url}
-            alt={agent.name || "Agent"}
-            className="h-14 w-14 shrink-0 rounded-full object-cover object-top"
-          />
+      <div className="flex min-w-0 flex-1 items-center gap-4">
+        {agents.length > 0 ? (
+          <div
+            className={
+              multiAgent
+                ? "grid grid-cols-2 gap-x-6 gap-y-3"
+                : "flex items-center gap-4"
+            }
+          >
+            {agents.map((agent, index) => (
+              <div
+                key={`${agent.name}-${agent.email}-${agent.phone}-${index}`}
+                className="flex items-center gap-4"
+              >
+                {agent.photo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={agent.photo_url}
+                    alt={agent.name || "Agent"}
+                    className="h-14 w-14 shrink-0 rounded-full object-cover object-top"
+                  />
+                ) : null}
+                <div className="min-w-0">
+                  {agent.name ? (
+                    <p
+                      className="text-[0.82rem] font-bold leading-tight text-neutral-900"
+                      style={{ fontFamily: headingFont }}
+                    >
+                      {agent.name}
+                    </p>
+                  ) : null}
+                  {agent.role_title ? (
+                    <p
+                      className="text-[0.7rem] text-neutral-500"
+                      style={{ fontFamily: bodyFont }}
+                    >
+                      {agent.role_title}
+                    </p>
+                  ) : null}
+                  {agent.phone ? (
+                    <p
+                      className="text-[0.72rem] text-neutral-700"
+                      style={{ fontFamily: bodyFont }}
+                    >
+                      {agent.phone}
+                    </p>
+                  ) : null}
+                  {agent.email ? (
+                    <p
+                      className="truncate text-[0.68rem] text-neutral-500"
+                      style={{ fontFamily: bodyFont }}
+                    >
+                      {agent.email}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : null}
-        <div className="min-w-0">
-          {agent.name ? (
-            <p
-              className="text-[0.82rem] font-bold leading-tight text-neutral-900"
-              style={{ fontFamily: headingFont }}
-            >
-              {agent.name}
-            </p>
-          ) : null}
-          {agent.role_title ? (
-            <p
-              className="text-[0.7rem] text-neutral-500"
-              style={{ fontFamily: bodyFont }}
-            >
-              {agent.role_title}
-            </p>
-          ) : null}
-          {agent.phone ? (
-            <p
-              className="text-[0.72rem] text-neutral-700"
-              style={{ fontFamily: bodyFont }}
-            >
-              {agent.phone}
-            </p>
-          ) : null}
-          {agent.email ? (
-            <p
-              className="truncate text-[0.68rem] text-neutral-500"
-              style={{ fontFamily: bodyFont }}
-            >
-              {agent.email}
-            </p>
-          ) : null}
-        </div>
-        {/* Thin accent divider between agent and agency side */}
-        <div className="mx-2 h-10 w-px bg-neutral-200" aria-hidden />
+        {/* Thin accent divider between agents and agency side */}
+        <div className="mx-2 h-10 w-px shrink-0 bg-neutral-200" aria-hidden />
         <div className="min-w-0 space-y-0.5">
           <p
             className="text-[0.72rem] font-semibold text-neutral-900"

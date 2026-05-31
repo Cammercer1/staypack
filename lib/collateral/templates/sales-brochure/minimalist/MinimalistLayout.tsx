@@ -10,6 +10,7 @@ import {
   sliceBlurbBlocksByParagraphs,
 } from "@/lib/collateral/sales-brochure/blurbBlocks";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import {
   resolveBrochurePrice,
@@ -137,7 +138,7 @@ function MinimalistSidebar({
   document: SalesBrochureDocumentJson;
   report: FinalReportJson;
 }) {
-  const agent = report.agent;
+  const agents = resolveBrochureAgents(report);
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
   const accent = document.agency.primary_colour || "#5c2f2f";
 
@@ -177,16 +178,20 @@ function MinimalistSidebar({
 
       <div className="space-y-1.5">
         <MinimalistSectionLabel>Agents</MinimalistSectionLabel>
-        <div className="space-y-0.5">
-          {agent.name ? (
-            <p className="text-[0.74rem] font-semibold text-neutral-900">{agent.name}</p>
-          ) : null}
-          {agent.phone ? (
-            <p className="text-[0.74rem] text-neutral-800">{agent.phone}</p>
-          ) : null}
-          {agent.email ? (
-            <p className="break-all text-[0.72rem] text-neutral-700">{agent.email}</p>
-          ) : null}
+        <div className="space-y-3">
+          {agents.map((agent, index) => (
+            <div key={`${agent.name}-${agent.email}-${agent.phone}-${index}`} className="space-y-0.5">
+              {agent.name ? (
+                <p className="text-[0.74rem] font-semibold text-neutral-900">{agent.name}</p>
+              ) : null}
+              {agent.phone ? (
+                <p className="text-[0.74rem] text-neutral-800">{agent.phone}</p>
+              ) : null}
+              {agent.email ? (
+                <p className="break-all text-[0.72rem] text-neutral-700">{agent.email}</p>
+              ) : null}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -379,14 +384,14 @@ export function MinimalistPageTwo({
   const { pageTwoGallery } = resolveMinimalistImages(document);
   const rightStack = pageTwoGallery.slice(0, 3);
   const bottomImage = pageTwoGallery[3] ?? pageTwoGallery[0] ?? "";
-  const agent = report.agent;
+  const agents = resolveBrochureAgents(report);
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
   const pageBg = document.agency.background_colour?.trim() || MINIMALIST_CREAM;
   const { remainder: continuationBlocks } = sliceBlurbBlocksByParagraphs(
     getBlurbBlocks(document.copy),
     PAGE_ONE_BLURB_PARAGRAPHS,
   );
-  const closingParagraph = buildClosingParagraph(document, agent);
+  const closingParagraph = buildClosingParagraph(document, agents[0] ?? report.agent);
 
   return (
     <div
@@ -457,18 +462,22 @@ export function MinimalistPageTwo({
           ) : null}
 
           <div className="space-y-3 pt-1">
-            {(agent.name || agent.phone) && (
-              <p className="text-[0.74rem] text-neutral-900" style={{ fontFamily: bodyFont }}>
-                {agent.name ? <span className="font-bold">{agent.name}</span> : null}
-                {agent.name && agent.phone ? " " : null}
-                {agent.phone ? <span className="font-bold">{agent.phone}</span> : null}
-              </p>
-            )}
-            {(agent.role_title || agent.email) && (
-              <p className="text-[0.72rem] text-neutral-800" style={{ fontFamily: bodyFont }}>
-                {[agent.role_title, agent.email].filter(Boolean).join(" | ")}
-              </p>
-            )}
+            {agents.map((agent, index) => (
+              <div key={`${agent.name}-${agent.email}-${agent.phone}-${index}`} className="space-y-1">
+                {(agent.name || agent.phone) && (
+                  <p className="text-[0.74rem] text-neutral-900" style={{ fontFamily: bodyFont }}>
+                    {agent.name ? <span className="font-bold">{agent.name}</span> : null}
+                    {agent.name && agent.phone ? " " : null}
+                    {agent.phone ? <span className="font-bold">{agent.phone}</span> : null}
+                  </p>
+                )}
+                {(agent.role_title || agent.email) && (
+                  <p className="text-[0.72rem] text-neutral-800" style={{ fontFamily: bodyFont }}>
+                    {[agent.role_title, agent.email].filter(Boolean).join(" | ")}
+                  </p>
+                )}
+              </div>
+            ))}
 
             <p className="text-[0.72rem] text-neutral-800" style={{ fontFamily: bodyFont }}>
               {document.agency.name ? (

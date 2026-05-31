@@ -10,9 +10,11 @@ import {
 import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
 import { getCollateralTemplate } from "@/lib/collateral/templates/registry";
 import { isSalesBrochureDocument } from "@/lib/collateral/templates/types";
+import { enrichSalesBrochureDocumentAgents } from "@/lib/collateral/enrichSalesBrochureDocument";
 import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
 import { mmToPx } from "@/lib/reports/pageFormat";
 import { cn } from "@/lib/utils";
+import type { AgentProfile, Listing } from "@/lib/types";
 import {
   EditableProvider,
   type BrochureImageSlot,
@@ -22,6 +24,9 @@ import type { BrochureBlurbBlock } from "@/lib/collateral/templates/types";
 
 type Props = {
   document: SalesBrochureDocumentJson;
+  listing?: Pick<Listing, "scraped_listing_json" | "agent_profile_id"> | null;
+  agencyAgents?: AgentProfile[];
+  agentProfile?: AgentProfile | null;
   className?: string;
   maxHeight?: string;
   fitToWidth?: boolean;
@@ -35,6 +40,9 @@ type Props = {
 
 export function FittedBrochurePreview({
   document,
+  listing = null,
+  agencyAgents = [],
+  agentProfile = null,
   className,
   maxHeight = "min(80vh, 900px)",
   fitToWidth = true,
@@ -79,9 +87,15 @@ export function FittedBrochurePreview({
   }, []);
 
   const previewDocument = useMemo((): SalesBrochureDocumentJson => {
-    const merged = applySalesBrochurePreviewBrand(document, previewBrand);
-    return isSalesBrochureDocument(merged) ? merged : document;
-  }, [document, previewBrand]);
+    const withListingAgents = listing
+      ? enrichSalesBrochureDocumentAgents(document, listing, {
+          agencyAgents,
+          agentProfile,
+        })
+      : document;
+    const merged = applySalesBrochurePreviewBrand(withListingAgents, previewBrand);
+    return isSalesBrochureDocument(merged) ? merged : withListingAgents;
+  }, [document, listing, agencyAgents, agentProfile, previewBrand]);
 
   useLayoutEffect(() => {
     const container = containerRef.current;

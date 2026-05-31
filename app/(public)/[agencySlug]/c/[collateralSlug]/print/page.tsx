@@ -6,7 +6,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
 import { CollateralPreview } from "@/components/collateral/CollateralPreview";
-import { mergeAgencyBrandIntoCollateralDocument } from "@/lib/collateral/mergeAgencyBrand";
+import { resolveSalesBrochurePrintDocument } from "@/lib/collateral/enrichSalesBrochureDocument";
 import type { Agency, CollateralDocumentJson, CollateralType } from "@/lib/types";
 
 export default async function PublicCollateralPrintPage({
@@ -33,7 +33,7 @@ export default async function PublicCollateralPrintPage({
 
   const { data: collateral } = await admin
     .from("collateral_items")
-    .select("document_json, type, status")
+    .select("document_json, type, status, listing_id, agency_id")
     .eq("agency_id", agency.id)
     .eq("public_slug", collateralSlug)
     .in("status", ["generated", "published"])
@@ -43,10 +43,15 @@ export default async function PublicCollateralPrintPage({
     notFound();
   }
 
-  const document = mergeAgencyBrandIntoCollateralDocument(
-    agency as Agency,
-    collateral.document_json as CollateralDocumentJson,
-  );
+  const document = await resolveSalesBrochurePrintDocument({
+    admin,
+    agency: agency as Agency,
+    collateral: {
+      document_json: collateral.document_json as CollateralDocumentJson,
+      listing_id: collateral.listing_id,
+      agency_id: collateral.agency_id,
+    },
+  });
 
   return (
     <>

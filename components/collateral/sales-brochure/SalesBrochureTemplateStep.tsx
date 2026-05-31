@@ -105,7 +105,11 @@ export function SalesBrochureTemplateStep({
         </div>
 
         <div className="min-w-0">
-          <FittedBrochurePreview document={previewDocument} maxHeight="min(85vh, 920px)" />
+          <FittedBrochurePreview
+            document={previewDocument}
+            listing={listing}
+            maxHeight="min(85vh, 920px)"
+          />
         </div>
       </div>
     </div>

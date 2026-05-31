@@ -7,6 +7,7 @@ import {
   sliceBlurbBlocksByParagraphs,
 } from "@/lib/collateral/sales-brochure/blurbBlocks";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
+import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import {
   resolveBrochurePrice,
@@ -71,15 +72,14 @@ function formatAddressLine(document: SalesBrochureDocumentJson) {
 }
 
 function SplitAgentBlock({
-  report,
+  agent,
   document,
   compact = false,
 }: {
-  report: FinalReportJson;
+  agent: FinalReportJson["agent"];
   document: SalesBrochureDocumentJson;
   compact?: boolean;
 }) {
-  const agent = report.agent;
   const accent = document.agency.accent_colour || document.agency.primary_colour;
   const avatarSize = compact ? 48 : 64;
 
@@ -283,7 +283,16 @@ export function SplitContentColumn({
         ) : null}
 
         <div className="space-y-3 border-t border-neutral-200/80 pt-4">
-          <SplitAgentBlock report={report} document={document} compact />
+          <div className="space-y-4">
+            {resolveBrochureAgents(report).map((agent, index) => (
+              <SplitAgentBlock
+                key={`${agent.name}-${agent.email}-${agent.phone}-${index}`}
+                agent={agent}
+                document={document}
+                compact
+              />
+            ))}
+          </div>
 
         <div className="flex items-end justify-between gap-3">
           {logoUrl ? (

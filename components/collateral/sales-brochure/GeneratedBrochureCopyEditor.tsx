@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
@@ -34,12 +34,14 @@ import {
 } from "@/lib/collateral/templates/types";
 import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
 import { cn } from "@/lib/utils";
-import type { Agency, CollateralItem, Listing } from "@/lib/types";
+import type { Agency, AgentProfile, CollateralItem, Listing } from "@/lib/types";
 
 type Props = {
   agency: Agency;
   listing: Listing;
   collateral: CollateralItem;
+  agencyAgents?: AgentProfile[];
+  agentProfile?: AgentProfile | null;
   onCollateralChange: (collateral: CollateralItem) => void;
   onContinueToPreview?: () => void;
 };
@@ -52,6 +54,8 @@ type ApiError = {
 export function GeneratedBrochureCopyEditor({
   listing,
   collateral,
+  agencyAgents = [],
+  agentProfile = null,
   onCollateralChange,
   onContinueToPreview,
 }: Props) {
@@ -72,20 +76,22 @@ export function GeneratedBrochureCopyEditor({
   useEffect(() => {
     const document = collateral.document_json;
     if (document && isSalesBrochureDocument(document)) {
-      setCopy(coerceSalesBrochureCopyForEditor(document.copy));
+      const nextCopy = coerceSalesBrochureCopyForEditor(document.copy);
+      setCopy(nextCopy);
       setPropertyImages(document.property);
+      setLastSavedSnapshot(
+        brochureEditorSnapshot(nextCopy, document.property),
+      );
+      setSaveFailed(false);
     }
   }, [collateral.document_json]);
   const [saving, setSaving] = useState(false);
-  const [saveState, setSaveState] = useState<"idle" | "pending" | "saved" | "error">(
-    "idle",
-  );
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [imagePickerSlot, setImagePickerSlot] = useState<BrochureImageSlot | null>(
     null,
   );
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const skipAutosave = useRef(true);
 
   const displayPrice = useMemo(
     () => resolveReportDisplayPrice(listing),
@@ -98,6 +104,18 @@ export function GeneratedBrochureCopyEditor({
       ? document.property.display_price
       : "";
   }, [collateral.document_json]);
+
+  const currentSnapshot = useMemo(() => {
+    if (!copy || !propertyImages) {
+      return null;
+    }
+    return brochureEditorSnapshot(copy, propertyImages);
+  }, [copy, propertyImages]);
+
+  const isDirty =
+    currentSnapshot != null &&
+    lastSavedSnapshot != null &&
+    currentSnapshot !== lastSavedSnapshot;
 
   const previewDocument = useMemo((): SalesBrochureDocumentJson | null => {
     const document = collateral.document_json;
@@ -119,7 +137,7 @@ export function GeneratedBrochureCopyEditor({
     }
 
     setSaving(true);
-    setSaveState("pending");
+    setSaveFailed(false);
     const response = await fetch(`/api/collateral/${collateral.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -140,7 +158,7 @@ export function GeneratedBrochureCopyEditor({
     if (!response.ok) {
       toast.error(payload.error ?? "Unable to save brochure");
       setSaving(false);
-      setSaveState("error");
+      setSaveFailed(true);
       return false;
     }
 
@@ -148,42 +166,19 @@ export function GeneratedBrochureCopyEditor({
       onCollateralChange(payload.collateral);
     }
 
+    if (currentSnapshot) {
+      setLastSavedSnapshot(currentSnapshot);
+    }
+
     if (!options?.silent) {
       toast.success("Brochure saved");
     }
 
     setSaving(false);
-    setSaveState("saved");
     return true;
   },
-    [collateral.id, copy, onCollateralChange, propertyImages],
+    [collateral.id, copy, currentSnapshot, onCollateralChange, propertyImages],
   );
-
-  useEffect(() => {
-    if (!copy || !propertyImages) {
-      return;
-    }
-
-    if (skipAutosave.current) {
-      skipAutosave.current = false;
-      return;
-    }
-
-    setSaveState("pending");
-    if (autosaveTimer.current) {
-      clearTimeout(autosaveTimer.current);
-    }
-
-    autosaveTimer.current = setTimeout(() => {
-      void persistBrochure({ silent: true });
-    }, 800);
-
-    return () => {
-      if (autosaveTimer.current) {
-        clearTimeout(autosaveTimer.current);
-      }
-    };
-  }, [copy, propertyImages, persistBrochure]);
 
   async function generateCopy() {
     if (copy && !confirmRegenerate) {
@@ -225,11 +220,9 @@ export function GeneratedBrochureCopyEditor({
   }
 
   async function continueToPreview() {
-    if (copy) {
-      const saved = await persistBrochure({ silent: true });
-      if (!saved) {
-        return;
-      }
+    if (isDirty) {
+      toast.error("Save your changes before continuing to preview");
+      return;
     }
 
     onContinueToPreview?.();
@@ -284,27 +277,27 @@ export function GeneratedBrochureCopyEditor({
 
   const limits = SALES_BROCHURE_COPY_LIMITS;
 
-  const saveStatusLabel =
-    saveState === "pending" || saving
-      ? "Saving…"
-      : saveState === "saved"
-        ? "All changes saved"
-        : saveState === "error"
-          ? "Save failed — will retry on your next edit"
-          : copy
-            ? "Edits autosave"
-            : null;
-
   return (
     <AsyncLoadingOverlay
       active={generating}
       title="Generating collateral"
       description="Writing buyer-facing brochure copy from your listing. This usually takes 10–20 seconds."
     >
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+      <div
+        className={cn(
+          "mx-auto flex w-full max-w-5xl flex-col gap-4",
+          copy && isDirty && "pb-24",
+        )}
+      >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold">
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
+              {copy && isDirty ? (
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full bg-amber-500"
+                  aria-hidden
+                />
+              ) : null}
               {copy ? "Edit brochure" : "Content generation"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -322,12 +315,27 @@ export function GeneratedBrochureCopyEditor({
                 {listingContextSummary(listing, displayPrice)}
               </p>
             ) : null}
-            {saveStatusLabel ? (
-              <p className="mt-1 text-xs text-muted-foreground">{saveStatusLabel}</p>
+            {saveFailed ? (
+              <p className="mt-1 text-xs text-destructive">Save failed — try again below.</p>
             ) : null}
           </div>
 
           <div className="flex shrink-0 flex-wrap gap-2">
+            {copy && isDirty ? (
+              <Button
+                disabled={generating || saving}
+                onClick={() => void persistBrochure()}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  "Save changes"
+                )}
+              </Button>
+            ) : null}
             <Button onClick={generateCopy} disabled={generating || saving}>
               {generating ? (
                 <>
@@ -346,7 +354,12 @@ export function GeneratedBrochureCopyEditor({
               <Button
                 variant="outline"
                 onClick={continueToPreview}
-                disabled={generating || saving}
+                disabled={generating || saving || isDirty}
+                title={
+                  isDirty
+                    ? "Save your changes before continuing to preview"
+                    : undefined
+                }
               >
                 Continue to preview
               </Button>
@@ -378,6 +391,9 @@ export function GeneratedBrochureCopyEditor({
           <>
             <FittedBrochurePreview
               document={previewDocument}
+              listing={listing}
+              agencyAgents={agencyAgents}
+              agentProfile={agentProfile}
               maxHeight="min(85vh, 960px)"
               editable={{
                 blurbBlocks: getBlurbBlocksForEditor(copy),
@@ -475,8 +491,57 @@ export function GeneratedBrochureCopyEditor({
           </div>
         )}
       </div>
+
+      {copy && isDirty ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-x-0 bottom-0 z-50 border-t border-amber-200/90 bg-amber-50/95 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm dark:border-amber-800/60 dark:bg-amber-950/95"
+        >
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap">
+            <div className="min-w-0 space-y-0.5">
+              <p className="text-sm font-semibold text-foreground">
+                Unsaved changes
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Save your brochure before continuing to preview.
+              </p>
+            </div>
+            <Button
+              size="lg"
+              className="shrink-0 shadow-md"
+              disabled={saving || generating}
+              onClick={() => void persistBrochure()}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                "Save brochure"
+              )}
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </AsyncLoadingOverlay>
   );
+}
+
+function brochureEditorSnapshot(
+  copy: SalesBrochureCopyJson,
+  property: SalesBrochureDocumentJson["property"],
+) {
+  return JSON.stringify({
+    copy,
+    property: {
+      hero_image_url: property.hero_image_url,
+      selected_image_urls: property.selected_image_urls,
+      page_one_image_urls: property.page_one_image_urls,
+      page_two_image_urls: property.page_two_image_urls,
+    },
+  });
 }
 
 function listingContextSummary(

@@ -86,7 +86,7 @@ export function salesBrochurePreviewBrandFromAgency(
   };
 }
 
-/** Overlay showcase agency + agent on in-app brochure previews (not publish/PDF). */
+/** Overlay logged-in agency brand on in-app brochure previews (not publish/PDF). */
 export function applySalesBrochurePreviewBrand(
   document: SalesBrochureDocumentJson,
   preview: SalesBrochurePreviewBrand,
@@ -94,7 +94,5 @@ export function applySalesBrochurePreviewBrand(
   return {
     ...document,
     agency: preview.agency,
-    agent: preview.agent,
-    agents: [preview.agent],
   };
 }

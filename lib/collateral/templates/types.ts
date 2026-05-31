@@ -293,6 +293,10 @@ export type SalesBrochureDocumentJson = {
   type: "sales_brochure";
   template_id: string;
   generated_at: string;
+  /** Last time copy/images were saved in the editor. */
+  content_saved_at?: string;
+  /** Last time pdf_url reflected content_saved_at (set when PDF is generated). */
+  pdf_synced_at?: string;
   agency: CollateralBrandSlice;
   agent: CollateralAgentSlice;
   agents: CollateralAgentSlice[];

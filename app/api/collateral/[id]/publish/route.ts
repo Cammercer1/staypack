@@ -5,6 +5,7 @@ import {
   buildPublicCollateralUrl,
   generateCollateralSlug,
 } from "@/lib/collateral/slugs";
+import { withBrochureContentSaved } from "@/lib/collateral/sales-brochure/brochurePublishSync";
 import {
   isSalesBrochureDocument,
   type SalesBrochureDocumentJson,
@@ -49,13 +50,13 @@ export async function POST(
     const documentJson: SalesBrochureDocumentJson = isSalesBrochureDocument(
       existingDocument,
     )
-      ? {
+      ? withBrochureContentSaved({
           ...existingDocument,
           assets: {
             ...existingDocument.assets,
             qr_code_url: qrCodeUrl,
           },
-        }
+        })
       : existingDocument;
 
     const { data, error } = await supabase
