@@ -112,7 +112,7 @@ export function AgentProfileForm({
         <div className="space-y-2 md:col-span-2">
           <AgentPhotoUploader
             fieldId={fieldId("photo_url")}
-            value={photoUrl}
+            value={photoUrl ?? ""}
             fallbackInitial={displayName}
             hoverToChange={Boolean(initial)}
             onChange={(url) =>
