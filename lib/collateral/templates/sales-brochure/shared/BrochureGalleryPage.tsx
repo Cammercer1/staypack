@@ -1,3 +1,4 @@
+import { isBrochureFloorPlanUrl } from "@/lib/collateral/sales-brochure/brochureImageFit";
 import type { FinalReportJson } from "@/lib/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
 import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
@@ -20,7 +21,7 @@ export function getBrochureGalleryPhotos(
     ...document.property.selected_image_urls,
   ]
     .filter(Boolean)
-    .filter((url) => !url.includes("floor-plan") && url !== hero)
+    .filter((url) => !isBrochureFloorPlanUrl(url) && url !== hero)
     .filter((url, i, arr) => arr.indexOf(url) === i);
 }
 

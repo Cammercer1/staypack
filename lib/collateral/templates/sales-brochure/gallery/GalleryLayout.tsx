@@ -13,6 +13,10 @@ import {
   type SalesBrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
+import {
+  brochurePropertyPhotoClassName,
+  brochurePropertyPhotoFrameClassName,
+} from "@/lib/collateral/sales-brochure/brochureImageFit";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
@@ -143,13 +147,15 @@ export function GalleryPhotoMosaic({ document }: { document: SalesBrochureDocume
 
   return (
     <div className="relative flex h-[70%] min-h-0 shrink-0 flex-col gap-[6px]">
-      <div className="relative min-h-0 flex-[1.5] overflow-hidden bg-neutral-200">
+      <div
+        className={`relative min-h-0 flex-[1.5] overflow-hidden ${hero ? brochurePropertyPhotoFrameClassName(hero) : "bg-neutral-200"}`}
+      >
         {hero ? (
           <EditableImage
             slot="hero"
             src={hero}
             className="h-full w-full"
-            imgClassName="h-full w-full object-cover"
+            imgClassName={brochurePropertyPhotoClassName(hero)}
           />
         ) : null}
         {logoUrl ? (
@@ -169,13 +175,16 @@ export function GalleryPhotoMosaic({ document }: { document: SalesBrochureDocume
 
       <div className="grid min-h-0 flex-1 grid-cols-3 gap-[6px]">
         {thumbs.map((url, index) => (
-          <div key={`${url}-${index}`} className="min-h-0 overflow-hidden bg-neutral-200">
+          <div
+            key={`${url}-${index}`}
+            className={`min-h-0 overflow-hidden ${url ? brochurePropertyPhotoFrameClassName(url) : "bg-neutral-200"}`}
+          >
             {url ? (
               <EditableImage
                 slot={{ kind: "page_one", index: index + 1 }}
                 src={url}
                 className="h-full w-full"
-                imgClassName="h-full w-full object-cover"
+                imgClassName={brochurePropertyPhotoClassName(url)}
               />
             ) : null}
           </div>

@@ -1,10 +1,12 @@
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
 import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
+import { brochurePropertyPhotoClassName } from "@/lib/collateral/sales-brochure/brochureImageFit";
 import {
   resolveBrochurePrice,
   resolveBrochurePriceLabel,
   type SalesBrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
+import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
 import { formatNumber } from "@/lib/reports/formatters";
 
 export function BrochureAddressBlock({
@@ -177,10 +179,10 @@ export function BrochurePhotoGrid({
 
   return (
     <div className={`grid gap-2 ${gridClass} ${className}`}>
-      {urls.map((url) => (
-        <div key={url} className="min-h-0 overflow-hidden bg-neutral-100">
+      {dedupeImageUrls(urls).map((url, index) => (
+        <div key={`${index}-${url}`} className="min-h-0 overflow-hidden bg-neutral-100">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="" className="h-full w-full object-cover" />
+          <img src={url} alt="" className={brochurePropertyPhotoClassName(url)} />
         </div>
       ))}
     </div>

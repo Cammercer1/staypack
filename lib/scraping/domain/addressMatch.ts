@@ -48,6 +48,50 @@ export function parseStreetAddress(input: AddressMatchInput): ParsedStreetAddres
     };
   }
 
+  const spacedUnitMatch = streetPart.match(/^(\d+)\s+(\d+)\s+(.+)$/i);
+  if (spacedUnitMatch) {
+    const streetNumber = `${spacedUnitMatch[1]}/${spacedUnitMatch[2]}`;
+    let streetName = spacedUnitMatch[3].trim();
+    for (const suffix of [
+      " road",
+      " rd",
+      " street",
+      " st",
+      " avenue",
+      " ave",
+      " drive",
+      " dr",
+      " parade",
+      " pde",
+      " court",
+      " ct",
+      " place",
+      " pl",
+      " lane",
+      " ln",
+      " way",
+      " crescent",
+      " cres",
+      " circuit",
+      " cct",
+      " close",
+      " cl",
+    ]) {
+      if (streetName.toLowerCase().endsWith(suffix)) {
+        streetName = streetName.slice(0, -suffix.length).trim();
+        break;
+      }
+    }
+
+    return {
+      streetNumber,
+      streetName: normalizeToken(streetName) || null,
+      suburb: suburb ? normalizeToken(suburb) : null,
+      state,
+      postcode,
+    };
+  }
+
   const unitMatch = streetPart.match(/^(\d+\s*\/\s*\d+|\d+[a-z]?)\s+(.+)$/i);
   if (!unitMatch) {
     return {
@@ -124,11 +168,13 @@ export function domainListingMatchesAddress(
     postcode: listingAddress.postcode,
   });
 
-  if (
-    target.streetNumber &&
-    candidate.streetNumber &&
-    target.streetNumber !== candidate.streetNumber
-  ) {
+  const normalizeUnitNumber = (value: string | null) =>
+    value?.replace(/\s+/g, "").replace(/-/g, "/").toLowerCase() ?? null;
+
+  const targetUnit = normalizeUnitNumber(target.streetNumber);
+  const candidateUnit = normalizeUnitNumber(candidate.streetNumber);
+
+  if (targetUnit && candidateUnit && targetUnit !== candidateUnit) {
     return false;
   }
 

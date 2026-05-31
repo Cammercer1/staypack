@@ -11,6 +11,7 @@ import {
   primaryReportAgent,
   resolveReportAgents,
 } from "@/lib/reports/resolveReportAgents";
+import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
 import type {
   Agency,
   AgentProfile,
@@ -30,7 +31,7 @@ type BuildInput = {
 };
 
 export function splitBrochureImages(urls: string[]) {
-  const unique = [...new Set(urls.filter(Boolean))];
+  const unique = dedupeImageUrls(urls);
   const hero = unique[0] ?? "";
   const pageOne = unique.slice(0, 4);
   const pageTwo = unique.slice(4);

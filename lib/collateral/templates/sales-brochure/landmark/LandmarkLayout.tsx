@@ -12,6 +12,10 @@ import {
   type SalesBrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
+import {
+  brochurePropertyPhotoClassName,
+  isBrochureFloorPlanUrl,
+} from "@/lib/collateral/sales-brochure/brochureImageFit";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
@@ -358,7 +362,7 @@ export function LandmarkSpread({
 }) {
   const images = document.property.page_one_image_urls
     .filter(Boolean)
-    .filter((url) => !url.includes("floor-plan"));
+    .filter((url) => !isBrochureFloorPlanUrl(url));
   const hero = images[0] ?? document.property.hero_image_url ?? "";
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
 
@@ -371,7 +375,7 @@ export function LandmarkSpread({
             slot="hero"
             src={hero}
             className="h-full w-full"
-            imgClassName="h-full w-full object-cover"
+            imgClassName={brochurePropertyPhotoClassName(hero)}
           />
         ) : (
           <div className="h-full bg-neutral-300" />

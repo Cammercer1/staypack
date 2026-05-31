@@ -37,7 +37,6 @@ export function ScrapedListingReviewStep({
   listingSetup = false,
   onSaved,
 }: Props) {
-  const imported = !manualMode && Boolean(listing.scraped_listing_json);
   const scrapedImages = listing.scraped_listing_json?.images ?? [];
   const masterSelection = resolveMasterPhotoSelection(listing);
 
@@ -100,9 +99,6 @@ export function ScrapedListingReviewStep({
       setGeneratingDesc(false);
     }
   }
-
-  const scrapeWarnings = listing.scraped_listing_json?.warnings ?? [];
-  const scrapeConfidence = listing.scraped_listing_json?.confidence;
 
   async function saveListing() {
     const selected = form.selected_image_urls.slice(0, MAX_LANDING_IMAGES);
@@ -229,35 +225,7 @@ export function ScrapedListingReviewStep({
             below and upload photos.
           </p>
         </div>
-      ) : (
-        <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
-          <p className="text-sm font-medium">
-            {scrapeConfidence
-              ? `Imported listing · confidence: ${scrapeConfidence}`
-              : "Review imported listing details"}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Check the prefilled fields, review the webpage description, and choose
-            which photos to keep. All are selected by default.
-          </p>
-          {scrapedImages.length > 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">
-              {scrapedImages.length} photo
-              {scrapedImages.length === 1 ? "" : "s"} imported from the listing
-              {scrapedImages.length < MAX_LANDING_IMAGES
-                ? " — add more in the upload area below."
-                : "."}
-            </p>
-          ) : null}
-          {scrapeWarnings.length ? (
-            <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
-              {scrapeWarnings.map((warning) => (
-                <li key={warning}>• {warning}</li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      )}
+      ) : null}
 
       <div className="space-y-2">
         <Label>This listing is for</Label>

@@ -18,6 +18,11 @@ import {
   type SalesBrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
+import {
+  brochurePropertyPhotoClassName,
+  brochurePropertyPhotoFrameClassName,
+  isBrochureFloorPlanUrl,
+} from "@/lib/collateral/sales-brochure/brochureImageFit";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
@@ -41,7 +46,7 @@ function buildFeatureItems(document: SalesBrochureDocumentJson) {
 function resolveMinimalistImages(document: SalesBrochureDocumentJson) {
   const pageOne = document.property.page_one_image_urls
     .filter(Boolean)
-    .filter((url) => !url.includes("floor-plan"));
+    .filter((url) => !isBrochureFloorPlanUrl(url));
   const fallback = document.property.hero_image_url ?? "";
 
   const hero = pageOne[0] ?? fallback;
@@ -70,7 +75,7 @@ function resolvePageTwoGallery(
   const unique: string[] = [];
 
   for (const url of pool) {
-    if (!url || url.includes("floor-plan") || unique.includes(url)) continue;
+    if (!url || isBrochureFloorPlanUrl(url) || unique.includes(url)) continue;
     unique.push(url);
     if (unique.length >= 5) break;
   }
@@ -246,7 +251,7 @@ function MinimalistPhotoStrip({
               slot="hero"
               src={hero}
               className="h-full w-full"
-              imgClassName="h-full w-full object-cover"
+              imgClassName={brochurePropertyPhotoClassName(hero)}
             />
           </div>
         ) : (
@@ -261,7 +266,7 @@ function MinimalistPhotoStrip({
                   slot={{ kind: "page_one", index: index + 1 }}
                   src={url}
                   className="h-full w-full"
-                  imgClassName="h-full w-full object-cover"
+                  imgClassName={brochurePropertyPhotoClassName(url)}
                 />
               </div>
             ))}
@@ -365,7 +370,7 @@ function MinimalistPageTwoGallery({ urls }: { urls: string[] }) {
       {urls.map((url, index) => (
         <div key={`${url}-${index}`} className="min-h-0 flex-1 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="" className="h-full w-full object-cover" />
+          <img src={url} alt="" className={brochurePropertyPhotoClassName(url)} />
         </div>
       ))}
     </div>
@@ -504,7 +509,11 @@ export function MinimalistPageTwo({
         <div className="shrink-0 px-8">
           <div className="h-[72mm] overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={bottomImage} alt="" className="h-full w-full object-cover" />
+            <img
+              src={bottomImage}
+              alt=""
+              className={brochurePropertyPhotoClassName(bottomImage)}
+            />
           </div>
         </div>
       ) : null}

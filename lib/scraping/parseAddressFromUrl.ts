@@ -79,7 +79,13 @@ function parseMcGrathPropertySlug(slug: string): Partial<ParsedListing> | null {
     }
   }
 
-  const street = titleCaseWords(remainder.slice(0, streetEndIndex).join(" "));
+  const streetTokens = remainder.slice(0, streetEndIndex);
+  const street =
+    /^\d+$/.test(streetTokens[0] ?? "") &&
+    /^\d+$/.test(streetTokens[1] ?? "") &&
+    streetTokens.length >= 3
+      ? `${streetTokens[0]}/${streetTokens[1]} ${titleCaseWords(streetTokens.slice(2).join(" "))}`
+      : titleCaseWords(streetTokens.join(" "));
   const suburb = titleCaseWords(remainder.slice(streetEndIndex).join(" "));
 
   if (!street || !suburb) {

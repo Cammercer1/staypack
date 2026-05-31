@@ -1,9 +1,24 @@
 import type { ParsedListing } from "@/lib/types";
+import { mergeListingAgents } from "@/lib/agents/agentContact";
 import { listingHostname } from "@/lib/scraping/parsers/registry";
 import { findDomainListingUrl } from "@/lib/scraping/domain/findDomainListingUrl";
 import { fetchStaticHtml } from "@/lib/scraping/fetchStaticHtml";
 import { mergeParsedListings } from "@/lib/scraping/index";
 import { parseDomainListing } from "@/lib/scraping/parsers/domain";
+
+export function isDomainListingUrl(sourceUrl: string) {
+  const hostname = listingHostname(sourceUrl);
+  return Boolean(hostname?.endsWith("domain.com.au"));
+}
+
+export function hasSearchableDomainAddress(listing: ParsedListing) {
+  return Boolean(
+    listing.address?.trim() &&
+      listing.suburb?.trim() &&
+      listing.state?.trim() &&
+      listing.postcode?.trim(),
+  );
+}
 
 function listingNeedsDomainFallback(listing: ParsedListing, checkpoint: boolean) {
   if (checkpoint) {
@@ -23,18 +38,26 @@ export function shouldTryDomainFallback(
   listing: ParsedListing,
   checkpoint: boolean,
 ) {
-  const hostname = listingHostname(sourceUrl);
-  if (!hostname || hostname.endsWith("domain.com.au")) {
+  if (isDomainListingUrl(sourceUrl)) {
     return false;
   }
 
   return listingNeedsDomainFallback(listing, checkpoint);
 }
 
-export async function tryDomainListingFallback(
+export function shouldTryDomainPrimary(sourceUrl: string, listing: ParsedListing) {
+  if (isDomainListingUrl(sourceUrl)) {
+    return false;
+  }
+
+  return hasSearchableDomainAddress(listing);
+}
+
+async function fetchAndParseDomainListing(
   sourceUrl: string,
   listing: ParsedListing,
-  checkpoint: boolean,
+  successMessage: string,
+  notFoundMessage: string,
 ): Promise<{
   listing: ParsedListing;
   used: boolean;
@@ -42,10 +65,6 @@ export async function tryDomainListingFallback(
   warnings: string[];
 }> {
   const warnings: string[] = [];
-
-  if (!shouldTryDomainFallback(sourceUrl, listing, checkpoint)) {
-    return { listing, used: false, warnings };
-  }
 
   const domainUrl = await findDomainListingUrl({
     address: listing.address,
@@ -55,9 +74,7 @@ export async function tryDomainListingFallback(
   });
 
   if (!domainUrl) {
-    warnings.push(
-      "Could not find a matching listing on Domain.com.au for this address. Import used limited data from the original URL.",
-    );
+    warnings.push(notFoundMessage);
     return { listing, used: false, warnings };
   }
 
@@ -75,14 +92,12 @@ export async function tryDomainListingFallback(
 
   const domainParsed = parseDomainListing(html, domainUrl);
   if (!domainParsed.address?.trim()) {
-    warnings.push("Domain fallback page did not return usable listing data.");
+    warnings.push("Domain listing page did not return usable listing data.");
     return { listing, used: false, domainUrl, warnings };
   }
 
   const merged = mergeParsedListings(listing, domainParsed);
-  warnings.push(
-    `Primary site was blocked or incomplete. Enriched from Domain: ${domainUrl}`,
-  );
+  warnings.push(`${successMessage}: ${domainUrl}`);
 
   return {
     listing: {
@@ -92,5 +107,64 @@ export async function tryDomainListingFallback(
     used: true,
     domainUrl,
     warnings,
+  };
+}
+
+/** Domain-first: try before fetching the agency site when we already know the address. */
+export async function tryDomainListingPrimary(
+  sourceUrl: string,
+  listing: ParsedListing,
+): Promise<{
+  listing: ParsedListing;
+  used: boolean;
+  domainUrl?: string;
+  warnings: string[];
+}> {
+  if (!shouldTryDomainPrimary(sourceUrl, listing)) {
+    return { listing, used: false, warnings: [] };
+  }
+
+  return fetchAndParseDomainListing(
+    sourceUrl,
+    listing,
+    "Imported from Domain.com.au",
+    "No matching listing found on Domain.com.au yet. Trying the agency website next.",
+  );
+}
+
+/** After agency parse: enrich when the primary site was blocked or returned thin data. */
+export async function tryDomainListingFallback(
+  sourceUrl: string,
+  listing: ParsedListing,
+  checkpoint: boolean,
+): Promise<{
+  listing: ParsedListing;
+  used: boolean;
+  domainUrl?: string;
+  warnings: string[];
+}> {
+  if (!shouldTryDomainFallback(sourceUrl, listing, checkpoint)) {
+    return { listing, used: false, warnings: [] };
+  }
+
+  return fetchAndParseDomainListing(
+    sourceUrl,
+    listing,
+    "Primary site was blocked or incomplete. Enriched from Domain",
+    "Could not find a matching listing on Domain.com.au for this address. Import used limited data from the original URL.",
+  );
+}
+
+export function mergeAgencyAgentsOntoListing(
+  listing: ParsedListing,
+  agencyListing: ParsedListing,
+) {
+  if (!agencyListing.agents.length) {
+    return listing;
+  }
+
+  return {
+    ...listing,
+    agents: mergeListingAgents(listing.agents, agencyListing.agents),
   };
 }

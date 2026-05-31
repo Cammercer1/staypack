@@ -38,8 +38,13 @@ function buildSearchUrls(input: AddressMatchInput) {
   const streetLine = input.address?.split(",")[0]?.trim();
   const suburbLabel = parsed.suburb?.replace(/-/g, " ");
 
+  const searchKeywordVariants = new Set<string>();
+
   if (streetLine) {
-    urls.add(`${base}/house/?keywords=${encodeURIComponent(streetLine)}`);
+    searchKeywordVariants.add(streetLine);
+    if (parsed.streetNumber?.includes("/")) {
+      searchKeywordVariants.add(streetLine.replace(/\//g, "-"));
+    }
   }
 
   const keywordParts = [
@@ -49,14 +54,32 @@ function buildSearchUrls(input: AddressMatchInput) {
   ].filter(Boolean);
 
   if (keywordParts.length) {
-    const keywords = keywordParts.join(" ");
+    searchKeywordVariants.add(keywordParts.join(" "));
+  }
+
+  // Domain search often matches compact unit queries (e.g. "15-32 keira") better
+  // than full street lines ("15/32 Keira Street").
+  if (parsed.streetNumber?.includes("/") && parsed.streetName) {
+    searchKeywordVariants.add(
+      `${parsed.streetNumber.replace(/\//g, "-")} ${parsed.streetName}`,
+    );
+  }
+
+  for (const keywords of searchKeywordVariants) {
+    urls.add(`${base}/?keywords=${encodeURIComponent(keywords)}`);
+    urls.add(
+      `${base}/apartment-unit-flat/?keywords=${encodeURIComponent(keywords)}`,
+    );
     urls.add(`${base}/house/?keywords=${encodeURIComponent(keywords)}`);
   }
 
   if (parsed.streetNumber && parsed.streetName) {
     const streetNameQuery = parsed.streetName.split(" ")[0] ?? parsed.streetName;
+    const unitNumber = parsed.streetNumber.includes("/")
+      ? parsed.streetNumber.split("/")[1]
+      : parsed.streetNumber;
     urls.add(
-      `${base}/?streetnumber=${encodeURIComponent(parsed.streetNumber)}&streetname=${encodeURIComponent(streetNameQuery)}`,
+      `${base}/?streetnumber=${encodeURIComponent(unitNumber)}&streetname=${encodeURIComponent(streetNameQuery)}`,
     );
   }
 

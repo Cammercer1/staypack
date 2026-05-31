@@ -19,6 +19,7 @@ import {
 } from "@/lib/collateral/templates/sales-brochure/editorial/EditorialChrome";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
 import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
+import { brochurePropertyPhotoClassName } from "@/lib/collateral/sales-brochure/brochureImageFit";
 
 /**
  * Editorial page-1 spread — overlay hero + drop-cap narrative column + hairline
@@ -43,7 +44,7 @@ export function EditorialPageOneSpread({
             slot="hero"
             src={hero}
             className="h-full w-full"
-            imgClassName="h-full w-full object-cover"
+            imgClassName={brochurePropertyPhotoClassName(hero)}
           />
           <EditorialPhotoTopScrim />
           <EditorialLogoOverlay document={document} report={report} />

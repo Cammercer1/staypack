@@ -130,10 +130,7 @@ export function UnknownAgentsAfterScrapeModal({
   function missingRequiredFields(draft: AgentDraft) {
     const missing: string[] = [];
     if (!draft.name.trim()) missing.push("name");
-    if (!draft.role_title.trim()) missing.push("role title");
     if (!draft.phone.trim()) missing.push("phone");
-    if (!draft.email.trim()) missing.push("email");
-    if (!draft.photo_url.trim()) missing.push("photo URL");
     return missing;
   }
 
@@ -202,7 +199,7 @@ export function UnknownAgentsAfterScrapeModal({
             adding.
           </DialogDescription>
           <p className="text-xs font-medium text-muted-foreground">
-            All fields are required to add an agent.
+            Name and phone are required to add an agent.
           </p>
         </DialogHeader>
 
@@ -248,11 +245,10 @@ export function UnknownAgentsAfterScrapeModal({
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor={`agent-role-${agent.name}`}>Role title *</Label>
+                        <Label htmlFor={`agent-role-${agent.name}`}>Role title</Label>
                         <Input
                           id={`agent-role-${agent.name}`}
                           value={draft.role_title}
-                          aria-invalid={showMissing && !draft.role_title.trim()}
                           disabled={isSaved || isSkipped}
                           onChange={(event) =>
                             updateDraft(agent.name, { role_title: event.target.value })
@@ -273,12 +269,11 @@ export function UnknownAgentsAfterScrapeModal({
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`agent-email-${agent.name}`}>Email *</Label>
+                      <Label htmlFor={`agent-email-${agent.name}`}>Email</Label>
                       <Input
                         id={`agent-email-${agent.name}`}
                         type="email"
                         value={draft.email}
-                        aria-invalid={showMissing && !draft.email.trim()}
                         disabled={isSaved || isSkipped}
                         onChange={(event) =>
                           updateDraft(agent.name, { email: event.target.value })
@@ -286,11 +281,10 @@ export function UnknownAgentsAfterScrapeModal({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`agent-photo-${agent.name}`}>Photo URL *</Label>
+                      <Label htmlFor={`agent-photo-${agent.name}`}>Photo URL</Label>
                       <Input
                         id={`agent-photo-${agent.name}`}
                         value={draft.photo_url}
-                        aria-invalid={showMissing && !draft.photo_url.trim()}
                         disabled={isSaved || isSkipped}
                         onChange={(event) =>
                           updateDraft(agent.name, { photo_url: event.target.value })

@@ -15,6 +15,10 @@ import {
   type SalesBrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
+import {
+  brochurePropertyPhotoClassName,
+  brochurePropertyPhotoFrameClassName,
+} from "@/lib/collateral/sales-brochure/brochureImageFit";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
@@ -137,12 +141,14 @@ export function SplitPhotoColumn({ document }: { document: SalesBrochureDocument
   return (
     <div className="grid h-full grid-rows-[1.05fr_0.55fr_0.65fr] gap-[3px] bg-white">
       {photos.top ? (
-        <div className="min-h-0 overflow-hidden">
+        <div
+          className={`min-h-0 overflow-hidden ${brochurePropertyPhotoFrameClassName(photos.top)}`}
+        >
           <EditableImage
             slot={{ kind: "page_one", index: 0 }}
             src={photos.top}
             className="h-full w-full"
-            imgClassName="h-full w-full object-cover"
+            imgClassName={brochurePropertyPhotoClassName(photos.top)}
           />
         </div>
       ) : (
@@ -151,12 +157,15 @@ export function SplitPhotoColumn({ document }: { document: SalesBrochureDocument
       <div className="grid min-h-0 grid-cols-2 gap-[3px]">
         {[photos.middleLeft, photos.middleRight].map((url, index) =>
           url ? (
-            <div key={`${url}-${index}`} className="min-h-0 overflow-hidden">
+            <div
+              key={`${url}-${index}`}
+              className={`min-h-0 overflow-hidden ${brochurePropertyPhotoFrameClassName(url)}`}
+            >
               <EditableImage
                 slot={{ kind: "page_one", index: index + 1 }}
                 src={url}
                 className="h-full w-full"
-                imgClassName="h-full w-full object-cover"
+                imgClassName={brochurePropertyPhotoClassName(url)}
               />
             </div>
           ) : (
@@ -165,12 +174,14 @@ export function SplitPhotoColumn({ document }: { document: SalesBrochureDocument
         )}
       </div>
       {photos.bottom ? (
-        <div className="min-h-0 overflow-hidden">
+        <div
+          className={`min-h-0 overflow-hidden ${brochurePropertyPhotoFrameClassName(photos.bottom)}`}
+        >
           <EditableImage
             slot={{ kind: "page_one", index: 3 }}
             src={photos.bottom}
             className="h-full w-full"
-            imgClassName="h-full w-full object-cover"
+            imgClassName={brochurePropertyPhotoClassName(photos.bottom)}
           />
         </div>
       ) : (

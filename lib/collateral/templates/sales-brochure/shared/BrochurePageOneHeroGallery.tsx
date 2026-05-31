@@ -1,4 +1,8 @@
 import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import {
+  brochurePropertyPhotoClassName,
+  brochurePropertyPhotoFrameClassName,
+} from "@/lib/collateral/sales-brochure/brochureImageFit";
 import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
 
 /** Page-one hero grid for brochure templates (editable image slots in the editor). */
@@ -26,12 +30,14 @@ export function BrochurePageOneHeroGallery({
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
       {hero ? (
-        <div className="min-h-0 flex-[2] overflow-hidden">
+        <div
+          className={`min-h-0 flex-[2] overflow-hidden ${brochurePropertyPhotoFrameClassName(hero)}`}
+        >
           <EditableImage
             slot="hero"
             src={hero}
             className="h-full w-full"
-            imgClassName="h-full w-full object-cover"
+            imgClassName={brochurePropertyPhotoClassName(hero)}
           />
         </div>
       ) : null}
@@ -41,12 +47,15 @@ export function BrochurePageOneHeroGallery({
           className={`mt-[2px] grid min-h-0 flex-1 gap-[2px] overflow-hidden ${secondaryGridClass}`}
         >
           {slots.map((url, index) => (
-            <div key={`${url}-${index}`} className="min-h-0 overflow-hidden">
+            <div
+              key={`${url}-${index}`}
+              className={`min-h-0 overflow-hidden ${brochurePropertyPhotoFrameClassName(url)}`}
+            >
               <EditableImage
                 slot={{ kind: "page_one", index: index + 1 }}
                 src={url}
                 className="h-full w-full"
-                imgClassName="h-full w-full object-cover"
+                imgClassName={brochurePropertyPhotoClassName(url)}
               />
             </div>
           ))}

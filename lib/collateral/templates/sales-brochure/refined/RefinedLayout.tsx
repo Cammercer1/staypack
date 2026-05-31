@@ -12,6 +12,12 @@ import {
   type SalesBrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
+import {
+  brochurePropertyPhotoClassName,
+  brochurePropertyPhotoFrameClassName,
+  isBrochureFloorPlanUrl,
+} from "@/lib/collateral/sales-brochure/brochureImageFit";
+import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
@@ -44,10 +50,10 @@ function resolveRefinedImages(document: SalesBrochureDocumentJson) {
   const hero = urls[0] ?? document.property.hero_image_url ?? "";
   const footer = urls[2] ?? urls[1] ?? hero;
   // Use a real floor plan only if one was uploaded; otherwise show a property photo.
-  const floorPlan = urls.find((url) => url.includes("floor-plan"));
+  const floorPlan = urls.find((url) => isBrochureFloorPlanUrl(url));
   const side = floorPlan ?? urls[1] ?? urls[2] ?? hero;
 
-  return { hero, side, sideIsFloorPlan: Boolean(floorPlan), footer };
+  return { hero, side, footer };
 }
 
 export function RefinedHeader({
@@ -108,7 +114,7 @@ export function RefinedBody({
   document: SalesBrochureDocumentJson;
 }) {
   const features = buildRefinedFeatures(document);
-  const { side, sideIsFloorPlan } = resolveRefinedImages(document);
+  const { side } = resolveRefinedImages(document);
   const priceBoxBg = document.agency.accent_colour || "#f3f4f6";
   const priceBoxText =
     document.agency.callout_heading_colour ||
@@ -184,15 +190,13 @@ export function RefinedBody({
       <div className="flex min-h-0 flex-col overflow-hidden">
         {side ? (
           <div
-            className={`flex min-h-0 flex-1 items-center justify-center overflow-hidden ${
-              sideIsFloorPlan ? "bg-white" : "bg-neutral-200"
-            }`}
+            className={`flex min-h-0 flex-1 items-center justify-center overflow-hidden ${brochurePropertyPhotoFrameClassName(side)}`}
           >
             <EditableImage
               slot={{ kind: "page_one", index: 1 }}
               src={side}
               className="h-full w-full"
-              imgClassName={`h-full w-full ${sideIsFloorPlan ? "object-contain" : "object-cover"}`}
+              imgClassName={brochurePropertyPhotoClassName(side)}
             />
           </div>
         ) : (
@@ -223,12 +227,14 @@ function RefinedGalleryCell({
   galleryIndex: number;
 }) {
   return (
-    <div className={`min-h-0 overflow-hidden bg-neutral-200 ${className}`}>
+    <div
+      className={`min-h-0 overflow-hidden ${brochurePropertyPhotoFrameClassName(url)} ${className}`}
+    >
       <EditableImage
         slot={{ kind: "gallery", index: galleryIndex }}
         src={url}
         className="h-full w-full"
-        imgClassName="h-full w-full object-cover"
+        imgClassName={brochurePropertyPhotoClassName(url)}
       />
     </div>
   );
@@ -236,7 +242,7 @@ function RefinedGalleryCell({
 
 /** Page 2 — mosaic gallery filling most of the page height. */
 export function RefinedPageTwoGallery({ urls }: { urls: string[] }) {
-  const images = urls.filter(Boolean).slice(0, 6);
+  const images = dedupeImageUrls(urls).slice(0, 6);
   if (images.length === 0) return null;
 
   if (images.length === 1) {
@@ -247,7 +253,7 @@ export function RefinedPageTwoGallery({ urls }: { urls: string[] }) {
     return (
       <div className="grid h-full grid-cols-2 gap-[3px]">
         {images.map((url, index) => (
-          <RefinedGalleryCell key={url} url={url} galleryIndex={index} />
+          <RefinedGalleryCell key={`${index}-${url}`} url={url} galleryIndex={index} />
         ))}
       </div>
     );
@@ -267,7 +273,7 @@ export function RefinedPageTwoGallery({ urls }: { urls: string[] }) {
     return (
       <div className="grid h-full grid-cols-2 grid-rows-2 gap-[3px]">
         {images.map((url, index) => (
-          <RefinedGalleryCell key={url} url={url} galleryIndex={index} />
+          <RefinedGalleryCell key={`${index}-${url}`} url={url} galleryIndex={index} />
         ))}
       </div>
     );
@@ -303,12 +309,14 @@ export function RefinedFooterImage({ document }: { document: SalesBrochureDocume
   if (!footer) return null;
 
   return (
-    <div className="h-[88mm] shrink-0 overflow-hidden">
+    <div
+      className={`h-[88mm] shrink-0 overflow-hidden ${brochurePropertyPhotoFrameClassName(footer)}`}
+    >
       <EditableImage
         slot={{ kind: "page_one", index: 2 }}
         src={footer}
         className="h-full w-full"
-        imgClassName="h-full w-full object-cover"
+        imgClassName={brochurePropertyPhotoClassName(footer)}
       />
     </div>
   );

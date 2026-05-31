@@ -1,4 +1,9 @@
 import { EditableImage } from "@/components/collateral/sales-brochure/inline/EditableImage";
+import {
+  brochurePropertyPhotoClassName,
+  brochurePropertyPhotoFrameClassName,
+} from "@/lib/collateral/sales-brochure/brochureImageFit";
+import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
 
 const GAP = "gap-[3px]";
 
@@ -13,12 +18,14 @@ function Frame({
   galleryIndex: number;
 }) {
   return (
-    <div className={`min-h-0 h-full overflow-hidden bg-neutral-200 ${className}`}>
+    <div
+      className={`min-h-0 h-full overflow-hidden ${brochurePropertyPhotoFrameClassName(src)} ${className}`}
+    >
       <EditableImage
         slot={{ kind: "gallery", index: galleryIndex }}
         src={src}
         className="h-full w-full"
-        imgClassName="h-full w-full object-cover"
+        imgClassName={brochurePropertyPhotoClassName(src)}
       />
     </div>
   );
@@ -35,7 +42,7 @@ export function BrochurePhotoCollage({
   photos: string[];
   className?: string;
 }) {
-  const imgs = photos.filter(Boolean).slice(0, 6);
+  const imgs = dedupeImageUrls(photos).slice(0, 6);
   if (!imgs.length) return null;
 
   if (imgs.length === 1) {

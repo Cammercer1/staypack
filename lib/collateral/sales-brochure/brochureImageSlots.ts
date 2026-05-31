@@ -1,4 +1,5 @@
 import { splitBrochureImages } from "@/lib/collateral/buildSalesBrochureDocument";
+import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
 import { getBrochureGalleryPhotos } from "@/lib/collateral/templates/sales-brochure/shared/BrochureGalleryPage";
 import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
 import type { BrochureImageSlot } from "@/components/collateral/sales-brochure/inline/EditableContext";
@@ -106,9 +107,14 @@ export function replaceBrochureImageAtSlot(
         ),
       };
     }
+    const split = splitBrochureImages([
+      ...prop.page_one_image_urls,
+      ...dedupeImageUrls(pageTwo),
+      ...prop.selected_image_urls,
+    ]);
     return {
       ...document,
-      property: { ...prop, page_two_image_urls: pageTwo },
+      property: { ...prop, ...split },
     };
   }
 
