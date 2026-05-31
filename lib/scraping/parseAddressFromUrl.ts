@@ -23,6 +23,8 @@ const STREET_TYPE_TOKENS = new Set([
   "cres",
   "parade",
   "pde",
+  "esplanade",
+  "esp",
   "boulevard",
   "blvd",
   "terrace",
@@ -103,6 +105,91 @@ function parseMcGrathPropertySlug(slug: string): Partial<ParsedListing> | null {
   };
 }
 
+/**
+ * Domain listing URLs encode the address in the path, e.g.
+ * /6606-88-the-esplanade-surfers-paradise-qld-4217-2020878542
+ */
+function parseDomainListingSlug(slug: string): Partial<ParsedListing> | null {
+  const parts = slug.split("-").filter(Boolean);
+  if (parts.length < 5) {
+    return null;
+  }
+
+  let endIndex = parts.length;
+  if (/^\d{7,}$/.test(parts[endIndex - 1] ?? "")) {
+    endIndex -= 1;
+  }
+
+  const postcode = parts[endIndex - 1];
+  const state = parts[endIndex - 2]?.toUpperCase();
+
+  if (!/^\d{4}$/.test(postcode) || !AU_STATES.has(state)) {
+    return null;
+  }
+
+  const remainder = parts.slice(0, endIndex - 2);
+  if (remainder.length < 2) {
+    return null;
+  }
+
+  let streetNumberParts = 1;
+  if (
+    /^\d+$/.test(remainder[0] ?? "") &&
+    /^\d+$/.test(remainder[1] ?? "") &&
+    remainder.length >= 3
+  ) {
+    streetNumberParts = 2;
+  } else if (!/^\d+[a-z]?$/i.test(remainder[0] ?? "")) {
+    return null;
+  }
+
+  const afterNumber = remainder.slice(streetNumberParts);
+  if (!afterNumber.length) {
+    return null;
+  }
+
+  let streetEndInAfter = afterNumber.length;
+  for (let i = 0; i < afterNumber.length; i++) {
+    if (STREET_TYPE_TOKENS.has(afterNumber[i].toLowerCase())) {
+      streetEndInAfter = i + 1;
+      break;
+    }
+  }
+
+  if (streetEndInAfter === afterNumber.length && afterNumber.length >= 3) {
+    streetEndInAfter = afterNumber.length - 2;
+  } else if (streetEndInAfter === afterNumber.length && afterNumber.length === 2) {
+    streetEndInAfter = 1;
+  }
+
+  const streetNameTokens = afterNumber.slice(0, streetEndInAfter);
+  const suburbTokens = afterNumber.slice(streetEndInAfter);
+  if (!streetNameTokens.length || !suburbTokens.length) {
+    return null;
+  }
+
+  const streetNumber =
+    streetNumberParts === 2
+      ? `${remainder[0]}/${remainder[1]}`
+      : (remainder[0] ?? "");
+  const street = `${streetNumber} ${titleCaseWords(streetNameTokens.join(" "))}`;
+  const suburb = titleCaseWords(suburbTokens.join(" "));
+
+  if (!street.trim() || !suburb) {
+    return null;
+  }
+
+  return {
+    address: `${street}, ${suburb}`,
+    suburb,
+    state,
+    postcode,
+    title: `${street}, ${suburb} ${state} ${postcode}`,
+    confidence: "medium",
+    warnings: [],
+  };
+}
+
 function extractPropertySlug(url: string) {
   try {
     const { pathname } = new URL(url);
@@ -113,8 +200,37 @@ function extractPropertySlug(url: string) {
   }
 }
 
+function extractDomainListingSlug(url: string) {
+  try {
+    const { pathname } = new URL(url);
+    const segment = pathname.split("/").filter(Boolean).at(-1);
+    if (!segment || !/\d-.*-[a-z]{2,3}-\d{4}/i.test(segment)) {
+      return null;
+    }
+    return segment;
+  } catch {
+    return null;
+  }
+}
+
 export function parseAddressFromListingUrl(url: string): Partial<ParsedListing> | null {
   const hostname = listingHostname(url);
+
+  if (hostname?.endsWith("domain.com.au")) {
+    const slug = extractDomainListingSlug(url);
+    if (slug) {
+      const parsed = parseDomainListingSlug(slug);
+      if (parsed) {
+        return {
+          ...parsed,
+          warnings: [
+            "Address parsed from Domain listing URL (page HTML was unavailable or blocked).",
+          ],
+        };
+      }
+    }
+  }
+
   const slug = extractPropertySlug(url);
 
   if (!slug) {

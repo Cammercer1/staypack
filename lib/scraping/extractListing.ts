@@ -25,7 +25,8 @@ function shouldSkipAiEnrichment(
   if (
     checkpoint ||
     parserName === "domain_fallback" ||
-    parserName === "domain_primary"
+    parserName === "domain_primary" ||
+    parserName === "domain_url"
   ) {
     return true;
   }
@@ -235,6 +236,30 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
     fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H1',location:'extractListing.ts:domain:fetchAgencyHtml',message:'domain fetch complete',data:{method,htmlLength:html?.length??0,fetchMs:Date.now()-fetchStartedAt},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
     if (!html) {
+      const urlAddress = parseAddressFromListingUrl(url);
+      if (urlAddress?.address?.trim()) {
+        warnings.push(
+          ...(urlAddress.warnings ?? []),
+          "Could not fetch Domain page HTML. Used address from listing URL.",
+        );
+        const listing = mergeParsedListings(emptyListing(), {
+          images: [],
+          agents: [],
+          confidence: urlAddress.confidence ?? "medium",
+          warnings: urlAddress.warnings ?? [],
+          ...urlAddress,
+        });
+        // #region agent log
+        fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'post-fix',hypothesisId:'H6',location:'extractListing.ts:domain:noHtml',message:'domain url fallback used (no html)',data:{address:listing.address},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        return {
+          listing: finalizeListing(listing, warnings),
+          method,
+          parserName: "domain_url",
+          warnings: finalizeListing(listing, warnings).warnings,
+        };
+      }
+
       throw new Error(
         "Unable to fetch listing HTML. Check the URL and try again, or enter details manually.",
       );
@@ -247,6 +272,24 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
 
     if (checkpoint && /security checkpoint/i.test(listing.title ?? "")) {
       listing = { ...listing, title: undefined };
+    }
+
+    const urlAddress = parseAddressFromListingUrl(url);
+    if (!listing.address?.trim() && urlAddress?.address) {
+      listing = mergeParsedListings(listing, {
+        images: [],
+        agents: [],
+        confidence: urlAddress.confidence ?? "medium",
+        warnings: urlAddress.warnings ?? [],
+        ...urlAddress,
+      });
+      warnings.push(...(urlAddress.warnings ?? []));
+      if (parserName === "domain" && !listing.images.length) {
+        parserName = "domain_url";
+      }
+      // #region agent log
+      fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'post-fix',hypothesisId:'H6',location:'extractListing.ts:domain:urlFallback',message:'domain url fallback merged after html parse',data:{address:listing.address,hasNextData:html.includes('__NEXT_DATA__'),htmlLength:html.length},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
     }
 
     const skipAi = shouldSkipAiEnrichment(url, listing, parserName, checkpoint);
