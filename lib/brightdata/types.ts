@@ -8,6 +8,7 @@ export type BrightDataReaAgent = {
 export type BrightDataReaRecord = {
   rea_property_id?: string;
   property_type?: string;
+  house_type?: string;
   state?: string;
   postcode?: string;
   bedrooms?: string | number;
