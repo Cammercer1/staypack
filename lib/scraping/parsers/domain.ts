@@ -320,3 +320,26 @@ export function parseDomainListing(html: string, _url: string): ParsedListing {
 
   return listing;
 }
+
+/** True when HTML includes Domain's embedded __NEXT_DATA__ listing payload. */
+export function domainHtmlHasListingPayload(html: string) {
+  const $ = cheerio.load(html);
+  const nextData = $("#__NEXT_DATA__").text();
+  if (!nextData) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(nextData) as {
+      props?: { pageProps?: { componentProps?: Record<string, unknown> } };
+    };
+    const componentProps = parsed.props?.pageProps?.componentProps;
+    return Boolean(
+      componentProps &&
+        (typeof componentProps.address === "string" ||
+          typeof componentProps.headline === "string"),
+    );
+  } catch {
+    return false;
+  }
+}

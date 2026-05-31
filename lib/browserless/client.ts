@@ -103,7 +103,11 @@ type SmartScrapeResponse = {
   strategy?: string;
 };
 
-export async function fetchSmartScrapeHtml(url: string): Promise<string | null> {
+export async function fetchSmartScrapeHtml(
+  url: string,
+  options?: { timeoutMs?: number },
+): Promise<string | null> {
+  const timeoutMs = options?.timeoutMs ?? getBrowserlessTimeoutMs();
   const payload = (await browserlessRequest(
     "/smart-scrape",
     {
@@ -112,7 +116,7 @@ export async function fetchSmartScrapeHtml(url: string): Promise<string | null> 
     },
     {
       responseType: "json",
-      query: { timeout: getBrowserlessTimeoutMs() },
+      query: { timeout: timeoutMs },
     },
   )) as SmartScrapeResponse | null;
 

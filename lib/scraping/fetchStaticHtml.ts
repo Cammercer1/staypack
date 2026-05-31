@@ -1,8 +1,8 @@
 const DEFAULT_TIMEOUT_MS = 15000;
 
-export async function fetchStaticHtml(url: string) {
+export async function fetchStaticHtml(url: string, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url, {

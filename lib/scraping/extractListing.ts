@@ -2,8 +2,10 @@ import type { ParsedListing } from "@/lib/types";
 import { parseListingFromHtml } from "@/lib/openai/parseListingFromHtml";
 import { fetchRenderedHtml } from "@/lib/scraping/fetchRenderedHtml";
 import { fetchStaticHtml } from "@/lib/scraping/fetchStaticHtml";
+import { fetchSmartScrapeHtml } from "@/lib/browserless/client";
 import { mergeParsedListings, parseListing } from "@/lib/scraping/index";
 import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
+import { domainHtmlHasListingPayload } from "@/lib/scraping/parsers/domain";
 import {
   isDomainListingUrl,
   mergeAgencyAgentsOntoListing,
@@ -78,22 +80,66 @@ function finalizeListing(
   return finalized;
 }
 
-/** Domain.com.au embeds listing data in __NEXT_DATA__; static fetch is enough and avoids Browserless timeouts. */
+/** Domain.com.au embeds listing data in __NEXT_DATA__. Static fetch works locally; production IPs are often blocked. */
+const DOMAIN_STATIC_TIMEOUT_MS = 8_000;
+const DOMAIN_BROWSERLESS_TIMEOUT_MS = 22_000;
+
 async function fetchDomainListingHtml(url: string, warnings: string[]) {
   // #region agent log
   const domainFetchStartedAt = Date.now();
   // #endregion
 
+  let html = "";
+  let method: "static_fetch" | "browserless_rendered" = "static_fetch";
+
   try {
-    const html = await fetchStaticHtml(url);
-    // #region agent log
-    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'post-fix',hypothesisId:'H1',location:'extractListing.ts:fetchDomainListingHtml',message:'domain static fetch complete',data:{url,hasHtml:Boolean(html),staticMs:Date.now()-domainFetchStartedAt},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    return { html, method: "static_fetch" as const };
+    html = await fetchStaticHtml(url, DOMAIN_STATIC_TIMEOUT_MS);
   } catch (error) {
     warnings.push(error instanceof Error ? error.message : "Static fetch failed");
-    return { html: "", method: "static_fetch" as const };
   }
+
+  const staticHasPayload = Boolean(html && domainHtmlHasListingPayload(html));
+  // #region agent log
+  fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'post-fix',hypothesisId:'H7',location:'extractListing.ts:fetchDomainListingHtml:static',message:'domain static fetch evaluated',data:{url,hasHtml:Boolean(html),staticHasPayload,staticMs:Date.now()-domainFetchStartedAt},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
+  if (staticHasPayload) {
+    return { html, method: "static_fetch" as const };
+  }
+
+  if (html) {
+    warnings.push(
+      "Domain static fetch did not include listing data. Trying rendered fetch.",
+    );
+  }
+
+  try {
+    const browserlessStartedAt = Date.now();
+    const rendered = await fetchSmartScrapeHtml(url, {
+      timeoutMs: DOMAIN_BROWSERLESS_TIMEOUT_MS,
+    });
+    const renderedHasPayload = Boolean(
+      rendered && domainHtmlHasListingPayload(rendered),
+    );
+    // #region agent log
+    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'post-fix',hypothesisId:'H7',location:'extractListing.ts:fetchDomainListingHtml:browserless',message:'domain browserless fetch evaluated',data:{url,hasHtml:Boolean(rendered),renderedHasPayload,browserlessMs:Date.now()-browserlessStartedAt,totalMs:Date.now()-domainFetchStartedAt},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
+    if (renderedHasPayload) {
+      return { html: rendered!, method: "browserless_rendered" as const };
+    }
+
+    if (rendered) {
+      html = rendered;
+      method = "browserless_rendered";
+    }
+  } catch (error) {
+    warnings.push(
+      error instanceof Error ? error.message : "Rendered page fetch failed",
+    );
+  }
+
+  return { html, method };
 }
 
 async function fetchAgencyHtml(url: string, warnings: string[]) {

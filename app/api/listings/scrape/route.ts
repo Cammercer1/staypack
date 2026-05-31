@@ -16,6 +16,8 @@ import { detectListingPurpose } from "@/lib/listings/detectListingPurpose";
 import { listingImageMetaForScrapeUpdate } from "@/lib/listings/syncListingImageMeta";
 import type { Listing, ParsedListing } from "@/lib/types";
 
+export const maxDuration = 26;
+
 function buildScrapedListingFields(
   listingUrl: string,
   listing: ParsedListing,
