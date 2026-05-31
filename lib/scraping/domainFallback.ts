@@ -1,6 +1,10 @@
 import type { ParsedListing } from "@/lib/types";
 import { mergeListingAgents } from "@/lib/agents/agentContact";
 import {
+  fetchBrightDataHtml,
+  hasBrightDataUnlockerConfig,
+} from "@/lib/brightdata/client";
+import {
   fetchBrowserlessContentHtml,
   fetchBrowserlessUnblockHtml,
   hasBrowserlessConfig,
@@ -17,6 +21,19 @@ import { emptyListing } from "@/lib/scraping/parsers/utils";
 
 const DOMAIN_STATIC_TIMEOUT_MS = 8_000;
 const DOMAIN_BROWSERLESS_TIMEOUT_MS = 22_000;
+
+function shouldUseBrowserForDomain() {
+  if (!hasBrowserlessConfig()) {
+    return false;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return true;
+  }
+
+  const forced = process.env.FORCE_DOMAIN_BROWSER?.trim().toLowerCase();
+  return forced === "1" || forced === "true" || forced === "yes";
+}
 
 export function isDomainListingUrl(sourceUrl: string) {
   const hostname = listingHostname(sourceUrl);
@@ -71,6 +88,31 @@ function parseDomainHtml(domainUrl: string, html: string) {
   return { listing, hasPayload };
 }
 
+async function fetchDomainHtmlViaBrightData(domainUrl: string, warnings: string[]) {
+  if (!hasBrightDataUnlockerConfig()) {
+    return null;
+  }
+
+  try {
+    const html = await fetchBrightDataHtml(domainUrl);
+    if (html && domainHtmlHasListingPayload(html)) {
+      return html;
+    }
+
+    if (html) {
+      warnings.push("Bright Data fetch did not include Domain listing data.");
+    }
+  } catch (error) {
+    warnings.push(
+      error instanceof Error
+        ? `Bright Data fetch failed: ${error.message}`
+        : "Bright Data fetch failed",
+    );
+  }
+
+  return null;
+}
+
 async function fetchDomainHtmlViaBrowser(domainUrl: string, warnings: string[]) {
   if (!hasBrowserlessConfig()) {
     return null;
@@ -111,24 +153,35 @@ async function fetchDomainHtmlViaBrowser(domainUrl: string, warnings: string[]) 
 }
 
 /**
- * Domain listing import. Local dev uses static fetch (residential IP).
- * Production uses Browserless (real Chrome) because Netlify datacenter IPs are blocked.
+ * Domain listing import. Bright Data Web Unlocker is preferred when configured.
+ * Local dev falls back to static fetch (residential IP). Production uses Browserless
+ * when unlocker is unavailable because Netlify datacenter IPs are blocked.
+ * Set FORCE_DOMAIN_BROWSER=1 in .env.local to test the Browserless path via npm run dev.
  */
 export async function fetchDomainListingPage(domainUrl: string) {
   const warnings: string[] = [];
   let html = "";
-  let method: "static_fetch" | "browserless_rendered" = "static_fetch";
+  let method: "static_fetch" | "browserless_rendered" | "brightdata_unlocker" =
+    "static_fetch";
 
-  const useBrowserInProd =
-    process.env.NODE_ENV === "production" && hasBrowserlessConfig();
+  html = (await fetchDomainHtmlViaBrightData(domainUrl, warnings)) ?? "";
+  if (html) {
+    method = "brightdata_unlocker";
+  }
 
-  if (useBrowserInProd) {
-    warnings.push("Fetching Domain listing via browser (production).");
+  const useBrowserFetch = shouldUseBrowserForDomain();
+
+  if (!html && useBrowserFetch) {
+    warnings.push(
+      process.env.NODE_ENV === "production"
+        ? "Fetching Domain listing via browser (production)."
+        : "Fetching Domain listing via browser (FORCE_DOMAIN_BROWSER).",
+    );
     html = (await fetchDomainHtmlViaBrowser(domainUrl, warnings)) ?? "";
     if (html) {
       method = "browserless_rendered";
     }
-  } else {
+  } else if (!html) {
     try {
       html = await fetchStaticHtml(domainUrl, DOMAIN_STATIC_TIMEOUT_MS);
     } catch (error) {
@@ -158,10 +211,6 @@ export async function fetchDomainListingPage(domainUrl: string) {
   if (!listing.address?.trim()) {
     warnings.push("Domain listing page did not return usable listing data.");
   }
-
-  // #region agent log
-  fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'post-fix',hypothesisId:'H9',location:'domainFallback.ts:fetchDomainListingPage',message:'domain page fetched',data:{domainUrl,method,useBrowserInProd,imageCount:listing.images.length,hasAddress:Boolean(listing.address?.trim()),hasPayload:domainHtmlHasListingPayload(html)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 
   return { html, listing, warnings, method };
 }

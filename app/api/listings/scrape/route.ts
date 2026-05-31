@@ -217,28 +217,15 @@ async function updateListingFromScrape({
 }
 
 export async function POST(request: Request) {
-  // #region agent log
-  const scrapeStartedAt = Date.now();
-  // #endregion
   try {
     const body = scrapeListingSchema.parse(await request.json());
-    // #region agent log
-    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H5',location:'scrape/route.ts:start',message:'scrape route started',data:{listingUrl:body.listing_url,hasListingId:Boolean(body.listing_id)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    const extractStartedAt = Date.now();
     const { listing, method, parserName, warnings } = await extractListingFromUrl(
       body.listing_url,
     );
-    // #region agent log
-    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H1',location:'scrape/route.ts:extractDone',message:'extractListingFromUrl complete',data:{method,parserName,extractMs:Date.now()-extractStartedAt,warningCount:warnings.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     const scrapedFields = buildScrapedListingFields(body.listing_url, listing);
 
     if (!scrapedFields.property_address?.trim()) {
-      // #region agent log
-      fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'post-fix',hypothesisId:'H6',location:'scrape/route.ts:noAddress',message:'scrape rejected - no address',data:{listingUrl:body.listing_url,parserName,warnings,listingWarnings:listing.warnings},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       return NextResponse.json(
         { error: "Could not extract a property address from this listing" },
         { status: 400 },
@@ -310,16 +297,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: scrapeError.message }, { status: 400 });
     }
 
-    const expandStartedAt = Date.now();
     const listingWithDescription = await applyExpandedListingDescription({
       supabase,
       listing: createdListing as Listing,
       existingBeforeScrape: null,
       warnings,
     });
-    // #region agent log
-    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H2',location:'scrape/route.ts:expandDone',message:'description expansion complete',data:{expandMs:Date.now()-expandStartedAt,totalMsSoFar:Date.now()-scrapeStartedAt},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     const agencyAgents = await loadAgencyAgents(supabase, agency.id);
     const unknown_agents = findUnknownScrapedAgents(listing.agents, agencyAgents);
@@ -338,9 +321,6 @@ export async function POST(request: Request) {
       unknown_agents,
     });
   } catch (error) {
-    // #region agent log
-    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H5',location:'scrape/route.ts:error',message:'scrape route failed',data:{error:error instanceof Error?error.message:'unknown',totalMs:Date.now()-scrapeStartedAt},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Import failed" },
       { status: 400 },

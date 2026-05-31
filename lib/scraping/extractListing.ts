@@ -1,4 +1,5 @@
 import type { ParsedListing } from "@/lib/types";
+import { hasBrightDataReaConfig, hasBrightDataUnlockerConfig } from "@/lib/brightdata/client";
 import { parseListingFromHtml } from "@/lib/openai/parseListingFromHtml";
 import { fetchRenderedHtml } from "@/lib/scraping/fetchRenderedHtml";
 import { fetchStaticHtml } from "@/lib/scraping/fetchStaticHtml";
@@ -16,6 +17,8 @@ import {
   isBotCheckpointHtml,
   parseAddressFromListingUrl,
 } from "@/lib/scraping/parseAddressFromUrl";
+import { isReaListingUrl } from "@/lib/scraping/rea/findReaListingUrl";
+import { tryReaBrightDataImport } from "@/lib/scraping/reaEnrichment";
 
 function shouldSkipAiEnrichment(
   url: string,
@@ -27,7 +30,8 @@ function shouldSkipAiEnrichment(
     checkpoint ||
     parserName === "domain_fallback" ||
     parserName === "domain_primary" ||
-    parserName === "domain_url"
+    parserName === "domain_url" ||
+    parserName === "rea_brightdata"
   ) {
     return true;
   }
@@ -79,19 +83,27 @@ function finalizeListing(
   return finalized;
 }
 
+function buildResult(
+  listing: ParsedListing,
+  warnings: string[],
+  method: ExtractListingResult["method"],
+  parserName: string,
+): ExtractListingResult {
+  const finalized = finalizeListing(listing, warnings);
+  return {
+    listing: finalized,
+    method,
+    parserName,
+    warnings: finalized.warnings,
+  };
+}
+
 async function fetchAgencyHtml(url: string, warnings: string[]) {
   let method: "static_fetch" | "browserless_rendered" = "browserless_rendered";
   let html = "";
-  // #region agent log
-  const agencyFetchStartedAt = Date.now();
-  // #endregion
 
   try {
-    const browserlessStartedAt = Date.now();
     const rendered = await fetchRenderedHtml(url);
-    // #region agent log
-    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H1',location:'extractListing.ts:fetchAgencyHtml:browserless',message:'browserless attempt finished',data:{url,hasHtml:Boolean(rendered),browserlessMs:Date.now()-browserlessStartedAt},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (rendered) {
       html = rendered;
     }
@@ -105,11 +117,7 @@ async function fetchAgencyHtml(url: string, warnings: string[]) {
     method = "static_fetch";
 
     try {
-      const staticStartedAt = Date.now();
       html = await fetchStaticHtml(url);
-      // #region agent log
-      fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H4',location:'extractListing.ts:fetchAgencyHtml:static',message:'static fetch finished',data:{url,hasHtml:Boolean(html),staticMs:Date.now()-staticStartedAt},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       if (warnings.length) {
         warnings.push(
           "Full page import was unavailable. Used a basic fetch of this page instead.",
@@ -119,10 +127,6 @@ async function fetchAgencyHtml(url: string, warnings: string[]) {
       warnings.push(error instanceof Error ? error.message : "Static fetch failed");
     }
   }
-
-  // #region agent log
-  fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H1',location:'extractListing.ts:fetchAgencyHtml:done',message:'fetchAgencyHtml complete',data:{url,method,hasHtml:Boolean(html),totalMs:Date.now()-agencyFetchStartedAt},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 
   return { html, method };
 }
@@ -194,67 +198,92 @@ async function enrichFromAgencySite(
   };
 }
 
+async function tryReaImportWithOptionalAgencyAgents(
+  sourceUrl: string,
+  addressHint: Partial<ParsedListing> | null | undefined,
+  warnings: string[],
+) {
+  const reaImport = await tryReaBrightDataImport(sourceUrl, addressHint);
+  warnings.push(...reaImport.warnings);
+
+  if (!reaImport.used) {
+    return null;
+  }
+
+  if (!isReaListingUrl(sourceUrl) && !isDomainListingUrl(sourceUrl)) {
+    const agency = await enrichFromAgencySite(sourceUrl, reaImport.listing, warnings, {
+      agentsOnly: true,
+    });
+    return buildResult(agency.listing, warnings, "brightdata_rea", "rea_brightdata");
+  }
+
+  return buildResult(reaImport.listing, warnings, "brightdata_rea", "rea_brightdata");
+}
+
 export type ExtractListingResult = {
   listing: ParsedListing;
-  method: "static_fetch" | "browserless_rendered";
+  method: "static_fetch" | "browserless_rendered" | "brightdata_rea" | "brightdata_unlocker";
   parserName: string;
   warnings: string[];
 };
 
-export async function extractListingFromUrl(url: string): Promise<ExtractListingResult> {
-  const warnings: string[] = [];
-  // #region agent log
-  const extractStartedAt = Date.now();
-  fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H1',location:'extractListing.ts:extractListingFromUrl:start',message:'extract started',data:{url,isDomain:isDomainListingUrl(url)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
+function domainImportMessage(method: "static_fetch" | "browserless_rendered" | "brightdata_unlocker") {
+  if (method === "brightdata_unlocker") {
+    return "Imported from Domain.com.au via Bright Data.";
+  }
 
-  if (isDomainListingUrl(url)) {
-    const fetchStartedAt = Date.now();
-    const { listing: domainListing, warnings: domainWarnings, method: domainMethod } =
-      await fetchDomainListingPage(url);
-    warnings.push(...domainWarnings);
+  if (method === "browserless_rendered") {
+    return "Imported from Domain.com.au via browser fetch.";
+  }
 
-    let listing = domainListing;
-    let parserName = "domain";
+  return "Imported from Domain.com.au via static fetch.";
+}
 
-    if (!listing.address?.trim()) {
-      const urlAddress = parseAddressFromListingUrl(url);
-      if (urlAddress?.address?.trim()) {
-        listing = mergeParsedListings(emptyListing(), {
-          images: [],
-          agents: [],
-          confidence: urlAddress.confidence ?? "medium",
-          warnings: urlAddress.warnings ?? [],
-          ...urlAddress,
-        });
-        parserName = "domain_url";
-        warnings.push(
-          ...(urlAddress.warnings ?? []),
-          "Could not read Domain listing data. Used address from listing URL.",
-        );
-      } else {
-        throw new Error(
-          "Unable to fetch listing HTML. Check the URL and try again, or enter details manually.",
-        );
-      }
-    } else {
+async function extractDomainListingUrl(
+  url: string,
+  urlAddressHint: ReturnType<typeof parseAddressFromListingUrl>,
+  warnings: string[],
+): Promise<ExtractListingResult> {
+  const { listing: domainListing, warnings: domainWarnings, method: domainMethod } =
+    await fetchDomainListingPage(url);
+  warnings.push(...domainWarnings);
+
+  let listing = domainListing;
+  let parserName = "domain";
+
+  if (!listing.address?.trim()) {
+    if (urlAddressHint?.address?.trim()) {
+      listing = mergeParsedListings(emptyListing(), {
+        images: [],
+        agents: [],
+        confidence: urlAddressHint.confidence ?? "medium",
+        warnings: urlAddressHint.warnings ?? [],
+        ...urlAddressHint,
+      });
+      parserName = "domain_url";
       warnings.push(
-        domainMethod === "browserless_rendered"
-          ? "Imported from Domain.com.au via browser fetch."
-          : "Imported from Domain.com.au via static fetch.",
+        ...(urlAddressHint.warnings ?? []),
+        "Could not read Domain listing data. Used address from listing URL.",
+      );
+    } else {
+      throw new Error(
+        "Unable to fetch listing HTML. Check the URL and try again, or enter details manually.",
       );
     }
+  } else {
+    warnings.push(domainImportMessage(domainMethod));
+  }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'post-fix',hypothesisId:'H8',location:'extractListing.ts:domain:fetchDomainListingPage',message:'direct domain import complete',data:{parserName,method:domainMethod,fetchMs:Date.now()-fetchStartedAt,imageCount:listing.images.length,hasAddress:Boolean(listing.address?.trim()),confidence:listing.confidence},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
+  return buildResult(listing, warnings, domainMethod, parserName);
+}
 
-    return {
-      listing: finalizeListing(listing, warnings),
-      method: domainMethod,
-      parserName,
-      warnings: finalizeListing(listing, warnings).warnings,
-    };
+export async function extractListingFromUrl(url: string): Promise<ExtractListingResult> {
+  const warnings: string[] = [];
+  const urlAddressHint = parseAddressFromListingUrl(url);
+  const preferDomain = hasBrightDataUnlockerConfig();
+
+  if (isDomainListingUrl(url)) {
+    return extractDomainListingUrl(url, urlAddressHint, warnings);
   }
 
   let method: ExtractListingResult["method"] = "static_fetch";
@@ -266,30 +295,67 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
 
   if (urlSeed) {
     domainPrimaryAttempted = true;
-    const domainPrimary = await tryDomainListingPrimary(url, listing);
-    listing = domainPrimary.listing;
-    warnings.push(...domainPrimary.warnings);
 
-    if (domainPrimary.used) {
-      const agency = await enrichFromAgencySite(url, listing, warnings, {
-        agentsOnly: true,
-      });
-      method = agency.method;
-      listing = agency.listing;
-      if (agency.parserName) {
-        parserName = "domain_primary";
+    if (preferDomain) {
+      const domainPrimary = await tryDomainListingPrimary(url, listing);
+      listing = domainPrimary.listing;
+      warnings.push(...domainPrimary.warnings);
+
+      if (domainPrimary.used) {
+        const agency = await enrichFromAgencySite(url, listing, warnings, {
+          agentsOnly: true,
+        });
+        method = preferDomain ? "brightdata_unlocker" : agency.method;
+        listing = agency.listing;
+        if (agency.parserName) {
+          parserName = "domain_primary";
+        }
+
+        warnings.push(
+          "Used Domain.com.au for property details. Agency site was checked for listing agents.",
+        );
+
+        return buildResult(listing, warnings, method, "domain_primary");
       }
+    }
 
-      warnings.push(
-        "Used Domain.com.au for property details. Agency site was checked for listing agents.",
-      );
+    if (hasBrightDataReaConfig()) {
+      const reaResult = await tryReaImportWithOptionalAgencyAgents(url, urlSeed, warnings);
+      if (reaResult) {
+        return reaResult;
+      }
+    }
 
-      return {
-        listing: finalizeListing(listing, warnings),
-        method,
-        parserName: "domain_primary",
-        warnings: finalizeListing(listing, warnings).warnings,
-      };
+    if (!preferDomain) {
+      const domainPrimary = await tryDomainListingPrimary(url, listing);
+      listing = domainPrimary.listing;
+      warnings.push(...domainPrimary.warnings);
+
+      if (domainPrimary.used) {
+        const agency = await enrichFromAgencySite(url, listing, warnings, {
+          agentsOnly: true,
+        });
+        method = agency.method;
+        listing = agency.listing;
+        if (agency.parserName) {
+          parserName = "domain_primary";
+        }
+
+        warnings.push(
+          "Used Domain.com.au for property details. Agency site was checked for listing agents.",
+        );
+
+        return buildResult(listing, warnings, method, "domain_primary");
+      }
+    }
+  } else if (hasBrightDataReaConfig()) {
+    const reaResult = await tryReaImportWithOptionalAgencyAgents(
+      url,
+      urlAddressHint,
+      warnings,
+    );
+    if (reaResult) {
+      return reaResult;
     }
   }
 
@@ -316,12 +382,7 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
       "Could not fetch the agency listing page. Used the address from the URL and searched Domain.com.au.",
     );
 
-    return {
-      listing: finalizeListing(listing, warnings),
-      method,
-      parserName,
-      warnings: finalizeListing(listing, warnings).warnings,
-    };
+    return buildResult(listing, warnings, method, parserName);
   }
 
   const checkpoint = isBotCheckpointHtml(html);
@@ -333,16 +394,15 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
     listing = { ...listing, title: undefined };
   }
 
-  const urlAddress = parseAddressFromListingUrl(url);
-  if (!listing.address?.trim() && urlAddress?.address) {
+  if (!listing.address?.trim() && urlAddressHint?.address) {
     listing = mergeParsedListings(listing, {
       images: [],
       agents: [],
-      confidence: urlAddress.confidence ?? "medium",
-      warnings: urlAddress.warnings ?? [],
-      ...urlAddress,
+      confidence: urlAddressHint.confidence ?? "medium",
+      warnings: urlAddressHint.warnings ?? [],
+      ...urlAddressHint,
     });
-    warnings.push(...(urlAddress.warnings ?? []));
+    warnings.push(...(urlAddressHint.warnings ?? []));
   }
 
   if (!domainPrimaryAttempted) {
@@ -358,12 +418,12 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
         "Used Domain.com.au for property details. Agency site was checked for listing agents.",
       );
 
-      return {
-        listing: finalizeListing(listing, warnings),
-        method,
+      return buildResult(
+        listing,
+        warnings,
+        preferDomain ? "brightdata_unlocker" : method,
         parserName,
-        warnings: finalizeListing(listing, warnings).warnings,
-      };
+      );
     }
   }
 
@@ -373,6 +433,19 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
 
   if (domainFallback.used) {
     parserName = "domain_fallback";
+    return buildResult(
+      listing,
+      warnings,
+      preferDomain ? "brightdata_unlocker" : method,
+      parserName,
+    );
+  }
+
+  if (hasBrightDataReaConfig()) {
+    const reaResult = await tryReaImportWithOptionalAgencyAgents(url, listing, warnings);
+    if (reaResult) {
+      return reaResult;
+    }
   }
 
   const skipAi = shouldSkipAiEnrichment(url, listing, parserName, checkpoint);
@@ -404,10 +477,5 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
     warnings.push(`Skipped AI enrichment because the ${reason}.`);
   }
 
-  return {
-    listing: finalizeListing(listing, warnings),
-    method,
-    parserName,
-    warnings: finalizeListing(listing, warnings).warnings,
-  };
+  return buildResult(listing, warnings, method, parserName);
 }

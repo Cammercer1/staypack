@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { fetchBrightDataHtml } from "@/lib/brightdata/client";
 import { fetchStaticHtml } from "@/lib/scraping/fetchStaticHtml";
 import {
   type AddressMatchInput,
@@ -152,7 +153,10 @@ export async function findDomainListingUrl(
   for (const searchUrl of searchUrls) {
     let html = "";
     try {
-      html = await fetchStaticHtml(searchUrl);
+      html = (await fetchBrightDataHtml(searchUrl)) ?? "";
+      if (!html) {
+        html = await fetchStaticHtml(searchUrl);
+      }
     } catch {
       continue;
     }
