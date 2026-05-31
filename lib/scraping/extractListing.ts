@@ -77,12 +77,41 @@ function finalizeListing(
   return finalized;
 }
 
-async function fetchAgencyHtml(url: string, warnings: string[]) {
-  let method: "static_fetch" | "browserless_rendered" = "browserless_rendered";
-  let html = "";
+/** Domain.com.au embeds listing data in __NEXT_DATA__; static fetch is enough and avoids Browserless timeouts. */
+async function fetchDomainListingHtml(url: string, warnings: string[]) {
+  // #region agent log
+  const domainFetchStartedAt = Date.now();
+  // #endregion
 
   try {
+    const html = await fetchStaticHtml(url);
+    // #region agent log
+    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'post-fix',hypothesisId:'H1',location:'extractListing.ts:fetchDomainListingHtml',message:'domain static fetch complete',data:{url,hasHtml:Boolean(html),staticMs:Date.now()-domainFetchStartedAt},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return { html, method: "static_fetch" as const };
+  } catch (error) {
+    warnings.push(error instanceof Error ? error.message : "Static fetch failed");
+    return { html: "", method: "static_fetch" as const };
+  }
+}
+
+async function fetchAgencyHtml(url: string, warnings: string[]) {
+  if (isDomainListingUrl(url)) {
+    return fetchDomainListingHtml(url, warnings);
+  }
+
+  let method: "static_fetch" | "browserless_rendered" = "browserless_rendered";
+  let html = "";
+  // #region agent log
+  const agencyFetchStartedAt = Date.now();
+  // #endregion
+
+  try {
+    const browserlessStartedAt = Date.now();
     const rendered = await fetchRenderedHtml(url);
+    // #region agent log
+    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H1',location:'extractListing.ts:fetchAgencyHtml:browserless',message:'browserless attempt finished',data:{url,hasHtml:Boolean(rendered),browserlessMs:Date.now()-browserlessStartedAt},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (rendered) {
       html = rendered;
     }
@@ -96,7 +125,11 @@ async function fetchAgencyHtml(url: string, warnings: string[]) {
     method = "static_fetch";
 
     try {
+      const staticStartedAt = Date.now();
       html = await fetchStaticHtml(url);
+      // #region agent log
+      fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H4',location:'extractListing.ts:fetchAgencyHtml:static',message:'static fetch finished',data:{url,hasHtml:Boolean(html),staticMs:Date.now()-staticStartedAt},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       if (warnings.length) {
         warnings.push(
           "Full page import was unavailable. Used a basic fetch of this page instead.",
@@ -106,6 +139,10 @@ async function fetchAgencyHtml(url: string, warnings: string[]) {
       warnings.push(error instanceof Error ? error.message : "Static fetch failed");
     }
   }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H1',location:'extractListing.ts:fetchAgencyHtml:done',message:'fetchAgencyHtml complete',data:{url,method,hasHtml:Boolean(html),totalMs:Date.now()-agencyFetchStartedAt},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   return { html, method };
 }
@@ -186,9 +223,17 @@ export type ExtractListingResult = {
 
 export async function extractListingFromUrl(url: string): Promise<ExtractListingResult> {
   const warnings: string[] = [];
+  // #region agent log
+  const extractStartedAt = Date.now();
+  fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H1',location:'extractListing.ts:extractListingFromUrl:start',message:'extract started',data:{url,isDomain:isDomainListingUrl(url)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   if (isDomainListingUrl(url)) {
+    const fetchStartedAt = Date.now();
     const { html, method } = await fetchAgencyHtml(url, warnings);
+    // #region agent log
+    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H1',location:'extractListing.ts:domain:fetchAgencyHtml',message:'domain fetch complete',data:{method,htmlLength:html?.length??0,fetchMs:Date.now()-fetchStartedAt},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (!html) {
       throw new Error(
         "Unable to fetch listing HTML. Check the URL and try again, or enter details manually.",
@@ -205,6 +250,9 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
     }
 
     const skipAi = shouldSkipAiEnrichment(url, listing, parserName, checkpoint);
+    // #region agent log
+    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H3',location:'extractListing.ts:domain:parse',message:'domain parse complete',data:{parserName,skipAi,confidence:listing.confidence,checkpoint,imageCount:listing.images.length,hasDescription:Boolean(listing.description?.trim())},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     if (!skipAi) {
       try {
@@ -227,6 +275,10 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
     } else if (skipAi) {
       warnings.push("Skipped AI enrichment because the Domain listing data was complete.");
     }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'pre-fix',hypothesisId:'H1',location:'extractListing.ts:domain:done',message:'domain extract complete',data:{totalMs:Date.now()-extractStartedAt},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     return {
       listing: finalizeListing(listing, warnings),
