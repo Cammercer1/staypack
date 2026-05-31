@@ -134,6 +134,71 @@ export async function fetchSmartScrapeHtml(
   return payload.content;
 }
 
+const DOMAIN_BROWSERLESS_TIMEOUT_MS = 22_000;
+
+/** Full rendered HTML from headless Chrome — includes __NEXT_DATA__ script tags. */
+export async function fetchBrowserlessContentHtml(
+  url: string,
+  options?: { timeoutMs?: number },
+): Promise<string | null> {
+  const timeoutMs = options?.timeoutMs ?? DOMAIN_BROWSERLESS_TIMEOUT_MS;
+
+  const html = await browserlessRequest(
+    "/content",
+    {
+      url,
+      gotoOptions: {
+        waitUntil: "networkidle2",
+      },
+      waitForSelector: {
+        selector: "#__NEXT_DATA__",
+        timeout: timeoutMs,
+      },
+    },
+    {
+      responseType: "text",
+      query: { timeout: timeoutMs },
+    },
+  );
+
+  return typeof html === "string" && html.trim() ? html : null;
+}
+
+type UnblockResponse = {
+  content?: string | null;
+};
+
+/** Stealth browser fetch for bot-protected pages when /content is blocked. */
+export async function fetchBrowserlessUnblockHtml(
+  url: string,
+  options?: { timeoutMs?: number },
+): Promise<string | null> {
+  const timeoutMs = options?.timeoutMs ?? DOMAIN_BROWSERLESS_TIMEOUT_MS;
+
+  const payload = (await browserlessRequest(
+    "/unblock",
+    {
+      url,
+      content: true,
+      ttl: timeoutMs,
+      waitForSelector: {
+        selector: "#__NEXT_DATA__",
+        timeout: timeoutMs,
+      },
+    },
+    {
+      responseType: "json",
+      query: { timeout: timeoutMs },
+    },
+  )) as UnblockResponse | null;
+
+  if (!payload?.content?.trim()) {
+    return null;
+  }
+
+  return payload.content;
+}
+
 function formatBrowserlessError(
   status: number,
   detail: string,

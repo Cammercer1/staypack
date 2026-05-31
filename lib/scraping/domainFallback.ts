@@ -1,11 +1,22 @@
 import type { ParsedListing } from "@/lib/types";
 import { mergeListingAgents } from "@/lib/agents/agentContact";
+import {
+  fetchBrowserlessContentHtml,
+  fetchBrowserlessUnblockHtml,
+  hasBrowserlessConfig,
+} from "@/lib/browserless/client";
 import { listingHostname } from "@/lib/scraping/parsers/registry";
 import { findDomainListingUrl } from "@/lib/scraping/domain/findDomainListingUrl";
 import { fetchStaticHtml } from "@/lib/scraping/fetchStaticHtml";
 import { mergeParsedListings } from "@/lib/scraping/index";
-import { parseDomainListing } from "@/lib/scraping/parsers/domain";
+import {
+  domainHtmlHasListingPayload,
+  parseDomainListing,
+} from "@/lib/scraping/parsers/domain";
 import { emptyListing } from "@/lib/scraping/parsers/utils";
+
+const DOMAIN_STATIC_TIMEOUT_MS = 8_000;
+const DOMAIN_BROWSERLESS_TIMEOUT_MS = 22_000;
 
 export function isDomainListingUrl(sourceUrl: string) {
   const hostname = listingHostname(sourceUrl);
@@ -54,28 +65,105 @@ export function shouldTryDomainPrimary(sourceUrl: string, listing: ParsedListing
   return hasSearchableDomainAddress(listing);
 }
 
-/** Same static fetch + __NEXT_DATA__ parse used by McGrath→Domain enrichment. */
-export async function fetchDomainListingPage(domainUrl: string) {
-  const warnings: string[] = [];
-  let html = "";
+function parseDomainHtml(domainUrl: string, html: string) {
+  const listing = parseDomainListing(html, domainUrl);
+  const hasPayload = domainHtmlHasListingPayload(html);
+  return { listing, hasPayload };
+}
+
+async function fetchDomainHtmlViaBrowser(domainUrl: string, warnings: string[]) {
+  if (!hasBrowserlessConfig()) {
+    return null;
+  }
 
   try {
-    html = await fetchStaticHtml(domainUrl);
+    const html = await fetchBrowserlessContentHtml(domainUrl, {
+      timeoutMs: DOMAIN_BROWSERLESS_TIMEOUT_MS,
+    });
+    if (html && domainHtmlHasListingPayload(html)) {
+      return html;
+    }
   } catch (error) {
     warnings.push(
       error instanceof Error
-        ? `Could not fetch Domain listing: ${error.message}`
-        : "Could not fetch Domain listing",
+        ? `Browser fetch failed: ${error.message}`
+        : "Browser fetch failed",
     );
-    return { html: "", listing: emptyListing(), warnings };
   }
 
-  const listing = parseDomainListing(html, domainUrl);
+  try {
+    warnings.push("Trying stealth browser fetch for Domain.");
+    const html = await fetchBrowserlessUnblockHtml(domainUrl, {
+      timeoutMs: DOMAIN_BROWSERLESS_TIMEOUT_MS,
+    });
+    if (html && domainHtmlHasListingPayload(html)) {
+      return html;
+    }
+  } catch (error) {
+    warnings.push(
+      error instanceof Error
+        ? `Stealth browser fetch failed: ${error.message}`
+        : "Stealth browser fetch failed",
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Domain listing import. Local dev uses static fetch (residential IP).
+ * Production uses Browserless (real Chrome) because Netlify datacenter IPs are blocked.
+ */
+export async function fetchDomainListingPage(domainUrl: string) {
+  const warnings: string[] = [];
+  let html = "";
+  let method: "static_fetch" | "browserless_rendered" = "static_fetch";
+
+  const useBrowserInProd =
+    process.env.NODE_ENV === "production" && hasBrowserlessConfig();
+
+  if (useBrowserInProd) {
+    warnings.push("Fetching Domain listing via browser (production).");
+    html = (await fetchDomainHtmlViaBrowser(domainUrl, warnings)) ?? "";
+    if (html) {
+      method = "browserless_rendered";
+    }
+  } else {
+    try {
+      html = await fetchStaticHtml(domainUrl, DOMAIN_STATIC_TIMEOUT_MS);
+    } catch (error) {
+      warnings.push(
+        error instanceof Error
+          ? `Could not fetch Domain listing: ${error.message}`
+          : "Could not fetch Domain listing",
+      );
+    }
+
+    const staticParsed = html ? parseDomainHtml(domainUrl, html) : null;
+    if (!staticParsed?.hasPayload && hasBrowserlessConfig()) {
+      warnings.push("Static fetch did not include Domain listing data. Trying browser.");
+      const rendered = await fetchDomainHtmlViaBrowser(domainUrl, warnings);
+      if (rendered) {
+        html = rendered;
+        method = "browserless_rendered";
+      }
+    }
+  }
+
+  if (!html) {
+    return { html: "", listing: emptyListing(), warnings, method };
+  }
+
+  const { listing } = parseDomainHtml(domainUrl, html);
   if (!listing.address?.trim()) {
     warnings.push("Domain listing page did not return usable listing data.");
   }
 
-  return { html, listing, warnings };
+  // #region agent log
+  fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'post-fix',hypothesisId:'H9',location:'domainFallback.ts:fetchDomainListingPage',message:'domain page fetched',data:{domainUrl,method,useBrowserInProd,imageCount:listing.images.length,hasAddress:Boolean(listing.address?.trim()),hasPayload:domainHtmlHasListingPayload(html)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
+  return { html, listing, warnings, method };
 }
 
 async function fetchAndParseDomainListing(

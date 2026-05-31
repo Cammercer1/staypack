@@ -210,7 +210,7 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
 
   if (isDomainListingUrl(url)) {
     const fetchStartedAt = Date.now();
-    const { listing: domainListing, warnings: domainWarnings } =
+    const { listing: domainListing, warnings: domainWarnings, method: domainMethod } =
       await fetchDomainListingPage(url);
     warnings.push(...domainWarnings);
 
@@ -238,16 +238,20 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
         );
       }
     } else {
-      warnings.push("Imported from Domain.com.au via static fetch.");
+      warnings.push(
+        domainMethod === "browserless_rendered"
+          ? "Imported from Domain.com.au via browser fetch."
+          : "Imported from Domain.com.au via static fetch.",
+      );
     }
 
     // #region agent log
-    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'post-fix',hypothesisId:'H8',location:'extractListing.ts:domain:fetchDomainListingPage',message:'direct domain import complete',data:{parserName,fetchMs:Date.now()-fetchStartedAt,imageCount:listing.images.length,hasAddress:Boolean(listing.address?.trim()),confidence:listing.confidence},timestamp:Date.now()})}).catch(()=>{});
+    fetch('http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'55ff1d'},body:JSON.stringify({sessionId:'55ff1d',runId:'post-fix',hypothesisId:'H8',location:'extractListing.ts:domain:fetchDomainListingPage',message:'direct domain import complete',data:{parserName,method:domainMethod,fetchMs:Date.now()-fetchStartedAt,imageCount:listing.images.length,hasAddress:Boolean(listing.address?.trim()),confidence:listing.confidence},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
 
     return {
       listing: finalizeListing(listing, warnings),
-      method: "static_fetch",
+      method: domainMethod,
       parserName,
       warnings: finalizeListing(listing, warnings).warnings,
     };
