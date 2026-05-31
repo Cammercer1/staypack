@@ -5,6 +5,7 @@ import { findDomainListingUrl } from "@/lib/scraping/domain/findDomainListingUrl
 import { fetchStaticHtml } from "@/lib/scraping/fetchStaticHtml";
 import { mergeParsedListings } from "@/lib/scraping/index";
 import { parseDomainListing } from "@/lib/scraping/parsers/domain";
+import { emptyListing } from "@/lib/scraping/parsers/utils";
 
 export function isDomainListingUrl(sourceUrl: string) {
   const hostname = listingHostname(sourceUrl);
@@ -53,6 +54,30 @@ export function shouldTryDomainPrimary(sourceUrl: string, listing: ParsedListing
   return hasSearchableDomainAddress(listing);
 }
 
+/** Same static fetch + __NEXT_DATA__ parse used by McGrath→Domain enrichment. */
+export async function fetchDomainListingPage(domainUrl: string) {
+  const warnings: string[] = [];
+  let html = "";
+
+  try {
+    html = await fetchStaticHtml(domainUrl);
+  } catch (error) {
+    warnings.push(
+      error instanceof Error
+        ? `Could not fetch Domain listing: ${error.message}`
+        : "Could not fetch Domain listing",
+    );
+    return { html: "", listing: emptyListing(), warnings };
+  }
+
+  const listing = parseDomainListing(html, domainUrl);
+  if (!listing.address?.trim()) {
+    warnings.push("Domain listing page did not return usable listing data.");
+  }
+
+  return { html, listing, warnings };
+}
+
 async function fetchAndParseDomainListing(
   sourceUrl: string,
   listing: ParsedListing,
@@ -78,31 +103,22 @@ async function fetchAndParseDomainListing(
     return { listing, used: false, warnings };
   }
 
-  let html = "";
-  try {
-    html = await fetchStaticHtml(domainUrl);
-  } catch (error) {
-    warnings.push(
-      error instanceof Error
-        ? `Found Domain listing but could not fetch it: ${error.message}`
-        : "Found Domain listing but could not fetch it",
-    );
+  const fetched = await fetchDomainListingPage(domainUrl);
+  warnings.push(...fetched.warnings);
+
+  if (!fetched.listing.address?.trim()) {
     return { listing, used: false, domainUrl, warnings };
   }
 
-  const domainParsed = parseDomainListing(html, domainUrl);
-  if (!domainParsed.address?.trim()) {
-    warnings.push("Domain listing page did not return usable listing data.");
-    return { listing, used: false, domainUrl, warnings };
-  }
-
-  const merged = mergeParsedListings(listing, domainParsed);
+  const merged = mergeParsedListings(listing, fetched.listing);
   warnings.push(`${successMessage}: ${domainUrl}`);
 
   return {
     listing: {
       ...merged,
-      warnings: [...new Set([...merged.warnings, ...warnings, ...domainParsed.warnings])],
+      warnings: [
+        ...new Set([...merged.warnings, ...warnings, ...fetched.listing.warnings]),
+      ],
     },
     used: true,
     domainUrl,
