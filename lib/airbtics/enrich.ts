@@ -44,6 +44,43 @@ function buildSeasonality(
     }));
 }
 
+/** Drop comps Airbtics scored as weak revenue performers before picking featured cards. */
+const MIN_COMP_REVENUE_SCORE = 0.07;
+
+function getCompRevenueScore(comp: Record<string, unknown>) {
+  const meta = comp.similarity_score_meta;
+  if (!meta || typeof meta !== "object") {
+    return null;
+  }
+
+  return numberOrNull((meta as Record<string, unknown>).revenue_score);
+}
+
+function sortCompsBySimilarity(comps: Record<string, unknown>[]) {
+  return [...comps].sort((left, right) => {
+    const leftScore = Number(left.similarity_score ?? 0);
+    const rightScore = Number(right.similarity_score ?? 0);
+    return rightScore - leftScore;
+  });
+}
+
+function selectFeaturedComps(comps: Record<string, unknown>[], limit = 3) {
+  const bySimilarity = sortCompsBySimilarity(comps);
+  const revenueQualified = bySimilarity.filter((comp) => {
+    const revenueScore = getCompRevenueScore(comp);
+    if (revenueScore == null) {
+      return true;
+    }
+
+    return revenueScore >= MIN_COMP_REVENUE_SCORE;
+  });
+
+  const pool =
+    revenueQualified.length >= limit ? revenueQualified : bySimilarity;
+
+  return pool.slice(0, limit);
+}
+
 function normalizeComp(raw: Record<string, unknown>): StrCompCard {
   return {
     listing_id: String(raw.listingID ?? raw.listing_id ?? ""),
@@ -92,12 +129,6 @@ export function buildStrEnrichment(
       }
     : null;
 
-  const sortedComps = [...comps].sort((left, right) => {
-    const leftScore = Number(left.similarity_score ?? 0);
-    const rightScore = Number(right.similarity_score ?? 0);
-    return rightScore - leftScore;
-  });
-
   return {
     tier: "full",
     comp_count: comps.length,
@@ -110,6 +141,6 @@ export function buildStrEnrichment(
       p50?.monthly_occupancy_rate as Record<string, unknown> | undefined,
       p50?.monthly_adr as Record<string, unknown> | undefined,
     ),
-    comps: sortedComps.slice(0, 3).map(normalizeComp),
+    comps: selectFeaturedComps(comps).map(normalizeComp),
   };
 }
