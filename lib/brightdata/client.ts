@@ -2,6 +2,8 @@ import { isDevelopment } from "@/lib/env";
 
 const DEFAULT_API_HOST = "api.brightdata.com";
 const DEFAULT_SCRAPE_TIMEOUT_MS = 25_000;
+const DEFAULT_REA_SCRAPE_TIMEOUT_MS = 60_000;
+const REA_ABORT_RETRY_ATTEMPTS = 1;
 
 export function getBrightDataApiKey() {
   return process.env.BRIGHTDATA_API_KEY?.trim() ?? "";
@@ -30,6 +32,16 @@ function getScrapeTimeoutMs() {
   return Number.isFinite(configured) && configured > 0
     ? configured
     : DEFAULT_SCRAPE_TIMEOUT_MS;
+}
+
+function getReaScrapeTimeoutMs() {
+  const configured = Number(process.env.BRIGHTDATA_REA_SCRAPE_TIMEOUT_MS);
+  if (Number.isFinite(configured) && configured > 0) {
+    return configured;
+  }
+
+  const shared = getScrapeTimeoutMs();
+  return Math.max(shared, DEFAULT_REA_SCRAPE_TIMEOUT_MS);
 }
 
 async function brightDataRequest(
@@ -93,12 +105,30 @@ function parseBrightDataPayload<T>(raw: string): T[] {
 
 export async function scrapeBrightDataReaListing(url: string) {
   const datasetId = getBrightDataReaDatasetId();
-  const raw = await brightDataRequest(
-    `/datasets/v3/scrape?dataset_id=${encodeURIComponent(datasetId)}&notify=false&include_errors=true`,
-    {
-      input: [{ url }],
-    },
-  );
+  const timeoutMs = getReaScrapeTimeoutMs();
+  let raw: string | null = null;
+  let attempt = 0;
+
+  while (attempt <= REA_ABORT_RETRY_ATTEMPTS) {
+    attempt += 1;
+    try {
+      raw = await brightDataRequest(
+        `/datasets/v3/scrape?dataset_id=${encodeURIComponent(datasetId)}&notify=false&include_errors=true`,
+        {
+          input: [{ url }],
+        },
+        { timeoutMs },
+      );
+      break;
+    } catch (error) {
+      const isAbort =
+        error instanceof Error &&
+        /aborted|abort/i.test(error.message);
+      if (!isAbort || attempt > REA_ABORT_RETRY_ATTEMPTS) {
+        throw error;
+      }
+    }
+  }
 
   if (!raw) {
     return null;

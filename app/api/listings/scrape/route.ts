@@ -16,7 +16,7 @@ import { detectListingPurpose } from "@/lib/listings/detectListingPurpose";
 import { listingImageMetaForScrapeUpdate } from "@/lib/listings/syncListingImageMeta";
 import type { Listing, ParsedListing } from "@/lib/types";
 
-export const maxDuration = 26;
+export const maxDuration = 60;
 
 function buildScrapedListingFields(
   listingUrl: string,
@@ -307,15 +307,17 @@ export async function POST(request: Request) {
     const agencyAgents = await loadAgencyAgents(supabase, agency.id);
     const unknown_agents = findUnknownScrapedAgents(listing.agents, agencyAgents);
 
+    const landingListing = await ensureListingLandingProvisioned(
+      listingWithDescription,
+      agency,
+      supabase,
+    );
+
     return NextResponse.json({
       scrape_job_id: scrapeJob.id,
       method,
       parser_name: parserName,
-      listing: await ensureListingLandingProvisioned(
-        listingWithDescription,
-        agency,
-        supabase,
-      ),
+      listing: landingListing,
       scraped_listing: listing,
       warnings,
       unknown_agents,
