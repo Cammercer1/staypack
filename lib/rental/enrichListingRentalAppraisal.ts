@@ -12,6 +12,7 @@ import { applyRentBandSuburbFloor } from "@/lib/rental/applyRentBandSuburbFloor"
 import {
   computeRentBandFromComps,
   formatWeeklyRentRange,
+  type RentBandTier,
 } from "@/lib/rental/computeRentBand";
 import { detectPremiumRentSubject } from "@/lib/rental/detectPremiumRentSubject";
 import { enrichLtrSuburbMarket } from "@/lib/propradar/enrichLtrSuburbMarket";
@@ -174,7 +175,7 @@ export async function enrichListingRentalAppraisal(
     }
 
     const tierSetting = options?.rentAppraisalConfig?.tier ?? "auto";
-    const tierOverride =
+    const tierOverride: RentBandTier | undefined =
       tierSetting === "premium"
         ? "premium"
         : tierSetting === "standard"

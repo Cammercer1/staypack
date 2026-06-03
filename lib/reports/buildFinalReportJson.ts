@@ -138,6 +138,8 @@ export function buildFinalReportJson({
       buyer_checks: copy.buyer_checks,
       methodology_note: copy.methodology_note,
       disclaimer: copy.disclaimer || agency.default_disclaimer || DEFAULT_DISCLAIMER,
+      comparable_evidence: "",
+      comparable_disclaimer: "",
       cta: agency.default_cta,
     },
     assets: {

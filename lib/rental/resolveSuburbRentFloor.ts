@@ -64,7 +64,7 @@ export function propradarHouseRentFloor(
     return null;
   }
 
-  if (market.property_segment !== "house") {
+  if (market?.property_segment !== "house") {
     return null;
   }
 

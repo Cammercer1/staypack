@@ -82,6 +82,8 @@ export function salesBrochureToReportShape(
       buyer_checks: [],
       methodology_note: "",
       disclaimer: copy.disclaimer,
+      comparable_evidence: "",
+      comparable_disclaimer: "",
       cta: copy.inspection_cta,
     },
     assets: {
