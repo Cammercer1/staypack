@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  requireAgency,
-  requireListingAccess,
-} from "@/lib/auth/requireUser";
+import { requireAgency, requireListingAccess } from "@/lib/auth/requireUser";
 import { enrichListingRentalAppraisal } from "@/lib/rental/enrichListingRentalAppraisal";
 import { resolveRentalDisplayPrice } from "@/lib/rental/formatRentalDisplayPrice";
 import { extractListingFromUrl } from "@/lib/scraping/extractListing";
@@ -16,7 +13,6 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const { supabase, agency } = await requireAgency();
   const json = await request.json().catch(() => null);
   const parsed = bodySchema.safeParse(json);
 
@@ -38,6 +34,7 @@ export async function POST(request: Request) {
 
   try {
     if (url) {
+      await requireAgency();
       const extracted = await extractListingFromUrl(url, {
         enrichRentalAppraisal: true,
       });
@@ -51,7 +48,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const listing = await requireListingAccess(supabase, agency.id, listingId!);
+    const { supabase, listing } = await requireListingAccess(listingId!);
     const scraped = listing.scraped_listing_json;
 
     if (!scraped) {
