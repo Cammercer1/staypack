@@ -1,0 +1,29 @@
+{
+  "slug": "havenly",
+  "name": "havenly property",
+  "timezone": "Australia/Brisbane",
+  "enabled": true,
+  "scrape_enabled": true,
+  "scrape_schedule": {
+    "type": "cron",
+    "cron": "0 7 * * *"
+  },
+  "partner_sources": [
+    {
+      "label": "SPFN residential search",
+      "url": "https://surfersparadisefn.com.au/real-estate-search/residential-real-estate?ltype=1&page=1&sort=date-desc",
+      "adapter": "spfn_first_national_v1",
+      "config": {
+        "fetchMethod": "static_fetch",
+        "maxPages": 2
+      }
+    }
+  ],
+  "email_recipients": ["reports@example.com"],
+  "str_template_pack_id": "haven_properties",
+  "deliverables": ["str"],
+  "billing_mode": "dry_run",
+  "brand": {
+    "displayName": "havenly property"
+  }
+}

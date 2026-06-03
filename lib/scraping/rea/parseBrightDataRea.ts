@@ -1,4 +1,5 @@
 import type { BrightDataReaRecord } from "@/lib/brightdata/types";
+import { normalizeReaImageUrls } from "@/lib/scraping/rea/normalizeReaImageUrl";
 import type { ParsedListing } from "@/lib/types";
 
 function parseCount(value: string | number | undefined) {
@@ -71,8 +72,10 @@ export function parseBrightDataReaRecord(
   record: BrightDataReaRecord,
 ): ParsedListing {
   const address = buildAddress(record);
-  const images = (record.images_urls ?? []).filter(
-    (url) => typeof url === "string" && url.startsWith("http"),
+  const images = normalizeReaImageUrls(
+    (record.images_urls ?? []).filter(
+      (url) => typeof url === "string" && url.startsWith("http"),
+    ),
   );
   const agents = (record.agents ?? [])
     .filter((agent) => agent.name?.trim())

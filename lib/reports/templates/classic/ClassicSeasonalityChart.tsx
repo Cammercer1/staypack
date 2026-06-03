@@ -6,9 +6,18 @@ type Props = {
   compact?: boolean;
 };
 
-const HEADLINE = "var(--report-headline-colour, #002e36)";
+const DEFAULT_CHART_COLOUR = "var(--report-headline-colour, #009eca)";
 
-export function ClassicSeasonalityChart({ seasonality, compact = false }: Props) {
+type ChartProps = Props & {
+  chartColour?: string;
+};
+
+export function ClassicSeasonalityChart({
+  seasonality,
+  compact = false,
+  chartColour = DEFAULT_CHART_COLOUR,
+}: ChartProps) {
+  const headline = chartColour;
   const rows = seasonality.slice(-12).filter((row) => row.occupancy != null);
 
   if (rows.length === 0) {
@@ -69,7 +78,7 @@ export function ClassicSeasonalityChart({ seasonality, compact = false }: Props)
                   className="w-full"
                   style={{
                     height: `${height}%`,
-                    backgroundColor: `color-mix(in srgb, ${HEADLINE} ${row.month === peak.month ? "100%" : "50%"}, white)`,
+                    backgroundColor: `color-mix(in srgb, ${headline} ${row.month === peak.month ? "100%" : row.month === low.month ? "35%" : "58%"}, white)`,
                   }}
                   title={`${formatMonthLabel(row.month)}: ${formatPercent(row.occupancy)}`}
                 />

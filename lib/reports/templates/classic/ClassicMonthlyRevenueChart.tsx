@@ -4,13 +4,15 @@ import { formatCurrency, formatMonthLabel } from "@/lib/reports/formatters";
 type Props = {
   report: FinalReportJson;
   compact?: boolean;
+  /** Chart line/band colour — defaults to agency headline colour. */
+  chartColour?: string;
 };
 
 const CHART_WIDTH = 520;
 const CHART_HEIGHT = 108;
 const PAD_X = 28;
 const PAD_Y = 14;
-const HEADLINE = "var(--report-headline-colour, #002e36)";
+const DEFAULT_CHART_COLOUR = "var(--report-headline-colour, #009eca)";
 
 function formatAxisCurrency(value: number) {
   if (value >= 1000) {
@@ -67,7 +69,12 @@ function buildBandPath(
   return `${forward} ${backward} Z`;
 }
 
-export function ClassicMonthlyRevenueChart({ report, compact = false }: Props) {
+export function ClassicMonthlyRevenueChart({
+  report,
+  compact = false,
+  chartColour = DEFAULT_CHART_COLOUR,
+}: Props) {
+  const headline = chartColour;
   const enrichment = report.str_enrichment;
   const rows = enrichment?.seasonality?.slice(-12) ?? [];
 
@@ -168,13 +175,13 @@ export function ClassicMonthlyRevenueChart({ report, compact = false }: Props) {
 
           <path
             d={bandPath}
-            fill={`color-mix(in srgb, ${HEADLINE} 16%, white)`}
+            fill={`color-mix(in srgb, ${headline} 22%, white)`}
             stroke="none"
           />
           <path
             d={midPath}
             fill="none"
-            stroke={HEADLINE}
+            stroke={headline}
             strokeWidth="2.25"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -189,7 +196,7 @@ export function ClassicMonthlyRevenueChart({ report, compact = false }: Props) {
                 cx={point.x}
                 cy={point.y}
                 r="2.75"
-                fill={HEADLINE}
+                fill={headline}
               />
             );
           })}
@@ -209,14 +216,14 @@ export function ClassicMonthlyRevenueChart({ report, compact = false }: Props) {
         <span className="inline-flex items-center gap-1">
           <span
             className="inline-block h-1.5 w-2.5"
-            style={{ backgroundColor: `color-mix(in srgb, ${HEADLINE} 16%, white)` }}
+            style={{ backgroundColor: `color-mix(in srgb, ${headline} 22%, white)` }}
             aria-hidden
           />
           Range
         </span>
         <span className="mx-2 text-neutral-300">·</span>
         <span className="inline-flex items-center gap-1">
-          <span className="inline-block h-px w-2.5" style={{ backgroundColor: HEADLINE }} aria-hidden />
+          <span className="inline-block h-px w-2.5" style={{ backgroundColor: headline }} aria-hidden />
           Median
         </span>
       </p>

@@ -1,3 +1,4 @@
+import { normalizeReaImageUrl } from "@/lib/scraping/rea/normalizeReaImageUrl";
 import type { FinalReportJson } from "@/lib/types";
 
 type Props = {
@@ -5,10 +6,12 @@ type Props = {
 };
 
 export function resolveHeroGalleryImages(property: FinalReportJson["property"]) {
-  const hero = property.hero_image_url || null;
-  const supporting = property.selected_image_urls.filter(
-    (url) => url && url !== hero,
-  );
+  const hero = property.hero_image_url
+    ? normalizeReaImageUrl(property.hero_image_url)
+    : null;
+  const supporting = property.selected_image_urls
+    .filter((url) => url && url !== property.hero_image_url)
+    .map(normalizeReaImageUrl);
   const unique = [...new Set([...(hero ? [hero] : []), ...supporting])];
 
   return {

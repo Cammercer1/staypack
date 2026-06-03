@@ -14,9 +14,16 @@ import type { FinalReportJson } from "@/lib/types";
 const headingFont = "var(--report-heading-font, inherit)";
 const bodyFont = "var(--report-body-font, inherit)";
 
-function BoldStatStrip({ report }: { report: FinalReportJson }) {
+function BoldStatStrip({
+  report,
+  backgroundColor,
+}: {
+  report: FinalReportJson;
+  backgroundColor?: string;
+}) {
   const { property } = report;
-  const accent = report.agency.primary_colour || "#1a1a2e";
+  const accent =
+    backgroundColor ?? report.agency.primary_colour ?? "#1a1a2e";
 
   const stats: { value: string; label: string }[] = [];
   if (property.bedrooms) stats.push({ value: formatNumber(property.bedrooms), label: "Bed" });
@@ -59,11 +66,41 @@ function BoldStatStrip({ report }: { report: FinalReportJson }) {
   );
 }
 
-export function BoldReportPageOne({ report }: { report: FinalReportJson }) {
+export type BoldReportPageOneOptions = {
+  /** Override logo URL (e.g. white-label templates with hardcoded assets). */
+  logoUrl?: string;
+  /** Footer logo img class — default inverts for generic agency marks. */
+  footerLogoClassName?: string;
+  /** Stat strip + footer band background. */
+  accentColor?: string;
+  /** Stronger hero gradient so white headline text reads on bright photos. */
+  heroOverlayEnhanced?: boolean;
+  agentPhotoClassName?: string;
+  /** Revenue box uses accent fill with white type (Haven). */
+  revenueOnAccent?: boolean;
+  /** Hero subtitle under address; pass null to hide. */
+  heroSubheadline?: string | null;
+};
+
+export function BoldReportPageOne({
+  report,
+  options,
+}: {
+  report: FinalReportJson;
+  options?: BoldReportPageOneOptions;
+}) {
   const brand = getReportBrandColours(report.agency);
   const { hero } = resolveHeroGalleryImages(report.property);
-  const logoUrl = getAgencyLogoUrl(report.agency, "dark");
-  const accent = report.agency.primary_colour || "#1a1a2e";
+  const logoUrl = options?.logoUrl ?? getAgencyLogoUrl(report.agency, "dark");
+  const footerLogoClassName =
+    options?.footerLogoClassName ??
+    "h-7 max-w-[130px] object-contain brightness-0 invert";
+  const accent = options?.accentColor ?? report.agency.primary_colour ?? "#1a1a2e";
+  const heroOverlayEnhanced = options?.heroOverlayEnhanced ?? false;
+  const heroSubheadline =
+    options?.heroSubheadline !== undefined
+      ? options.heroSubheadline
+      : report.copy.heading;
   const agents = resolveReportAgents(report).slice(0, 2);
   const features = [
     ...(report.copy.appeal_points ?? []),
@@ -89,12 +126,24 @@ export function BoldReportPageOne({ report }: { report: FinalReportJson }) {
         ) : (
           <div className="h-full bg-neutral-300" />
         )}
+        {heroOverlayEnhanced ? (
+          <div
+            className="pointer-events-none absolute inset-0 bg-black/20"
+            aria-hidden
+          />
+        ) : null}
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/55 to-transparent"
+          className={`pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b to-transparent ${
+            heroOverlayEnhanced ? "from-black/65" : "from-black/55"
+          }`}
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/80 via-black/40 to-transparent"
+          className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t to-transparent ${
+            heroOverlayEnhanced
+              ? "h-56 from-black/90 via-black/55"
+              : "h-48 from-black/80 via-black/40"
+          }`}
           aria-hidden
         />
         {logoUrl ? (
@@ -122,18 +171,18 @@ export function BoldReportPageOne({ report }: { report: FinalReportJson }) {
           >
             {report.property.address}
           </h1>
-          {report.copy.heading && report.copy.heading !== report.property.address ? (
+          {heroSubheadline && heroSubheadline !== report.property.address ? (
             <p
               className="mt-2 text-[0.9rem] font-medium leading-snug text-white/90"
               style={{ fontFamily: headingFont }}
             >
-              {report.copy.heading}
+              {heroSubheadline}
             </p>
           ) : null}
         </div>
       </div>
 
-      <BoldStatStrip report={report} />
+      <BoldStatStrip report={report} backgroundColor={accent} />
 
       {/* Body — two columns */}
       <div className="grid min-h-0 flex-1 grid-cols-[1.45fr_1fr] gap-8 overflow-hidden px-8 py-6">
@@ -168,13 +217,14 @@ export function BoldReportPageOne({ report }: { report: FinalReportJson }) {
 
         {/* Right — revenue + agents + QR */}
         <div className="flex min-h-0 flex-col justify-between gap-5 overflow-hidden">
-          <StrRevenueBlock report={report} />
+          <StrRevenueBlock report={report} onAccent={options?.revenueOnAccent} />
           <div className="space-y-4">
             {agents.map((agent) => (
               <ReportAgentBlock
                 key={agent.name || agent.email || agent.phone}
                 agent={agent}
                 accent={accent}
+                photoClassName={options?.agentPhotoClassName}
               />
             ))}
           </div>
@@ -205,7 +255,7 @@ export function BoldReportPageOne({ report }: { report: FinalReportJson }) {
           <img
             src={logoUrl}
             alt={report.agency.name}
-            className="h-7 max-w-[130px] object-contain brightness-0 invert"
+            className={footerLogoClassName}
           />
         ) : (
           <p

@@ -21,6 +21,7 @@ function mergeListings(base: ParsedListing, next: ParsedListing): ParsedListing 
     images: base.images.length ? base.images : next.images,
     agents: mergeListingAgents(base.agents, next.agents),
     rentalAppraisal: base.rentalAppraisal ?? next.rentalAppraisal,
+    rentalComps: base.rentalComps?.length ? base.rentalComps : next.rentalComps,
     outgoings: base.outgoings ?? next.outgoings,
     confidence:
       base.confidence === "high" || next.confidence === "high"

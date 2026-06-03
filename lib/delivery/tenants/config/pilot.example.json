@@ -1,0 +1,45 @@
+{
+  "slug": "pilot-client",
+  "name": "Pilot Client",
+  "timezone": "Australia/Sydney",
+  "enabled": true,
+  "scrape_enabled": true,
+  "scrape_schedule": {
+    "type": "interval",
+    "intervalHours": 24
+  },
+  "partner_sources": [
+    {
+      "label": "Partner listings",
+      "url": "https://example.com/properties"
+    }
+  ],
+  "email_recipients": ["reports@example.com"],
+  "email_from": "StayPacks <reports@staypack.app>",
+  "email_subject_template": "STR report: {{address}}",
+  "str_template_pack_id": "minimalist",
+  "deliverables": ["str"],
+  "billing_mode": "dry_run",
+  "billing": {
+    "billingPlan": "pilot",
+    "includedDeliveriesPerMonth": 50,
+    "overagePricePerDeliveryCents": 2500,
+    "billingEmail": "billing@example.com"
+  },
+  "reprocess_on_material_change": false,
+  "brand": {
+    "displayName": "Pilot Client",
+    "logo_dark_url": "https://your-cdn.com/pilot-logo.png",
+    "primary_colour": "#111111",
+    "accent_colour": "#c9a227",
+    "background_colour": "#f9f5ea",
+    "heading_font_family": "fraunces",
+    "body_font_family": "inter",
+    "report_template_id": "minimalist-detailed",
+    "agent": {
+      "name": "Alex Agent",
+      "email": "alex@example.com",
+      "role_title": "Property Consultant"
+    }
+  }
+}

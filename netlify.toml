@@ -6,3 +6,8 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Managed delivery: hit /api/delivery/cron every 15 minutes (set DELIVERY_CRON_SECRET in Netlify env).
+[functions."delivery-cron"]
+  schedule = "*/15 * * * *"
+  path = "/api/delivery/cron"

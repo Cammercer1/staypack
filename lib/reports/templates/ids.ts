@@ -26,6 +26,13 @@ export const DEFAULT_REPORT_TEMPLATE_ID = MINIMALIST_LIGHT_TEMPLATE_ID;
 export const LANDMARK_LIGHT_TEMPLATE_ID = "landmark-light";
 export const LANDMARK_DETAILED_TEMPLATE_ID = "landmark-detailed";
 
+/** Managed delivery — bespoke Haven Properties STR layout */
+export const HAVEN_PROPERTIES_STR_TEMPLATE_ID = "haven-properties-str";
+
+/** Managed delivery — investor lease appraisal (LTR comps, Landmark-inspired) */
+export const HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID =
+  "haven-properties-lease-appraisal";
+
 export const REPORT_TEMPLATE_IDS = [
   CLASSIC_LIGHT_TEMPLATE_ID,
   CLASSIC_DETAILED_TEMPLATE_ID,
@@ -43,6 +50,8 @@ export const REPORT_TEMPLATE_IDS = [
   MINIMALIST_DETAILED_TEMPLATE_ID,
   LANDMARK_LIGHT_TEMPLATE_ID,
   LANDMARK_DETAILED_TEMPLATE_ID,
+  HAVEN_PROPERTIES_STR_TEMPLATE_ID,
+  HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID,
 ] as const;
 
 export type ReportTemplateId = (typeof REPORT_TEMPLATE_IDS)[number];

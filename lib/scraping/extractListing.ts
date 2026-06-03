@@ -17,8 +17,13 @@ import {
   isBotCheckpointHtml,
   parseAddressFromListingUrl,
 } from "@/lib/scraping/parseAddressFromUrl";
+import {
+  isSpfnListingUrl,
+  parseSpfnDetailHtml,
+} from "@/lib/scraping/spfn/parseSpfnListing";
 import { isReaListingUrl } from "@/lib/scraping/rea/findReaListingUrl";
 import { tryReaBrightDataImport } from "@/lib/scraping/reaEnrichment";
+import { enrichListingRentalAppraisal } from "@/lib/rental/enrichListingRentalAppraisal";
 
 function shouldSkipAiEnrichment(
   url: string,
@@ -131,8 +136,12 @@ async function fetchAgencyHtml(url: string, warnings: string[]) {
   return { html, method };
 }
 
-function listingFromUrlAddress(url: string, warnings: string[]) {
-  const urlAddress = parseAddressFromListingUrl(url);
+function listingFromUrlAddress(
+  url: string,
+  warnings: string[],
+  addressHint?: Partial<ParsedListing> | null,
+) {
+  const urlAddress = addressHint ?? parseAddressFromListingUrl(url);
   if (!urlAddress?.address?.trim()) {
     return null;
   }
@@ -227,6 +236,27 @@ export type ExtractListingResult = {
   warnings: string[];
 };
 
+export type ExtractListingOptions = {
+  /** REA rent discover + median band (slow; 2–3 min). */
+  enrichRentalAppraisal?: boolean;
+};
+
+async function applyExtractOptions(
+  result: ExtractListingResult,
+  options?: ExtractListingOptions,
+): Promise<ExtractListingResult> {
+  if (!options?.enrichRentalAppraisal) {
+    return result;
+  }
+
+  const listing = await enrichListingRentalAppraisal(result.listing);
+  return {
+    ...result,
+    listing,
+    warnings: listing.warnings,
+  };
+}
+
 function domainImportMessage(method: "static_fetch" | "browserless_rendered" | "brightdata_unlocker") {
   if (method === "brightdata_unlocker") {
     return "Imported from Domain.com.au via Bright Data.";
@@ -277,20 +307,52 @@ async function extractDomainListingUrl(
   return buildResult(listing, warnings, domainMethod, parserName);
 }
 
-export async function extractListingFromUrl(url: string): Promise<ExtractListingResult> {
+async function spfnAddressSeed(url: string, warnings: string[]) {
+  const slugHint = parseAddressFromListingUrl(url);
+  if (slugHint?.postcode?.trim()) {
+    return slugHint;
+  }
+
+  try {
+    const html = await fetchStaticHtml(url, 15000);
+    const fromPage = parseSpfnDetailHtml(html);
+    if (fromPage?.address?.trim()) {
+      warnings.push(...(fromPage.warnings ?? []));
+      return fromPage;
+    }
+  } catch (error) {
+    warnings.push(
+      error instanceof Error
+        ? `SPFN detail fetch failed: ${error.message}`
+        : "SPFN detail fetch failed",
+    );
+  }
+
+  return slugHint;
+}
+
+export async function extractListingFromUrl(
+  url: string,
+  options?: ExtractListingOptions,
+): Promise<ExtractListingResult> {
   const warnings: string[] = [];
-  const urlAddressHint = parseAddressFromListingUrl(url);
+  const urlAddressHint = isSpfnListingUrl(url)
+    ? await spfnAddressSeed(url, warnings)
+    : parseAddressFromListingUrl(url);
   const preferDomain = hasBrightDataUnlockerConfig();
 
   if (isDomainListingUrl(url)) {
-    return extractDomainListingUrl(url, urlAddressHint, warnings);
+    return applyExtractOptions(
+      await extractDomainListingUrl(url, urlAddressHint, warnings),
+      options,
+    );
   }
 
   let method: ExtractListingResult["method"] = "static_fetch";
   let parserName = resolveSiteParser(url)?.name ?? "generic";
   let domainPrimaryAttempted = false;
 
-  const urlSeed = listingFromUrlAddress(url, warnings);
+  const urlSeed = listingFromUrlAddress(url, warnings, urlAddressHint);
   let listing = urlSeed ?? emptyListing();
 
   if (urlSeed) {
@@ -315,14 +377,17 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
           "Used Domain.com.au for property details. Agency site was checked for listing agents.",
         );
 
-        return buildResult(listing, warnings, method, "domain_primary");
+        return applyExtractOptions(
+          buildResult(listing, warnings, method, "domain_primary"),
+          options,
+        );
       }
     }
 
     if (hasBrightDataReaConfig()) {
       const reaResult = await tryReaImportWithOptionalAgencyAgents(url, urlSeed, warnings);
       if (reaResult) {
-        return reaResult;
+        return applyExtractOptions(reaResult, options);
       }
     }
 
@@ -345,7 +410,10 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
           "Used Domain.com.au for property details. Agency site was checked for listing agents.",
         );
 
-        return buildResult(listing, warnings, method, "domain_primary");
+        return applyExtractOptions(
+          buildResult(listing, warnings, method, "domain_primary"),
+          options,
+        );
       }
     }
   } else if (hasBrightDataReaConfig()) {
@@ -355,7 +423,7 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
       warnings,
     );
     if (reaResult) {
-      return reaResult;
+      return applyExtractOptions(reaResult, options);
     }
   }
 
@@ -382,7 +450,7 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
       "Could not fetch the agency listing page. Used the address from the URL and searched Domain.com.au.",
     );
 
-    return buildResult(listing, warnings, method, parserName);
+    return applyExtractOptions(buildResult(listing, warnings, method, parserName), options);
   }
 
   const checkpoint = isBotCheckpointHtml(html);
@@ -418,11 +486,14 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
         "Used Domain.com.au for property details. Agency site was checked for listing agents.",
       );
 
-      return buildResult(
-        listing,
-        warnings,
-        preferDomain ? "brightdata_unlocker" : method,
-        parserName,
+      return applyExtractOptions(
+        buildResult(
+          listing,
+          warnings,
+          preferDomain ? "brightdata_unlocker" : method,
+          parserName,
+        ),
+        options,
       );
     }
   }
@@ -433,18 +504,21 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
 
   if (domainFallback.used) {
     parserName = "domain_fallback";
-    return buildResult(
-      listing,
-      warnings,
-      preferDomain ? "brightdata_unlocker" : method,
-      parserName,
+    return applyExtractOptions(
+      buildResult(
+        listing,
+        warnings,
+        preferDomain ? "brightdata_unlocker" : method,
+        parserName,
+      ),
+      options,
     );
   }
 
   if (hasBrightDataReaConfig()) {
     const reaResult = await tryReaImportWithOptionalAgencyAgents(url, listing, warnings);
     if (reaResult) {
-      return reaResult;
+      return applyExtractOptions(reaResult, options);
     }
   }
 
@@ -477,5 +551,5 @@ export async function extractListingFromUrl(url: string): Promise<ExtractListing
     warnings.push(`Skipped AI enrichment because the ${reason}.`);
   }
 
-  return buildResult(listing, warnings, method, parserName);
+  return applyExtractOptions(buildResult(listing, warnings, method, parserName), options);
 }

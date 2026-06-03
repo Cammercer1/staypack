@@ -1,0 +1,155 @@
+{
+  "version": "lease_appraisal_v1",
+  "template_id": "haven-properties-lease-appraisal",
+  "generated_at": "2026-06-01T12:00:00.000Z",
+  "agency": {
+    "name": "havenly property",
+    "logo_url": "https://images.zenu.com.au/w336ynmmwwefedna2gdto9mn4u6twg84.png",
+    "logo_light_url": "https://images.zenu.com.au/w336ynmmwwefedna2gdto9mn4u6twg84.png",
+    "logo_dark_url": "https://images.zenu.com.au/9ih5p3dcbphy7rxoy2l8qii12px8ayox.png",
+    "primary_colour": "#009eca",
+    "secondary_colour": "#ffffff",
+    "accent_colour": "#009eca",
+    "text_colour": "#111111",
+    "background_colour": "#ffffff",
+    "heading_font_family": "manrope",
+    "body_font_family": "manrope",
+    "font_family": "manrope",
+    "heading_font_file_url": "",
+    "body_font_file_url": "",
+    "font_file_url": "",
+    "website_url": "",
+    "phone": "",
+    "email": ""
+  },
+  "agent": {
+    "name": "Shannyn Laird",
+    "role_title": "CEO",
+    "phone": "0403172544",
+    "email": "",
+    "photo_url": "/delivery/haven-properties/shannyn-laird.png"
+  },
+  "agents": [
+    {
+      "name": "Shannyn Laird",
+      "role_title": "CEO",
+      "phone": "0403172544",
+      "email": "",
+      "photo_url": "/delivery/haven-properties/shannyn-laird.png"
+    }
+  ],
+  "property": {
+    "address": "39/24 Hamilton Avenue, Surfers Paradise",
+    "suburb": "Surfers Paradise",
+    "state": "QLD",
+    "postcode": "4217",
+    "summary": "39/24 Hamilton Avenue, Surfers Paradise",
+    "property_type": "Apartment",
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "car_spaces": 1,
+    "accommodates": 6,
+    "listing_url": "",
+    "hero_image_url": "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1200&q=80",
+    "selected_image_urls": [
+      "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1200&q=80",
+      "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1200&q=80",
+      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&q=80"
+    ],
+    "display_price": "$1,200 – $1,250 per week"
+  },
+  "str": {
+    "annual_revenue": null,
+    "monthly_revenue": null,
+    "weekly_revenue": null,
+    "nightly_rate": null,
+    "occupancy_rate": null,
+    "booked_nights": null,
+    "radius_m": null
+  },
+  "str_yield": null,
+  "ltr": {
+    "weekly_min": 1200,
+    "weekly_max": 1250,
+    "weekly_midpoint": 1200,
+    "annual_midpoint": 62400,
+    "difference_before_costs": null
+  },
+  "copy": {
+    "heading": "What can you lease this for?",
+    "blurb": "Indicative long-term rental range for 39/24 Hamilton Avenue, Surfers Paradise, based on 10 comparable listings currently advertised in the area. Figures are a guide for investors — not a formal valuation or rental guarantee.",
+    "key_metrics_line": "Estimated market rent: $1,200 – $1,250 per week",
+    "appeal_points": [
+      "Apartment configuration in Surfers Paradise.",
+      "Compared with 10 similar properties currently for lease nearby."
+    ],
+    "supporting_factors": [
+      "Median and interquartile range derived from active REA rental listings.",
+      "Filters aligned to bedroom, bathroom and parking count where possible."
+    ],
+    "buyer_checks": [
+      "Confirm body corporate, furnishing and inclusions affect achievable rent.",
+      "Review tenancy legislation, vacancy and property condition."
+    ],
+    "methodology_note": "Rent range is derived from comparable long-term rental listings (realestate.com.au) discovered via matching property criteria. Outliers trimmed; median and 25th–75th percentile shown.",
+    "disclaimer": "This appraisal is indicative only and does not constitute financial, legal or valuation advice. Investors should make their own enquiries.",
+    "cta": "Contact us to discuss leasing strategy for this asset."
+  },
+  "assets": {
+    "qr_code_url": "",
+    "pdf_url": ""
+  },
+  "str_enrichment": null,
+  "ltr_enrichment": {
+    "comp_count": 10,
+    "weekly_range": {
+      "p25": 1100,
+      "p50": 1200,
+      "p75": 1250
+    },
+    "source": "rea_discover",
+    "search_url": "https://www.realestate.com.au/rent/property-unit+apartment-with-3-bedrooms-in-surfers+paradise,+qld+4217/list-1?numParkingSpaces=1&numBaths=2&maxBeds=3&activeSort=list-date",
+    "comps": [
+      {
+        "listing_id": "rea-444016608",
+        "name": "1401/21 Peninsular Drive, Surfers Paradise",
+        "thumbnail_url": "https://i2.au.reastatic.net/1000x750-format=webp/011cb5d8d7be0e216d8ea21784278117f74a4ae9c581f75b0b454ea11fb1cbfc/image.jpg",
+        "listing_url": "https://www.realestate.com.au/property-apartment-qld-surfers+paradise-444016608",
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "weekly_rent": 1200,
+        "suburb": "Surfers Paradise"
+      },
+      {
+        "listing_id": "rea-444154084",
+        "name": "105/2 Admiralty Drive, Surfers Paradise",
+        "thumbnail_url": "https://i2.au.reastatic.net/1000x750-format=webp/e2aced845d2275bf3e494afaf1668332898111be4e87c14cd8be5538d8bd7450/image.jpg",
+        "listing_url": "https://www.realestate.com.au/property-apartment-qld-surfers+paradise-444154084",
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "weekly_rent": 1200,
+        "suburb": "Surfers Paradise"
+      },
+      {
+        "listing_id": "rea-443958164",
+        "name": "3/114 The Esplanade, Surfers Paradise",
+        "thumbnail_url": "https://i2.au.reastatic.net/1000x750-format=webp/453be2075ce3bbc442c02309eb23e3d83303c4c2bc0b546c63e530be92e02c28/image.jpg",
+        "listing_url": "https://www.realestate.com.au/property-apartment-qld-surfers+paradise-443958164",
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "weekly_rent": 1250,
+        "suburb": "Surfers Paradise"
+      },
+      {
+        "listing_id": "rea-443682608",
+        "name": "2940 Gold Coast Highway, Surfers Paradise",
+        "thumbnail_url": "https://i2.au.reastatic.net/1000x750-format=webp/196be9fea3c683dccad5e8bded9b9ec2785c9f524959dd10e365c5750e8fcec4/image.jpg",
+        "listing_url": "https://www.realestate.com.au/property-apartment-qld-surfers+paradise-443682608",
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "weekly_rent": 1100,
+        "suburb": "Surfers Paradise"
+      }
+    ]
+  }
+}

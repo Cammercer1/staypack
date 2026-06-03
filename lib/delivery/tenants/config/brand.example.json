@@ -1,0 +1,25 @@
+{
+  "displayName": "Acme Property Partners",
+  "website_url": "https://acme.example.com",
+  "email": "hello@acme.example.com",
+  "phone": "+61 2 9000 0000",
+  "logo_dark_url": "https://your-cdn.com/acme-logo-dark.png",
+  "logo_light_url": "https://your-cdn.com/acme-logo-light.png",
+  "primary_colour": "#1a365d",
+  "secondary_colour": "#ffffff",
+  "accent_colour": "#c9a227",
+  "text_colour": "#1a202c",
+  "background_colour": "#f7fafc",
+  "heading_font_family": "fraunces",
+  "body_font_family": "inter",
+  "default_report_title": "Short-Term Rental Potential Report",
+  "default_cta": "Contact Acme for the full buyer pack and property details.",
+  "default_disclaimer": "This report is indicative only and not financial advice.",
+  "report_template_id": "minimalist-detailed",
+  "agent": {
+    "name": "Jordan Smith",
+    "email": "jordan@acme.example.com",
+    "phone": "+61 400 000 000",
+    "role_title": "Senior Sales Agent"
+  }
+}

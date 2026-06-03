@@ -1,7 +1,9 @@
+import { HAVEN_AGENT_PHOTO_CLASS } from "@/lib/reports/templates/haven-properties/brand";
 import type { FinalReportJson } from "@/lib/types";
 
 type Props = {
   report: FinalReportJson;
+  compact?: boolean;
 };
 
 type FooterAgent = FinalReportJson["agent"];
@@ -44,10 +46,16 @@ function AgentContactLine({
 function AgentBlock({
   agent,
   compact = false,
+  photoClassName,
 }: {
   agent: FooterAgent;
   compact?: boolean;
+  photoClassName?: string;
 }) {
+  const defaultPhotoClass = compact
+    ? "h-20 w-[4.5rem] shrink-0 object-cover object-top"
+    : "h-24 w-20 shrink-0 object-cover object-top";
+
   return (
     <div className="flex min-w-0 items-center gap-3">
       {agent.photo_url ? (
@@ -55,11 +63,7 @@ function AgentBlock({
         <img
           src={agent.photo_url}
           alt=""
-          className={
-            compact
-              ? "h-20 w-[4.5rem] shrink-0 object-cover object-top"
-              : "h-24 w-20 shrink-0 object-cover object-top"
-          }
+          className={photoClassName ?? defaultPhotoClass}
         />
       ) : null}
 
@@ -85,18 +89,30 @@ function AgentBlock({
   );
 }
 
-export function ClassicAgentFooter({ report }: Props) {
+export function ClassicAgentFooter({ report, compact = false }: Props) {
   const agents = resolveFooterAgents(report);
   const hasQr = Boolean(report.assets.qr_code_url);
+  const havenPhotoClass =
+    report.template_id === "haven-properties-str" ||
+    report.template_id === "haven-properties-lease-appraisal"
+      ? HAVEN_AGENT_PHOTO_CLASS
+      : undefined;
 
   if (agents.length === 0 && !hasQr) {
     return null;
   }
 
   const multiAgent = agents.length > 1;
+  const isHavenManagedTemplate =
+    report.template_id === "haven-properties-str" ||
+    report.template_id === "haven-properties-lease-appraisal";
 
   return (
-    <footer className="shrink-0 border-t border-neutral-200 px-10 py-4">
+    <footer
+      className={`shrink-0 border-t border-neutral-200 ${
+        compact ? "py-3.5" : "py-4"
+      } ${isHavenManagedTemplate ? "" : "px-10"}`}
+    >
       <div className="flex items-center justify-between gap-6">
         {agents.length > 0 ? (
           <div
@@ -111,6 +127,7 @@ export function ClassicAgentFooter({ report }: Props) {
                 key={agent.name || agent.email || agent.phone}
                 agent={agent}
                 compact={multiAgent}
+                photoClassName={havenPhotoClass}
               />
             ))}
           </div>

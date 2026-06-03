@@ -36,6 +36,13 @@ export const HEADING_FONT_PRESETS: FontPreset[] = [
     googleFont: "Montserrat",
   },
   {
+    id: "manrope",
+    label: "Manrope · geometric sans",
+    description: "Rounded geometric sans for headings and body.",
+    family: "Manrope, system-ui, sans-serif",
+    googleFont: "Manrope",
+  },
+  {
     id: "oswald",
     label: "Oswald · bold sans",
     description: "Bold, confident headings for high-impact reports.",
@@ -58,6 +65,13 @@ export const BODY_FONT_PRESETS: FontPreset[] = [
     description: "Best default for easy reading.",
     family: "Inter, system-ui, sans-serif",
     googleFont: "Inter",
+  },
+  {
+    id: "manrope",
+    label: "Manrope · geometric sans",
+    description: "Rounded geometric sans for headings and body.",
+    family: "Manrope, system-ui, sans-serif",
+    googleFont: "Manrope",
   },
   {
     id: "dm-sans",

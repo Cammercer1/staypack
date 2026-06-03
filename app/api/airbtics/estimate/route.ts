@@ -50,6 +50,44 @@ export async function POST(request: Request) {
     );
     const { estimate, tier, reportId, costCents, enrichment } = result;
 
+    // #region agent log
+    fetch("http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "a0cff1",
+      },
+      body: JSON.stringify({
+        sessionId: "a0cff1",
+        runId: "pre-fix",
+        hypothesisId: "C",
+        location: "app/api/airbtics/estimate/route.ts:POST",
+        message: "Estimate saved enrichment snapshot",
+        data: {
+          report_id: body.report_id,
+          tier,
+          airbtics_report_id: reportId,
+          enrichment_comp_count: enrichment?.comp_count ?? null,
+          enrichment_comps_len: enrichment?.comps?.length ?? null,
+          enrichment_seasonality_len: enrichment?.seasonality?.length ?? null,
+          raw_comps_status:
+            estimate.raw &&
+            typeof estimate.raw === "object" &&
+            "comps_status" in estimate.raw
+              ? String((estimate.raw as Record<string, unknown>).comps_status)
+              : null,
+          raw_comps_len:
+            estimate.raw &&
+            typeof estimate.raw === "object" &&
+            Array.isArray((estimate.raw as Record<string, unknown>).comps)
+              ? ((estimate.raw as Record<string, unknown>).comps as unknown[]).length
+              : null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
     const { error: listingError } = await supabase
       .from("listings")
       .update({

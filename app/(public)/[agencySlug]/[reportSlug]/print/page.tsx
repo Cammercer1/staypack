@@ -5,6 +5,8 @@ import {
 } from "@/lib/agencies/resolveAgencyBySlug";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
+import { refreshStrEnrichmentInFinalReport } from "@/lib/airbtics/enrich";
+import { applyTemplateBrandToFinalReport } from "@/lib/reports/applyTemplateBrand";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
 import { ReportPreview } from "@/components/reports/ReportPreview";
@@ -34,7 +36,7 @@ export default async function PublicReportPrintPage({
 
   const { data: report } = await admin
     .from("reports")
-    .select("final_report_json, status, listing_id")
+    .select("final_report_json, raw_airbtics_json, status, listing_id")
     .eq("agency_id", agency.id)
     .eq("public_slug", reportSlug)
     .eq("status", "published")
@@ -60,16 +62,23 @@ export default async function PublicReportPrintPage({
       ? agencyAgents?.find((agent) => agent.id === listing.agent_profile_id) ?? null
       : null;
 
-  const finalReport = enrichFinalReportMetrics(
-    (listing ?? { display_price: null, scraped_listing_json: null }) as Pick<
-      Listing,
-      "display_price" | "scraped_listing_json"
-    >,
-    mergeAgencyBrandIntoFinalReport(
-      agency as Agency,
-      report.final_report_json as FinalReportJson,
+  const mergedReport = mergeAgencyBrandIntoFinalReport(
+    agency as Agency,
+    report.final_report_json as FinalReportJson,
+  );
+
+  const finalReport = applyTemplateBrandToFinalReport(
+    refreshStrEnrichmentInFinalReport(
+      enrichFinalReportMetrics(
+        (listing ?? { display_price: null, scraped_listing_json: null }) as Pick<
+          Listing,
+          "display_price" | "scraped_listing_json"
+        >,
+        mergedReport,
+        { agentProfile, agencyAgents: agencyAgents ?? [] },
+      ),
+      report.raw_airbtics_json,
     ),
-    { agentProfile, agencyAgents: agencyAgents ?? [] },
   );
 
   return (

@@ -1,0 +1,225 @@
+{
+  "version": "lease_appraisal_v1",
+  "template_id": "haven-properties-lease-appraisal",
+  "generated_at": "2026-06-01T08:22:19.354Z",
+  "agency": {
+    "name": "havenly property",
+    "logo_url": "https://images.zenu.com.au/w336ynmmwwefedna2gdto9mn4u6twg84.png",
+    "logo_light_url": "https://images.zenu.com.au/w336ynmmwwefedna2gdto9mn4u6twg84.png",
+    "logo_dark_url": "https://images.zenu.com.au/9ih5p3dcbphy7rxoy2l8qii12px8ayox.png",
+    "primary_colour": "#009eca",
+    "secondary_colour": "#ffffff",
+    "accent_colour": "#009eca",
+    "text_colour": "#111111",
+    "callout_heading_colour": "#ffffff",
+    "callout_text_colour": "#ffffff",
+    "background_colour": "#ffffff",
+    "heading_font_family": "manrope",
+    "body_font_family": "manrope",
+    "font_family": "manrope",
+    "heading_font_file_url": "",
+    "body_font_file_url": "",
+    "font_file_url": "",
+    "website_url": "",
+    "phone": "",
+    "email": "",
+    "brand_advanced": null
+  },
+  "agent": {
+    "name": "Shannyn Laird",
+    "role_title": "CEO",
+    "phone": "0403172544",
+    "email": "",
+    "photo_url": "/delivery/haven-properties/shannyn-laird.png"
+  },
+  "agents": [
+    {
+      "name": "Shannyn Laird",
+      "role_title": "CEO",
+      "phone": "0403172544",
+      "email": "",
+      "photo_url": "/delivery/haven-properties/shannyn-laird.png"
+    }
+  ],
+  "property": {
+    "address": "1401/67 Ferny Avenue, Surfers Paradise",
+    "suburb": "Surfers Paradise",
+    "state": "QLD",
+    "postcode": "4217",
+    "summary": "Apartment · 2 bed · 1401/67 Ferny Avenue, Surfers Paradise",
+    "property_type": "Apartment",
+    "bedrooms": 2,
+    "bathrooms": 2,
+    "car_spaces": 1,
+    "accommodates": 4,
+    "listing_url": "https://www.realestate.com.au/property-apartment-qld-surfers+paradise-151279484",
+    "hero_image_url": "https://i2.au.reastatic.net/1000x750-format=webp/422520a544404447b3705e0c4c61557f6cb3a7c7da5aec3419311d8ad31e329a/image.jpg",
+    "selected_image_urls": [
+      "https://i2.au.reastatic.net/1000x750-format=webp/422520a544404447b3705e0c4c61557f6cb3a7c7da5aec3419311d8ad31e329a/image.jpg",
+      "https://i2.au.reastatic.net/1000x750-format=webp/4413b1f668c7c800cbf2fb80a308169820f5155ac2d4610aeb2578a2c7d4a0ae/image.jpg",
+      "https://i2.au.reastatic.net/1000x750-format=webp/21eac4425b17a6127d8b48c4e115f6ab0b1e91716b2107db52eb87c2fd1823fa/image.jpg",
+      "https://i2.au.reastatic.net/1000x750-format=webp/17aa766ef91774800520e0d347d4ad606c11e79944208371dfd22ce32eda8182/image.jpg",
+      "https://i2.au.reastatic.net/1000x750-format=webp/8248bd3b6e57c0080d0fdda59ab689fd01f6f4baeb3a376d95f8a4ad2bf2989e/image.jpg"
+    ],
+    "display_price": "$890 – $950 per week"
+  },
+  "str": {
+    "annual_revenue": null,
+    "monthly_revenue": null,
+    "weekly_revenue": null,
+    "nightly_rate": null,
+    "occupancy_rate": null,
+    "booked_nights": null,
+    "radius_m": null
+  },
+  "str_yield": null,
+  "ltr": {
+    "weekly_min": 890,
+    "weekly_max": 950,
+    "weekly_midpoint": 900,
+    "annual_midpoint": 46800,
+    "difference_before_costs": null
+  },
+  "copy": {
+    "heading": "Spacious 14th-floor apartment with stunning north-facing ocean views",
+    "blurb": "This oversized two-bedroom, two-bathroom apartment sits high on the 14th level of the prized Centrepoint complex in Surfers Paradise. It offers an open-plan living area with a large kitchen featuring a walk-in pantry, complemented by a north-facing balcony that overlooks the ocean, Nerang River, and city skyline. Resort facilities include multiple pools, sauna, spa, tennis court, and more, enriching the lifestyle appeal.\n\nRent for this apartment aligns with the upper range of Surfers Paradise unit rentals, reflecting its size, premium views, and resort amenities. Comparable properties nearby demonstrate a consistent rental range, indicative of steady demand.\n\nThe suburb's rental market maintains a relatively low vacancy rate and a gross yield around 4.75%, supporting sustainable tenancy prospects in this sought-after coastal location.",
+    "key_metrics_line": "",
+    "appeal_points": [
+      "Located just 150m from Cypress Avenue Light Rail Station, enhancing connectivity",
+      "Includes secure underground parking and on-site reception for convenience and security",
+      "Surfers Paradise units show a vacancy rate of 2.94%, indicating strong renter demand"
+    ],
+    "supporting_factors": [],
+    "buyer_checks": [
+      "Check current Body Corporate fees and included services to assess ongoing costs",
+      "Review parking arrangements and any restrictions related to shared facilities"
+    ],
+    "methodology_note": "This appraisal reflects analysis of 21 REA listings combined with PropRadar's proprietary suburb rental data.",
+    "disclaimer": "Comparable listings are based on publicly available rental advertisements at the time of preparation. Advertised rents may differ from final leased prices. This appraisal is intended as a rental guide only and does not constitute a formal valuation or rental guarantee.",
+    "comparable_evidence": "Twenty-one comparable rentals within Surfers Paradise were reviewed, exhibiting weekly rents between $890 and $950. These properties typically feature similar two-bedroom, two-bathroom configurations with amenities such as parking, proximity to public transport, and easy access to local shopping and beaches.\n\nThe appraisal range for this unit is reasonable considering its elevated 14th-floor position and expansive northerly views, premium kitchen with walk-in pantry, and substantial resort facilities. At $890 to $950 per week, the price aligns well with comparable offerings in the area that feature similar layouts and lifestyle benefits.",
+    "comparable_disclaimer": "Comparable listings are based on publicly available rental advertisements at the time of preparation. Advertised rents may differ from final leased prices. This appraisal is intended as a rental guide only and does not constitute a formal valuation or rental guarantee.",
+    "cta": "Contact us to discuss leasing strategy for this asset."
+  },
+  "assets": {
+    "qr_code_url": "",
+    "pdf_url": ""
+  },
+  "str_enrichment": null,
+  "ltr_enrichment": {
+    "comp_count": 21,
+    "weekly_range": {
+      "p25": 890,
+      "p50": 900,
+      "p75": 950
+    },
+    "comps": [
+      {
+        "listing_id": "apartment-qld-surfers-paradise-444299040",
+        "name": "802/7 Mallana Street, Surfers Paradise",
+        "thumbnail_url": "https://i2.au.reastatic.net/1000x750-format=webp/3e47afc718728b32be2fec1ecabd52be69780a0043e4e50f51c924e88733afe0/image.jpg",
+        "listing_url": "https://www.realestate.com.au/property-apartment-qld-surfers+paradise-444299040",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "weekly_rent": 900,
+        "suburb": "Surfers Paradise"
+      },
+      {
+        "listing_id": "erty-unit-qld-surfers-paradise-444289052",
+        "name": "23/24 Hamilton Avenue, Surfers Paradise",
+        "thumbnail_url": "https://i2.au.reastatic.net/1000x750-format=webp/de4c2ccfaa6e7f3a1570d65bfdeed46f821d8e8ad7c6d10f923ebd32bd015be5/image.jpg",
+        "listing_url": "https://www.realestate.com.au/property-unit-qld-surfers+paradise-444289052",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "weekly_rent": 900,
+        "suburb": "Surfers Paradise"
+      },
+      {
+        "listing_id": "apartment-qld-surfers-paradise-444204404",
+        "name": "912/3018  Surfers Paradise Blvd, Surfers Paradise",
+        "thumbnail_url": "https://i2.au.reastatic.net/1000x750-format=webp/2549cd1cabda268e9ee1162483ba8eb85b6a8a53b006ee4daa8c944c4acd3a4d/image.jpg",
+        "listing_url": "https://www.realestate.com.au/property-apartment-qld-surfers+paradise-444204404",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "weekly_rent": 900,
+        "suburb": "Surfers Paradise"
+      },
+      {
+        "listing_id": "apartment-qld-surfers-paradise-441683520",
+        "name": "40/114 The Esplanade, Surfers Paradise",
+        "thumbnail_url": "https://i2.au.reastatic.net/1000x750-format=webp/ee4e138ea78da76c791b9420616712c3f1bbc2ffbecd7338e141645e0d922e79/image.jpg",
+        "listing_url": "https://www.realestate.com.au/property-apartment-qld-surfers+paradise-441683520",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "weekly_rent": 900,
+        "suburb": "Surfers Paradise"
+      },
+      {
+        "listing_id": "erty-unit-qld-surfers-paradise-430100606",
+        "name": "2186/23 Ferny Avenue, Surfers Paradise",
+        "thumbnail_url": "https://i2.au.reastatic.net/1000x750-format=webp/b812ca0ce88809fb3005b18e6e49d4003d785ba4a6049aa43dadaa0198fc6186/image.jpg",
+        "listing_url": "https://www.realestate.com.au/property-unit-qld-surfers+paradise-430100606",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "weekly_rent": 900,
+        "suburb": "Surfers Paradise"
+      },
+      {
+        "listing_id": "apartment-qld-surfers-paradise-438858856",
+        "name": "60/40 Ferny Avenue, Surfers Paradise",
+        "thumbnail_url": "https://i2.au.reastatic.net/1000x750-format=webp/b25265bbdc4a70e35bde40e6143b1359881635ec1952ef5959e34d7306c242b5/image.jpg",
+        "listing_url": "https://www.realestate.com.au/property-apartment-qld-surfers+paradise-438858856",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "weekly_rent": 890,
+        "suburb": "Surfers Paradise"
+      }
+    ],
+    "source": "rea_discover",
+    "search_url": "https://www.realestate.com.au/rent/property-unit+apartment-with-2-bedrooms-in-surfers+paradise,+qld+4217/list-1?numParkingSpaces=1&numBaths=2&maxBeds=2&activeSort=list-date&source=refinement",
+    "suburb_market": {
+      "suburb": "SURFERS PARADISE",
+      "state": "QLD",
+      "postcode": 4217,
+      "property_segment": "unit",
+      "vacancy_rate_pct": 2.94,
+      "population": 23673,
+      "renter_pct": 51.2,
+      "gross_yield_pct": 4.75,
+      "median_weekly_rent": 785,
+      "as_of": "2026-05-31T10:47:42.354Z",
+      "source": "propradar"
+    }
+  },
+  "_meta": {
+    "source_url": "https://www.realestate.com.au/property-apartment-qld-surfers+paradise-151279484",
+    "scraped_at": "2026-06-01T08:22:10.983Z",
+    "description_length": 1521,
+    "rental_appraisal": {
+      "weeklyMin": 890,
+      "weeklyMax": 950,
+      "weeklyMidpoint": 900,
+      "source": "rea_discover",
+      "compCount": 21,
+      "searchUrl": "https://www.realestate.com.au/rent/property-unit+apartment-with-2-bedrooms-in-surfers+paradise,+qld+4217/list-1?numParkingSpaces=1&numBaths=2&maxBeds=2&activeSort=list-date&source=refinement"
+    },
+    "suburb_market": {
+      "suburb": "SURFERS PARADISE",
+      "state": "QLD",
+      "postcode": 4217,
+      "property_segment": "unit",
+      "vacancy_rate_pct": 2.94,
+      "population": 23673,
+      "renter_pct": 51.2,
+      "gross_yield_pct": 4.75,
+      "median_weekly_rent": 785,
+      "as_of": "2026-05-31T10:47:42.354Z",
+      "source": "propradar"
+    },
+    "warnings": [
+      "Imported from realestate.com.au via Bright Data: https://www.realestate.com.au/property-apartment-qld-surfers+paradise-151279484",
+      "Rental appraisal from saved discover export (n=21).",
+      "Suburb context from PropRadar (SURFERS PARADISE, units)."
+    ],
+    "copy_source": "derived"
+  }
+}

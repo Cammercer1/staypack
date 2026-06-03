@@ -19,19 +19,32 @@ export function resolveReportAgents(report: FinalReportJson): FinalReportJson["a
 export function StrRevenueBlock({
   report,
   compact = false,
+  onAccent = false,
 }: {
   report: FinalReportJson;
   compact?: boolean;
+  /** White text on brand accent background (e.g. Haven #009eca). */
+  onAccent?: boolean;
 }) {
   const { str, copy } = report;
   if (!str.annual_revenue) return null;
 
+  const labelClass = onAccent
+    ? "text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-white/85"
+    : "text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-neutral-600";
+  const subClass = onAccent
+    ? "mt-1.5 text-[0.75rem] font-medium text-white/90"
+    : "mt-1.5 text-[0.75rem] font-medium text-neutral-600";
+  const metricsClass = onAccent
+    ? "mt-2 border-t border-white/25 pt-2 text-[0.68rem] leading-[1.6] text-white/85"
+    : "mt-2 border-t border-neutral-200/70 pt-2 text-[0.68rem] leading-[1.6] text-neutral-600";
+
   return (
-    <div className="p-4" style={{ backgroundColor: "var(--report-soft-highlight, #f3f4f6)" }}>
-      <p
-        className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-neutral-600"
-        style={{ fontFamily: headingFont }}
-      >
+    <div
+      className="p-4"
+      style={{ backgroundColor: "var(--report-soft-highlight, #f3f4f6)" }}
+    >
+      <p className={labelClass} style={{ fontFamily: headingFont }}>
         Estimated gross STR revenue
       </p>
       <p
@@ -39,16 +52,14 @@ export function StrRevenueBlock({
         style={{
           fontFamily: headingFont,
           fontSize: compact ? "1.5rem" : "2rem",
-          color: "var(--report-text-colour, inherit)",
+          color: onAccent ? "#ffffff" : "var(--report-text-colour, inherit)",
         }}
       >
         {formatCurrency(str.annual_revenue)}
       </p>
-      <p className="mt-1.5 text-[0.75rem] font-medium text-neutral-600">per year before costs</p>
+      <p className={subClass}>per year before costs</p>
       {copy.key_metrics_line ? (
-        <p className="mt-2 border-t border-neutral-200/70 pt-2 text-[0.68rem] leading-[1.6] text-neutral-600">
-          {copy.key_metrics_line}
-        </p>
+        <p className={metricsClass}>{copy.key_metrics_line}</p>
       ) : null}
     </div>
   );
@@ -94,18 +105,43 @@ export function StrStatRow({ report }: { report: FinalReportJson }) {
 export function ReportAgentBlock({
   agent,
   accent,
+  photoClassName,
+  align = "center",
+  size = "default",
 }: {
   agent: FinalReportJson["agent"];
   accent: string;
+  photoClassName?: string;
+  align?: "center" | "start";
+  size?: "default" | "prominent";
 }) {
+  const photoClass =
+    photoClassName ?? "h-14 w-14 shrink-0 rounded-full object-cover object-top";
+  const prominent = size === "prominent";
+  const rowGap = prominent ? "gap-4" : "gap-3";
+  const nameClass = prominent
+    ? "text-[0.95rem] font-bold leading-tight text-neutral-900"
+    : "text-[0.82rem] font-bold leading-tight text-neutral-900";
+  const roleClass = prominent
+    ? "text-[0.78rem] text-neutral-500"
+    : "text-[0.7rem] text-neutral-500";
+  const phoneClass = prominent
+    ? "text-[0.82rem] text-neutral-700"
+    : "text-[0.72rem] text-neutral-700";
+  const emailClass = prominent
+    ? "truncate text-[0.75rem] text-neutral-500"
+    : "truncate text-[0.68rem] text-neutral-500";
+
   return (
-    <div className="flex items-center gap-3">
+    <div
+      className={`flex w-full ${rowGap} ${align === "start" ? "items-start" : "items-center"}`}
+    >
       {agent.photo_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={agent.photo_url}
-          alt={agent.name || "Agent"}
-          className="h-14 w-14 shrink-0 rounded-full object-cover object-top"
+          alt=""
+          className={photoClass}
         />
       ) : (
         <div
@@ -115,25 +151,22 @@ export function ReportAgentBlock({
       )}
       <div className="min-w-0">
         {agent.name ? (
-          <p
-            className="text-[0.82rem] font-bold leading-tight text-neutral-900"
-            style={{ fontFamily: headingFont }}
-          >
+          <p className={nameClass} style={{ fontFamily: headingFont }}>
             {agent.name}
           </p>
         ) : null}
         {agent.role_title ? (
-          <p className="text-[0.7rem] text-neutral-500" style={{ fontFamily: bodyFont }}>
+          <p className={roleClass} style={{ fontFamily: bodyFont }}>
             {agent.role_title}
           </p>
         ) : null}
         {agent.phone ? (
-          <p className="text-[0.72rem] text-neutral-700" style={{ fontFamily: bodyFont }}>
+          <p className={phoneClass} style={{ fontFamily: bodyFont }}>
             {agent.phone}
           </p>
         ) : null}
         {agent.email ? (
-          <p className="truncate text-[0.68rem] text-neutral-500" style={{ fontFamily: bodyFont }}>
+          <p className={emailClass} style={{ fontFamily: bodyFont }}>
             {agent.email}
           </p>
         ) : null}

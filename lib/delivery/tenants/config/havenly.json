@@ -1,0 +1,48 @@
+{
+  "slug": "havenly",
+  "name": "havenly property",
+  "timezone": "Australia/Brisbane",
+  "enabled": true,
+  "scrape_enabled": true,
+  "scrape_schedule": {
+    "type": "cron",
+    "cron": "0 7 * * *"
+  },
+  "partner_sources": [
+    {
+      "label": "Harcourts Local buy",
+      "url": "https://www.harcourtslocal.com.au/listings/buy",
+      "adapter": "generic_links",
+      "config": { "max_listings": 1 }
+    },
+    {
+      "label": "Caroline Brown for sale",
+      "url": "https://www.carolinebrownproperty.com.au/for-sale",
+      "adapter": "generic_links",
+      "config": { "max_listings": 1 }
+    },
+    {
+      "label": "First National Surfers Paradise for sale",
+      "url": "https://surfersparadisefn.com.au/real-estate-search/residential-real-estate?ltype=1&page=1&sort=date-desc",
+      "adapter": "spfn_first_national_v1",
+      "config": {
+        "fetchMethod": "static_fetch",
+        "maxPages": 1,
+        "max_listings": 1
+      }
+    }
+  ],
+  "email_recipients": ["cameronmercer1991@gmail.com"],
+  "email_subject_template": "Havenly property reports",
+  "str_template_pack_id": "haven_properties",
+  "deliverables": ["str", "lease_appraisal"],
+  "billing_mode": "production",
+  "brand": {
+    "displayName": "havenly property"
+  },
+  "feature_flags": {
+    "rent_appraisal": { "tier": "auto" },
+    "max_listings_per_run": 3
+  },
+  "reprocess_on_material_change": false
+}

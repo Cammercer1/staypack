@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ensureStrEnrichmentFeaturedComps } from "@/lib/airbtics/enrich";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
@@ -25,7 +26,10 @@ export async function resolvePlaygroundFinalReport(
       mergeAgencyBrandIntoFinalReport(agency, {
         ...cached,
         template_id: normalizeReportTemplateId(cached.template_id),
-        str_enrichment: cached.str_enrichment ?? report.str_enrichment_json ?? null,
+        str_enrichment: ensureStrEnrichmentFeaturedComps(
+          cached.str_enrichment ?? report.str_enrichment_json ?? null,
+          report.raw_airbtics_json,
+        ),
       }),
       { agentProfile, agencyAgents },
     );

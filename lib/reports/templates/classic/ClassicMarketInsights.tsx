@@ -7,6 +7,9 @@ import {
 
 type Props = {
   report: FinalReportJson;
+  /** White type on accent highlight band (Haven market snapshot). */
+  invertedHighlight?: boolean;
+  compact?: boolean;
 };
 
 type SnapshotStat = {
@@ -72,45 +75,61 @@ function buildSnapshotStats(report: FinalReportJson) {
   };
 }
 
-export function ClassicMarketInsights({ report }: Props) {
+export function ClassicMarketInsights({
+  report,
+  invertedHighlight = false,
+  compact = false,
+}: Props) {
   const { median, supporting } = buildSnapshotStats(report);
 
   if (median == null && supporting.length === 0) {
     return null;
   }
 
+  const statLabelClass = invertedHighlight
+    ? "text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-white/80"
+    : "text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-neutral-500";
+  const statValueColor = invertedHighlight ? "#ffffff" : "var(--report-text-colour, inherit)";
+  const medianSubClass = invertedHighlight
+    ? "mt-2 text-[0.72rem] text-white/85"
+    : "mt-2 text-[0.72rem] text-neutral-600";
+
   return (
     <div>
       <p
-        className="mb-3 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600"
+        className={`font-semibold uppercase tracking-[0.14em] text-neutral-600 ${
+          compact ? "mb-2.5 text-[0.65rem]" : "mb-3 text-[0.7rem]"
+        }`}
         style={{ fontFamily: "var(--report-heading-font, inherit)" }}
       >
         Market snapshot
       </p>
 
       <div
-        className="px-8 py-5"
+        className={compact ? "px-6 py-4" : "px-8 py-5"}
         style={{ backgroundColor: "var(--report-soft-highlight, #f3f4f6)" }}
       >
         <div className="flex items-stretch gap-8">
           {median != null ? (
             <div className="min-w-[9.5rem] shrink-0 pr-8">
               <p
-                className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-neutral-500"
+                className={statLabelClass}
                 style={{ fontFamily: "var(--report-heading-font, inherit)" }}
               >
                 Median gross revenue
               </p>
               <p
-                className="mt-2 text-[2.1rem] font-semibold leading-none tracking-tight"
+                className={`font-semibold leading-none tracking-tight ${
+                  compact ? "mt-1.5 text-[1.65rem]" : "mt-2 text-[2.1rem]"
+                }`}
                 style={{
                   fontFamily: "var(--report-heading-font, inherit)",
-                  color: "var(--report-text-colour, inherit)",
+                  color: statValueColor,
                 }}
               >
                 {formatCurrency(median)}
               </p>
-              <p className="mt-2 text-[0.72rem] text-neutral-600">per year before costs</p>
+              <p className={medianSubClass}>per year before costs</p>
             </div>
           ) : null}
 
@@ -124,7 +143,7 @@ export function ClassicMarketInsights({ report }: Props) {
               {supporting.map((stat) => (
                 <div key={stat.id} className="min-w-0">
                   <p
-                    className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-neutral-500"
+                    className={statLabelClass}
                     style={{ fontFamily: "var(--report-heading-font, inherit)" }}
                   >
                     {stat.label}
@@ -133,7 +152,7 @@ export function ClassicMarketInsights({ report }: Props) {
                     className="mt-1.5 text-[1.05rem] font-semibold leading-snug"
                     style={{
                       fontFamily: "var(--report-heading-font, inherit)",
-                      color: "var(--report-text-colour, inherit)",
+                      color: statValueColor,
                     }}
                   >
                     {stat.value}

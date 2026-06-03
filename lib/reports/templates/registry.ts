@@ -7,6 +7,8 @@ import { SplitLightTemplate, SplitDetailedTemplate } from "@/lib/reports/templat
 import { RefinedLightTemplate, RefinedDetailedTemplate } from "@/lib/reports/templates/refined/RefinedTemplate";
 import { MinimalistLightTemplate, MinimalistDetailedTemplate } from "@/lib/reports/templates/minimalist/MinimalistTemplate";
 import { LandmarkLightTemplate, LandmarkDetailedTemplate } from "@/lib/reports/templates/landmark/LandmarkTemplate";
+import { HavenPropertiesStrTemplate } from "@/lib/reports/templates/haven-properties/HavenPropertiesStrTemplate";
+import { HavenPropertiesLeaseAppraisalTemplate } from "@/lib/reports/templates/haven-properties/HavenPropertiesLeaseAppraisalTemplate";
 import {
   CLASSIC_DETAILED_TEMPLATE_ID,
   CLASSIC_LIGHT_TEMPLATE_ID,
@@ -25,6 +27,8 @@ import {
   MINIMALIST_DETAILED_TEMPLATE_ID,
   LANDMARK_LIGHT_TEMPLATE_ID,
   LANDMARK_DETAILED_TEMPLATE_ID,
+  HAVEN_PROPERTIES_STR_TEMPLATE_ID,
+  HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID,
   isValidReportTemplateId,
   normalizeReportTemplateId,
   REPORT_TEMPLATE_IDS,
@@ -198,6 +202,27 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
     pages: 2,
     sourcePath: "lib/reports/templates/landmark",
     Component: LandmarkDetailedTemplate,
+  },
+  {
+    id: HAVEN_PROPERTIES_STR_TEMPLATE_ID,
+    family: "haven-properties",
+    tier: "detailed",
+    label: "Haven Properties",
+    description: "Bespoke STR layout for Haven Properties managed delivery.",
+    pages: 2,
+    sourcePath: "lib/reports/templates/haven-properties",
+    Component: HavenPropertiesStrTemplate,
+  },
+  {
+    id: HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID,
+    family: "haven-properties",
+    tier: "detailed",
+    label: "Haven Properties · Lease appraisal",
+    description:
+      "Investor long-term rental appraisal for Haven managed delivery (Landmark-inspired).",
+    pages: 2,
+    sourcePath: "lib/reports/templates/haven-properties",
+    Component: HavenPropertiesLeaseAppraisalTemplate,
   },
 ];
 

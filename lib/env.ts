@@ -90,7 +90,17 @@ export function getSiteUrl() {
 
 export function getReportsUrl() {
   const reports = process.env.NEXT_PUBLIC_REPORTS_URL?.trim();
-  if (reports) return normalizeSiteUrl(reports);
+  if (reports) {
+    const normalized = normalizeSiteUrl(reports);
+    const host = hostFromUrl(normalized);
+    const isLegacyHost =
+      Boolean(host && LEGACY_SITE_HOSTS.has(host)) ||
+      Boolean(host?.startsWith("127."));
+    if (isLegacyHost) {
+      return CANONICAL_PUBLIC_SITE_URL;
+    }
+    return normalized;
+  }
   return getSiteUrl();
 }
 

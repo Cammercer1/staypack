@@ -190,17 +190,23 @@ function isReportReady(message: AirbticsReportMessage, tier: AirbticsTier) {
     return "success" as const;
   }
 
+  const compsStatus = message.comps_status;
+  if (compsStatus === "fetching" || compsStatus === "pending") {
+    return "pending" as const;
+  }
+
+  if (compsStatus === "success") {
+    return "success" as const;
+  }
+
   // Some /report/all responses include full comps+KPIs with empty comps_status.
   const hasFullPayload =
     message.report_type === "all" &&
     Array.isArray(message.comps) &&
+    message.comps.length > 0 &&
     message.kpis != null &&
     typeof message.kpis === "object";
-  if (tier === "full" && hasFullPayload) {
-    return "success" as const;
-  }
-
-  if (message.comps_status === "success") {
+  if (hasFullPayload) {
     return "success" as const;
   }
 
@@ -223,17 +229,69 @@ async function pollAirbticsReport(
   baseUrl: string,
   tier: AirbticsTier,
 ) {
-  const maxAttempts = tier === "full" ? 14 : 10;
+  const maxAttempts = tier === "full" ? 20 : 10;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const message = await readAirbticsReport(reportId, apiKey, baseUrl);
     const status = isReportReady(message, tier);
+
+    // #region agent log
+    fetch("http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "a0cff1",
+      },
+      body: JSON.stringify({
+        sessionId: "a0cff1",
+        runId: "pre-fix",
+        hypothesisId: "E",
+        location: "lib/airbtics/client.ts:pollAirbticsReport",
+        message: "Airbtics poll attempt",
+        data: {
+          reportId,
+          tier,
+          attempt,
+          status,
+          comps_status: message.comps_status ?? null,
+          comps_len: Array.isArray(message.comps) ? message.comps.length : null,
+          report_type: message.report_type ?? null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
 
     if (status === "failed") {
       throw new Error("Could not find enough comparable short-term rentals nearby");
     }
 
     if (status === "success") {
+      // #region agent log
+      fetch("http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "a0cff1",
+        },
+        body: JSON.stringify({
+          sessionId: "a0cff1",
+          runId: "pre-fix",
+          hypothesisId: "E",
+          location: "lib/airbtics/client.ts:pollAirbticsReport",
+          message: "Airbtics poll success",
+          data: {
+            reportId,
+            tier,
+            attempt,
+            comps_len: Array.isArray(message.comps) ? message.comps.length : null,
+            comps_status: message.comps_status ?? null,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+
       return {
         reportId,
         message,

@@ -19,6 +19,7 @@ export function mergeParsedListings(base: ParsedListing, next: ParsedListing): P
     images: [...new Set([...next.images, ...base.images])],
     agents: mergeListingAgents(base.agents, next.agents),
     rentalAppraisal: next.rentalAppraisal ?? base.rentalAppraisal,
+    rentalComps: next.rentalComps?.length ? next.rentalComps : base.rentalComps,
     outgoings: next.outgoings ?? base.outgoings,
     confidence:
       next.confidence === "high" || base.confidence === "high"

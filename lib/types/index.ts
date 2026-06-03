@@ -41,11 +41,33 @@ export type ParsedListing = {
     photo_url?: string;
     role_title?: string;
   }[];
+  /** Land area parsed from listing copy (e.g. 1,025 m²). */
+  landAreaSqm?: number;
   rentalAppraisal?: {
     weeklyMin?: number;
     weeklyMax?: number;
     weeklyMidpoint?: number;
+    source?: "rea_discover";
+    compCount?: number;
+    searchUrl?: string;
+    premiumTier?: boolean;
+    premiumReasons?: string[];
+    rentFloorWeekly?: number;
+    rentFloorSource?: "domain_bed_median" | "rea_bed_median" | "propradar_house_median";
   };
+  /** Featured rental comps (e.g. from REA rent discover). */
+  rentalComps?: {
+    address: string;
+    suburb?: string;
+    weeklyRent: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    propertyType?: string;
+    imageUrl?: string;
+    listingUrl?: string;
+  }[];
+  /** PropRadar suburb medians / demographics for lease appraisal. */
+  ltrSuburbMarket?: LtrSuburbMarketJson;
   outgoings?: {
     bodyCorporateWeekly?: number;
     councilRatesQuarterly?: number;
@@ -101,6 +123,45 @@ export type StrEnrichmentJson = {
     adr: number | null;
   }[];
   comps: StrCompCard[];
+};
+
+/** Long-term rental comps from REA discover (lease appraisal for investors). */
+export type LtrRentalCompCard = {
+  listing_id: string;
+  name: string;
+  thumbnail_url: string;
+  listing_url: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  weekly_rent: number | null;
+  suburb: string | null;
+};
+
+export type LtrSuburbMarketJson = {
+  suburb: string;
+  state: string;
+  postcode: number | null;
+  property_segment: "house" | "unit";
+  vacancy_rate_pct: number | null;
+  population: number | null;
+  renter_pct: number | null;
+  gross_yield_pct: number | null;
+  median_weekly_rent: number | null;
+  as_of: string | null;
+  source: "propradar";
+};
+
+export type LtrEnrichmentJson = {
+  comp_count: number;
+  weekly_range: {
+    p25: number | null;
+    p50: number | null;
+    p75: number | null;
+  };
+  comps: LtrRentalCompCard[];
+  source?: string;
+  search_url?: string;
+  suburb_market?: LtrSuburbMarketJson | null;
 };
 
 export type AiCopyJson = {
@@ -208,6 +269,8 @@ export type FinalReportJson = {
     buyer_checks: string[];
     methodology_note: string;
     disclaimer: string;
+    comparable_evidence: string;
+    comparable_disclaimer: string;
     cta: string;
   };
   assets: {
@@ -215,6 +278,7 @@ export type FinalReportJson = {
     pdf_url: string;
   };
   str_enrichment?: StrEnrichmentJson | null;
+  ltr_enrichment?: LtrEnrichmentJson | null;
 };
 
 export type Agency = {

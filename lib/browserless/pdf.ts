@@ -56,15 +56,17 @@ function replaceImageSrc(html: string, source: string, replacement: string) {
     .join(`src='${replacement}'`);
 }
 
-async function fetchImageBuffer(src: string) {
+async function fetchImageBuffer(src: string, pageOrigin: string) {
   const decodedSrc = decodeHtmlEntities(src);
 
   if (decodedSrc.startsWith("data:")) {
     return null;
   }
 
+  const fetchUrl = resolveAssetUrl(decodedSrc, pageOrigin);
+
   try {
-    const response = await fetch(decodedSrc, {
+    const response = await fetch(fetchUrl, {
       headers: {
         "User-Agent": BROWSER_USER_AGENT,
         Accept: "image/*,*/*",
@@ -89,6 +91,7 @@ async function fetchImageBuffer(src: string) {
 
 async function mirrorImages(
   html: string,
+  pageOrigin: string,
   mirrorImage?: PrintHtmlImageMirror,
 ) {
   const sources = [
@@ -105,7 +108,7 @@ async function mirrorImages(
   const sampleMirroredUrls: string[] = [];
 
   for (const src of sources) {
-    const fetched = await fetchImageBuffer(src);
+    const fetched = await fetchImageBuffer(src, pageOrigin);
 
     if (!fetched || !mirrorImage) {
       failedCount += 1;
@@ -141,6 +144,13 @@ async function mirrorImages(
 }
 
 const MAX_INLINE_STYLESHEET_BYTES = 8_000;
+
+function extractGoogleFontsUrl(html: string): string | null {
+  const match = html.match(
+    /href=["'](https:\/\/fonts\.googleapis\.com\/css[^"']+)["']/i,
+  );
+  return match ? decodeHtmlEntities(match[1]) : null;
+}
 
 function extractPrintRootHtml(html: string) {
   const reportRoot = html.match(
@@ -235,7 +245,12 @@ async function preparePrintStyles(
 function buildPrintDocument(
   bodyHtml: string,
   styles: Awaited<ReturnType<typeof preparePrintStyles>>,
+  googleFontsUrl?: string | null,
 ) {
+  const fontPreconnect = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`;
+  const googleFontLink = googleFontsUrl
+    ? `<link rel="stylesheet" href="${googleFontsUrl}">`
+    : "";
   const headLinks = styles.linkedStyles
     .map((href) => `<link rel="stylesheet" href="${href}">`)
     .join("");
@@ -243,7 +258,7 @@ function buildPrintDocument(
     ? `<style>${styles.inlineStyles}</style>`
     : "";
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8">${headLinks}${headStyles}</head><body>${bodyHtml}</body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">${fontPreconnect}${googleFontLink}${headLinks}${headStyles}</head><body>${bodyHtml}</body></html>`;
 }
 
 async function preparePrintHtml(
@@ -266,15 +281,21 @@ async function preparePrintHtml(
     throw new Error("Could not find printable report content on the print page");
   }
 
+  const pageOrigin = new URL(url).origin;
+  const googleFontsUrl = extractGoogleFontsUrl(html);
   const styles = await preparePrintStyles(
     html,
     url,
     options?.mirrorStylesheet,
   );
-  const withImages = await mirrorImages(printRootHtml, options?.mirrorImage);
+  const withImages = await mirrorImages(
+    printRootHtml,
+    pageOrigin,
+    options?.mirrorImage,
+  );
 
   return {
-    html: buildPrintDocument(withImages.html, styles),
+    html: buildPrintDocument(withImages.html, styles, googleFontsUrl),
     stylesheetCount: styles.stylesheetCount,
     linkedStylesheetCount: styles.linkedStylesheetCount,
     inlinedStylesheetCount: styles.inlinedStylesheetCount,
@@ -336,8 +357,8 @@ function buildBrowserlessPdfBody(
     options: pdfOptions,
     emulateMediaType: "print",
     gotoOptions: {
-      waitUntil: "load" as const,
-      timeout: 60000,
+      waitUntil: "networkidle0" as const,
+      timeout: 90000,
     },
   };
 

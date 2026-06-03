@@ -1,5 +1,6 @@
 import type { ParsedListing } from "@/lib/types";
 import { listingHostname } from "@/lib/scraping/parsers/registry";
+import { parseSpfnAddressFromListingUrl } from "@/lib/scraping/spfn/parseSpfnListing";
 
 const AU_STATES = new Set(["ACT", "NSW", "NT", "QLD", "SA", "TAS", "VIC", "WA"]);
 
@@ -200,6 +201,49 @@ function extractPropertySlug(url: string) {
   }
 }
 
+/** Wix / agency sites: `/listing/40-harwood-street-bardon-qld-4065`. */
+function extractPathAddressSlug(url: string) {
+  try {
+    const { pathname } = new URL(url);
+    if (!/\/(listing|property)\/[^/]+\/?$/i.test(pathname)) {
+      return null;
+    }
+
+    const segment = pathname.split("/").filter(Boolean).at(-1);
+    if (!segment || !/\d-.*-[a-z]{2,3}-\d{4}/i.test(segment)) {
+      return null;
+    }
+
+    return segment;
+  } catch {
+    return null;
+  }
+}
+
+/** REA slugs like `unit-1401-67-ferny-ave-surfers-paradise-qld-4217`. */
+function parseReaPropertySlug(slug: string): Partial<ParsedListing> | null {
+  const typePrefix = slug.match(
+    /^(unit|apartment|house|townhouse|land|acreage|villa|studio|duplex)-/i,
+  )?.[1];
+  const cleaned = typePrefix ? slug.slice(typePrefix.length + 1) : slug;
+  const parsed = parseDomainListingSlug(cleaned);
+  if (!parsed) {
+    return null;
+  }
+
+  const propertyType =
+    typePrefix?.toLowerCase() === "apartment" || typePrefix?.toLowerCase() === "unit"
+      ? "Apartment"
+      : typePrefix
+        ? titleCaseWords(typePrefix)
+        : undefined;
+
+  return {
+    ...parsed,
+    ...(propertyType ? { propertyType } : {}),
+  };
+}
+
 function extractDomainListingSlug(url: string) {
   try {
     const { pathname } = new URL(url);
@@ -215,6 +259,28 @@ function extractDomainListingSlug(url: string) {
 
 export function parseAddressFromListingUrl(url: string): Partial<ParsedListing> | null {
   const hostname = listingHostname(url);
+
+  if (hostname && /surfersparadisefn\.com\.au$/i.test(hostname)) {
+    const parsed = parseSpfnAddressFromListingUrl(url);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  if (hostname?.endsWith("realestate.com.au")) {
+    const slug = extractPropertySlug(url);
+    if (slug) {
+      const parsed = parseReaPropertySlug(slug);
+      if (parsed) {
+        return {
+          ...parsed,
+          warnings: [
+            "Address parsed from REA listing URL (used while loading full REA dataset scrape).",
+          ],
+        };
+      }
+    }
+  }
 
   if (hostname?.endsWith("domain.com.au")) {
     const slug = extractDomainListingSlug(url);
@@ -233,11 +299,7 @@ export function parseAddressFromListingUrl(url: string): Partial<ParsedListing> 
 
   const slug = extractPropertySlug(url);
 
-  if (!slug) {
-    return null;
-  }
-
-  if (hostname?.endsWith("mcgrath.com.au")) {
+  if (hostname?.endsWith("mcgrath.com.au") && slug) {
     const parsed = parseMcGrathPropertySlug(slug);
     if (parsed) {
       return {
@@ -245,6 +307,17 @@ export function parseAddressFromListingUrl(url: string): Partial<ParsedListing> 
         warnings: [
           "Address parsed from McGrath listing URL (page HTML was unavailable or blocked).",
         ],
+      };
+    }
+  }
+
+  const pathSlug = extractPathAddressSlug(url);
+  if (pathSlug) {
+    const parsed = parseDomainListingSlug(pathSlug);
+    if (parsed) {
+      return {
+        ...parsed,
+        warnings: ["Address parsed from listing URL slug."],
       };
     }
   }

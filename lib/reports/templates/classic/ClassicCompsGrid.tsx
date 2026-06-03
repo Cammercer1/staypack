@@ -2,16 +2,35 @@ import { BedDouble, DollarSign, Percent } from "lucide-react";
 import type { StrCompCard } from "@/lib/types";
 import { formatCurrency, formatDistanceMeters, formatNumber, formatPercent } from "@/lib/reports/formatters";
 
-const FEATURED_COMP_COUNT = 3;
+const DEFAULT_FEATURED_COMP_COUNT = 3;
 
 type Props = {
   comps: StrCompCard[];
   suburb?: string;
   totalCompCount?: number;
+  /** How many comp cards to render (default 3). */
+  featuredCount?: number;
+  /** Tailwind aspect class for comp photos (default 5:3). */
+  imageAspectClass?: string;
+  /** Override subtitle under "Comparable listings" (default derives from counts). */
+  compPoolDescription?: string;
+  /** Show the count/suburb line under the section heading (default true). */
+  showPoolSubtitle?: boolean;
+  /** Tighter grid for single-page layouts (e.g. Haven page 2). */
+  compact?: boolean;
 };
 
-export function ClassicCompsGrid({ comps, suburb, totalCompCount }: Props) {
-  const featured = comps.slice(0, FEATURED_COMP_COUNT);
+export function ClassicCompsGrid({
+  comps,
+  suburb,
+  totalCompCount,
+  featuredCount = DEFAULT_FEATURED_COMP_COUNT,
+  imageAspectClass = "aspect-[5/3]",
+  compPoolDescription,
+  showPoolSubtitle = true,
+  compact = false,
+}: Props) {
+  const featured = comps.slice(0, featuredCount);
 
   if (featured.length === 0) {
     return (
@@ -22,26 +41,35 @@ export function ClassicCompsGrid({ comps, suburb, totalCompCount }: Props) {
   }
 
   const compPoolLabel =
-    totalCompCount && totalCompCount > featured.length
-      ? `Top ${featured.length} of ${totalCompCount} comparable listings`
-      : `${featured.length} comparable listing${featured.length === 1 ? "" : "s"}`;
+    compPoolDescription ??
+    (totalCompCount && totalCompCount > featured.length
+      ? `Top ${featured.length} of ${totalCompCount} comparable listings by estimated gross revenue`
+      : `${featured.length} comparable listing${featured.length === 1 ? "" : "s"}`);
 
   return (
     <div>
-      <div className="mb-3">
+      <div className={compact ? "mb-3" : "mb-3"}>
         <p
-          className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600"
+          className={`font-semibold uppercase tracking-[0.14em] text-neutral-600 ${
+            compact ? "text-[0.65rem]" : "text-[0.7rem]"
+          }`}
           style={{ fontFamily: "var(--report-heading-font, inherit)" }}
         >
           Comparable listings
         </p>
-        <p className="mt-1 text-xs text-neutral-600">
-          {compPoolLabel}
-          {suburb ? ` near ${suburb}` : ""}.
-        </p>
+        {showPoolSubtitle ? (
+          <p className={`text-neutral-600 ${compact ? "mt-0.5 text-[0.65rem]" : "mt-1 text-xs"}`}>
+            {compPoolLabel}
+            {suburb ? ` near ${suburb}` : ""}.
+          </p>
+        ) : null}
       </div>
 
-      <div className="grid grid-cols-3 gap-5">
+      <div
+        className={`grid ${compact ? "gap-4" : "gap-5"} ${
+          featured.length <= 4 ? "grid-cols-2" : "grid-cols-3"
+        }`}
+      >
         {featured.map((comp) => (
           <article key={comp.listing_id || comp.name} className="min-w-0">
             {comp.thumbnail_url ? (
@@ -49,16 +77,18 @@ export function ClassicCompsGrid({ comps, suburb, totalCompCount }: Props) {
               <img
                 src={comp.thumbnail_url}
                 alt=""
-                className="aspect-[5/3] w-full object-cover"
+                className={`${imageAspectClass} w-full object-cover`}
               />
             ) : (
-              <div className="aspect-[5/3] w-full bg-neutral-100" />
+              <div className={`${imageAspectClass} w-full bg-neutral-100`} />
             )}
 
-            <div className="pt-3">
+            <div className={compact ? "pt-2" : "pt-3"}>
               {comp.distance_m != null ? (
                 <p
-                  className="text-[0.62rem] font-semibold uppercase tracking-wide text-neutral-600"
+                  className={`font-semibold uppercase tracking-wide text-neutral-600 ${
+                    compact ? "text-[0.58rem]" : "text-[0.62rem]"
+                  }`}
                   style={{ fontFamily: "var(--report-heading-font, inherit)" }}
                 >
                   {formatDistanceMeters(comp.distance_m)} away
@@ -66,13 +96,21 @@ export function ClassicCompsGrid({ comps, suburb, totalCompCount }: Props) {
               ) : null}
 
               <p
-                className="mt-1 text-[0.72rem] font-bold leading-snug text-neutral-900"
+                className={`font-bold leading-snug text-neutral-900 ${
+                  compact
+                    ? "mt-0.5 line-clamp-2 text-[0.68rem]"
+                    : "mt-1 text-[0.72rem]"
+                }`}
                 style={{ fontFamily: "var(--report-heading-font, inherit)" }}
               >
                 {comp.name}
               </p>
 
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.62rem] text-neutral-800">
+              <div
+                className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 text-neutral-800 ${
+                  compact ? "mt-1 text-[0.58rem]" : "mt-2 gap-x-3 text-[0.62rem]"
+                }`}
+              >
                 {comp.bedrooms != null ? (
                   <span className="inline-flex items-center gap-1">
                     <BedDouble className="h-3 w-3" strokeWidth={1.75} aria-hidden />
@@ -90,14 +128,22 @@ export function ClassicCompsGrid({ comps, suburb, totalCompCount }: Props) {
               </div>
 
               <p
-                className="mt-2 text-[0.85rem] font-semibold leading-none"
+                className={`font-semibold leading-none ${
+                  compact ? "mt-1 text-[0.78rem]" : "mt-2 text-[0.85rem]"
+                }`}
                 style={{
                   fontFamily: "var(--report-heading-font, inherit)",
                   color: "var(--report-text-colour, inherit)",
                 }}
               >
                 {formatCurrency(comp.annual_revenue)}
-                <span className="ml-1 text-[0.6rem] font-medium text-neutral-600">/yr gross</span>
+                <span
+                  className={`ml-1 font-medium text-neutral-600 ${
+                    compact ? "text-[0.55rem]" : "text-[0.6rem]"
+                  }`}
+                >
+                  /yr gross
+                </span>
               </p>
             </div>
           </article>
