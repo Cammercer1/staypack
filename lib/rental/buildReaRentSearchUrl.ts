@@ -1,9 +1,12 @@
+import { formatReaRentPostcodeSegment } from "@/lib/rental/adjacentRentSearchPostcodes";
 import { slugifySuburbSegment } from "@/lib/scraping/domain/addressMatch";
 
 export type ReaRentSearchInput = {
   suburb: string;
   state: string;
   postcode: string;
+  /** Extra postcodes for REA multi-postcode SERPs (e.g. adjacent 6019;6021). */
+  additionalPostcodes?: string[];
   bedrooms: number;
   bathrooms?: number;
   carSpaces?: number;
@@ -42,7 +45,10 @@ export function buildReaRentSearchUrl(
 ) {
   const suburbSlug = slugifySuburbSegment(input.suburb);
   const state = input.state.trim().toLowerCase();
-  const postcode = input.postcode.trim();
+  const postcode = formatReaRentPostcodeSegment(
+    input.postcode,
+    input.additionalPostcodes,
+  );
   const beds = Math.max(1, Math.round(input.bedrooms));
 
   const includeType =

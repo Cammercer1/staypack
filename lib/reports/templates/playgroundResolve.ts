@@ -38,7 +38,7 @@ export function resolvePlaygroundTemplateId(
     const id = `${family}-lease-appraisal`;
     return isLeaseAppraisalTemplateId(id) ? id : "classic-lease-appraisal";
   }
-  return `${family}-${pages === 1 ? "light" : "detailed"}`;
+  return `${family}-detailed`;
 }
 
 export function resolvePlaygroundMeta(
@@ -126,5 +126,5 @@ export function pagesFromTemplateId(
   if (collateral === "lease" || isLeaseAppraisalTemplateId(templateId)) {
     return 2;
   }
-  return templateId.endsWith("-detailed") ? 2 : 1;
+  return 2;
 }

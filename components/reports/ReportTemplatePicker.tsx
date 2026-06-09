@@ -1,38 +1,29 @@
 "use client";
 
 import { useAvailableTemplates } from "@/components/templates/useAvailableTemplates";
-import type { ReportTemplateTier } from "@/lib/reports/templates/types";
+import { normalizeReportTemplateId } from "@/lib/reports/templates/ids";
 
 type Props = {
   value: string;
-  /**
-   * Inherited from the STR estimate step — controls light vs detailed.
-   * When omitted the tier is derived from the current value (useful in dev/playground).
-   */
-  tier?: ReportTemplateTier;
   onChange: (templateId: string) => void;
 };
 
-/** One option per visual family; tier (pages) is inherited from the estimate step. */
-export function ReportTemplatePicker({ value, tier: tierProp, onChange }: Props) {
+/** One option per visual family; all STR reports use the detailed (2-page) layout. */
+export function ReportTemplatePicker({ value, onChange }: Props) {
   const { data, loading } = useAvailableTemplates("str");
-  const tier: ReportTemplateTier =
-    tierProp ?? (value.endsWith("-detailed") ? "detailed" : "light");
 
-  const templates = (data?.templates ?? []).filter(
-    (entry) => entry.tier === tier,
-  );
+  const templates = data?.templates ?? [];
 
   const families = templates.map((entry) => ({
-    family: entry.family ?? entry.id.replace(/-(?:light|detailed)$/, ""),
+    family: entry.family ?? entry.id.replace(/-detailed$/, ""),
     label: entry.label,
   }));
 
-  const currentFamily = value.replace(/-(?:light|detailed)$/, "");
+  const normalizedValue = normalizeReportTemplateId(value);
+  const currentFamily = normalizedValue.replace(/-detailed$/, "");
 
   function handleChange(family: string) {
-    const id = `${family}-${tier}`;
-    onChange(id);
+    onChange(`${family}-detailed`);
   }
 
   if (loading && families.length === 0) {

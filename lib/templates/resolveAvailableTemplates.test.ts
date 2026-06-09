@@ -5,14 +5,15 @@ import type { Agency } from "@/lib/types";
 
 const agency = {
   id: "00000000-0000-4000-8000-000000000001",
-  report_template_id: "minimalist-light",
+  report_template_id: "minimalist-detailed",
   collateral_template_defaults: {},
 } as Agency;
 
 describe("resolveAvailableTemplatesFromGrants", () => {
   it("includes platform STR templates without grants", () => {
     const result = resolveAvailableTemplatesFromGrants(agency, "str", []);
-    expect(result.templates.some((t) => t.id === "classic-light")).toBe(true);
+    expect(result.templates.some((t) => t.id === "classic-detailed")).toBe(true);
+    expect(result.templates.some((t) => t.id === "classic-light")).toBe(false);
     expect(result.templates.some((t) => t.id === "haven-properties-str")).toBe(
       false,
     );
@@ -41,8 +42,8 @@ describe("template catalog metadata", () => {
     expect(entry?.defaultBlurbLength).toBe("long");
   });
 
-  it("marks classic-light as platform with agency brand", () => {
-    const entry = getTemplateCatalogEntry("classic-light");
+  it("marks classic-detailed as platform with agency brand", () => {
+    const entry = getTemplateCatalogEntry("classic-detailed");
     expect(entry?.scope).toBe("platform");
     expect(entry?.brandMode).toBe("agency");
   });

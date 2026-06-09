@@ -1,5 +1,7 @@
+import { adjacentRentSearchPostcodes } from "@/lib/rental/adjacentRentSearchPostcodes";
 import {
   buildReaRentSearchUrl,
+  type BuildReaRentSearchUrlOptions,
   type ReaRentSearchInput,
 } from "@/lib/rental/buildReaRentSearchUrl";
 import {
@@ -21,11 +23,12 @@ function pushAttempt(
   attempts: RentDiscoverAttempt[],
   label: string,
   input: ReaRentSearchInput,
+  urlOptions?: BuildReaRentSearchUrlOptions,
 ) {
   attempts.push({
     label,
     input,
-    searchUrl: buildReaRentSearchUrl(input),
+    searchUrl: buildReaRentSearchUrl(input, urlOptions),
   });
 }
 
@@ -37,6 +40,7 @@ function buildSearchInput(
     includeBathrooms?: boolean;
     includeCarSpaces?: boolean;
     featureKeywords?: string[];
+    additionalPostcodes?: string[];
     suburb?: string;
     state?: string;
     postcode?: string;
@@ -63,6 +67,10 @@ function buildSearchInput(
 
   if (options.featureKeywords?.length) {
     input.featureKeywords = options.featureKeywords;
+  }
+
+  if (options.additionalPostcodes?.length) {
+    input.additionalPostcodes = options.additionalPostcodes;
   }
 
   return input;
@@ -128,6 +136,23 @@ function pushTypedSuburbLadder(
     }),
   );
 
+  const subjectPostcode = (loc?.postcode ?? listing.postcode)!.trim();
+  const adjacentPostcodes = adjacentRentSearchPostcodes(subjectPostcode);
+  if (adjacentPostcodes.length > 0) {
+    pushAttempt(
+      attempts,
+      `${labelPrefix}-type-bed-adjacent-postcodes`,
+      buildSearchInput(listing, bedrooms, {
+        propertyType,
+        includeBathrooms: false,
+        includeCarSpaces: false,
+        additionalPostcodes: adjacentPostcodes,
+        ...loc,
+      }),
+      { includePropertyTypeInPath: false },
+    );
+  }
+
   if (bedrooms > 2) {
     pushAttempt(
       attempts,
@@ -181,6 +206,20 @@ function pushUntypedSuburbLadder(
       includeCarSpaces: false,
     }),
   );
+
+  const adjacentPostcodes = adjacentRentSearchPostcodes(listing.postcode!.trim());
+  if (adjacentPostcodes.length > 0) {
+    pushAttempt(
+      attempts,
+      `${labelPrefix}-bed-adjacent-postcodes`,
+      buildSearchInput(listing, bedrooms, {
+        includeBathrooms: false,
+        includeCarSpaces: false,
+        additionalPostcodes: adjacentPostcodes,
+      }),
+      { includePropertyTypeInPath: false },
+    );
+  }
 
   if (bedrooms > 2) {
     pushAttempt(

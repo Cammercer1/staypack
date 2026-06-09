@@ -17,7 +17,6 @@ import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
 import { buildPublicReportUrl, generateReportSlug } from "@/lib/reports/slugs";
 import { generateQrCodeBuffer } from "@/lib/reports/qr";
 import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
-import { reportTemplateIdFromAirbticsTier } from "@/lib/reports/templateFromEstimateTier";
 import { resolveDeliveryAgency } from "@/lib/delivery/brand/ensureShadowAgency";
 import { agentProfileFromBrand } from "@/lib/delivery/brand/agentFromBrand";
 import { buildDeliveryStrReportPdfFilename } from "@/lib/delivery/reports/pdfFilename";
@@ -26,8 +25,9 @@ import {
   assertListingReadyForStr,
   buildListingInsertFromParsed,
 } from "@/lib/delivery/str/buildListingFromScrape";
+import type { ReportAgent } from "@/lib/reports/resolveReportAgents";
 import type { DeliveryTenant } from "@/lib/delivery/types";
-import type { Agency, Listing, ParsedListing, Report } from "@/lib/types";
+import type { Agency, AgentProfile, Listing, ParsedListing, Report } from "@/lib/types";
 
 export type HeadlessStrResult = {
   reportId: string;
@@ -46,12 +46,20 @@ export async function generateHeadlessStrReport({
   parsed,
   listing: existingListing,
   agency: existingAgency,
+  templateIdOverride,
+  resolvedAgents,
+  agentProfile: agentProfileOverride,
+  agencyAgents: agencyAgentsOverride,
 }: {
   tenant: DeliveryTenant;
   listingUrl: string;
   parsed: ParsedListing;
   listing?: Listing;
   agency?: Agency;
+  templateIdOverride?: string;
+  resolvedAgents?: ReportAgent[];
+  agentProfile?: AgentProfile | null;
+  agencyAgents?: AgentProfile[];
 }): Promise<HeadlessStrResult> {
   if (!parsed.address?.trim()) {
     throw new Error("Scraped listing is missing a property address");
@@ -101,6 +109,7 @@ export async function generateHeadlessStrReport({
   }
 
   const packTemplateId =
+    templateIdOverride ??
     tenant.brand?.report_template_id ??
     templateIdFromPack(tenant.str_template_pack_id);
 
@@ -158,9 +167,7 @@ export async function generateHeadlessStrReport({
     estimateResult;
 
   const templateId =
-    packTemplateId ||
-    reportTemplateIdFromAirbticsTier(tier) ||
-    resolveReportTemplateId(agency as Agency, report as Report);
+    packTemplateId || resolveReportTemplateId(agency as Agency, report as Report);
 
   await admin
     .from("listings")
@@ -205,9 +212,11 @@ export async function generateHeadlessStrReport({
 
   const reportForCopy = estimatedReport as Report;
   const agentProfile =
+    agentProfileOverride ??
     (await loadListingAgentProfile(admin, listing)) ??
     agentProfileFromBrand(agency.id, tenant.brand);
-  const agencyAgents = await loadAgencyAgentProfiles(admin, agency.id);
+  const agencyAgents =
+    agencyAgentsOverride ?? (await loadAgencyAgentProfiles(admin, agency.id));
   const copy = await generateReportCopy({
     agency: agency as Agency,
     listing,
@@ -225,6 +234,7 @@ export async function generateHeadlessStrReport({
       estimate,
       copy,
       scraped: listing.scraped_listing_json,
+      resolvedAgents,
     }),
     { templateId },
   );

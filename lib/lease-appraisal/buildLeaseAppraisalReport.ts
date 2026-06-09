@@ -5,6 +5,7 @@ import { calculateAccommodates } from "@/lib/reports/formatters";
 import {
   primaryReportAgent,
   resolveAgencyAccountReportAgents,
+  type ReportAgent,
 } from "@/lib/reports/resolveReportAgents";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
 import {
@@ -37,6 +38,7 @@ export type BuildLeaseAppraisalReportInput = {
   copy?: LeaseAppraisalCopy;
   /** Preserves hero/gallery picks from the content editor across rebuilds. */
   propertyImages?: ReportPropertyImageSelection;
+  resolvedAgents?: ReportAgent[];
 };
 
 export function buildLeaseAppraisalReport({
@@ -49,11 +51,14 @@ export function buildLeaseAppraisalReport({
   templateId = HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID,
   copy: copyOverride,
   propertyImages,
+  resolvedAgents,
 }: BuildLeaseAppraisalReportInput): FinalReportJson {
-  const agents = resolveAgencyAccountReportAgents({
-    agentProfile,
-    agencyAgents,
-  });
+  const agents =
+    resolvedAgents ??
+    resolveAgencyAccountReportAgents({
+      agentProfile,
+      agencyAgents,
+    });
   const images = resolveCollateralImageSelection(listing, "str_report");
   const parsedImages = normalizeReaImageUrls(parsed.images ?? []);
   const heroFromSelection = images.hero_image_url

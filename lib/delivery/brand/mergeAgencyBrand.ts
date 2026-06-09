@@ -98,7 +98,7 @@ export function agencyFromTenantBrand(
       brand.default_cta ??
       "Speak with the agent for the full buyer pack and property details.",
     default_disclaimer: brand.default_disclaimer ?? null,
-    report_template_id: brand.report_template_id ?? "minimalist-light",
+    report_template_id: brand.report_template_id ?? "minimalist-detailed",
     collateral_template_defaults: {},
     brand_advanced_json: brand.brand_advanced_json ?? null,
     created_at: now,

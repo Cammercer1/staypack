@@ -9,7 +9,7 @@ describe("resolveCopyForTemplate", () => {
   it("uses long blurb for minimalist STR template", () => {
     const resolved = resolveCopyForTemplate({
       copy: { heading: "Test", blurb: "fallback", blurb_variants: variants },
-      templateId: "minimalist-light",
+      templateId: "minimalist-detailed",
       collateral: "str",
     });
     expect(resolved.blurb_blocks).toHaveLength(

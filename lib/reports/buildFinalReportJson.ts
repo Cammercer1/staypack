@@ -16,6 +16,7 @@ import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPri
 import {
   primaryReportAgent,
   resolveReportAgents,
+  type ReportAgent,
 } from "@/lib/reports/resolveReportAgents";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
 import { ensureStrEnrichmentFeaturedComps } from "@/lib/airbtics/enrich";
@@ -30,6 +31,7 @@ type BuildFinalReportInput = {
   estimate: StrEstimate;
   copy: AiCopyJson;
   scraped?: ParsedListing | null;
+  resolvedAgents?: ReportAgent[];
 };
 
 export function buildFinalReportJson({
@@ -41,6 +43,7 @@ export function buildFinalReportJson({
   estimate,
   copy,
   scraped,
+  resolvedAgents,
 }: BuildFinalReportInput): FinalReportJson {
   const scrapedListing = scraped ?? listing.scraped_listing_json;
   const weeklyMin = scrapedListing?.rentalAppraisal?.weeklyMin ?? null;
@@ -56,11 +59,13 @@ export function buildFinalReportJson({
     annualMidpoint != null && estimate.annualRevenue != null
       ? estimate.annualRevenue - annualMidpoint
       : null;
-  const agents = resolveReportAgents({
-    scraped: scrapedListing,
-    agentProfile,
-    agencyAgents,
-  });
+  const agents =
+    resolvedAgents ??
+    resolveReportAgents({
+      scraped: scrapedListing,
+      agentProfile,
+      agencyAgents,
+    });
   const displayPrice = resolveReportDisplayPrice(listing, scrapedListing);
   const strYield = calculateStrGrossYield(displayPrice, estimate.annualRevenue);
   const strImages = resolveCollateralImageSelection(listing, "str_report");

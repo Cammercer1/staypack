@@ -22,11 +22,6 @@ export const STR_TEMPLATE_PACKS: Record<string, StrTemplatePack> = {
     label: "Minimalist STR (detailed)",
     templateId: "minimalist-detailed",
   },
-  minimalist_light: {
-    id: "minimalist_light",
-    label: "Minimalist STR (light)",
-    templateId: "minimalist-light",
-  },
   classic_detailed: {
     id: "classic_detailed",
     label: "Classic STR (detailed)",

@@ -116,9 +116,11 @@ const GRANULAR_RENT_DISCOVER_LABELS = new Set([
   "primary-type-bed-bath-park-suburb",
   "primary-type-bed-bath-suburb",
   "primary-type-bed-suburb",
+  "primary-type-bed-adjacent-postcodes",
   "primary-bed-bath-park-suburb",
   "primary-bed-bath-suburb",
   "primary-bed-suburb",
+  "primary-bed-adjacent-postcodes",
 ]);
 
 async function fetchRentCompsForSearchUrl(
@@ -196,6 +198,18 @@ async function discoverRentalComps(
       ) >= MIN_SAME_SUBURB_COMPS_FOR_DISCOVER;
 
     if (enoughTotal && enoughLocal) {
+      return {
+        comps: mergedComps,
+        searchUrl: attempt.searchUrl,
+        attemptLabel: attempt.label,
+        provider,
+      };
+    }
+
+    if (
+      attempt.label.includes("adjacent-postcodes") &&
+      mergedComps.length >= MIN_RENT_COMPS_FOR_BAND
+    ) {
       return {
         comps: mergedComps,
         searchUrl: attempt.searchUrl,

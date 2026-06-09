@@ -16,6 +16,7 @@ import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPri
 import {
   primaryReportAgent,
   resolveReportAgents,
+  type ReportAgent,
 } from "@/lib/reports/resolveReportAgents";
 import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
 import type {
@@ -39,6 +40,7 @@ type BuildInput = {
   copy: BrochureCopyJson;
   agentProfile?: AgentProfile | null;
   agencyAgents?: AgentProfile[];
+  resolvedAgents?: ReportAgent[];
   qrCodeUrl: string;
   qrTargetUrl: string;
 };
@@ -65,6 +67,7 @@ export function buildBrochureDocument({
   copy,
   agentProfile,
   agencyAgents,
+  resolvedAgents,
   qrCodeUrl,
   qrTargetUrl,
 }: BuildInput): BrochureDocumentJson {
@@ -77,11 +80,13 @@ export function buildBrochureDocument({
     ),
   ];
   const images = splitBrochureImages(galleryUrls);
-  const agents = resolveReportAgents({
-    scraped,
-    agentProfile,
-    agencyAgents,
-  });
+  const agents =
+    resolvedAgents ??
+    resolveReportAgents({
+      scraped,
+      agentProfile,
+      agencyAgents,
+    });
   const agent = primaryReportAgent(agents);
   const displayPrice = resolveReportDisplayPrice(listing, scraped);
 

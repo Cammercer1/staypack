@@ -235,7 +235,7 @@ export function TemplatePlayground(props: Props) {
     if (nextFamily === "haven-properties" && next !== "lease") {
       nextFamily = "classic";
     }
-    const nextPages = next === "lease" ? 2 : pages;
+    const nextPages = next === "lease" || next === "str" ? 2 : pages;
     const templateId = resolvePlaygroundMeta(next, nextFamily, nextPages).templateId;
     setCollateral(next);
     setFamily(familyFromTemplateId(templateId, next));
@@ -247,11 +247,11 @@ export function TemplatePlayground(props: Props) {
   }
 
   function switchPages(next: 1 | 2) {
-    if (collateral === "lease") return;
+    if (collateral === "lease" || collateral === "str") return;
     setPages(next);
   }
 
-  const pagesLocked = collateral === "lease";
+  const pagesLocked = collateral === "lease" || collateral === "str";
 
   const collateralLive =
     liveFlags &&
@@ -394,7 +394,9 @@ export function TemplatePlayground(props: Props) {
             </div>
             {pagesLocked ? (
               <p className="text-[0.65rem] text-muted-foreground">
-                Lease appraisals are always 2 pages (comps on page 2).
+                {collateral === "lease"
+                  ? "Lease appraisals are always 2 pages (comps on page 2)."
+                  : "STR reports are always 2 pages (market evidence on page 2)."}
               </p>
             ) : null}
           </div>

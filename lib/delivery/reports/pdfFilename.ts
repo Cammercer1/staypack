@@ -75,3 +75,25 @@ export function buildDeliveryLeaseAppraisalPdfFilename({
 }): string {
   return buildLeaseAppraisalPdfFilename(resolveDeliveryPdfBrandPrefix(tenant), address);
 }
+
+export function buildSalesBrochurePdfFilename(
+  brandPrefix: string,
+  address: string,
+): string {
+  const prefix =
+    slugify(brandPrefix.trim(), { lower: true, strict: true, trim: true }) ||
+    "sales-brochure";
+  const addressSlug = slugifyReportAddressSegment(address);
+
+  return `${prefix}-sales-brochure-${addressSlug}.pdf`;
+}
+
+export function buildDeliverySalesBrochurePdfFilename({
+  tenant,
+  address,
+}: {
+  tenant: DeliveryTenant;
+  address: string;
+}): string {
+  return buildSalesBrochurePdfFilename(resolveDeliveryPdfBrandPrefix(tenant), address);
+}

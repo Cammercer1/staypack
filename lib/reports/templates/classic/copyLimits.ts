@@ -7,7 +7,6 @@ import {
 import type { AiCopyJson } from "@/lib/types";
 import {
   CLASSIC_DETAILED_TEMPLATE_ID,
-  CLASSIC_LIGHT_TEMPLATE_ID,
   normalizeReportTemplateId,
 } from "@/lib/reports/templates/ids";
 
@@ -70,7 +69,7 @@ export function enforceClassicCopyField(
 
 export function enforceClassicCopyLimits(
   copy: AiCopyJson,
-  templateId: string = CLASSIC_LIGHT_TEMPLATE_ID,
+  templateId: string = CLASSIC_DETAILED_TEMPLATE_ID,
 ): AiCopyJson {
   return {
     ...copy,

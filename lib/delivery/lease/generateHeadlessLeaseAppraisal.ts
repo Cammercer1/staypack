@@ -16,8 +16,10 @@ import {
   buildListingInsertFromParsed,
 } from "@/lib/delivery/str/buildListingFromScrape";
 import { generateListingSlug } from "@/lib/listings/provisionLandingPage";
+import { loadAgencyAgentProfiles } from "@/lib/reports/loadReportAgent";
+import type { ReportAgent } from "@/lib/reports/resolveReportAgents";
 import type { DeliveryTenant } from "@/lib/delivery/types";
-import type { Agency, Listing, ParsedListing, Report } from "@/lib/types";
+import type { Agency, AgentProfile, Listing, ParsedListing, Report } from "@/lib/types";
 
 export type HeadlessLeaseAppraisalResult = {
   reportId: string;
@@ -35,12 +37,20 @@ export async function generateHeadlessLeaseAppraisal({
   parsed,
   listing: existingListing,
   agency: existingAgency,
+  templateIdOverride,
+  resolvedAgents,
+  agentProfile: agentProfileOverride,
+  agencyAgents: agencyAgentsOverride,
 }: {
   tenant: DeliveryTenant;
   listingUrl: string;
   parsed: ParsedListing;
   listing?: Listing;
   agency?: Agency;
+  templateIdOverride?: string;
+  resolvedAgents?: ReportAgent[];
+  agentProfile?: AgentProfile | null;
+  agencyAgents?: AgentProfile[];
 }): Promise<HeadlessLeaseAppraisalResult> {
   if (!parsed.address?.trim()) {
     throw new Error("Scraped listing is missing a property address");
@@ -93,7 +103,7 @@ export async function generateHeadlessLeaseAppraisal({
     listing = createdListing as Listing;
   }
   const templateId =
-    tenant.brand?.report_template_id ?? HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID;
+    templateIdOverride ?? HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID;
 
   const { data: report, error: reportError } = await admin
     .from("reports")
@@ -110,7 +120,10 @@ export async function generateHeadlessLeaseAppraisal({
     throw new Error(reportError?.message ?? "Failed to create report");
   }
 
-  const agentProfile = agentProfileFromBrand(agency.id, tenant.brand);
+  const agentProfile =
+    agentProfileOverride ?? agentProfileFromBrand(agency.id, tenant.brand);
+  const agencyAgents =
+    agencyAgentsOverride ?? (await loadAgencyAgentProfiles(admin, agency.id));
 
   const { ltrEnrichmentFromParsed } = await import(
     "@/lib/lease-appraisal/ltrEnrichmentFromParsed"
@@ -140,8 +153,10 @@ export async function generateHeadlessLeaseAppraisal({
       report: report as Report,
       parsed: enriched,
       agentProfile,
+      agencyAgents,
       templateId,
       copy,
+      resolvedAgents,
     }),
     { templateId },
   );

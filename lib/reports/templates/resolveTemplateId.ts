@@ -1,4 +1,3 @@
-import { reportTemplateIdFromAirbticsTier } from "@/lib/reports/templateFromEstimateTier";
 import {
   DEFAULT_REPORT_TEMPLATE_ID,
   isValidReportTemplateId,
@@ -15,12 +14,6 @@ export function resolveReportTemplateId(agency: Agency, report: Report): string 
   // Agency-level default is next in priority.
   if (agency.report_template_id && isValidReportTemplateId(agency.report_template_id)) {
     return normalizeReportTemplateId(agency.report_template_id);
-  }
-
-  // If nothing explicit is set, fall back to the estimate-tier implied layout.
-  const fromEstimateTier = reportTemplateIdFromAirbticsTier(report.airbtics_tier);
-  if (fromEstimateTier) {
-    return fromEstimateTier;
   }
 
   return DEFAULT_REPORT_TEMPLATE_ID;

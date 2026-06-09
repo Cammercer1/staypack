@@ -28,7 +28,7 @@ type TierOption = {
 const TIER_OPTIONS: TierOption[] = [
   {
     id: "summary",
-    title: "Light estimate",
+    title: "Summary estimate",
     description: "Headline STR numbers for the report.",
     features: [
       "Annual, monthly and weekly revenue",
@@ -40,9 +40,9 @@ const TIER_OPTIONS: TierOption[] = [
   {
     id: "full",
     title: "Detailed estimate",
-    description: "Same headline numbers plus market evidence.",
+    description: "Same headline numbers plus market evidence for page 2.",
     features: [
-      "Everything in the light estimate",
+      "Everything in the summary estimate",
       "Revenue range (25th to 90th percentile)",
       "Up to 40 comparable listings with photos",
       "Monthly seasonality for charts and copy",
@@ -270,13 +270,13 @@ export function StrEstimateStep({ listing, report, onComplete }: Props) {
           ) : selectedTier === "full" ? (
             "Run detailed STR estimate"
           ) : (
-            "Run light STR estimate"
+            "Run summary STR estimate"
           )}
         </Button>
         {report.airbtics_tier ? (
           <p className="text-sm text-muted-foreground">
             Last run:{" "}
-            {report.airbtics_tier === "full" ? "Detailed" : "Light"} estimate
+            {report.airbtics_tier === "full" ? "Detailed" : "Summary"} estimate
           </p>
         ) : null}
       </div>

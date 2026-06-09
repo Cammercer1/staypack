@@ -1,12 +1,11 @@
 import { ClassicDetailedTemplate } from "@/lib/reports/templates/classic/DetailedTemplate";
-import { ClassicLightTemplate } from "@/lib/reports/templates/classic/LightTemplate";
-import { BoldLightTemplate, BoldDetailedTemplate } from "@/lib/reports/templates/bold/BoldTemplate";
-import { GalleryLightTemplate, GalleryDetailedTemplate } from "@/lib/reports/templates/gallery/GalleryTemplate";
-import { EditorialLightTemplate, EditorialDetailedTemplate } from "@/lib/reports/templates/editorial/EditorialTemplate";
-import { SplitLightTemplate, SplitDetailedTemplate } from "@/lib/reports/templates/split/SplitTemplate";
-import { RefinedLightTemplate, RefinedDetailedTemplate } from "@/lib/reports/templates/refined/RefinedTemplate";
-import { MinimalistLightTemplate, MinimalistDetailedTemplate } from "@/lib/reports/templates/minimalist/MinimalistTemplate";
-import { LandmarkLightTemplate, LandmarkDetailedTemplate } from "@/lib/reports/templates/landmark/LandmarkTemplate";
+import { BoldDetailedTemplate } from "@/lib/reports/templates/bold/BoldTemplate";
+import { GalleryDetailedTemplate } from "@/lib/reports/templates/gallery/GalleryTemplate";
+import { EditorialDetailedTemplate } from "@/lib/reports/templates/editorial/EditorialTemplate";
+import { SplitDetailedTemplate } from "@/lib/reports/templates/split/SplitTemplate";
+import { RefinedDetailedTemplate } from "@/lib/reports/templates/refined/RefinedTemplate";
+import { MinimalistDetailedTemplate } from "@/lib/reports/templates/minimalist/MinimalistTemplate";
+import { LandmarkDetailedTemplate } from "@/lib/reports/templates/landmark/LandmarkTemplate";
 import { HavenPropertiesStrTemplate } from "@/lib/reports/templates/haven-properties/HavenPropertiesStrTemplate";
 import { HavenPropertiesLeaseAppraisalTemplate } from "@/lib/reports/templates/haven-properties/HavenPropertiesLeaseAppraisalTemplate";
 import {
@@ -21,21 +20,13 @@ import {
 } from "@/lib/reports/templates/lease-appraisal/LeaseAppraisalFamilyTemplates";
 import {
   CLASSIC_DETAILED_TEMPLATE_ID,
-  CLASSIC_LIGHT_TEMPLATE_ID,
   DEFAULT_REPORT_TEMPLATE_ID,
-  BOLD_LIGHT_TEMPLATE_ID,
   BOLD_DETAILED_TEMPLATE_ID,
-  GALLERY_LIGHT_TEMPLATE_ID,
   GALLERY_DETAILED_TEMPLATE_ID,
-  EDITORIAL_LIGHT_TEMPLATE_ID,
   EDITORIAL_DETAILED_TEMPLATE_ID,
-  SPLIT_LIGHT_TEMPLATE_ID,
   SPLIT_DETAILED_TEMPLATE_ID,
-  REFINED_LIGHT_TEMPLATE_ID,
   REFINED_DETAILED_TEMPLATE_ID,
-  MINIMALIST_LIGHT_TEMPLATE_ID,
   MINIMALIST_DETAILED_TEMPLATE_ID,
-  LANDMARK_LIGHT_TEMPLATE_ID,
   LANDMARK_DETAILED_TEMPLATE_ID,
   HAVEN_PROPERTIES_STR_TEMPLATE_ID,
   HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID,
@@ -62,16 +53,6 @@ export {
 
 export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
   {
-    id: CLASSIC_LIGHT_TEMPLATE_ID,
-    family: "classic",
-    tier: "light",
-    label: "Classic",
-    description: "Single-page sales pack with headline STR estimate.",
-    pages: 1,
-    sourcePath: "lib/reports/templates/classic",
-    Component: ClassicLightTemplate,
-  },
-  {
     id: CLASSIC_DETAILED_TEMPLATE_ID,
     family: "classic",
     tier: "detailed",
@@ -80,16 +61,6 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
     pages: 2,
     sourcePath: "lib/reports/templates/classic",
     Component: ClassicDetailedTemplate,
-  },
-  {
-    id: BOLD_LIGHT_TEMPLATE_ID,
-    family: "bold",
-    tier: "light",
-    label: "Bold",
-    description: "Full-bleed hero overlay, stat strip, blurb and revenue on one page.",
-    pages: 1,
-    sourcePath: "lib/reports/templates/bold",
-    Component: BoldLightTemplate,
   },
   {
     id: BOLD_DETAILED_TEMPLATE_ID,
@@ -102,16 +73,6 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
     Component: BoldDetailedTemplate,
   },
   {
-    id: GALLERY_LIGHT_TEMPLATE_ID,
-    family: "gallery",
-    tier: "light",
-    label: "Gallery",
-    description: "Photo mosaic cover with address bar, revenue and agent on one page.",
-    pages: 1,
-    sourcePath: "lib/reports/templates/gallery",
-    Component: GalleryLightTemplate,
-  },
-  {
     id: GALLERY_DETAILED_TEMPLATE_ID,
     family: "gallery",
     tier: "detailed",
@@ -120,16 +81,6 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
     pages: 2,
     sourcePath: "lib/reports/templates/gallery",
     Component: GalleryDetailedTemplate,
-  },
-  {
-    id: EDITORIAL_LIGHT_TEMPLATE_ID,
-    family: "editorial",
-    tier: "light",
-    label: "Editorial",
-    description: "Magazine-cover hero with revenue badge overlay and highlights.",
-    pages: 1,
-    sourcePath: "lib/reports/templates/editorial",
-    Component: EditorialLightTemplate,
   },
   {
     id: EDITORIAL_DETAILED_TEMPLATE_ID,
@@ -142,16 +93,6 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
     Component: EditorialDetailedTemplate,
   },
   {
-    id: SPLIT_LIGHT_TEMPLATE_ID,
-    family: "split",
-    tier: "light",
-    label: "Split",
-    description: "Content and revenue left, four-photo grid right on one page.",
-    pages: 1,
-    sourcePath: "lib/reports/templates/split",
-    Component: SplitLightTemplate,
-  },
-  {
     id: SPLIT_DETAILED_TEMPLATE_ID,
     family: "split",
     tier: "detailed",
@@ -160,16 +101,6 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
     pages: 2,
     sourcePath: "lib/reports/templates/split",
     Component: SplitDetailedTemplate,
-  },
-  {
-    id: REFINED_LIGHT_TEMPLATE_ID,
-    family: "refined",
-    tier: "light",
-    label: "Refined",
-    description: "Branded header, copy and revenue block with footer property photo.",
-    pages: 1,
-    sourcePath: "lib/reports/templates/refined",
-    Component: RefinedLightTemplate,
   },
   {
     id: REFINED_DETAILED_TEMPLATE_ID,
@@ -182,16 +113,6 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
     Component: RefinedDetailedTemplate,
   },
   {
-    id: MINIMALIST_LIGHT_TEMPLATE_ID,
-    family: "minimalist",
-    tier: "light",
-    label: "Minimalist",
-    description: "Photo strip top half, copy and STR revenue sidebar on cream.",
-    pages: 1,
-    sourcePath: "lib/reports/templates/minimalist",
-    Component: MinimalistLightTemplate,
-  },
-  {
     id: MINIMALIST_DETAILED_TEMPLATE_ID,
     family: "minimalist",
     tier: "detailed",
@@ -200,16 +121,6 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
     pages: 2,
     sourcePath: "lib/reports/templates/minimalist",
     Component: MinimalistDetailedTemplate,
-  },
-  {
-    id: LANDMARK_LIGHT_TEMPLATE_ID,
-    family: "landmark",
-    tier: "light",
-    label: "Landmark",
-    description: "Full-bleed hero, stats banner, revenue and agents on one page.",
-    pages: 1,
-    sourcePath: "lib/reports/templates/landmark",
-    Component: LandmarkLightTemplate,
   },
   {
     id: LANDMARK_DETAILED_TEMPLATE_ID,

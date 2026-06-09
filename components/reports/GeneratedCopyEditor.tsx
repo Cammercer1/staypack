@@ -57,8 +57,6 @@ export function GeneratedCopyEditor({
   );
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
-  // Tier is locked by the estimate step: full → detailed, summary/none → light
-  const tier = report.airbtics_tier === "full" ? "detailed" : "light";
   const resolvedTemplateId = useMemo(
     () => resolveReportTemplateIdForReport(agency, report),
     [agency, report],
@@ -378,7 +376,6 @@ export function GeneratedCopyEditor({
           <p className="text-sm font-medium">Live preview</p>
           <ReportTemplatePicker
             value={selectedTemplateId}
-            tier={tier}
             onChange={handleTemplateChange}
           />
         </div>
