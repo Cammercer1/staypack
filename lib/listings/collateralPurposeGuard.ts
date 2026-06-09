@@ -1,7 +1,11 @@
 import type { CollateralType, Listing, ListingPurpose } from "@/lib/types";
 
 const LEASE_ONLY: CollateralType[] = ["rental_brochure"];
-const SALE_ONLY: CollateralType[] = ["sales_brochure", "str_report"];
+const SALE_ONLY: CollateralType[] = [
+  "sales_brochure",
+  "str_report",
+  "lease_appraisal",
+];
 
 export function collateralPurposeMismatchError(
   listing: Pick<Listing, "listing_purpose">,

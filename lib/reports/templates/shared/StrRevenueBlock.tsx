@@ -1,8 +1,37 @@
 import { formatCurrency } from "@/lib/reports/formatters";
+import { STR_ANNUAL_REVENUE_LABEL } from "@/lib/reports/resolveStrBrochurePrice";
+import { LtrRentBlock } from "@/lib/reports/templates/shared/LtrRentBlock";
+import {
+  isLeasePageVariant,
+  resolveReportPageVariant,
+  type ReportPageVariant,
+} from "@/lib/reports/templates/shared/reportPageVariant";
 import type { FinalReportJson } from "@/lib/types";
 
 const headingFont = "var(--report-heading-font, inherit)";
 const bodyFont = "var(--report-body-font, inherit)";
+
+function formatStrOccupancyPercent(rate: number | null | undefined): string | null {
+  if (rate == null || Number.isNaN(rate)) {
+    return null;
+  }
+  const pct = rate <= 1 ? Math.round(rate * 100) : Math.round(rate);
+  return `${pct}%`;
+}
+
+/** Small callout line — occupancy + ADR when available. */
+export function formatStrCalloutMetrics(report: FinalReportJson): string | null {
+  const { str } = report;
+  const parts: string[] = [];
+  const occupancy = formatStrOccupancyPercent(str.occupancy_rate);
+  if (occupancy) {
+    parts.push(`${occupancy} avg occupancy`);
+  }
+  if (str.nightly_rate != null) {
+    parts.push(`${formatCurrency(str.nightly_rate)}/night ADR`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
 
 /** Resolve agents from report, falling back to singular agent field. */
 export function resolveReportAgents(report: FinalReportJson): FinalReportJson["agent"][] {
@@ -18,16 +47,25 @@ export function resolveReportAgents(report: FinalReportJson): FinalReportJson["a
 /** Primary revenue highlight box. Drop into the "price / sidebar" slot of any template. */
 export function StrRevenueBlock({
   report,
+  reportVariant,
   compact = false,
   onAccent = false,
 }: {
   report: FinalReportJson;
+  reportVariant?: ReportPageVariant;
   compact?: boolean;
   /** White text on brand accent background (e.g. Haven #009eca). */
   onAccent?: boolean;
 }) {
+  const variant = resolveReportPageVariant(report, reportVariant);
+  if (isLeasePageVariant(variant)) {
+    return <LtrRentBlock report={report} compact={compact} onAccent={onAccent} />;
+  }
+
   const { str, copy } = report;
   if (!str.annual_revenue) return null;
+
+  const calloutMetrics = formatStrCalloutMetrics(report);
 
   const labelClass = onAccent
     ? "text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-white/85"
@@ -42,10 +80,14 @@ export function StrRevenueBlock({
   return (
     <div
       className="p-4"
-      style={{ backgroundColor: "var(--report-soft-highlight, #f3f4f6)" }}
+      style={{
+        backgroundColor: onAccent
+          ? "var(--report-soft-highlight, var(--report-headline-colour, #009eca))"
+          : "var(--report-soft-highlight, #f3f4f6)",
+      }}
     >
       <p className={labelClass} style={{ fontFamily: headingFont }}>
-        Estimated gross STR revenue
+        {STR_ANNUAL_REVENUE_LABEL}
       </p>
       <p
         className="mt-1.5 font-semibold leading-none tracking-tight"
@@ -58,15 +100,25 @@ export function StrRevenueBlock({
         {formatCurrency(str.annual_revenue)}
       </p>
       <p className={subClass}>per year before costs</p>
-      {copy.key_metrics_line ? (
-        <p className={metricsClass}>{copy.key_metrics_line}</p>
+      {(calloutMetrics ?? copy.key_metrics_line) ? (
+        <p className={metricsClass}>{calloutMetrics ?? copy.key_metrics_line}</p>
       ) : null}
     </div>
   );
 }
 
 /** Compact inline stat row — nightly rate + occupancy. */
-export function StrStatRow({ report }: { report: FinalReportJson }) {
+export function StrStatRow({
+  report,
+  reportVariant,
+}: {
+  report: FinalReportJson;
+  reportVariant?: ReportPageVariant;
+}) {
+  if (isLeasePageVariant(resolveReportPageVariant(report, reportVariant))) {
+    return null;
+  }
+
   const { str } = report;
   const items: { label: string; value: string }[] = [];
 

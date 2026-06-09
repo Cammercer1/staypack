@@ -19,6 +19,7 @@ export function HavenLeaseAppraisalPageTwo({ report }: Props) {
   const brand = getReportBrandColours(report.agency);
   const enrichment = report.ltr_enrichment;
   const comps = enrichment?.comps ?? [];
+  const showSix = comps.length >= HAVEN_LTR_FEATURED_COMP_COUNT;
   const suburbMarket = enrichment?.suburb_market ?? null;
   const accent = report.agency.primary_colour || HAVEN_BRAND.statBar;
 
@@ -38,7 +39,7 @@ export function HavenLeaseAppraisalPageTwo({ report }: Props) {
           <section className="min-h-0 shrink-0">
             {report.property.suburb ? (
               <h2
-                className="mb-3 text-base font-semibold"
+                className={`font-semibold ${showSix ? "mb-2 text-sm" : "mb-3 text-base"}`}
                 style={{
                   fontFamily: "var(--report-heading-font, inherit)",
                   color: accent,

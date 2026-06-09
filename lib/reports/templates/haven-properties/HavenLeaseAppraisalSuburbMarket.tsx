@@ -1,4 +1,8 @@
 import { formatNumber } from "@/lib/reports/formatters";
+import {
+  ReportSnapshotStatsBar,
+  type ReportSnapshotStat,
+} from "@/lib/reports/templates/shared/ReportSnapshotStatsBar";
 import type { LtrSuburbMarketJson } from "@/lib/types";
 
 const headingFont = "var(--report-heading-font, inherit)";
@@ -18,13 +22,7 @@ function formatCount(value: number | null) {
   return formatNumber(value);
 }
 
-type SnapshotStat = {
-  id: string;
-  label: string;
-  value: string;
-};
-
-function buildSuburbSnapshotStats(market: LtrSuburbMarketJson): SnapshotStat[] {
+function buildSuburbSnapshotStats(market: LtrSuburbMarketJson): ReportSnapshotStat[] {
   return [
     { id: "vacancy", label: "Vacancy rate", value: formatPct(market.vacancy_rate_pct) },
     { id: "yield", label: "Gross yield", value: formatPct(market.gross_yield_pct) },
@@ -56,9 +54,6 @@ export function HavenLeaseAppraisalSuburbMarket({
 }: Props) {
   const suburbTitle = formatSuburbTitle(market.suburb ?? "");
   const stats = buildSuburbSnapshotStats(market);
-  const statLabelClass =
-    "text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-white/80";
-  const statValueClass = compact ? "mt-1.5 text-[1.05rem]" : "mt-1.5 text-[1.15rem]";
 
   return (
     <div>
@@ -74,28 +69,7 @@ export function HavenLeaseAppraisalSuburbMarket({
         </h2>
       ) : null}
 
-      <div
-        className={compact ? "px-6 py-4" : "px-8 py-5"}
-        style={{
-          backgroundColor: accent ?? "var(--report-soft-highlight, #f3f4f6)",
-        }}
-      >
-        <div className="grid grid-cols-4 gap-8">
-          {stats.map((stat) => (
-            <div key={stat.id} className="min-w-0">
-              <p className={statLabelClass} style={{ fontFamily: headingFont }}>
-                {stat.label}
-              </p>
-              <p
-                className={`font-semibold leading-snug text-white ${statValueClass}`}
-                style={{ fontFamily: headingFont }}
-              >
-                {stat.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <ReportSnapshotStatsBar stats={stats} accent={accent} compact={compact} />
     </div>
   );
 }

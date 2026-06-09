@@ -18,7 +18,12 @@ function mergeListings(base: ParsedListing, next: ParsedListing): ParsedListing 
     carSpaces: base.carSpaces ?? next.carSpaces,
     description: base.description ?? next.description,
     displayPrice: normalizeDisplayPrice(base.displayPrice ?? next.displayPrice),
-    images: base.images.length ? base.images : next.images,
+    images:
+      next.images.length > base.images.length
+        ? next.images
+        : base.images.length
+          ? base.images
+          : next.images,
     agents: mergeListingAgents(base.agents, next.agents),
     rentalAppraisal: base.rentalAppraisal ?? next.rentalAppraisal,
     rentalComps: base.rentalComps?.length ? base.rentalComps : next.rentalComps,

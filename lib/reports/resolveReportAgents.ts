@@ -46,6 +46,35 @@ function normalizeProfileAgent(agent: AgentProfile): ReportAgent {
   };
 }
 
+/** Agency roster + listing assignment — ignores scraped REA agent cards. */
+export function resolveAgencyAccountReportAgents({
+  agentProfile,
+  agencyAgents = [],
+}: {
+  agentProfile?: AgentProfile | null;
+  agencyAgents?: AgentProfile[];
+}): ReportAgent[] {
+  const primary =
+    agentProfile ??
+    agencyAgents.find((agent) => agent.is_default) ??
+    agencyAgents[0] ??
+    null;
+
+  if (!primary) {
+    return [];
+  }
+
+  const ordered: AgentProfile[] = [primary];
+  for (const agent of agencyAgents) {
+    if (agent.id === primary.id || ordered.length >= MAX_LISTING_AGENTS) {
+      continue;
+    }
+    ordered.push(agent);
+  }
+
+  return ordered.map(normalizeProfileAgent);
+}
+
 export function resolveReportAgents({
   scraped,
   agentProfile,

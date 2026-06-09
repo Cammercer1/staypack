@@ -16,11 +16,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { BlurbVariantsEditor } from "@/components/collateral/sales-brochure/BlurbVariantsEditor";
+import { BlurbLengthMappingPanel } from "@/components/dev/BlurbLengthMappingPanel";
 import { BlurbBlockEditor } from "@/components/collateral/sales-brochure/BlurbBlockEditor";
 import { FittedBrochurePreview } from "@/components/collateral/sales-brochure/FittedBrochurePreview";
 import { BrochureImagePickerDialog } from "@/components/collateral/sales-brochure/inline/BrochureImagePickerDialog";
 import type { BrochureImageSlot } from "@/components/collateral/sales-brochure/inline/EditableContext";
 import { enforceSalesBrochureCopyLimits } from "@/lib/collateral/sales-brochure/copyLimits";
+import { pagesFromTemplateId } from "@/lib/reports/templates/playgroundResolve";
 import { SALES_BROCHURE_COPY_LIMITS } from "@/lib/collateral/sales-brochure/copyLimits";
 import {
   setCopyValueAtPath,
@@ -507,9 +510,19 @@ export const GeneratedBrochureCopyEditor = forwardRef<
                 <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
               </summary>
               <div className="space-y-4 border-t border-border/70 px-4 py-4">
-                <BlurbBlockEditor
-                  blocks={getBlurbBlocksForEditor(copy)}
-                  onChange={updateBlurbBlocks}
+                <BlurbVariantsEditor
+                  copy={copy}
+                  onChange={(next) => commitCopy(() => next)}
+                />
+                <BlurbLengthMappingPanel
+                  copy={copy}
+                  collateral="sale"
+                  pages={
+                    previewDocument
+                      ? pagesFromTemplateId(previewDocument.template_id, "sale")
+                      : 1
+                  }
+                  onChange={(next) => commitCopy(() => next)}
                 />
                 <StringListField
                   label={limits.property_highlights.label}

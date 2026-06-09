@@ -6,14 +6,35 @@ import {
   formatStrGrossYield,
   resolveStrGrossYield,
 } from "@/lib/reports/calculateStrYield";
+import { STR_ANNUAL_REVENUE_LABEL } from "@/lib/reports/resolveStrBrochurePrice";
+import {
+  ReportCopyAppealPoint,
+  ReportCopyBlurb,
+  ReportCopyHeading,
+  ReportCopyKeyMetricsLine,
+} from "@/components/reports/inline/ReportCopyFields";
+import { LtrRentBlock } from "@/lib/reports/templates/shared/LtrRentBlock";
+import {
+  isLeasePageVariant,
+  isSalePageVariant,
+  showGuestStat,
+  type ReportPageVariant,
+} from "@/lib/reports/templates/shared/reportPageVariant";
 
 type Props = {
   report: FinalReportJson;
-  variant?: "light" | "detailed";
+  tier?: "light" | "detailed";
+  reportVariant?: ReportPageVariant;
 };
 
-export function ClassicPropertySection({ report, variant = "light" }: Props) {
+export function ClassicPropertySection({
+  report,
+  tier = "light",
+  reportVariant = "str",
+}: Props) {
   const { property, str, copy } = report;
+  const isLease = isLeasePageVariant(reportVariant);
+  const isSale = isSalePageVariant(reportVariant);
   const grossYield = resolveStrGrossYield({
     display_price: property.display_price,
     annual_revenue: str.annual_revenue,
@@ -24,12 +45,16 @@ export function ClassicPropertySection({ report, variant = "light" }: Props) {
     { id: "bedrooms", icon: BedDouble, value: formatNumber(property.bedrooms), label: "Beds" },
     { id: "bathrooms", icon: Bath, value: formatNumber(property.bathrooms), label: "Bath" },
     { id: "car_spaces", icon: Car, value: formatNumber(property.car_spaces), label: "Car" },
-    {
-      id: "accommodates",
-      icon: Users,
-      value: formatNumber(property.accommodates),
-      label: "Guests",
-    },
+    ...(showGuestStat(reportVariant)
+      ? [
+          {
+            id: "accommodates",
+            icon: Users,
+            value: formatNumber(property.accommodates),
+            label: "Guests",
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -46,33 +71,36 @@ export function ClassicPropertySection({ report, variant = "light" }: Props) {
             {property.address}
           </h2>
           {copy.heading ? (
-            <p
+            <ReportCopyHeading
+              text={copy.heading}
+              as="p"
               className="mt-3 text-lg font-semibold leading-snug"
               style={{
                 fontFamily: "var(--report-heading-font, inherit)",
                 color: "var(--report-text-colour, inherit)",
               }}
-            >
-              {copy.heading}
-            </p>
+            />
           ) : null}
         </div>
 
         {copy.blurb ? (
-          <p className="text-[0.95rem] leading-7 text-neutral-800">{copy.blurb}</p>
+          <ReportCopyBlurb
+            blurb={copy.blurb}
+            paraClassName="text-[0.95rem] leading-7 text-neutral-800"
+          />
         ) : property.summary ? (
           <p className="text-[0.95rem] leading-7 text-neutral-800">{property.summary}</p>
         ) : null}
 
-        {variant === "detailed" && copy.appeal_points?.length ? (
+        {tier === "detailed" && copy.appeal_points?.length ? (
           <ul className="flex flex-col gap-2.5 pt-1">
-            {copy.appeal_points.slice(0, 3).map((point) => (
+            {copy.appeal_points.slice(0, 4).map((point, index) => (
               <li
-                key={point}
+                key={`${index}-${point.slice(0, 24)}`}
                 className="flex gap-2.5 text-[0.82rem] leading-relaxed text-neutral-700"
               >
                 <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-400" aria-hidden />
-                <span>{point}</span>
+                <ReportCopyAppealPoint index={index} text={point} />
               </li>
             ))}
           </ul>
@@ -91,38 +119,65 @@ export function ClassicPropertySection({ report, variant = "light" }: Props) {
           ))}
         </div>
 
-        <div
-          className="p-4"
-          style={{ backgroundColor: "var(--report-soft-highlight, #f3f4f6)" }}
-        >
-          <p
-            className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600"
-            style={{ fontFamily: "var(--report-heading-font, inherit)" }}
+        {isLease ? (
+          <LtrRentBlock report={report} />
+        ) : isSale && property.display_price ? (
+          <div
+            className="p-4"
+            style={{ backgroundColor: "var(--report-soft-highlight, #f3f4f6)" }}
           >
-            Estimated gross STR revenue
-          </p>
-          <p
-            className="mt-2 text-[2rem] font-semibold leading-none tracking-tight"
-            style={{
-              fontFamily: "var(--report-heading-font, inherit)",
-              color: "var(--report-text-colour, inherit)",
-            }}
+            <p
+              className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600"
+              style={{ fontFamily: "var(--report-heading-font, inherit)" }}
+            >
+              Price guide
+            </p>
+            <p
+              className="mt-2 text-[2rem] font-semibold leading-none tracking-tight"
+              style={{
+                fontFamily: "var(--report-heading-font, inherit)",
+                color: "var(--report-text-colour, inherit)",
+              }}
+            >
+              {property.display_price}
+            </p>
+          </div>
+        ) : (
+          <div
+            className="p-4"
+            style={{ backgroundColor: "var(--report-soft-highlight, #f3f4f6)" }}
           >
-            {formatCurrency(str.annual_revenue)}
-          </p>
-          <p className="mt-2 text-sm font-medium text-neutral-700">per year before costs</p>
-          {variant === "light" && grossYield ? (
-            <p className="mt-2 text-xs leading-5 text-neutral-600">
-              Est. gross STR yield {formatStrGrossYield(grossYield)} before costs
-              {" "}(listing price {grossYield.display_price})
+            <p
+              className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600"
+              style={{ fontFamily: "var(--report-heading-font, inherit)" }}
+            >
+              {STR_ANNUAL_REVENUE_LABEL}
             </p>
-          ) : null}
-          {copy.key_metrics_line ? (
-            <p className="mt-3 border-t border-neutral-200/70 pt-3 text-xs leading-5 text-neutral-600">
-              {copy.key_metrics_line}
+            <p
+              className="mt-2 text-[2rem] font-semibold leading-none tracking-tight"
+              style={{
+                fontFamily: "var(--report-heading-font, inherit)",
+                color: "var(--report-text-colour, inherit)",
+              }}
+            >
+              {formatCurrency(str.annual_revenue)}
             </p>
-          ) : null}
-        </div>
+            <p className="mt-2 text-sm font-medium text-neutral-700">per year before costs</p>
+            {tier === "light" && grossYield ? (
+              <p className="mt-2 text-xs leading-5 text-neutral-600">
+                Est. gross STR yield {formatStrGrossYield(grossYield)} before costs
+                {" "}(listing price {grossYield.display_price})
+              </p>
+            ) : null}
+            {copy.key_metrics_line ? (
+              <ReportCopyKeyMetricsLine
+                text={copy.key_metrics_line}
+                as="p"
+                className="mt-3 border-t border-neutral-200/70 pt-3 text-xs leading-5 text-neutral-600"
+              />
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { Button } from "@/components/ui/button";
+import { applyHavenBrandToReport } from "@/lib/reports/templates/haven-properties/brand";
 import { HAVEN_PROPERTIES_STR_TEMPLATE_ID } from "@/lib/reports/templates/ids";
 import type { FinalReportJson } from "@/lib/types";
 
@@ -27,10 +28,10 @@ export function HavenPropertiesPlayground({
   propertyAddress,
   baseReport,
 }: Props) {
-  const previewReport: FinalReportJson = {
+  const previewReport = applyHavenBrandToReport({
     ...baseReport,
     template_id: HAVEN_PROPERTIES_STR_TEMPLATE_ID,
-  };
+  });
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">

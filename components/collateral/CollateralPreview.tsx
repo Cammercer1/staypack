@@ -15,10 +15,8 @@ import {
   getDefaultSocialPostVariantId,
   normalizeSocialPostVariantId,
 } from "@/lib/collateral/social/formats";
-import {
-  coerceSalesBrochureDocument,
-  coerceSalesBrochureCopyForEditor,
-} from "@/lib/collateral/sales-brochure/propertyHighlights";
+import { coerceSalesBrochureDocument } from "@/lib/collateral/sales-brochure/coerceBrochureDocument";
+import { coerceSalesBrochureCopyForEditor } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import { salesBrochureToReportShape } from "@/lib/collateral/sales-brochure/toReportShape";
 import {
   isBrochureDocument,
@@ -50,18 +48,25 @@ import {
 import { BrochureImageMetaProvider } from "@/components/collateral/sales-brochure/inline/BrochureImageMetaContext";
 import { useEditableContext } from "@/components/collateral/sales-brochure/inline/EditableContext";
 import type { CollateralDocumentJson } from "@/lib/collateral/templates/types";
-import type { CollateralType } from "@/lib/types";
+import type { ReportPageVariant } from "@/lib/reports/templates/shared/reportPageVariant";
+import type { CollateralType, FinalReportJson } from "@/lib/types";
 
 export function CollateralPreview({
   document,
   collateralType,
   printMode = false,
   variantId,
+  metricsReport,
+  reportVariant,
+  allowDevBlurbLengthMap = false,
 }: {
   document: CollateralDocumentJson;
   collateralType: CollateralType;
   printMode?: boolean;
   variantId?: string;
+  metricsReport?: FinalReportJson;
+  reportVariant?: ReportPageVariant;
+  allowDevBlurbLengthMap?: boolean;
 }) {
   const { showFullBlurb } = useEditableContext();
 
@@ -76,10 +81,10 @@ export function CollateralPreview({
           copy: coerceSalesBrochureCopyForEditor(document.copy),
         };
       }
-      return coerceSalesBrochureDocument(document);
+      return coerceSalesBrochureDocument(document, { allowDevBlurbLengthMap });
     }
     return document;
-  }, [collateralType, document, showFullBlurb]);
+  }, [allowDevBlurbLengthMap, collateralType, document, showFullBlurb]);
 
   const templateId = resolveTemplateIdFromDocument(previewDocument, collateralType);
   const template = getCollateralTemplate(templateId);
@@ -204,6 +209,8 @@ export function CollateralPreview({
         <BrochureImageMetaProvider meta={previewDocument.listing_image_meta}>
           <Template
             document={previewDocument}
+            metricsReport={metricsReport}
+            reportVariant={reportVariant}
             {...(socialVariantId
               ? { variantId: socialVariantId }
               : businessCardVariantId
@@ -216,6 +223,8 @@ export function CollateralPreview({
       ) : (
         <Template
           document={previewDocument}
+          metricsReport={metricsReport}
+          reportVariant={reportVariant}
           {...(socialVariantId
             ? { variantId: socialVariantId }
             : businessCardVariantId

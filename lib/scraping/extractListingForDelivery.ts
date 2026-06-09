@@ -1,5 +1,4 @@
 import type { ParsedListing } from "@/lib/types";
-import { hasBrightDataReaConfig } from "@/lib/brightdata/client";
 import {
   fetchDomainListingPage,
   isDomainListingUrl,
@@ -20,7 +19,7 @@ import {
   parseAddressFromListingUrl,
 } from "@/lib/scraping/parseAddressFromUrl";
 import { isReaListingUrl } from "@/lib/scraping/rea/findReaListingUrl";
-import { tryReaBrightDataImport } from "@/lib/scraping/reaEnrichment";
+import { tryReaImport, hasReaImportConfig } from "@/lib/scraping/reaEnrichment";
 import {
   isSpfnListingUrl,
   parseSpfnDetailHtml,
@@ -109,26 +108,38 @@ async function resolveUrlAddressHint(
 }
 
 async function fetchAgencyHtml(url: string, warnings: string[]) {
-  let method: "static_fetch" | "browserless_rendered" = "browserless_rendered";
+  const isSpfn = isSpfnListingUrl(url);
+  let method: "static_fetch" | "browserless_rendered" = isSpfn
+    ? "static_fetch"
+    : "browserless_rendered";
   let html = "";
 
-  try {
-    const rendered = await fetchRenderedHtml(url);
-    if (rendered) {
-      html = rendered;
-    }
-  } catch (error) {
-    warnings.push(
-      error instanceof Error ? error.message : "Rendered page fetch failed",
-    );
-  }
-
-  if (!html) {
-    method = "static_fetch";
+  if (isSpfn) {
     try {
-      html = await fetchStaticHtml(url);
+      html = await fetchStaticHtml(url, 20000);
     } catch (error) {
-      warnings.push(error instanceof Error ? error.message : "Static fetch failed");
+      const msg = error instanceof Error ? error.message : "Static fetch failed";
+      warnings.push(msg);
+    }
+  } else {
+    try {
+      const rendered = await fetchRenderedHtml(url);
+      if (rendered) {
+        html = rendered;
+      }
+    } catch (error) {
+      warnings.push(
+        error instanceof Error ? error.message : "Rendered page fetch failed",
+      );
+    }
+
+    if (!html) {
+      method = "static_fetch";
+      try {
+        html = await fetchStaticHtml(url);
+      } catch (error) {
+        warnings.push(error instanceof Error ? error.message : "Static fetch failed");
+      }
     }
   }
 
@@ -182,11 +193,11 @@ async function enrichFromRea(
   agencyListing: ParsedListing,
   warnings: string[],
 ) {
-  if (!hasBrightDataReaConfig()) {
+  if (!hasReaImportConfig()) {
     return { listing, used: false };
   }
 
-  const reaImport = await tryReaBrightDataImport(url, {
+  const reaImport = await tryReaImport(url, {
     address: listing.address ?? addressHint?.address,
     suburb: listing.suburb ?? addressHint?.suburb,
     state: listing.state ?? addressHint?.state,
@@ -203,7 +214,11 @@ async function enrichFromRea(
     agencyListing,
   );
 
-  warnings.push("Enriched from realestate.com.au (Bright Data).");
+  warnings.push(
+    reaImport.provider === "apify"
+      ? "Enriched from realestate.com.au (Apify)."
+      : "Enriched from realestate.com.au (Bright Data).",
+  );
   return { listing: merged, used: true };
 }
 
@@ -334,7 +349,8 @@ async function extractDirectDomainUrl(url: string): Promise<ExtractListingForDel
 
 async function extractDirectReaUrl(url: string): Promise<ExtractListingForDeliveryResult> {
   const warnings: string[] = [];
-  const reaImport = await tryReaBrightDataImport(url, parseAddressFromListingUrl(url));
+  // URL is already a REA listing page — scrape it directly (Apify), no Google discovery.
+  const reaImport = await tryReaImport(url, null);
   warnings.push(...reaImport.warnings);
 
   if (!reaImport.used) {
@@ -362,7 +378,7 @@ async function extractDirectReaUrl(url: string): Promise<ExtractListingForDelive
     listing,
     warnings,
     method: "brightdata_rea",
-    parserName: "rea_brightdata",
+    parserName: reaImport.provider === "apify" ? "rea_apify" : "rea_brightdata",
     source: "rea",
   });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { REPORT_TEMPLATES } from "@/lib/reports/templates/registry";
+import { useAvailableTemplates } from "@/components/templates/useAvailableTemplates";
 import type { ReportTemplateTier } from "@/lib/reports/templates/types";
 
 type Props = {
@@ -15,20 +15,35 @@ type Props = {
 
 /** One option per visual family; tier (pages) is inherited from the estimate step. */
 export function ReportTemplatePicker({ value, tier: tierProp, onChange }: Props) {
+  const { data, loading } = useAvailableTemplates("str");
   const tier: ReportTemplateTier =
     tierProp ?? (value.endsWith("-detailed") ? "detailed" : "light");
-  // Deduplicate: one entry per family (use the light variant as the canonical label)
-  const families = REPORT_TEMPLATES.filter((t) => t.tier === "light").map((t) => ({
-    family: t.family,
-    label: t.label,
+
+  const templates = (data?.templates ?? []).filter(
+    (entry) => entry.tier === tier,
+  );
+
+  const families = templates.map((entry) => ({
+    family: entry.family ?? entry.id.replace(/-(?:light|detailed)$/, ""),
+    label: entry.label,
   }));
 
-  // Derive the current family from the full template ID
   const currentFamily = value.replace(/-(?:light|detailed)$/, "");
 
   function handleChange(family: string) {
     const id = `${family}-${tier}`;
     onChange(id);
+  }
+
+  if (loading && families.length === 0) {
+    return (
+      <select
+        disabled
+        className="h-8 rounded-md border border-input bg-background px-2.5 py-0 text-sm text-muted-foreground"
+      >
+        <option>Loading templates…</option>
+      </select>
+    );
   }
 
   return (

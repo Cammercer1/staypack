@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
 import { CollateralPreview } from "@/components/collateral/CollateralPreview";
 import { verifyCollateralPrintAccessToken } from "@/lib/collateral/printAccessToken";
-import { resolveBrochurePrintDocument } from "@/lib/collateral/enrichSalesBrochureDocument";
+import { resolveBrochurePrintContext } from "@/lib/collateral/enrichSalesBrochureDocument";
 import type { Agency, CollateralDocumentJson, CollateralType } from "@/lib/types";
 
 export default async function DraftCollateralPrintPage({
@@ -45,7 +45,7 @@ export default async function DraftCollateralPrintPage({
     notFound();
   }
 
-  const document = await resolveBrochurePrintDocument({
+  const { document, metricsReport } = await resolveBrochurePrintContext({
     admin,
     agency: agency as Agency,
     collateral: {
@@ -79,6 +79,8 @@ export default async function DraftCollateralPrintPage({
         <CollateralPreview
           document={document}
           collateralType={collateral.type as CollateralType}
+          metricsReport={metricsReport}
+          reportVariant="sale"
           printMode
           variantId={variant}
         />

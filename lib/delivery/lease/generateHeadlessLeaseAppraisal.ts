@@ -1,11 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getReportsUrl } from "@/lib/env";
+import { getPrintRenderBaseUrl, getReportsUrl } from "@/lib/env";
 import { renderPdfFromUrl, buildPdfImagePath, buildPdfStylesheetPath } from "@/lib/browserless/pdf";
 import { buildLeaseAppraisalReport } from "@/lib/lease-appraisal/buildLeaseAppraisalReport";
 import { generateLeaseAppraisalCopy } from "@/lib/openai/generateLeaseAppraisalCopy";
 import { rentAppraisalTierSetting } from "@/lib/delivery/rentAppraisalConfig";
 import { enrichListingRentalAppraisal } from "@/lib/rental/enrichListingRentalAppraisal";
-import { applyTemplateBrandToFinalReport } from "@/lib/reports/applyTemplateBrand";
+import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
 import { buildPublicReportUrl, generateReportSlug } from "@/lib/reports/slugs";
 import { HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/templates/ids";
@@ -133,7 +133,7 @@ export async function generateHeadlessLeaseAppraisal({
     featuredComps: ltrEnrichment?.comps ?? [],
   });
 
-  const finalReportJson = applyTemplateBrandToFinalReport(
+  const finalReportJson = resolveFinalReportForDisplay(
     buildLeaseAppraisalReport({
       agency: agency as Agency,
       listing,
@@ -143,6 +143,7 @@ export async function generateHeadlessLeaseAppraisal({
       templateId,
       copy,
     }),
+    { templateId },
   );
 
   const publicSlug = generateReportSlug();
@@ -171,7 +172,7 @@ export async function generateHeadlessLeaseAppraisal({
     throw new Error(publishError?.message ?? "Failed to publish lease appraisal report");
   }
 
-  const printUrl = `${getReportsUrl().replace(/\/$/, "")}/${agency.slug}/${publicSlug}/print`;
+  const printUrl = `${getPrintRenderBaseUrl().replace(/\/$/, "")}/${agency.slug}/${publicSlug}/print`;
 
   const pdfBuffer = await renderPdfFromUrl(printUrl, {
     mirrorImage: async (sourceUrl, buffer, contentType) => {

@@ -141,6 +141,26 @@ export async function markPropertyFailed(id: string, message: string) {
   if (error) throw new Error(error.message);
 }
 
+/** Listing URLs already delivered for this tenant (skip when picking the next new property per site). */
+export async function getDeliveredListingUrlsForTenant(
+  tenantId: string,
+): Promise<Set<string>> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("delivery_tenant_properties")
+    .select("listing_url")
+    .eq("tenant_id", tenantId)
+    .eq("status", "delivered");
+
+  if (error) throw new Error(error.message);
+
+  return new Set(
+    (data ?? [])
+      .map((row) => row.listing_url)
+      .filter((url): url is string => typeof url === "string" && url.length > 0),
+  );
+}
+
 export async function touchPropertyLastSeen(id: string) {
   const admin = createAdminClient();
   const { error } = await admin

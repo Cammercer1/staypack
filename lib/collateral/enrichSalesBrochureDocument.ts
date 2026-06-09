@@ -1,4 +1,6 @@
 import { mergeAgencyBrandIntoCollateralDocument } from "@/lib/collateral/mergeAgencyBrand";
+import { SALES_BROCHURE_CLASSIC_1PG_TEMPLATE_ID } from "@/lib/collateral/templates/ids";
+import { loadClassicBrochureMetricsForListing } from "@/lib/collateral/templates/sales-brochure/shared/loadClassicBrochureMetricsForListing";
 import {
   isBrochureDocument,
   type BrochureDocumentJson,
@@ -9,7 +11,13 @@ import {
   resolveReportAgents,
 } from "@/lib/reports/resolveReportAgents";
 import { resolveListingImageMetaForPool } from "@/lib/listings/syncListingImageMeta";
-import type { Agency, AgentProfile, CollateralDocumentJson, Listing } from "@/lib/types";
+import type {
+  Agency,
+  AgentProfile,
+  CollateralDocumentJson,
+  FinalReportJson,
+  Listing,
+} from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export function enrichSalesBrochureDocumentAgents(
@@ -114,6 +122,45 @@ export async function resolveBrochurePrintDocument(
   input: Parameters<typeof resolveSalesBrochurePrintDocument>[0],
 ): Promise<CollateralDocumentJson> {
   return resolveSalesBrochurePrintDocument(input);
+}
+
+export type BrochurePrintContext = {
+  document: CollateralDocumentJson;
+  metricsReport?: FinalReportJson;
+};
+
+/** Print/PDF payload: enriched brochure document plus Classic page-one STR/lease metrics when available. */
+export async function resolveBrochurePrintContext(
+  input: Parameters<typeof resolveSalesBrochurePrintDocument>[0],
+): Promise<BrochurePrintContext> {
+  const document = await resolveSalesBrochurePrintDocument(input);
+
+  if (
+    !input.collateral.listing_id ||
+    !isBrochureDocument(document) ||
+    document.template_id !== SALES_BROCHURE_CLASSIC_1PG_TEMPLATE_ID
+  ) {
+    return { document };
+  }
+
+  const { data: listing } = await input.admin
+    .from("listings")
+    .select("*")
+    .eq("id", input.collateral.listing_id)
+    .maybeSingle();
+
+  if (!listing) {
+    return { document };
+  }
+
+  const metricsReport = await loadClassicBrochureMetricsForListing({
+    admin: input.admin,
+    agency: input.agency,
+    listing: listing as Listing,
+    listingId: input.collateral.listing_id,
+  });
+
+  return metricsReport ? { document, metricsReport } : { document };
 }
 
 export const enrichBrochureDocumentAgents = enrichSalesBrochureDocumentAgents;

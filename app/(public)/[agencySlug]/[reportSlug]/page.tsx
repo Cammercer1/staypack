@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
+import { resolveStoredFinalReport } from "@/lib/reports/resolveStoredFinalReport";
 import { ReportPreview } from "@/components/reports/ReportPreview";
 import type { Agency, FinalReportJson, Listing } from "@/lib/types";
 
@@ -73,7 +74,8 @@ export default async function PublicReportPage({
     >,
     mergeAgencyBrandIntoFinalReport(
       agency as Agency,
-      report.final_report_json as FinalReportJson,
+      resolveStoredFinalReport(report) ??
+        (report.final_report_json as FinalReportJson),
     ),
     { agentProfile, agencyAgents: agencyAgents ?? [] },
   );

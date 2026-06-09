@@ -1,3 +1,9 @@
+import {
+  PAGE_ONE_BLURB_MAX,
+  PAGE_ONE_BULLET_COUNT,
+  PAGE_ONE_BULLET_MAX,
+  PAGE_ONE_HEADING_MAX,
+} from "@/lib/copy/pageOneMarketingCopy";
 import type { AiCopyJson } from "@/lib/types";
 import {
   CLASSIC_DETAILED_TEMPLATE_ID,
@@ -7,39 +13,23 @@ import {
 
 export const CLASSIC_LIGHT_COPY_LIMITS = {
   sales_pack_heading: {
-    max: 90,
+    max: PAGE_ONE_HEADING_MAX,
     label: "Heading",
-    hint: "Short subtitle shown under the address.",
+    hint: "Engaging title shown under the address.",
   },
   sales_pack_blurb: {
-    max: 340,
+    max: PAGE_ONE_BLURB_MAX,
     label: "Blurb",
-    hint: "About 4–5 lines on the Classic light layout. Text must fit in full.",
+    hint: "One short paragraph (max 350 characters).",
   },
   key_metrics_line: {
     max: 180,
     label: "Key metrics line",
-    hint: "Supporting line under the revenue figure.",
+    hint: "Supporting line under the revenue figure (auto-filled from estimate).",
   },
 } as const;
 
-export const CLASSIC_DETAILED_COPY_LIMITS = {
-  sales_pack_heading: {
-    max: 90,
-    label: "Heading",
-    hint: "Short subtitle shown under the address.",
-  },
-  sales_pack_blurb: {
-    max: 220,
-    label: "Blurb",
-    hint: "Shorter on page 1 — detailed evidence continues on page 2.",
-  },
-  key_metrics_line: {
-    max: 140,
-    label: "Key metrics line",
-    hint: "Brief supporting line; avoid repeating page-2 data.",
-  },
-} as const;
+export const CLASSIC_DETAILED_COPY_LIMITS = CLASSIC_LIGHT_COPY_LIMITS;
 
 export type ClassicCopyField = keyof typeof CLASSIC_LIGHT_COPY_LIMITS;
 
@@ -99,6 +89,9 @@ export function enforceClassicCopyLimits(
       copy.key_metrics_line,
       templateId,
     ),
+    property_appeal_points: copy.property_appeal_points
+      .slice(0, PAGE_ONE_BULLET_COUNT)
+      .map((item) => trimToWordBoundary(item, PAGE_ONE_BULLET_MAX)),
   };
 }
 
@@ -111,6 +104,7 @@ export function getClassicCopyPromptLimits(templateId: string) {
 
   return `Classic ${tier} layout hard maximums:
 - sales_pack_heading: ${limits.sales_pack_heading.max} characters
-- sales_pack_blurb: ${limits.sales_pack_blurb.max} characters
+- sales_pack_blurb: ${limits.sales_pack_blurb.max} characters (single paragraph)
+- property_appeal_points: exactly ${PAGE_ONE_BULLET_COUNT} bullets, ${PAGE_ONE_BULLET_MAX} characters each
 - key_metrics_line: ${limits.key_metrics_line.max} characters`;
 }

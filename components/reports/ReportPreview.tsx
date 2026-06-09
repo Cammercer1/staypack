@@ -16,6 +16,7 @@ import {
 import { getReportFontConfig } from "@/lib/reports/reportFonts";
 import { getReportTemplate } from "@/lib/reports/templates/registry";
 import { resolveTemplateIdFromFinalReport } from "@/lib/reports/templates/resolveTemplateId";
+import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 
 export function ReportPreview({
   report,
@@ -27,10 +28,11 @@ export function ReportPreview({
   orientation?: ReportPageOrientation;
 }) {
   const pageFormat = getReportPageFormat(orientation);
-  const template = getReportTemplate(resolveTemplateIdFromFinalReport(report));
+  const displayReport = resolveFinalReportForDisplay(report);
+  const template = getReportTemplate(resolveTemplateIdFromFinalReport(displayReport));
   const Template = template.Component;
-  const brand = getReportBrandColours(report.agency);
-  const fonts = getReportFontConfig(report.agency);
+  const brand = getReportBrandColours(displayReport.agency);
+  const fonts = getReportFontConfig(displayReport.agency);
 
   return (
     <div
@@ -40,8 +42,8 @@ export function ReportPreview({
       style={{
         ...getReportPageFormatStyle(pageFormat),
         ...getReportBrandColourVars(brand),
-        ...getReportBrandLogoVars(report.agency),
-        ...getReportBrandAdvancedVars(report.agency),
+        ...getReportBrandLogoVars(displayReport.agency),
+        ...getReportBrandAdvancedVars(displayReport.agency),
         color: brand.text,
         backgroundColor: brand.pageBackground,
         ["--report-heading-font" as string]: fonts.headingFontFamily,
@@ -68,12 +70,13 @@ export function ReportPreview({
         fonts={{
           heading_font_family: fonts.headingFontId,
           body_font_family: fonts.bodyFontId,
-          heading_font_file_url: report.agency.heading_font_file_url,
+          heading_font_file_url: displayReport.agency.heading_font_file_url,
           body_font_file_url:
-            report.agency.body_font_file_url || report.agency.font_file_url,
+            displayReport.agency.body_font_file_url ||
+            displayReport.agency.font_file_url,
         }}
       />
-      <Template report={report} />
+      <Template report={displayReport} />
     </div>
   );
 }

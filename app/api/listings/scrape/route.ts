@@ -16,7 +16,8 @@ import { detectListingPurpose } from "@/lib/listings/detectListingPurpose";
 import { listingImageMetaForScrapeUpdate } from "@/lib/listings/syncListingImageMeta";
 import type { Listing, ParsedListing } from "@/lib/types";
 
-export const maxDuration = 60;
+// Apify REA listing scrape can take up to APIFY_REA_TIMEOUT_MS (default 120s).
+export const maxDuration = 120;
 
 function buildScrapedListingFields(
   listingUrl: string,

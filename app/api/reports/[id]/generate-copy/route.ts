@@ -9,6 +9,8 @@ import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
 import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
+import { assertTemplateGranted } from "@/lib/templates/grants/assertTemplateGranted";
+import { templateGrantErrorResponse } from "@/lib/templates/grants/apiErrors";
 import { generateCopyRequestSchema } from "@/lib/validation/schemas";
 import type { Report } from "@/lib/types";
 
@@ -39,6 +41,16 @@ export async function POST(
       ? { ...report, template_id: body.template_id }
       : report;
     const templateId = resolveReportTemplateId(agency, reportForBuild);
+
+    try {
+      await assertTemplateGranted(agency.id, templateId);
+    } catch (grantError) {
+      const denied = templateGrantErrorResponse(grantError);
+      if (denied) {
+        return denied;
+      }
+      throw grantError;
+    }
 
     const agentProfile = await loadListingAgentProfile(supabase, listing);
     const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);

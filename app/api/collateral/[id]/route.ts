@@ -26,6 +26,9 @@ import {
   type SocialPostsDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { isValidCollateralTemplateId } from "@/lib/collateral/templates/ids";
+import { assertTemplateGranted } from "@/lib/templates/grants/assertTemplateGranted";
+import { templateGrantErrorResponse } from "@/lib/templates/grants/apiErrors";
+import type { Agency } from "@/lib/types";
 import {
   updateRentalBrochureDocumentSchema,
   updateSalesBrochureDocumentSchema,
@@ -42,7 +45,7 @@ export async function PATCH(
     const { supabase, agency, collateral } = await requireCollateralAccess(id);
 
     if (collateral.type === "sales_brochure" || collateral.type === "rental_brochure") {
-      return patchBrochure(request, supabase, collateral);
+      return patchBrochure(request, supabase, agency, collateral);
     }
 
     if (collateral.type === "social_posts") {
@@ -203,6 +206,7 @@ async function patchBusinessCard(
 async function patchBrochure(
   request: Request,
   supabase: Awaited<ReturnType<typeof requireCollateralAccess>>["supabase"],
+  agency: Agency,
   collateral: Awaited<ReturnType<typeof requireCollateralAccess>>["collateral"],
 ) {
   const schema =
@@ -216,6 +220,18 @@ async function patchBrochure(
     !isValidCollateralTemplateId(body.template_id)
   ) {
     return NextResponse.json({ error: "Invalid brochure template" }, { status: 400 });
+  }
+
+  if (body.template_id) {
+    try {
+      await assertTemplateGranted(agency.id, body.template_id);
+    } catch (grantError) {
+      const denied = templateGrantErrorResponse(grantError);
+      if (denied) {
+        return denied;
+      }
+      throw grantError;
+    }
   }
 
   if (!collateral.document_json) {

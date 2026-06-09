@@ -5,13 +5,14 @@ import {
   normalizeBlurbBlocks,
   normalizeBlurbBlocksForEditor,
 } from "@/lib/collateral/sales-brochure/blurbBlocks";
-import type {
-  SalesBrochureCopyJson,
-  BrochureDocumentJson,
-} from "@/lib/collateral/templates/types";
+import {
+  PROPERTY_HIGHLIGHTS_ITEM_MAX,
+  PROPERTY_HIGHLIGHTS_MAX,
+} from "@/lib/collateral/sales-brochure/brochureCopyConstants";
+import { normalizeBlurbVariantsFromCopy } from "@/lib/copy/blurbVariantEnforce";
+import type { SalesBrochureCopyJson } from "@/lib/collateral/templates/types";
 
-export const PROPERTY_HIGHLIGHTS_MAX = 8;
-export const PROPERTY_HIGHLIGHTS_ITEM_MAX = 140;
+export { PROPERTY_HIGHLIGHTS_ITEM_MAX, PROPERTY_HIGHLIGHTS_MAX };
 
 type LegacyBrochureCopy = SalesBrochureCopyJson & {
   appeal_points?: string[];
@@ -31,15 +32,6 @@ export function getPropertyHighlights(copy: LegacyBrochureCopy): string[] {
     ...(copy.appeal_points ?? []),
     ...(copy.feature_highlights ?? []),
   ]);
-}
-
-export function coerceSalesBrochureDocument(
-  document: BrochureDocumentJson,
-): BrochureDocumentJson {
-  return {
-    ...document,
-    copy: coerceSalesBrochureCopy(document.copy as LegacyBrochureCopy),
-  };
 }
 
 /** Merges legacy appeal_points + feature_highlights into property_highlights. */
@@ -65,6 +57,8 @@ export function coerceSalesBrochureCopy(
     heading: copy.heading ?? "",
     blurb,
     blurb_blocks,
+    blurb_variants: normalizeBlurbVariantsFromCopy(copy),
+    template_blurb_length: copy.template_blurb_length,
     property_highlights,
     inspection_cta: copy.inspection_cta ?? "",
     disclaimer: copy.disclaimer ?? "",
@@ -99,6 +93,8 @@ export function coerceSalesBrochureCopyForEditor(
     heading: copy.heading ?? "",
     blurb,
     blurb_blocks,
+    blurb_variants: normalizeBlurbVariantsFromCopy(copy),
+    template_blurb_length: copy.template_blurb_length,
     property_highlights,
     inspection_cta: copy.inspection_cta ?? "",
     disclaimer: copy.disclaimer ?? "",

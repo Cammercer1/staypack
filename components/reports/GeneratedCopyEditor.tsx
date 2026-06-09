@@ -5,9 +5,10 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  CopyEditorContextMetric,
+  CopyEditorField,
+} from "@/components/copy-editor/primitives";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { formatCurrency, formatPercent } from "@/lib/reports/formatters";
@@ -16,7 +17,12 @@ import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
 import { enforceTemplateCopyLimits } from "@/lib/reports/enforceTemplateCopyLimits";
 import { getTemplateCopyFieldLimit } from "@/lib/reports/getTemplateCopyLimits";
 import { resolveReportTemplateIdForReport } from "@/lib/reports/templateFromEstimateTier";
+import { BlurbVariantsEditor } from "@/components/collateral/sales-brochure/BlurbVariantsEditor";
 import { ReportTemplatePicker } from "@/components/reports/ReportTemplatePicker";
+import {
+  aiCopyToVariantEditorShape,
+  applyVariantEditorToAiCopy,
+} from "@/lib/copy/aiCopyBlurbAdapter";
 import type { Agency, AgentProfile, AiCopyJson, Listing, Report } from "@/lib/types";
 
 type Props = {
@@ -212,10 +218,6 @@ export function GeneratedCopyEditor({
     selectedTemplateId,
     "sales_pack_heading",
   );
-  const blurbLimit = getTemplateCopyFieldLimit(
-    selectedTemplateId,
-    "sales_pack_blurb",
-  );
 
   const addressLine = [
     listing.property_address,
@@ -242,33 +244,33 @@ export function GeneratedCopyEditor({
             {addressLine || "No property address saved yet"}
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <ContextMetric
+            <CopyEditorContextMetric
               label="Bedrooms"
               value={listing.bedrooms != null ? String(listing.bedrooms) : "—"}
             />
-            <ContextMetric
+            <CopyEditorContextMetric
               label="Bathrooms"
               value={listing.bathrooms != null ? String(listing.bathrooms) : "—"}
             />
-            <ContextMetric
+            <CopyEditorContextMetric
               label="Listing price"
               value={displayPrice ?? "—"}
             />
             {estimate ? (
               <>
-                <ContextMetric
+                <CopyEditorContextMetric
                   label="Annual revenue"
                   value={formatCurrency(estimate.annualRevenue)}
                 />
-                <ContextMetric
+                <CopyEditorContextMetric
                   label="Occupancy"
                   value={formatPercent(estimate.occupancyRate)}
                 />
-                <ContextMetric
+                <CopyEditorContextMetric
                   label="Nightly rate"
                   value={formatCurrency(estimate.nightlyRate)}
                 />
-                <ContextMetric
+                <CopyEditorContextMetric
                   label="Booked nights"
                   value={
                     estimate.bookedNights != null
@@ -317,20 +319,21 @@ export function GeneratedCopyEditor({
 
         {copy ? (
           <div className="space-y-4">
-            <Field
+            <CopyEditorField
               label="Heading"
               value={copy.sales_pack_heading}
               onChange={(value) => updateField("sales_pack_heading", value)}
               limit={headingLimit}
             />
-            <Field
-              label="Blurb"
-              value={copy.sales_pack_blurb}
-              onChange={(value) => updateField("sales_pack_blurb", value)}
-              textarea
-              limit={blurbLimit}
+            <BlurbVariantsEditor
+              copy={aiCopyToVariantEditorShape(copy)}
+              onChange={(shaped) =>
+                setCopy((current) =>
+                  current ? applyVariantEditorToAiCopy(current, shaped) : current,
+                )
+              }
             />
-            <Field
+            <CopyEditorField
               label="Appeal points"
               value={copy.property_appeal_points.join("\n")}
               onChange={(value) =>
@@ -342,7 +345,7 @@ export function GeneratedCopyEditor({
               textarea
               hint="One point per line."
             />
-            <Field
+            <CopyEditorField
               label="Disclaimer"
               value={copy.disclaimer}
               onChange={(value) => updateField("disclaimer", value)}
@@ -393,73 +396,6 @@ export function GeneratedCopyEditor({
       </div>
     </div>
     </AsyncLoadingOverlay>
-  );
-}
-
-function ContextMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-medium">{value}</p>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  textarea = false,
-  hint,
-  limit,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  textarea?: boolean;
-  hint?: string;
-  limit?: {
-    max: number;
-    hint: string;
-  } | null;
-}) {
-  const atLimit = limit ? value.length >= limit.max : false;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-3">
-        <Label>{label}</Label>
-        {limit ? (
-          <span
-            className={
-              atLimit
-                ? "text-xs font-medium text-amber-700"
-                : "text-xs text-muted-foreground"
-            }
-          >
-            {value.length}/{limit.max}
-          </span>
-        ) : null}
-      </div>
-      {textarea ? (
-        <Textarea
-          rows={4}
-          value={value}
-          maxLength={limit?.max}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      ) : (
-        <Input
-          value={value}
-          maxLength={limit?.max}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      )}
-      {limit ? (
-        <p className="text-xs text-muted-foreground">{limit.hint}</p>
-      ) : null}
-      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
-    </div>
   );
 }
 

@@ -1,4 +1,6 @@
+import { isLightColour } from "@/lib/branding/contrast";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
+import { resolveBrochureBrandBand } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureBrandBand";
 import type { FinalReportJson } from "@/lib/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
 import { BrochureSlotImage } from "@/components/collateral/sales-brochure/inline/BrochureSlotImage";
@@ -29,27 +31,31 @@ function resolveBoldPhotos(document: BrochureDocumentJson) {
 }
 
 function buildBoldFeatureItems(document: BrochureDocumentJson) {
-  return getPropertyHighlights(document.copy).slice(0, 8);
+  return getPropertyHighlights(document.copy).slice(0, 4);
 }
 
 function BoldStatPill({
   value,
   label,
+  text,
+  mutedText,
 }: {
   value: string;
   label: string;
+  text: string;
+  mutedText: string;
 }) {
   return (
     <div className="flex items-baseline gap-1.5">
       <span
-        className="text-[1.1rem] font-bold leading-none text-white"
-        style={{ fontFamily: bodyFont }}
+        className="text-[1.1rem] font-bold leading-none"
+        style={{ fontFamily: bodyFont, color: text }}
       >
         {value}
       </span>
       <span
-        className="text-[0.62rem] font-medium uppercase tracking-[0.08em] text-white/70"
-        style={{ fontFamily: headingFont }}
+        className="text-[0.62rem] font-medium uppercase tracking-[0.08em]"
+        style={{ fontFamily: headingFont, color: mutedText, opacity: 0.75 }}
       >
         {label}
       </span>
@@ -59,7 +65,7 @@ function BoldStatPill({
 
 function BoldStatStrip({ document }: { document: BrochureDocumentJson }) {
   const { property } = document;
-  const accent = document.agency.accent_colour || document.agency.primary_colour || "#1a1a2e";
+  const band = resolveBrochureBrandBand(document.agency);
 
   const stats: Array<{ value: string; label: string }> = [];
   if (property.bedrooms) stats.push({ value: formatNumber(property.bedrooms), label: "Bed" });
@@ -72,11 +78,17 @@ function BoldStatStrip({ document }: { document: BrochureDocumentJson }) {
   return (
     <div
       className="flex shrink-0 items-center justify-between px-8 py-3.5"
-      style={{ backgroundColor: accent }}
+      style={{ backgroundColor: band.background, color: band.text }}
     >
       <div className="flex items-center gap-8">
         {stats.map((s) => (
-          <BoldStatPill key={s.label} value={s.value} label={s.label} />
+          <BoldStatPill
+            key={s.label}
+            value={s.value}
+            label={s.label}
+            text={band.text}
+            mutedText={band.text}
+          />
         ))}
       </div>
       {resolveBrochurePrice(document) ? (
@@ -84,20 +96,25 @@ function BoldStatStrip({ document }: { document: BrochureDocumentJson }) {
           <Editable
             as="span"
             path="copy.price_label"
-            className="text-[0.62rem] font-medium uppercase tracking-[0.08em] text-white/70"
-            style={{ fontFamily: headingFont }}
+            className="text-[0.62rem] font-medium uppercase tracking-[0.08em]"
+            style={{ fontFamily: headingFont, color: band.text, opacity: 0.75 }}
           >
             {resolveBrochurePriceLabel(document)}
           </Editable>
           <Editable
             as="span"
             path="copy.price_value"
-            className="text-[1rem] font-bold text-white"
-            style={{ fontFamily: headingFont }}
+            className="text-[1rem] font-bold"
+            style={{ fontFamily: headingFont, color: band.text }}
           >
             {resolveBrochurePrice(document)}
           </Editable>
-          <BrochureRentalBondInline document={document} inverted compact />
+          <BrochureRentalBondInline
+            document={document}
+            inverted
+            compact
+            accent={band.text}
+          />
         </div>
       ) : null}
     </div>
@@ -330,33 +347,39 @@ function BoldBody({
 }
 
 export function BoldFooterBand({ document }: { document: BrochureDocumentJson }) {
-  const footerBg = document.agency.accent_colour || document.agency.primary_colour || "#1a1a2e";
-  const logoUrl = getAgencyLogoUrl(document.agency, "dark");
+  const band = resolveBrochureBrandBand(document.agency);
+  const onLightBand = isLightColour(band.background);
+  let logoUrl = getAgencyLogoUrl(document.agency, onLightBand ? "light" : "dark");
+  let invertLogo = !onLightBand && Boolean(logoUrl);
+  if (!onLightBand && !logoUrl) {
+    logoUrl = getAgencyLogoUrl(document.agency, "light");
+    invertLogo = Boolean(logoUrl);
+  }
 
   return (
     <footer
       className="flex shrink-0 items-center justify-between px-8 py-3"
-      style={{ backgroundColor: footerBg }}
+      style={{ backgroundColor: band.background, color: band.text }}
     >
       {logoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={logoUrl}
           alt={document.agency.name}
-          className="h-7 max-w-[130px] object-contain brightness-0 invert"
+          className={`h-7 max-w-[130px] object-contain${invertLogo ? " brightness-0 invert" : ""}`}
         />
       ) : (
         <p
-          className="text-sm font-bold uppercase tracking-[0.14em] text-white"
-          style={{ fontFamily: headingFont }}
+          className="text-sm font-bold uppercase tracking-[0.14em]"
+          style={{ fontFamily: headingFont, color: band.text }}
         >
           {document.agency.name}
         </p>
       )}
       {document.agency.website_url ? (
         <p
-          className="text-[0.65rem] text-white/70"
-          style={{ fontFamily: bodyFont }}
+          className="text-[0.65rem]"
+          style={{ fontFamily: bodyFont, color: band.text, opacity: 0.75 }}
         >
           {document.agency.website_url}
         </p>

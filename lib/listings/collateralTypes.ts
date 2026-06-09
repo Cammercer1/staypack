@@ -1,9 +1,11 @@
 import type { CollateralType, ListingPurpose } from "@/lib/types";
 
 export const STR_REPORT_LABEL = "Short-Term Rental Report";
+export const LEASE_APPRAISAL_LABEL = "Long-term rental appraisal";
 
 export const COLLATERAL_TYPE_ORDER: CollateralType[] = [
   "sales_brochure",
+  "lease_appraisal",
   "rental_brochure",
   "investor_snapshot",
   "str_report",
@@ -16,7 +18,7 @@ export function collateralOrderForPurpose(
 ): CollateralType[] {
   return COLLATERAL_TYPE_ORDER.filter((type) =>
     purpose === "lease"
-      ? type !== "str_report" && type !== "sales_brochure"
+      ? type !== "str_report" && type !== "sales_brochure" && type !== "lease_appraisal"
       : type !== "rental_brochure",
   );
 }
@@ -36,6 +38,11 @@ export const COLLATERAL_TYPE_META: Record<
   rental_brochure: {
     label: "Lease brochure",
     description: "Branded brochure for properties for lease.",
+  },
+  lease_appraisal: {
+    label: LEASE_APPRAISAL_LABEL,
+    description:
+      "Investor-facing rental appraisal with REA rent comps, weekly rent range, and suburb context (for sale listings).",
   },
   social_posts: {
     label: "Social posts",
@@ -63,6 +70,8 @@ export function collateralEditorPath(
       return `/listings/${listingId}/brochure`;
     case "rental_brochure":
       return `/listings/${listingId}/lease-brochure`;
+    case "lease_appraisal":
+      return `/listings/${listingId}/lease-appraisal`;
     case "social_posts":
       return `/listings/${listingId}/social`;
     default:
@@ -72,4 +81,8 @@ export function collateralEditorPath(
 
 export function reportEditorPath(listingId: string, reportId: string): string {
   return `/listings/${listingId}/reports/${reportId}`;
+}
+
+export function leaseAppraisalEditorPath(listingId: string): string {
+  return `/listings/${listingId}/lease-appraisal`;
 }

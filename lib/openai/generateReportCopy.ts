@@ -1,46 +1,45 @@
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import type { Agency, AiCopyJson, Listing, Report, StrEstimate } from "@/lib/types";
-import { DEFAULT_DISCLAIMER } from "@/lib/types";
-import { aiCopySchema } from "@/lib/validation/schemas";
 import { getMockAiCopy } from "@/lib/reports/buildFinalReportJson";
-import { formatCurrency, formatPercent } from "@/lib/reports/formatters";
-import { normalizeAiCopy } from "@/lib/reports/normalizeAiCopy";
 import { enforceTemplateCopyLimits } from "@/lib/reports/enforceTemplateCopyLimits";
-import { getClassicCopyPromptLimits } from "@/lib/reports/templates/classic/copyLimits";
-import { isClassicTemplateId } from "@/lib/reports/templates/ids";
 import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
 import { isDevelopment } from "@/lib/env";
+import {
+  PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
+  getPageOneMarketingCopyPromptLimits,
+  pageOneFromAiShape,
+  pageOneMarketingCopyAiSchema,
+  pageOneToAiCopyJson,
+} from "@/lib/copy/pageOneMarketingCopy";
+import { aiCopySchema } from "@/lib/validation/schemas";
 
 const SYSTEM_PROMPT = `You are a real estate sales pack copywriter for Australian property agents.
 
-Write clear, useful, buyer-facing copy for a short-term rental potential report.
+Write page-1 copy for a short-term rental (STR) potential report aimed at property investors and buyers weighing income potential.
 
-Rules:
-- Use Australian English.
-- Be commercially useful but conservative.
-- Do not use hype.
-- Do not guarantee income.
+Blurb tone and purpose:
+- Get the investor excited about the property's STR appeal — location, layout, features, guest demand drivers, and estimated revenue opportunity.
+- Write with confident, commercially compelling prose. Sell the upside of the asset and the market story.
+- Use concrete details from the listing (renovations, amenities, proximity, layout) to build desire.
+
+Blurb must NOT contain disclaimer or hedge language. A separate disclaimer block is rendered elsewhere on the page. Never put any of the following in blurb or bullets:
+- Caveats about performance varying, risks, costs, management, seasonality, or "actual results"
+- Phrases like "may vary", "can vary", "depending on", "subject to", "not guaranteed", "buyers should", "enquiries", "conditions apply"
+- Methodology, data-source, or compliance-style sentences
+- Occupancy or ADR stats used as warnings rather than positive market context
+
+Revenue in blurb:
+- You may reference estimated gross short-term rental revenue once, framed as an opportunity (not a promise).
 - Do not call revenue profit.
-- Use "estimated gross short-term rental revenue".
-- Do not invent amenities, distances, approvals, regulations, tax treatment or returns.
-- Use only the supplied property data.
-- Do not mention Airbtics.
-- Do not mention OpenAI.
-- If long-term rental data is available, compare carefully before costs.
-- If long-term rental data is missing, do not mention uplift.
-- Output valid JSON only.`;
+- Do not guarantee income.
 
-const JSON_CONTRACT = `Return JSON with exactly these snake_case fields:
-- sales_pack_heading: string
-- sales_pack_blurb: string
-- key_metrics_line: string
-- property_appeal_points: string[]
-- performance_supporting_factors: string[]
-- buyer_checks: string[]
-- methodology_note: string
-- disclaimer: string
-- confidence_notes: string (internal staff notes only, not shown to buyers)`;
+Other rules:
+- Use Australian English.
+- Do not invent amenities, distances, approvals, regulations, or tax treatment.
+- Use only the supplied property data.
+- Do not mention Airbtics or OpenAI.
+- Output valid JSON only with exactly the fields in the contract (heading, three blurb lengths, bullets).`;
 
 export class CopyValidationError extends Error {
   code = "validation_failed" as const;
@@ -86,7 +85,7 @@ export async function generateReportCopy({
   const userPayload = buildUserPayload({ agency, listing, report, estimate, templateId });
 
   const first = await requestCopy(client, userPayload);
-  const parsed = parseCopyResponse(first, agency, templateId);
+  const parsed = parseCopyResponse(first, agency, estimate, templateId);
 
   if (parsed.success) {
     return parsed.data;
@@ -98,7 +97,7 @@ export async function generateReportCopy({
     invalidJson: first,
     validationErrors: parsed.error.flatten(),
   });
-  const repairedParsed = parseCopyResponse(repaired, agency, templateId);
+  const repairedParsed = parseCopyResponse(repaired, agency, estimate, templateId);
 
   if (!repairedParsed.success) {
     console.error("Repair copy validation failed:", repairedParsed.error.flatten());
@@ -130,8 +129,7 @@ function buildUserPayload({
     agency: {
       name: agency.name,
       default_report_title: agency.default_report_title,
-      default_cta: agency.default_cta,
-      default_disclaimer: agency.default_disclaimer ?? DEFAULT_DISCLAIMER,
+      default_disclaimer: agency.default_disclaimer,
     },
     property: {
       address: listing.property_address,
@@ -154,26 +152,29 @@ function buildUserPayload({
       occupancy_rate: estimate.occupancyRate,
       booked_nights: estimate.bookedNights,
       radius_m: estimate.radiusM,
-      formatted: {
-        annual_revenue: formatCurrency(estimate.annualRevenue),
-        monthly_revenue: formatCurrency(estimate.monthlyRevenue),
-        weekly_revenue: formatCurrency(estimate.weeklyRevenue),
-        nightly_rate: formatCurrency(estimate.nightlyRate),
-        occupancy_rate: formatPercent(estimate.occupancyRate),
-        booked_nights: estimate.bookedNights ?? "—",
-      },
     },
     long_term_rental: scraped?.rentalAppraisal ?? null,
     template_id: templateId,
-    copy_limits: isClassicTemplateId(templateId)
-      ? getClassicCopyPromptLimits(templateId)
-      : null,
-    output_schema: JSON_CONTRACT,
+    copy_limits: getPageOneMarketingCopyPromptLimits(),
+    output_schema: PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
   };
 }
 
-function parseCopyResponse(raw: unknown, agency: Agency, templateId: string) {
-  const parsed = aiCopySchema.safeParse(normalizeAiCopy(raw, agency));
+function parseCopyResponse(
+  raw: unknown,
+  agency: Agency,
+  estimate: StrEstimate,
+  templateId: string,
+) {
+  const pageOneParsed = pageOneMarketingCopyAiSchema.safeParse(raw);
+
+  if (!pageOneParsed.success) {
+    return pageOneParsed;
+  }
+
+  const pageOne = pageOneFromAiShape(pageOneParsed.data);
+  const aiCopy = pageOneToAiCopyJson(pageOne, agency, estimate);
+  const parsed = aiCopySchema.safeParse(aiCopy);
 
   if (!parsed.success) {
     return parsed;
@@ -204,15 +205,18 @@ async function requestCopy(
         : null;
 
     const response = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
-      response_format: zodResponseFormat(aiCopySchema, "report_copy"),
+      model: "gpt-5.4-mini",
+      response_format: zodResponseFormat(
+        pageOneMarketingCopyAiSchema,
+        "report_copy",
+      ),
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
           content: repair
             ? `Repair the invalid JSON below. Fix only validation issues and return valid JSON matching the schema.\n\nValidation errors:\n${JSON.stringify(repair.validationErrors)}\n\nInvalid JSON:\n${JSON.stringify(repair.invalidJson)}\n\nSource payload:\n${JSON.stringify(payload)}`
-            : `${JSON.stringify(payload)}\n\n${JSON_CONTRACT}${
+            : `${JSON.stringify(payload)}\n\n${PAGE_ONE_MARKETING_COPY_JSON_CONTRACT}${
                 copyLimits ? `\n\n${copyLimits}` : ""
               }`,
         },

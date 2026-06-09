@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireReportAccess } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getReportsUrl, getSiteUrl } from "@/lib/env";
+import { getPrintRenderBaseUrl } from "@/lib/env";
 import { renderPdfFromUrl, buildPdfImagePath, buildPdfStylesheetPath } from "@/lib/browserless/pdf";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
 import { buildPreviewPrintUrl } from "@/lib/reports/printAccessToken";
@@ -36,9 +36,11 @@ export async function POST(
       );
     }
 
+    const printBase = getPrintRenderBaseUrl().replace(/\/$/, "");
     const printUrl = report.public_slug
-      ? `${getReportsUrl().replace(/\/$/, "")}/${agency.slug}/${report.public_slug}/print`
-      : buildPreviewPrintUrl(report.id, getSiteUrl());
+      ? `${printBase}/${agency.slug}/${report.public_slug}/print`
+      : buildPreviewPrintUrl(report.id, printBase);
+
     const admin = createAdminClient();
 
     const pdfBuffer = await renderPdfFromUrl(printUrl, {

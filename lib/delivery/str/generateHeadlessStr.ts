@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAirbticsEstimate } from "@/lib/airbtics/client";
 import { geocodeReportAddress } from "@/lib/geocoding";
-import { getReportsUrl } from "@/lib/env";
+import { getPrintRenderBaseUrl, getReportsUrl } from "@/lib/env";
 import { renderPdfFromUrl, buildPdfImagePath, buildPdfStylesheetPath } from "@/lib/browserless/pdf";
 import { ensureListingLandingProvisioned } from "@/lib/listings/provisionLandingPage";
 import { generateListingSlug } from "@/lib/listings/provisionLandingPage";
@@ -10,7 +10,7 @@ import {
   resolveListingDestinationUrl,
 } from "@/lib/listings/listingUrls";
 import { generateReportCopy } from "@/lib/openai/generateReportCopy";
-import { applyTemplateBrandToFinalReport } from "@/lib/reports/applyTemplateBrand";
+import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
@@ -215,7 +215,7 @@ export async function generateHeadlessStrReport({
     estimate,
   });
 
-  const finalReportJson = applyTemplateBrandToFinalReport(
+  const finalReportJson = resolveFinalReportForDisplay(
     buildFinalReportJson({
       agency: agency as Agency,
       agentProfile,
@@ -226,6 +226,7 @@ export async function generateHeadlessStrReport({
       copy,
       scraped: listing.scraped_listing_json,
     }),
+    { templateId },
   );
 
   const { data: generatedReport, error: generatedError } = await admin
@@ -312,7 +313,7 @@ export async function generateHeadlessStrReport({
     .update({ status: "published" })
     .eq("report_id", report.id);
 
-  const printUrl = `${getReportsUrl().replace(/\/$/, "")}/${agency.slug}/${publicSlug}/print`;
+  const printUrl = `${getPrintRenderBaseUrl().replace(/\/$/, "")}/${agency.slug}/${publicSlug}/print`;
 
   const pdfBuffer = await renderPdfFromUrl(printUrl, {
     mirrorImage: async (sourceUrl, buffer, contentType) => {

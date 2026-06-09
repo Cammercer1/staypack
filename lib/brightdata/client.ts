@@ -4,7 +4,16 @@ const DEFAULT_API_HOST = "api.brightdata.com";
 const DEFAULT_SCRAPE_TIMEOUT_MS = 25_000;
 const DEFAULT_REA_SCRAPE_TIMEOUT_MS = 60_000;
 const DEFAULT_REA_DISCOVER_TIMEOUT_MS = 180_000;
-const REA_ABORT_RETRY_ATTEMPTS = 1;
+const REA_NETWORK_RETRY_ATTEMPTS = 2;
+
+function isRetryableBrightDataNetworkError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return /aborted|abort|fetch failed|econnreset|etimedout|timed out|socket/i.test(
+    error.message,
+  );
+}
 
 export function getBrightDataApiKey() {
   return process.env.BRIGHTDATA_API_KEY?.trim() ?? "";
@@ -218,7 +227,7 @@ export async function scrapeBrightDataReaListing(url: string) {
   let raw: string | null = null;
   let attempt = 0;
 
-  while (attempt <= REA_ABORT_RETRY_ATTEMPTS) {
+  while (attempt <= REA_NETWORK_RETRY_ATTEMPTS) {
     attempt += 1;
     try {
       raw = await brightDataRequest(
@@ -230,12 +239,10 @@ export async function scrapeBrightDataReaListing(url: string) {
       );
       break;
     } catch (error) {
-      const isAbort =
-        error instanceof Error &&
-        /aborted|abort/i.test(error.message);
-      if (!isAbort || attempt > REA_ABORT_RETRY_ATTEMPTS) {
+      if (!isRetryableBrightDataNetworkError(error) || attempt > REA_NETWORK_RETRY_ATTEMPTS) {
         throw error;
       }
+      await sleep(2000 * attempt);
     }
   }
 
@@ -270,7 +277,7 @@ export async function scrapeBrightDataReaRentDiscover({
   let raw: string | null = null;
   let attempt = 0;
 
-  while (attempt <= REA_ABORT_RETRY_ATTEMPTS) {
+  while (attempt <= REA_NETWORK_RETRY_ATTEMPTS) {
     attempt += 1;
     try {
       raw = await brightDataRequest(
@@ -282,11 +289,10 @@ export async function scrapeBrightDataReaRentDiscover({
       );
       break;
     } catch (error) {
-      const isAbort =
-        error instanceof Error && /aborted|abort/i.test(error.message);
-      if (!isAbort || attempt > REA_ABORT_RETRY_ATTEMPTS) {
+      if (!isRetryableBrightDataNetworkError(error) || attempt > REA_NETWORK_RETRY_ATTEMPTS) {
         throw error;
       }
+      await sleep(2000 * attempt);
     }
   }
 

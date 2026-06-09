@@ -1,22 +1,25 @@
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { enforceSalesBrochureCopyLimits } from "@/lib/collateral/sales-brochure/copyLimits";
-import { coerceSalesBrochureCopy } from "@/lib/collateral/sales-brochure/propertyHighlights";
-import { getSalesBrochureCopyPromptLimits } from "@/lib/collateral/sales-brochure/copyLimits";
-import { normalizeSalesBrochureCopy } from "@/lib/collateral/sales-brochure/normalizeSalesBrochureCopy";
+import {
+  brochureCopyFromPageOneAi,
+  enforceSalesBrochureCopyLimits,
+  getSalesBrochureCopyPromptLimits,
+} from "@/lib/collateral/sales-brochure/copyLimits";
 import { getMockSalesBrochureCopy } from "@/lib/collateral/buildSalesBrochureDocument";
 import type { SalesBrochureCopyJson } from "@/lib/collateral/templates/types";
 import {
-  salesBrochureCopyAiSchema,
-  salesBrochureCopySchema,
-} from "@/lib/validation/schemas";
+  PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
+  pageOneFromAiShape,
+  pageOneMarketingCopyAiSchema,
+} from "@/lib/copy/pageOneMarketingCopy";
+import { salesBrochureCopySchema } from "@/lib/validation/schemas";
 import { isDevelopment } from "@/lib/env";
 import type { Agency, Listing } from "@/lib/types";
 import { DEFAULT_DISCLAIMER } from "@/lib/types";
 
 const SYSTEM_PROMPT = `You are a real estate copywriter for Australian property agents.
 
-Write clear, buyer-facing copy for a print-ready open-home sales brochure.
+Write clear, buyer-facing copy for a print-ready open-home sales brochure page 1.
 
 Rules:
 - Use Australian English.
@@ -25,14 +28,7 @@ Rules:
 - Do not mention short-term rental income, Airbtics, or investment yields.
 - Use only the supplied property data.
 - Do not mention OpenAI.
-- Output valid JSON only.`;
-
-const JSON_CONTRACT = `Return JSON with exactly these snake_case fields:
-- heading: string
-- blurb: string
-- property_highlights: string[]
-- inspection_cta: string
-- disclaimer: string`;
+- Output valid JSON only with exactly the fields in the contract (heading, three blurb lengths, bullets).`;
 
 export class SalesBrochureCopyValidationError extends Error {
   code = "validation_failed" as const;
@@ -96,7 +92,6 @@ function buildUserPayload({ agency, listing }: { agency: Agency; listing: Listin
   return {
     agency: {
       name: agency.name,
-      default_cta: agency.default_cta,
       default_disclaimer: agency.default_disclaimer ?? DEFAULT_DISCLAIMER,
     },
     property: {
@@ -113,13 +108,23 @@ function buildUserPayload({ agency, listing }: { agency: Agency; listing: Listin
       display_price: listing.display_price,
     },
     copy_limits: getSalesBrochureCopyPromptLimits(),
-    output_schema: JSON_CONTRACT,
+    output_schema: PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
   };
 }
 
 function parseCopyResponse(raw: unknown, agency: Agency) {
-  const coerced = coerceSalesBrochureCopy(normalizeSalesBrochureCopy(raw, agency));
-  const parsed = salesBrochureCopySchema.safeParse(coerced);
+  const pageOneParsed = pageOneMarketingCopyAiSchema.safeParse(raw);
+
+  if (!pageOneParsed.success) {
+    return pageOneParsed;
+  }
+
+  const pageOne = pageOneFromAiShape(pageOneParsed.data);
+  const brochure = brochureCopyFromPageOneAi(pageOne, {
+    inspection_cta: agency.default_cta?.trim() || "",
+    disclaimer: agency.default_disclaimer?.trim() || DEFAULT_DISCLAIMER,
+  });
+  const parsed = salesBrochureCopySchema.safeParse(brochure);
 
   if (!parsed.success) {
     return parsed;
@@ -127,7 +132,7 @@ function parseCopyResponse(raw: unknown, agency: Agency) {
 
   return {
     success: true as const,
-    data: enforceSalesBrochureCopyLimits(coerced),
+    data: parsed.data,
   };
 }
 
@@ -150,16 +155,19 @@ async function requestCopy(
         : null;
 
     const response = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
-      response_format: zodResponseFormat(salesBrochureCopyAiSchema, "sales_brochure_copy"),
+      model: "gpt-5.4-mini",
+      response_format: zodResponseFormat(
+        pageOneMarketingCopyAiSchema,
+        "sales_brochure_copy",
+      ),
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
           content: repair
             ? `Repair the invalid JSON below. Fix only validation issues and return valid JSON matching the schema.\n\nValidation errors:\n${JSON.stringify(repair.validationErrors)}\n\nInvalid JSON:\n${JSON.stringify(repair.invalidJson)}\n\nSource payload:\n${JSON.stringify(payload)}`
-            : `${JSON.stringify(payload)}\n\n${JSON_CONTRACT}${
-                copyLimits ? `\n\nCharacter limits:\n${copyLimits}` : ""
+            : `${JSON.stringify(payload)}\n\n${PAGE_ONE_MARKETING_COPY_JSON_CONTRACT}${
+                copyLimits ? `\n\n${copyLimits}` : ""
               }`,
         },
       ],

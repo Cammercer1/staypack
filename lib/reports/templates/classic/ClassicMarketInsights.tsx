@@ -1,24 +1,22 @@
-import type { FinalReportJson } from "@/lib/types";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/reports/formatters";
 import {
   formatStrGrossYield,
   resolveStrGrossYield,
 } from "@/lib/reports/calculateStrYield";
+import { formatCurrency, formatNumber, formatPercent } from "@/lib/reports/formatters";
+import {
+  ReportSnapshotStatsBar,
+  type ReportSnapshotStat,
+} from "@/lib/reports/templates/shared/ReportSnapshotStatsBar";
+import type { FinalReportJson } from "@/lib/types";
 
 type Props = {
   report: FinalReportJson;
-  /** White type on accent highlight band (Haven market snapshot). */
-  invertedHighlight?: boolean;
   compact?: boolean;
 };
 
-type SnapshotStat = {
-  id: string;
-  label: string;
-  value: string;
-};
+const headingFont = "var(--report-heading-font, inherit)";
 
-function buildSnapshotStats(report: FinalReportJson) {
+function buildSnapshotStats(report: FinalReportJson): ReportSnapshotStat[] {
   const { str, str_enrichment: enrichment } = report;
   const range = enrichment?.revenue_range;
   const grossYield = resolveStrGrossYield({
@@ -27,10 +25,19 @@ function buildSnapshotStats(report: FinalReportJson) {
     str_yield: report.str_yield,
   });
 
-  const supporting: SnapshotStat[] = [];
+  const stats: ReportSnapshotStat[] = [];
+
+  if (str.annual_revenue != null) {
+    stats.push({
+      id: "median",
+      label: "Median gross revenue",
+      value: formatCurrency(str.annual_revenue),
+      footnote: "per year before costs",
+    });
+  }
 
   if (grossYield) {
-    supporting.push({
+    stats.push({
       id: "yield",
       label: "Est. gross STR yield",
       value: formatStrGrossYield(grossYield),
@@ -38,7 +45,7 @@ function buildSnapshotStats(report: FinalReportJson) {
   }
 
   if (range?.p25 != null && range.p75 != null) {
-    supporting.push({
+    stats.push({
       id: "range",
       label: "Annual range",
       value: `${formatCurrency(range.p25)} – ${formatCurrency(range.p75)}`,
@@ -46,123 +53,54 @@ function buildSnapshotStats(report: FinalReportJson) {
   }
 
   if (str.occupancy_rate != null) {
-    supporting.push({
+    stats.push({
       id: "occupancy",
       label: "Occupancy",
       value: formatPercent(str.occupancy_rate),
     });
   }
 
-  if (str.nightly_rate != null) {
-    supporting.push({
+  if (stats.length < 4 && str.nightly_rate != null) {
+    stats.push({
       id: "nightly",
       label: "Nightly rate",
       value: `${formatCurrency(str.nightly_rate)}/night`,
     });
   }
 
-  if (enrichment?.comp_count) {
-    supporting.push({
+  if (stats.length < 4 && enrichment?.comp_count) {
+    stats.push({
       id: "comps",
       label: "Comparable listings",
       value: formatNumber(enrichment.comp_count),
     });
   }
 
-  return {
-    median: str.annual_revenue,
-    supporting: supporting.slice(0, 3),
-  };
+  return stats.slice(0, 4);
 }
 
-export function ClassicMarketInsights({
-  report,
-  invertedHighlight = false,
-  compact = false,
-}: Props) {
-  const { median, supporting } = buildSnapshotStats(report);
+export function ClassicMarketInsights({ report, compact = false }: Props) {
+  const stats = buildSnapshotStats(report);
 
-  if (median == null && supporting.length === 0) {
+  if (stats.length === 0) {
     return null;
   }
 
-  const statLabelClass = invertedHighlight
-    ? "text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-white/80"
-    : "text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-neutral-500";
-  const statValueColor = invertedHighlight ? "#ffffff" : "var(--report-text-colour, inherit)";
-  const medianSubClass = invertedHighlight
-    ? "mt-2 text-[0.72rem] text-white/85"
-    : "mt-2 text-[0.72rem] text-neutral-600";
+  const accent = report.agency.primary_colour;
 
   return (
     <div>
-      <p
-        className={`font-semibold uppercase tracking-[0.14em] text-neutral-600 ${
-          compact ? "mb-2.5 text-[0.65rem]" : "mb-3 text-[0.7rem]"
-        }`}
-        style={{ fontFamily: "var(--report-heading-font, inherit)" }}
+      <h2
+        className={`font-semibold ${compact ? "mb-2.5 text-base" : "mb-3 text-base"}`}
+        style={{
+          fontFamily: headingFont,
+          color: accent ?? "var(--report-headline-colour, inherit)",
+        }}
       >
         Market snapshot
-      </p>
+      </h2>
 
-      <div
-        className={compact ? "px-6 py-4" : "px-8 py-5"}
-        style={{ backgroundColor: "var(--report-soft-highlight, #f3f4f6)" }}
-      >
-        <div className="flex items-stretch gap-8">
-          {median != null ? (
-            <div className="min-w-[9.5rem] shrink-0 pr-8">
-              <p
-                className={statLabelClass}
-                style={{ fontFamily: "var(--report-heading-font, inherit)" }}
-              >
-                Median gross revenue
-              </p>
-              <p
-                className={`font-semibold leading-none tracking-tight ${
-                  compact ? "mt-1.5 text-[1.65rem]" : "mt-2 text-[2.1rem]"
-                }`}
-                style={{
-                  fontFamily: "var(--report-heading-font, inherit)",
-                  color: statValueColor,
-                }}
-              >
-                {formatCurrency(median)}
-              </p>
-              <p className={medianSubClass}>per year before costs</p>
-            </div>
-          ) : null}
-
-          {supporting.length > 0 ? (
-            <div
-              className="grid min-w-0 flex-1 content-center gap-x-8 gap-y-4"
-              style={{
-                gridTemplateColumns: `repeat(${Math.min(supporting.length, 3)}, minmax(0, 1fr))`,
-              }}
-            >
-              {supporting.map((stat) => (
-                <div key={stat.id} className="min-w-0">
-                  <p
-                    className={statLabelClass}
-                    style={{ fontFamily: "var(--report-heading-font, inherit)" }}
-                  >
-                    {stat.label}
-                  </p>
-                  <p
-                    className="mt-1.5 text-[1.05rem] font-semibold leading-snug"
-                    style={{
-                      fontFamily: "var(--report-heading-font, inherit)",
-                      color: statValueColor,
-                    }}
-                  >
-                    {stat.value}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </div>
+      <ReportSnapshotStatsBar stats={stats} accent={accent} compact={compact} />
     </div>
   );
 }

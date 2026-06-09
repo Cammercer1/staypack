@@ -9,7 +9,7 @@ export type RentalComp = {
   listingUrl?: string;
 };
 
-export type RentalAppraisalSource = "rea_discover";
+export type RentalAppraisalSource = "rea_discover" | "apify_rea";
 
 export type SuburbRentFloorSource =
   | "domain_bed_median"

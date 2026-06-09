@@ -2,6 +2,7 @@ import {
   blurbBlocksFromRaw,
   blurbBlocksToPlainText,
 } from "@/lib/collateral/sales-brochure/blurbBlocks";
+import { mockBlurbVariantsFromText } from "@/lib/copy/blurbVariantEnforce";
 import type {
   SalesBrochureCopyJson,
   BrochureDocumentJson,
@@ -30,6 +31,9 @@ const PLAYGROUND_COPY: SalesBrochureCopyJson = {
   heading: "Open house",
   blurb: blurbBlocksToPlainText(PLAYGROUND_BLURB_BLOCKS),
   blurb_blocks: PLAYGROUND_BLURB_BLOCKS,
+  blurb_variants: mockBlurbVariantsFromText(
+    blurbBlocksToPlainText(PLAYGROUND_BLURB_BLOCKS),
+  ),
   property_highlights: [
     "North-facing living zones with garden outlook",
     "Updated kitchen with stone benchtops",

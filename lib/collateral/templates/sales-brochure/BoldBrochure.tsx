@@ -1,4 +1,6 @@
+import { isLightColour } from "@/lib/branding/contrast";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
+import { resolveBrochureBrandBand } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureBrandBand";
 import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
 import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
 import { isBrochureDocument } from "@/lib/collateral/templates/types";
@@ -23,8 +25,14 @@ export function BoldBrochure({ document, pageFormat = "a4-portrait" }: Collatera
 
   const { report, brand } = useBrochurePage(document);
   const fmt = getCollateralPageFormat(pageFormat);
-  const accent = document.agency.accent_colour || document.agency.primary_colour || "#1a1a2e";
-  const logoUrl = getAgencyLogoUrl(document.agency, "light");
+  const band = resolveBrochureBrandBand(document.agency);
+  const onLightBand = isLightColour(band.background);
+  let pageTwoLogoUrl = getAgencyLogoUrl(document.agency, onLightBand ? "light" : "dark");
+  let invertPageTwoLogo = !onLightBand && Boolean(pageTwoLogoUrl);
+  if (!onLightBand && !pageTwoLogoUrl) {
+    pageTwoLogoUrl = getAgencyLogoUrl(document.agency, "light");
+    invertPageTwoLogo = Boolean(pageTwoLogoUrl);
+  }
   const galleryPhotos = getBrochureGalleryPhotos(document);
   const note = document.copy.page_two_note?.trim();
 
@@ -47,26 +55,26 @@ export function BoldBrochure({ document, pageFormat = "a4-portrait" }: Collatera
           {/* Page 2 header */}
           <div
             className="flex shrink-0 items-center justify-between px-8 py-4"
-            style={{ backgroundColor: accent }}
+            style={{ backgroundColor: band.background, color: band.text }}
           >
-            {logoUrl ? (
+            {pageTwoLogoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={logoUrl}
+                src={pageTwoLogoUrl}
                 alt={document.agency.name}
-                className="h-7 max-w-[130px] object-contain brightness-0 invert"
+                className={`h-7 max-w-[130px] object-contain${invertPageTwoLogo ? " brightness-0 invert" : ""}`}
               />
             ) : (
               <p
-                className="text-sm font-bold uppercase tracking-[0.14em] text-white"
-                style={{ fontFamily: headingFont }}
+                className="text-sm font-bold uppercase tracking-[0.14em]"
+                style={{ fontFamily: headingFont, color: band.text }}
               >
                 {document.agency.name}
               </p>
             )}
             <p
-              className="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-white/70"
-              style={{ fontFamily: headingFont }}
+              className="text-[0.62rem] font-semibold uppercase tracking-[0.18em]"
+              style={{ fontFamily: headingFont, color: band.text, opacity: 0.75 }}
             >
               {document.property.address}
             </p>

@@ -22,6 +22,16 @@ export async function POST(
       );
     }
 
+    if (collateral.type === "lease_appraisal") {
+      return NextResponse.json(
+        {
+          error:
+            "Use the Long-term rental appraisal editor to regenerate this report",
+        },
+        { status: 400 },
+      );
+    }
+
     if (listing) {
       const purposeError = collateralPurposeMismatchError(listing, collateral.type);
       if (purposeError) {

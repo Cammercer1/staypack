@@ -1,5 +1,5 @@
+import { ReportCopyDisclaimer } from "@/components/reports/inline/ReportCopyFields";
 import type { FinalReportJson } from "@/lib/types";
-import { ClassicAgentFooter } from "@/lib/reports/templates/classic/ClassicAgentFooter";
 import { ClassicCompsGrid } from "@/lib/reports/templates/classic/ClassicCompsGrid";
 import { ClassicMarketInsights } from "@/lib/reports/templates/classic/ClassicMarketInsights";
 import { ClassicPageHeader } from "@/lib/reports/templates/classic/ClassicPageHeader";
@@ -63,13 +63,15 @@ export function ClassicPageTwo({ report }: Props) {
 
         <div className="mt-auto shrink-0 pt-5">
           <ClassicMarketInsights report={report} />
-          <p className="mt-3 text-[0.5rem] leading-[1.35] text-neutral-500">
-            {report.copy.disclaimer}
-          </p>
+          {report.copy.disclaimer ? (
+            <ReportCopyDisclaimer
+              text={report.copy.disclaimer}
+              as="p"
+              className="mt-3 text-[0.5rem] leading-[1.35] text-neutral-500"
+            />
+          ) : null}
         </div>
       </div>
-
-      <ClassicAgentFooter report={report} />
     </section>
   );
 }

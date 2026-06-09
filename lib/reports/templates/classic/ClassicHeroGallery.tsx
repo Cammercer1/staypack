@@ -1,3 +1,4 @@
+import { ReportEditableImage } from "@/components/reports/inline/ReportEditableImage";
 import { normalizeReaImageUrl } from "@/lib/scraping/rea/normalizeReaImageUrl";
 import type { FinalReportJson } from "@/lib/types";
 
@@ -34,24 +35,37 @@ export function ClassicHeroGallery({ property }: Props) {
       : slots.length === 2
         ? "grid-cols-2"
         : "grid-cols-3";
+  const hasSecondary = slots.length > 0;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white">
+    <div
+      className={`grid h-full min-h-0 bg-white ${
+        hasSecondary ? "grid-rows-[1.65fr_1fr]" : "grid-rows-1"
+      }`}
+    >
       {hero ? (
-        <div className="min-h-0 flex-[2] overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={hero} alt="" className="h-full w-full object-cover" />
+        <div className="min-h-0 overflow-hidden">
+          <ReportEditableImage
+            slot="hero"
+            src={hero}
+            className="h-full w-full"
+            imgClassName="h-full w-full object-cover"
+          />
         </div>
       ) : null}
 
-      {slots.length > 0 ? (
+      {hasSecondary ? (
         <div
-          className={`mt-[2px] grid min-h-0 flex-1 gap-[2px] overflow-hidden ${secondaryGridClass}`}
+          className={`mt-[2px] grid min-h-[28mm] gap-[2px] overflow-hidden ${secondaryGridClass}`}
         >
-          {slots.map((url) => (
-            <div key={url} className="min-h-0 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="h-full w-full object-cover" />
+          {slots.map((url, index) => (
+            <div key={`gallery-secondary-${index}`} className="min-h-0 overflow-hidden">
+              <ReportEditableImage
+                slot={{ kind: "secondary", index }}
+                src={url}
+                className="h-full w-full"
+                imgClassName="h-full w-full object-cover"
+              />
             </div>
           ))}
         </div>

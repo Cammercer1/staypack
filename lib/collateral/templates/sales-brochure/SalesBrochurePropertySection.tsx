@@ -1,30 +1,38 @@
 "use client";
 
 import { Bath, BedDouble, Car, Ruler } from "lucide-react";
+import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
 import { useEditableContext } from "@/components/collateral/sales-brochure/inline/EditableContext";
 import type { LucideIcon } from "lucide-react";
 import { hasBlurbContent } from "@/lib/collateral/sales-brochure/blurbBlocks";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
 import { BrochureRentalBondInline } from "@/lib/collateral/templates/sales-brochure/shared/BrochureCopyBlocks";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
-import {
-  resolveBrochurePrice,
-  resolveBrochurePriceLabel,
-  type BrochureDocumentJson,
-} from "@/lib/collateral/templates/types";
-import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
+import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { ClassicBrochureMetricsStack } from "@/lib/collateral/templates/sales-brochure/shared/ClassicBrochureMetricsStack";
 import { formatNumber } from "@/lib/reports/formatters";
+import {
+  resolveReportPageVariant,
+  type ReportPageVariant,
+} from "@/lib/reports/templates/shared/reportPageVariant";
+import type { FinalReportJson } from "@/lib/types";
 
 type Props = {
   document: BrochureDocumentJson;
+  report?: FinalReportJson;
+  reportVariant?: ReportPageVariant;
   /** Tighter layout for single-page brochure. */
   compact?: boolean;
 };
 
-export function SalesBrochurePropertySection({ document, compact = false }: Props) {
+export function SalesBrochurePropertySection({
+  document,
+  report,
+  reportVariant,
+  compact = false,
+}: Props) {
   const { editable } = useEditableContext();
   const { property, copy } = document;
-
   const propertyStats: {
     id: string;
     icon: LucideIcon;
@@ -60,7 +68,7 @@ export function SalesBrochurePropertySection({ document, compact = false }: Prop
     });
   }
 
-  const highlights = getPropertyHighlights(copy).slice(0, compact ? 4 : 6);
+  const highlights = getPropertyHighlights(copy).slice(0, 4);
   const showTwoColumnBody = Boolean(
     editable || hasBlurbContent(copy) || highlights.length,
   );
@@ -119,29 +127,13 @@ export function SalesBrochurePropertySection({ document, compact = false }: Prop
             ))}
           </div>
 
-          {resolveBrochurePrice(document) ? (
-            <div>
-              <Editable
-                as="p"
-                path="copy.price_label"
-                className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-neutral-500"
-                style={{
-                  fontFamily: "var(--report-heading-font, var(--collateral-heading-font, inherit))",
-                }}
-              >
-                {resolveBrochurePriceLabel(document)}
-              </Editable>
-              <Editable
-                as="p"
-                path="copy.price_value"
-                className="mt-1 text-[1.9rem] font-semibold leading-none tracking-tight"
-                style={{
-                  fontFamily: "var(--report-heading-font, var(--collateral-heading-font, inherit))",
-                  color: "var(--report-text-colour, inherit)",
-                }}
-              >
-                {resolveBrochurePrice(document)}
-              </Editable>
+          {report ? (
+            <div className="w-full">
+              <ClassicBrochureMetricsStack
+                report={report}
+                document={document}
+                reportVariant={reportVariant}
+              />
               <BrochureRentalBondInline document={document} compact />
             </div>
           ) : null}

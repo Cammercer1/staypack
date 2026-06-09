@@ -2,7 +2,10 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 import { ReportPreview } from "@/components/reports/ReportPreview";
+import { ReportEditableProvider } from "@/components/reports/inline/ReportEditableContext";
 import { cn } from "@/lib/utils";
+import type { ReportCopyFieldPath } from "@/lib/reports/editable/reportCopyPaths";
+import type { ReportImageSlot } from "@/lib/reports/editable/reportImageSlots";
 import {
   getReportPageFormat,
   mmToPx,
@@ -18,6 +21,12 @@ type Props = {
   orientation?: ReportPageOrientation;
   /** Scale to container width and scroll vertically instead of shrinking to fit height. */
   fitToWidth?: boolean;
+  editable?: {
+    setField: (path: ReportCopyFieldPath, value: string) => void;
+    openImagePicker: (slot: ReportImageSlot) => void;
+    brandPrimaryColour?: string;
+    onFieldFocus?: (path: ReportCopyFieldPath | null) => void;
+  };
 };
 
 export function FittedReportPreview({
@@ -26,6 +35,7 @@ export function FittedReportPreview({
   maxHeight = "calc(100vh - 12rem)",
   orientation = "portrait",
   fitToWidth = false,
+  editable,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const pageFormat = getReportPageFormat(orientation);
@@ -172,7 +182,28 @@ export function FittedReportPreview({
                   : undefined,
               }}
             >
-              <ReportPreview report={report} printMode orientation={orientation} />
+              {editable ? (
+                <ReportEditableProvider
+                  brandPrimaryColour={
+                    editable.brandPrimaryColour ??
+                    report.agency.primary_colour ??
+                    "var(--hiline-green)"
+                  }
+                  setField={editable.setField}
+                  openImagePicker={editable.openImagePicker}
+                  onFieldFocus={editable.onFieldFocus}
+                >
+                  <div className="report-inline-edit">
+                    <ReportPreview
+                      report={report}
+                      printMode
+                      orientation={orientation}
+                    />
+                  </div>
+                </ReportEditableProvider>
+              ) : (
+                <ReportPreview report={report} printMode orientation={orientation} />
+              )}
             </div>
           </div>
         </div>

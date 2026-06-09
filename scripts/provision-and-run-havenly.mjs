@@ -56,10 +56,22 @@ const configPath = resolve(ROOT, "lib/delivery/tenants/config/havenly.json");
 const tenantConfig = JSON.parse(readFileSync(configPath, "utf8"));
 
 async function assertServer() {
-  const health = await fetch(`${apiBase}/`, { redirect: "follow" }).catch(() => null);
-  if (!health?.ok) {
-    console.error(`App not reachable at ${apiBase}. Run: npm run dev`);
-    process.exit(1);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const health = await fetch(`${apiBase}/`, {
+      redirect: "follow",
+      signal: controller.signal,
+    }).catch(() => null);
+    if (!health?.ok) {
+      console.error(`App not reachable at ${apiBase}. Run: npm run dev`);
+      console.error(
+        "Tip: if port 3000 is stuck, run: lsof -i :3000 then kill that PID, or set DELIVERY_API_BASE=http://localhost:3003",
+      );
+      process.exit(1);
+    }
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

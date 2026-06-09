@@ -5,8 +5,9 @@ import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
+import { hydrateFinalReportBlurbVariants } from "@/lib/reports/hydrateFinalReportBlurbVariants";
 import { normalizeReportTemplateId } from "@/lib/reports/templates/ids";
-import type { Agency, FinalReportJson, Listing, Report } from "@/lib/types";
+import type { Agency, AiCopyJson, FinalReportJson, Listing, Report } from "@/lib/types";
 
 export async function resolvePlaygroundFinalReport(
   supabase: SupabaseClient,
@@ -19,7 +20,10 @@ export async function resolvePlaygroundFinalReport(
   const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
 
   if (report.final_report_json) {
-    const cached = report.final_report_json as FinalReportJson;
+    const cached = hydrateFinalReportBlurbVariants(
+      report.final_report_json as FinalReportJson,
+      report.ai_copy_json as AiCopyJson | null,
+    );
 
     return enrichFinalReportMetrics(
       listing,

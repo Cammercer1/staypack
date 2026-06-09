@@ -10,6 +10,7 @@ import {
   Check,
   ExternalLink,
   BookOpen,
+  ClipboardList,
   Eye,
   FileText,
   Globe,
@@ -33,6 +34,7 @@ import { StatusBadge } from "@/components/reports/StatusBadge";
 import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
 import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
 import { ScrapedListingReviewStep } from "@/components/reports/ScrapedListingReviewStep";
+import { CreateLeaseAppraisalButton } from "@/components/listings/CreateLeaseAppraisalButton";
 import { CreateStrReportButton } from "@/components/listings/CreateStrReportButton";
 import { ListingAgentsStrip } from "@/components/listings/ListingAgentsStrip";
 import { CollateralPdfButton } from "@/components/collateral/CollateralPdfButton";
@@ -47,11 +49,15 @@ import {
   COLLATERAL_TYPE_META,
   collateralEditorPath,
   collateralOrderForPurpose,
+  leaseAppraisalEditorPath,
 } from "@/lib/listings/collateralTypes";
+import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
+import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import { formatCurrency } from "@/lib/reports/formatters";
 import type {
   CollateralItem,
   CollateralType,
+  FinalReportJson,
   Lead,
   LeadStatus,
   Listing,
@@ -63,6 +69,7 @@ const COLLATERAL_ICONS: Record<CollateralType, typeof FileText> = {
   str_report: FileText,
   sales_brochure: ScrollText,
   rental_brochure: BookOpen,
+  lease_appraisal: ClipboardList,
   social_posts: Share2,
   investor_snapshot: PieChart,
   agent_business_card: IdCard,
@@ -497,10 +504,32 @@ function CollateralTab({
             type === "str_report" && item?.report_id
               ? reportsById.get(item.report_id) ?? null
               : type === "str_report"
-                ? reports.find((report) => report.status !== "archived") ?? null
+                ? reports.find(
+                    (report) =>
+                      report.status !== "archived" &&
+                      !isLeaseAppraisalTemplateId(report.template_id),
+                  ) ?? null
                 : null;
+          const leaseAppraisalReport =
+            type === "lease_appraisal" && item?.report_id
+              ? reportsById.get(item.report_id) ?? null
+              : type === "lease_appraisal"
+                ? reports.find(
+                    (report) =>
+                      report.status !== "archived" &&
+                      isLeaseAppraisalTemplateId(report.template_id),
+                  ) ?? null
+                : null;
+          const leaseAppraisalFinal = leaseAppraisalReport?.final_report_json as
+            | FinalReportJson
+            | null
+            | undefined;
           const hasCollateral =
-            type === "str_report" ? Boolean(strReport) : Boolean(item);
+            type === "str_report"
+              ? Boolean(strReport)
+              : type === "lease_appraisal"
+                ? Boolean(leaseAppraisalReport)
+                : Boolean(item);
           const photosRemaining = Math.max(
             photoRequirement.minimum - photoRequirement.count,
             1,
@@ -523,6 +552,8 @@ function CollateralTab({
                 </div>
                 {strReport ? (
                   <StatusBadge status={strReport.status} />
+                ) : leaseAppraisalReport ? (
+                  <StatusBadge status={leaseAppraisalReport.status} />
                 ) : item ? (
                   <Badge variant="secondary">{item.status}</Badge>
                 ) : null}
@@ -562,6 +593,12 @@ function CollateralTab({
                   code to your listing page.
                 </p>
               ) : null}
+              {type === "lease_appraisal" && leaseAppraisalFinal ? (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Two-page investor appraisal with REA rent comparables and suburb
+                  market context — not a tenant lease brochure.
+                </p>
+              ) : null}
               {(type === "sales_brochure" || type === "rental_brochure") &&
               !item?.document_json ? (
                 <p className="mt-4 text-sm text-muted-foreground">
@@ -575,6 +612,24 @@ function CollateralTab({
                   <span className="font-medium text-foreground">
                     {formatCurrency(strReport.final_estimate_json.annualRevenue)}
                   </span>
+                </p>
+              ) : null}
+              {leaseAppraisalFinal?.ltr?.weekly_min != null &&
+              leaseAppraisalFinal.ltr.weekly_max != null ? (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Estimated weekly rent:{" "}
+                  <span className="font-medium text-foreground">
+                    {formatWeeklyRentRange(
+                      leaseAppraisalFinal.ltr.weekly_min,
+                      leaseAppraisalFinal.ltr.weekly_max,
+                    )}
+                  </span>
+                  {leaseAppraisalFinal.ltr_enrichment?.comp_count ? (
+                    <>
+                      {" "}
+                      · {leaseAppraisalFinal.ltr_enrichment.comp_count} comps
+                    </>
+                  ) : null}
                 </p>
               ) : null}
 
@@ -615,6 +670,28 @@ function CollateralTab({
                     </>
                   ) : (
                     <CreateStrReportButton
+                      listingId={listing.id}
+                      photoRequirement={photoRequirement}
+                    />
+                  )
+                ) : type === "lease_appraisal" ? (
+                  leaseAppraisalReport ? (
+                    <>
+                      <Link href={leaseAppraisalEditorPath(listing.id)}>
+                        <Button size="sm">Edit</Button>
+                      </Link>
+                      {leaseAppraisalReport.pdf_url ? (
+                        <DownloadPdfButton
+                          url={leaseAppraisalReport.pdf_url}
+                          reportId={leaseAppraisalReport.id}
+                          cacheVersion={leaseAppraisalReport.updated_at}
+                          canGenerate={false}
+                          downloadLabel="Download asset"
+                        />
+                      ) : null}
+                    </>
+                  ) : (
+                    <CreateLeaseAppraisalButton
                       listingId={listing.id}
                       photoRequirement={photoRequirement}
                     />

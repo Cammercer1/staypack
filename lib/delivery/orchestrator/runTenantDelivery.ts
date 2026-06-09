@@ -6,7 +6,12 @@ import {
   logDeliveryDigestPreview,
   sendDeliveryDigestEmail,
 } from "@/lib/delivery/email/sendDeliveryDigestEmail";
-import { maxListingsPerRun, maxListingsPerSource } from "@/lib/delivery/runConfig";
+import {
+  DISCOVERY_CANDIDATES_PER_SOURCE,
+  maxListingsPerRun,
+  maxListingsPerSource,
+} from "@/lib/delivery/runConfig";
+import { getDeliveredListingUrlsForTenant } from "@/lib/delivery/property-ledger/repository";
 import { emitUsageEvent } from "@/lib/delivery/usage/events";
 import { logDelivery, alertDeliveryFailure } from "@/lib/delivery/observability/log";
 import type {
@@ -51,16 +56,30 @@ export async function runTenantDelivery(
   const seenUrls = new Set<string>();
 
   try {
+    const deliveredUrls = await getDeliveredListingUrlsForTenant(tenant.id);
+
     for (const source of tenant.partner_sources) {
       try {
         const discovered = await discoverFromPartnerSource(source);
         const sourceCap = maxListingsPerSource(source);
-        for (const item of discovered.slice(0, sourceCap)) {
-          if (seenUrls.has(item.listingUrl)) {
+        let picked = 0;
+
+        for (const item of discovered.slice(0, DISCOVERY_CANDIDATES_PER_SOURCE)) {
+          if (picked >= sourceCap) {
+            break;
+          }
+          if (seenUrls.has(item.listingUrl) || deliveredUrls.has(item.listingUrl)) {
             continue;
           }
           seenUrls.add(item.listingUrl);
           listingUrls.push(item.listingUrl);
+          picked += 1;
+        }
+
+        if (picked === 0) {
+          errors.push(
+            `Partner source ${source.label ?? source.url}: no new listings (all candidates already delivered)`,
+          );
         }
       } catch (error) {
         errors.push(
@@ -81,6 +100,7 @@ export async function runTenantDelivery(
         listingUrl,
         scrapeRunId: run.id,
       });
+
 
       switch (result.outcome) {
         case "skipped":

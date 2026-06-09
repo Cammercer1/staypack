@@ -16,10 +16,10 @@ import type { BrochureBlurbBlock } from "@/lib/collateral/templates/types";
 import { mmToPx } from "@/lib/reports/pageFormat";
 import { cn } from "@/lib/utils";
 import { resolveListingImageMetaForPool } from "@/lib/listings/syncListingImageMeta";
-import type { AgentProfile, Listing } from "@/lib/types";
+import type { ReportPageVariant } from "@/lib/reports/templates/shared/reportPageVariant";
+import type { AgentProfile, FinalReportJson, Listing } from "@/lib/types";
 import {
   EditableProvider,
-  BrochureScreenPreviewProvider,
   type BrochureImageSlot,
 } from "@/components/collateral/sales-brochure/inline/EditableContext";
 import type { BrochureCopyFieldPath } from "@/lib/collateral/sales-brochure/editablePaths";
@@ -40,6 +40,11 @@ type Props = {
   className?: string;
   maxHeight?: string;
   fitToWidth?: boolean;
+  /** When true, use agency/fonts from `document` (listing playground) instead of session preview-brand API. */
+  useDocumentBrand?: boolean;
+  metricsReport?: FinalReportJson;
+  reportVariant?: ReportPageVariant;
+  allowDevBlurbLengthMap?: boolean;
   editable?: {
     blurbBlocks: BrochureBlurbBlock[];
     setField: (path: BrochureCopyFieldPath, value: string) => void;
@@ -58,6 +63,10 @@ export function FittedBrochurePreview({
   className,
   maxHeight = "min(80vh, 900px)",
   fitToWidth = true,
+  useDocumentBrand = false,
+  metricsReport,
+  reportVariant,
+  allowDevBlurbLengthMap = false,
   editable,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -80,6 +89,10 @@ export function FittedBrochurePreview({
   }, [document.template_id, pageCount]);
 
   useEffect(() => {
+    if (useDocumentBrand) {
+      return;
+    }
+
     let cancelled = false;
 
     fetch("/api/collateral/preview-brand")
@@ -96,7 +109,7 @@ export function FittedBrochurePreview({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [useDocumentBrand]);
 
   const previewDocument = useMemo((): BrochureDocumentJson => {
     const withListingAgents = listing
@@ -105,7 +118,9 @@ export function FittedBrochurePreview({
           agentProfile,
         })
       : document;
-    const merged = applySalesBrochurePreviewBrand(withListingAgents, previewBrand);
+    const merged = useDocumentBrand
+      ? withListingAgents
+      : applySalesBrochurePreviewBrand(withListingAgents, previewBrand);
     if (!isBrochureDocument(merged)) {
       return withListingAgents;
     }
@@ -118,7 +133,7 @@ export function FittedBrochurePreview({
       ...merged,
       listing_image_meta: listingMeta ?? merged.listing_image_meta ?? {},
     };
-  }, [document, listing, agencyAgents, agentProfile, previewBrand]);
+  }, [document, listing, agencyAgents, agentProfile, previewBrand, useDocumentBrand]);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -265,17 +280,21 @@ export function FittedBrochurePreview({
                   <CollateralPreview
                     document={previewDocument}
                     collateralType={collateralType}
+                    metricsReport={metricsReport}
+                    reportVariant={reportVariant}
+                    allowDevBlurbLengthMap={allowDevBlurbLengthMap}
                     printMode
                   />
                 </EditableProvider>
               ) : (
-                <BrochureScreenPreviewProvider>
-                  <CollateralPreview
-                    document={previewDocument}
-                    collateralType={collateralType}
-                    printMode
-                  />
-                </BrochureScreenPreviewProvider>
+                <CollateralPreview
+                  document={previewDocument}
+                  collateralType={collateralType}
+                  metricsReport={metricsReport}
+                  reportVariant={reportVariant}
+                  allowDevBlurbLengthMap={allowDevBlurbLengthMap}
+                  printMode
+                />
               )}
             </div>
           </div>

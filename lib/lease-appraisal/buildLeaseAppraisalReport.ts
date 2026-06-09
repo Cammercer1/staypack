@@ -4,7 +4,7 @@ import { HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/temp
 import { calculateAccommodates } from "@/lib/reports/formatters";
 import {
   primaryReportAgent,
-  resolveReportAgents,
+  resolveAgencyAccountReportAgents,
 } from "@/lib/reports/resolveReportAgents";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
 import {
@@ -15,6 +15,7 @@ import {
   deriveLeaseAppraisalCopy,
   type LeaseAppraisalCopy,
 } from "@/lib/lease-appraisal/deriveLeaseAppraisalCopy";
+import type { ReportPropertyImageSelection } from "@/lib/reports/editable/reportImageSlots";
 import type {
   Agency,
   AgentProfile,
@@ -34,6 +35,8 @@ export type BuildLeaseAppraisalReportInput = {
   templateId?: string;
   /** Investor copy; defaults to listing-derived text (use AI via generateLeaseAppraisalCopy). */
   copy?: LeaseAppraisalCopy;
+  /** Preserves hero/gallery picks from the content editor across rebuilds. */
+  propertyImages?: ReportPropertyImageSelection;
 };
 
 export function buildLeaseAppraisalReport({
@@ -45,9 +48,9 @@ export function buildLeaseAppraisalReport({
   agencyAgents,
   templateId = HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID,
   copy: copyOverride,
+  propertyImages,
 }: BuildLeaseAppraisalReportInput): FinalReportJson {
-  const agents = resolveReportAgents({
-    scraped: parsed,
+  const agents = resolveAgencyAccountReportAgents({
     agentProfile,
     agencyAgents,
   });
@@ -134,8 +137,15 @@ export function buildLeaseAppraisalReport({
         listing.accommodates,
       ),
       listing_url: listing.listing_url ?? "",
-      hero_image_url: heroFromSelection ?? parsedImages[0] ?? "",
-      selected_image_urls: selectedFromListing,
+      hero_image_url:
+        propertyImages?.hero_image_url ??
+        heroFromSelection ??
+        parsedImages[0] ??
+        "",
+      selected_image_urls:
+        propertyImages?.selected_image_urls?.length
+          ? propertyImages.selected_image_urls
+          : selectedFromListing,
       display_price: listing.display_price ?? rentRangeLabel,
     },
     str: {

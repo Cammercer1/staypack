@@ -140,12 +140,16 @@ export function BrochureRentalBondInline({
   }
 
   const labelClass = compact
-    ? "text-[0.65rem] font-medium uppercase tracking-wide text-neutral-500"
+    ? inverted
+      ? "text-[0.65rem] font-medium uppercase tracking-wide"
+      : "text-[0.65rem] font-medium uppercase tracking-wide text-neutral-500"
     : `text-[0.7rem] font-semibold uppercase tracking-[0.14em] ${
         inverted ? "text-white/90" : "text-neutral-600"
       }`;
   const valueClass = compact
-    ? "mt-1 text-[1.05rem] font-bold leading-none text-neutral-900"
+    ? inverted
+      ? "text-[1rem] font-bold leading-none"
+      : "mt-1 text-[1.05rem] font-bold leading-none text-neutral-900"
     : `mt-2 text-xl font-semibold leading-none ${inverted ? "text-white" : ""}`;
 
   return (
@@ -154,7 +158,10 @@ export function BrochureRentalBondInline({
         as="p"
         path="copy.bond_label"
         className={labelClass}
-        style={compact ? { fontFamily: "var(--report-heading-font, inherit)" } : undefined}
+        style={{
+          fontFamily: compact ? "var(--report-heading-font, inherit)" : undefined,
+          ...(compact && inverted && accent ? { color: accent, opacity: 0.75 } : {}),
+        }}
       >
         {resolveBrochureBondLabel(document)}
       </Editable>

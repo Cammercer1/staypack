@@ -6,9 +6,11 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
 import { refreshStrEnrichmentInFinalReport } from "@/lib/airbtics/enrich";
-import { applyTemplateBrandToFinalReport } from "@/lib/reports/applyTemplateBrand";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
+import { resolveFinalReportForPrint } from "@/lib/reports/resolveFinalReportForPrint";
+import { resolveStoredFinalReport } from "@/lib/reports/resolveStoredFinalReport";
+import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
 import { ReportPreview } from "@/components/reports/ReportPreview";
 import type { Agency, FinalReportJson, Listing } from "@/lib/types";
 
@@ -36,7 +38,7 @@ export default async function PublicReportPrintPage({
 
   const { data: report } = await admin
     .from("reports")
-    .select("final_report_json, raw_airbtics_json, status, listing_id")
+    .select("final_report_json, raw_airbtics_json, status, listing_id, template_id")
     .eq("agency_id", agency.id)
     .eq("public_slug", reportSlug)
     .eq("status", "published")
@@ -62,28 +64,38 @@ export default async function PublicReportPrintPage({
       ? agencyAgents?.find((agent) => agent.id === listing.agent_profile_id) ?? null
       : null;
 
-  const mergedReport = mergeAgencyBrandIntoFinalReport(
-    agency as Agency,
-    report.final_report_json as FinalReportJson,
+  const isLease = isLeaseAppraisalTemplateId(
+    report.template_id ??
+      (report.final_report_json as FinalReportJson).template_id,
   );
 
-  const finalReport = applyTemplateBrandToFinalReport(
-    refreshStrEnrichmentInFinalReport(
-      enrichFinalReportMetrics(
-        (listing ?? { display_price: null, scraped_listing_json: null }) as Pick<
-          Listing,
-          "display_price" | "scraped_listing_json"
-        >,
-        mergedReport,
-        { agentProfile, agencyAgents: agencyAgents ?? [] },
-      ),
-      report.raw_airbtics_json,
-    ),
+  const storedReport =
+    resolveStoredFinalReport(report) ??
+    (report.final_report_json as FinalReportJson);
+  const mergedForPrint = resolveFinalReportForPrint(
+    report,
+    listing as Listing | null,
+    storedReport,
   );
+
+  const mergedReport = mergeAgencyBrandIntoFinalReport(agency as Agency, mergedForPrint);
+
+  let enriched = enrichFinalReportMetrics(
+    (listing ?? { display_price: null, scraped_listing_json: null }) as Pick<
+      Listing,
+      "display_price" | "scraped_listing_json"
+    >,
+    mergedReport,
+    { agentProfile, agencyAgents: agencyAgents ?? [] },
+  );
+
+  if (!isLease && report.raw_airbtics_json) {
+    enriched = refreshStrEnrichmentInFinalReport(enriched, report.raw_airbtics_json);
+  }
 
   return (
     <div className="report-print-root print-mode">
-      <ReportPreview report={finalReport} printMode />
+      <ReportPreview report={enriched} printMode />
     </div>
   );
 }

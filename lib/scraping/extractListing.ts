@@ -1,5 +1,5 @@
 import type { ParsedListing } from "@/lib/types";
-import { hasBrightDataReaConfig, hasBrightDataUnlockerConfig } from "@/lib/brightdata/client";
+import { hasBrightDataUnlockerConfig } from "@/lib/brightdata/client";
 import { parseListingFromHtml } from "@/lib/openai/parseListingFromHtml";
 import { fetchRenderedHtml } from "@/lib/scraping/fetchRenderedHtml";
 import { fetchStaticHtml } from "@/lib/scraping/fetchStaticHtml";
@@ -22,7 +22,11 @@ import {
   parseSpfnDetailHtml,
 } from "@/lib/scraping/spfn/parseSpfnListing";
 import { isReaListingUrl } from "@/lib/scraping/rea/findReaListingUrl";
-import { tryReaBrightDataImport } from "@/lib/scraping/reaEnrichment";
+import {
+  hasReaImportConfig,
+  tryReaImport,
+  type ReaImportProvider,
+} from "@/lib/scraping/reaEnrichment";
 import { enrichListingRentalAppraisal } from "@/lib/rental/enrichListingRentalAppraisal";
 
 function shouldSkipAiEnrichment(
@@ -36,7 +40,8 @@ function shouldSkipAiEnrichment(
     parserName === "domain_fallback" ||
     parserName === "domain_primary" ||
     parserName === "domain_url" ||
-    parserName === "rea_brightdata"
+    parserName === "rea_brightdata" ||
+    parserName === "rea_apify"
   ) {
     return true;
   }
@@ -207,31 +212,47 @@ async function enrichFromAgencySite(
   };
 }
 
+function reaImportMethod(provider: ReaImportProvider): ExtractListingResult["method"] {
+  return provider === "apify" ? "apify_rea" : "brightdata_rea";
+}
+
+function reaImportParserName(provider: ReaImportProvider) {
+  return provider === "apify" ? "rea_apify" : "rea_brightdata";
+}
+
 async function tryReaImportWithOptionalAgencyAgents(
   sourceUrl: string,
   addressHint: Partial<ParsedListing> | null | undefined,
   warnings: string[],
 ) {
-  const reaImport = await tryReaBrightDataImport(sourceUrl, addressHint);
+  const reaImport = await tryReaImport(sourceUrl, addressHint);
   warnings.push(...reaImport.warnings);
 
-  if (!reaImport.used) {
+  if (!reaImport.used || !reaImport.provider) {
     return null;
   }
+
+  const method = reaImportMethod(reaImport.provider);
+  const parserName = reaImportParserName(reaImport.provider);
 
   if (!isReaListingUrl(sourceUrl) && !isDomainListingUrl(sourceUrl)) {
     const agency = await enrichFromAgencySite(sourceUrl, reaImport.listing, warnings, {
       agentsOnly: true,
     });
-    return buildResult(agency.listing, warnings, "brightdata_rea", "rea_brightdata");
+    return buildResult(agency.listing, warnings, method, parserName);
   }
 
-  return buildResult(reaImport.listing, warnings, "brightdata_rea", "rea_brightdata");
+  return buildResult(reaImport.listing, warnings, method, parserName);
 }
 
 export type ExtractListingResult = {
   listing: ParsedListing;
-  method: "static_fetch" | "browserless_rendered" | "brightdata_rea" | "brightdata_unlocker";
+  method:
+    | "static_fetch"
+    | "browserless_rendered"
+    | "apify_rea"
+    | "brightdata_rea"
+    | "brightdata_unlocker";
   parserName: string;
   warnings: string[];
 };
@@ -384,7 +405,7 @@ export async function extractListingFromUrl(
       }
     }
 
-    if (hasBrightDataReaConfig()) {
+    if (hasReaImportConfig()) {
       const reaResult = await tryReaImportWithOptionalAgencyAgents(url, urlSeed, warnings);
       if (reaResult) {
         return applyExtractOptions(reaResult, options);
@@ -416,7 +437,7 @@ export async function extractListingFromUrl(
         );
       }
     }
-  } else if (hasBrightDataReaConfig()) {
+  } else if (hasReaImportConfig()) {
     const reaResult = await tryReaImportWithOptionalAgencyAgents(
       url,
       urlAddressHint,
@@ -515,7 +536,7 @@ export async function extractListingFromUrl(
     );
   }
 
-  if (hasBrightDataReaConfig()) {
+  if (hasReaImportConfig()) {
     const reaResult = await tryReaImportWithOptionalAgencyAgents(url, listing, warnings);
     if (reaResult) {
       return applyExtractOptions(reaResult, options);

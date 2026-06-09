@@ -1,6 +1,8 @@
 import type { ComponentType } from "react";
 import type { FinalReportJson } from "@/lib/types";
 
+export type { ReportPageOneProps, ReportPageVariant } from "@/lib/reports/templates/shared/reportPageVariant";
+
 export type ReportTemplateProps = {
   report: FinalReportJson;
 };

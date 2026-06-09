@@ -1,7 +1,12 @@
 import {
   hasBrightDataReaConfig,
+  hasBrightDataUnlockerConfig,
   scrapeBrightDataReaListing,
 } from "@/lib/brightdata/client";
+import {
+  hasApifyReaConfig,
+  scrapeApifyReaListingUrl,
+} from "@/lib/apify/client";
 import type { ParsedListing } from "@/lib/types";
 import { mergeParsedListings } from "@/lib/scraping/index";
 import { MIN_DELIVERY_DESCRIPTION_CHARS } from "@/lib/scraping/listingCompleteness";
@@ -9,14 +14,28 @@ import {
   findReaListingUrlCandidates,
   prependDirectReaUrl,
 } from "@/lib/scraping/rea/findReaListingUrlCandidates";
+import { parseApifyReaRecord } from "@/lib/scraping/rea/parseApifyRea";
 import {
   isReaListingUrl,
   normalizeReaListingUrl,
   reaUrlFormat,
 } from "@/lib/scraping/rea/reaUrlMatch";
-import { hasBrightDataUnlockerConfig } from "@/lib/brightdata/client";
 import { parseBrightDataReaRecord } from "@/lib/scraping/rea/parseBrightDataRea";
 import { emptyListing } from "@/lib/scraping/parsers/utils";
+
+export type ReaImportProvider = "apify" | "brightdata";
+
+export type ReaImportResult = {
+  used: boolean;
+  listing: ParsedListing;
+  reaUrl?: string;
+  warnings: string[];
+  provider?: ReaImportProvider;
+};
+
+export function hasReaImportConfig() {
+  return hasApifyReaConfig() || hasBrightDataReaConfig();
+}
 
 export function hasSearchableReaAddress(listing: Partial<ParsedListing>) {
   return Boolean(
@@ -50,7 +69,13 @@ async function resolveReaListingUrlCandidates(
     return direct ? [direct] : [];
   }
 
-  const discovered = await findReaListingUrlCandidates(matchInput);
+  let discovered: string[] = [];
+  try {
+    discovered = await findReaListingUrlCandidates(matchInput);
+  } catch {
+    // Unlocker unavailable — still scrape direct REA URL when present.
+  }
+
   return prependDirectReaUrl(discovered, direct);
 }
 
@@ -94,9 +119,19 @@ function shouldTryNextReaUrl(
   return !quality.hasDescription;
 }
 
+type ReaCandidateScraper = {
+  provider: ReaImportProvider;
+  scrape: (reaUrl: string) => Promise<ParsedListing | null>;
+  emptyRecordMessage: (reaUrl: string) => string;
+  unusableMessage: (reaUrl: string) => string;
+  failedMessage: (reaUrl: string, error: unknown) => string;
+  thinDataMessage: string;
+};
+
 async function scrapeBestReaListingFromCandidates(
   urls: string[],
   warnings: string[],
+  scraper: ReaCandidateScraper,
 ): Promise<{
   parsed: ParsedListing;
   reaUrl: string;
@@ -108,15 +143,14 @@ async function scrapeBestReaListingFromCandidates(
     const remaining = urls.slice(index + 1);
 
     try {
-      const record = await scrapeBrightDataReaListing(reaUrl);
-      if (!record) {
-        warnings.push(`Bright Data returned no REA listing data for ${reaUrl}.`);
+      const parsed = await scraper.scrape(reaUrl);
+      if (!parsed) {
+        warnings.push(scraper.emptyRecordMessage(reaUrl));
         continue;
       }
 
-      const parsed = parseBrightDataReaRecord(record);
       if (!isUsableReaRecord(parsed)) {
-        warnings.push(`Bright Data REA scrape for ${reaUrl} did not return a usable address.`);
+        warnings.push(scraper.unusableMessage(reaUrl));
         continue;
       }
 
@@ -136,41 +170,79 @@ async function scrapeBestReaListingFromCandidates(
       }
 
       if (shouldTryNextReaUrl(parsed, reaUrl, remaining)) {
-        warnings.push(
-          `REA dataset returned thin data for ${reaUrl}; trying next discovered URL.`,
-        );
+        warnings.push(scraper.thinDataMessage);
         continue;
       }
 
       return { parsed, reaUrl };
     } catch (error) {
-      warnings.push(
-        error instanceof Error
-          ? `Bright Data REA scrape failed for ${reaUrl}: ${error.message}`
-          : `Bright Data REA scrape failed for ${reaUrl}.`,
-      );
+      warnings.push(scraper.failedMessage(reaUrl, error));
     }
   }
 
   return fallback;
 }
 
-export async function tryReaBrightDataImport(
-  sourceUrl: string,
-  addressHint?: Partial<ParsedListing> | null,
-): Promise<{
-  used: boolean;
-  listing: ParsedListing;
-  reaUrl?: string;
-  warnings: string[];
-}> {
-  const warnings: string[] = [];
+const APIFY_SCRAPER: ReaCandidateScraper = {
+  provider: "apify",
+  scrape: async (reaUrl) => {
+    const record = await scrapeApifyReaListingUrl(reaUrl);
+    return record ? parseApifyReaRecord(record) : null;
+  },
+  emptyRecordMessage: (reaUrl) => `Apify returned no REA listing data for ${reaUrl}.`,
+  unusableMessage: (reaUrl) =>
+    `Apify REA scrape for ${reaUrl} did not return a usable address.`,
+  failedMessage: (reaUrl, error) =>
+    error instanceof Error
+      ? `Apify REA scrape failed for ${reaUrl}: ${error.message}`
+      : `Apify REA scrape failed for ${reaUrl}.`,
+  thinDataMessage: "Apify REA scrape returned thin data; trying next discovered URL.",
+};
 
-  if (!hasBrightDataReaConfig()) {
-    return { used: false, listing: emptyListing(), warnings };
+const BRIGHTDATA_SCRAPER: ReaCandidateScraper = {
+  provider: "brightdata",
+  scrape: async (reaUrl) => {
+    const record = await scrapeBrightDataReaListing(reaUrl);
+    return record ? parseBrightDataReaRecord(record) : null;
+  },
+  emptyRecordMessage: (reaUrl) => `Bright Data returned no REA listing data for ${reaUrl}.`,
+  unusableMessage: (reaUrl) =>
+    `Bright Data REA scrape for ${reaUrl} did not return a usable address.`,
+  failedMessage: (reaUrl, error) =>
+    error instanceof Error
+      ? `Bright Data REA scrape failed for ${reaUrl}: ${error.message}`
+      : `Bright Data REA scrape failed for ${reaUrl}.`,
+  thinDataMessage: "REA dataset returned thin data; trying next discovered URL.",
+};
+
+function mergeReaImportListing(
+  scraped: ParsedListing,
+  addressHint?: Partial<ParsedListing> | null,
+) {
+  if (!addressHint) {
+    return scraped;
   }
 
+  return mergeParsedListings(
+    {
+      images: [],
+      agents: [],
+      confidence: addressHint.confidence ?? "medium",
+      warnings: addressHint.warnings ?? [],
+      ...addressHint,
+    },
+    scraped,
+  );
+}
+
+async function tryReaProviderImport(
+  sourceUrl: string,
+  addressHint: Partial<ParsedListing> | null | undefined,
+  scraper: ReaCandidateScraper,
+): Promise<ReaImportResult> {
+  const warnings: string[] = [];
   const reaUrls = await resolveReaListingUrlCandidates(sourceUrl, addressHint);
+
   if (!reaUrls.length) {
     if (isReaListingUrl(sourceUrl)) {
       warnings.push("Could not normalize the realestate.com.au listing URL.");
@@ -190,31 +262,68 @@ export async function tryReaBrightDataImport(
     );
   }
 
-  const scraped = await scrapeBestReaListingFromCandidates(reaUrls, warnings);
+  const scraped = await scrapeBestReaListingFromCandidates(reaUrls, warnings, scraper);
   if (!scraped) {
-    warnings.push("Bright Data REA scrape did not return usable listing data.");
+    const providerLabel = scraper.provider === "apify" ? "Apify" : "Bright Data";
+    warnings.push(`${providerLabel} REA scrape did not return usable listing data.`);
     return { used: false, listing: emptyListing(), warnings };
   }
 
-  const merged = addressHint
-    ? mergeParsedListings(
-        {
-          images: [],
-          agents: [],
-          confidence: addressHint.confidence ?? "medium",
-          warnings: addressHint.warnings ?? [],
-          ...addressHint,
-        },
-        scraped.parsed,
-      )
-    : scraped.parsed;
+  const merged = mergeReaImportListing(scraped.parsed, addressHint);
+  const providerLabel = scraper.provider === "apify" ? "Apify" : "Bright Data";
 
-  warnings.push(`Imported from realestate.com.au via Bright Data: ${scraped.reaUrl}`);
+  warnings.push(
+    `Imported from realestate.com.au via ${providerLabel}: ${scraped.reaUrl}`,
+  );
 
   return {
     used: true,
     listing: merged,
     reaUrl: scraped.reaUrl,
     warnings,
+    provider: scraper.provider,
+  };
+}
+
+export async function tryReaApifyImport(
+  sourceUrl: string,
+  addressHint?: Partial<ParsedListing> | null,
+): Promise<ReaImportResult> {
+  if (!hasApifyReaConfig()) {
+    return { used: false, listing: emptyListing(), warnings: [] };
+  }
+
+  return tryReaProviderImport(sourceUrl, addressHint, APIFY_SCRAPER);
+}
+
+export async function tryReaBrightDataImport(
+  sourceUrl: string,
+  addressHint?: Partial<ParsedListing> | null,
+): Promise<ReaImportResult> {
+  if (!hasBrightDataReaConfig()) {
+    return { used: false, listing: emptyListing(), warnings: [] };
+  }
+
+  return tryReaProviderImport(sourceUrl, addressHint, BRIGHTDATA_SCRAPER);
+}
+
+export async function tryReaImport(
+  sourceUrl: string,
+  addressHint?: Partial<ParsedListing> | null,
+): Promise<ReaImportResult> {
+  const apifyResult = await tryReaApifyImport(sourceUrl, addressHint);
+  if (apifyResult.used) {
+    return apifyResult;
+  }
+
+  const brightDataResult = await tryReaBrightDataImport(sourceUrl, addressHint);
+  if (brightDataResult.used) {
+    return brightDataResult;
+  }
+
+  return {
+    used: false,
+    listing: emptyListing(),
+    warnings: [...apifyResult.warnings, ...brightDataResult.warnings],
   };
 }

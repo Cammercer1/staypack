@@ -104,6 +104,38 @@ export function getReportsUrl() {
   return getSiteUrl();
 }
 
+function isLocalDevHost(hostname: string | null) {
+  return Boolean(
+    hostname && (LEGACY_SITE_HOSTS.has(hostname) || hostname.startsWith("127.")),
+  );
+}
+
+/**
+ * Origin for server-side /print HTML capture during PDF generation.
+ * In local dev, keep localhost so PDFs use the running dev app — not production staypack.app.
+ */
+export function getPrintRenderBaseUrl() {
+  if (isDevelopment()) {
+    const candidates = [
+      process.env.PDF_PRINT_BASE_URL?.trim(),
+      process.env.NEXT_PUBLIC_REPORTS_URL?.trim(),
+      process.env.NEXT_PUBLIC_SITE_URL?.trim(),
+    ].filter(Boolean) as string[];
+
+    for (const candidate of candidates) {
+      const normalized = normalizeSiteUrl(candidate);
+      const host = hostFromUrl(normalized);
+      if (isLocalDevHost(host)) {
+        return normalized;
+      }
+    }
+
+    return "http://localhost:3000";
+  }
+
+  return getReportsUrl();
+}
+
 export function isDevelopment() {
   return (process.env.APP_ENV ?? "development") === "development";
 }

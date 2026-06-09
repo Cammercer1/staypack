@@ -1,4 +1,7 @@
-import { HAVEN_AGENT_PHOTO_CLASS } from "@/lib/reports/templates/haven-properties/brand";
+import {
+  HAVEN_AGENT_PHOTO_CLASS,
+  isHavenPropertiesTemplateId,
+} from "@/lib/reports/templates/haven-properties/brand";
 import type { FinalReportJson } from "@/lib/types";
 
 type Props = {
@@ -92,20 +95,14 @@ function AgentBlock({
 export function ClassicAgentFooter({ report, compact = false }: Props) {
   const agents = resolveFooterAgents(report);
   const hasQr = Boolean(report.assets.qr_code_url);
-  const havenPhotoClass =
-    report.template_id === "haven-properties-str" ||
-    report.template_id === "haven-properties-lease-appraisal"
-      ? HAVEN_AGENT_PHOTO_CLASS
-      : undefined;
+  const isHavenManagedTemplate = isHavenPropertiesTemplateId(report.template_id);
+  const havenPhotoClass = isHavenManagedTemplate ? HAVEN_AGENT_PHOTO_CLASS : undefined;
 
   if (agents.length === 0 && !hasQr) {
     return null;
   }
 
   const multiAgent = agents.length > 1;
-  const isHavenManagedTemplate =
-    report.template_id === "haven-properties-str" ||
-    report.template_id === "haven-properties-lease-appraisal";
 
   return (
     <footer

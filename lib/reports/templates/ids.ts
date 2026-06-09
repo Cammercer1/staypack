@@ -29,9 +29,21 @@ export const LANDMARK_DETAILED_TEMPLATE_ID = "landmark-detailed";
 /** Managed delivery — bespoke Haven Properties STR layout */
 export const HAVEN_PROPERTIES_STR_TEMPLATE_ID = "haven-properties-str";
 
-/** Managed delivery — investor lease appraisal (LTR comps, Landmark-inspired) */
+/** Managed delivery — investor lease appraisal (Haven bespoke page 1) */
 export const HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID =
   "haven-properties-lease-appraisal";
+
+export {
+  CLASSIC_LEASE_APPRAISAL_TEMPLATE_ID,
+  BOLD_LEASE_APPRAISAL_TEMPLATE_ID,
+  GALLERY_LEASE_APPRAISAL_TEMPLATE_ID,
+  EDITORIAL_LEASE_APPRAISAL_TEMPLATE_ID,
+  SPLIT_LEASE_APPRAISAL_TEMPLATE_ID,
+  REFINED_LEASE_APPRAISAL_TEMPLATE_ID,
+  MINIMALIST_LEASE_APPRAISAL_TEMPLATE_ID,
+  LANDMARK_LEASE_APPRAISAL_TEMPLATE_ID,
+  DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID,
+} from "@/lib/reports/templates/lease-appraisal/ids";
 
 export const REPORT_TEMPLATE_IDS = [
   CLASSIC_LIGHT_TEMPLATE_ID,
@@ -52,6 +64,14 @@ export const REPORT_TEMPLATE_IDS = [
   LANDMARK_DETAILED_TEMPLATE_ID,
   HAVEN_PROPERTIES_STR_TEMPLATE_ID,
   HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID,
+  "classic-lease-appraisal",
+  "bold-lease-appraisal",
+  "gallery-lease-appraisal",
+  "editorial-lease-appraisal",
+  "split-lease-appraisal",
+  "refined-lease-appraisal",
+  "minimalist-lease-appraisal",
+  "landmark-lease-appraisal",
 ] as const;
 
 export type ReportTemplateId = (typeof REPORT_TEMPLATE_IDS)[number];

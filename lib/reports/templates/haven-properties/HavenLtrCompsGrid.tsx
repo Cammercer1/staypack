@@ -1,10 +1,11 @@
 import { BedDouble, Bath } from "lucide-react";
 import type { LtrRentalCompCard } from "@/lib/types";
+import { MAX_LEASE_APPRAISAL_FEATURED_COMPS } from "@/lib/lease-appraisal/leaseAppraisalData";
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import { formatNumber } from "@/lib/reports/formatters";
 
 /** Haven lease appraisal page 2 — matches STR comp count (2×3 grid). */
-export const HAVEN_LTR_FEATURED_COMP_COUNT = 6;
+export const HAVEN_LTR_FEATURED_COMP_COUNT = MAX_LEASE_APPRAISAL_FEATURED_COMPS;
 export const HAVEN_LTR_COMP_IMAGE_ASPECT = "aspect-[5/2]";
 
 const DEFAULT_FEATURED = HAVEN_LTR_FEATURED_COMP_COUNT;
@@ -30,6 +31,7 @@ export function HavenLtrCompsGrid({
   hideHeader = false,
 }: Props) {
   const featured = comps.slice(0, featuredCount);
+  const denseSix = compact && featured.length >= 6;
 
   if (featured.length === 0) {
     return (
@@ -63,7 +65,9 @@ export function HavenLtrCompsGrid({
         </div>
       ) : null}
 
-      <div className={`grid grid-cols-2 ${compact ? "gap-3" : "gap-5"}`}>
+      <div
+        className={`grid grid-cols-2 ${denseSix ? "gap-2" : compact ? "gap-3" : "gap-5"}`}
+      >
         {featured.map((comp) => (
           <article key={comp.listing_id || comp.name} className="min-w-0">
             {comp.thumbnail_url ? (
@@ -71,23 +75,25 @@ export function HavenLtrCompsGrid({
               <img
                 src={comp.thumbnail_url}
                 alt=""
-                className={`${imageAspectClass} w-full object-cover`}
+                className={`${denseSix ? "aspect-[4/2]" : imageAspectClass} w-full object-cover`}
               />
             ) : (
-              <div className={`${imageAspectClass} w-full bg-neutral-200`} />
+              <div
+                className={`${denseSix ? "aspect-[4/2]" : imageAspectClass} w-full bg-neutral-200`}
+              />
             )}
-            <div className="mt-2 space-y-1">
+            <div className={`space-y-0.5 ${denseSix ? "mt-1" : "mt-2"}`}>
               <p
                 className={`font-semibold leading-snug text-neutral-900 ${
-                  compact ? "text-[0.68rem]" : "text-xs"
+                  denseSix ? "text-[0.62rem]" : compact ? "text-[0.68rem]" : "text-xs"
                 }`}
                 style={{ fontFamily: "var(--report-body-font, inherit)" }}
               >
                 {comp.name}
               </p>
               <div
-                className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-neutral-600 ${
-                  compact ? "text-[0.62rem]" : "text-[0.68rem]"
+                className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 text-neutral-600 ${
+                  denseSix ? "text-[0.58rem]" : compact ? "text-[0.62rem]" : "text-[0.68rem]"
                 }`}
               >
                 {comp.weekly_rent != null ? (

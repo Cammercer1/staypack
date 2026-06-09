@@ -203,6 +203,14 @@ export async function processDeliveryListing({
         },
       });
 
+
+      if (enriched.rentalAppraisal?.weeklyMin == null || enriched.rentalAppraisal?.weeklyMax == null) {
+        throw new Error(
+          enriched.warnings?.find((w) => w.startsWith("Rental appraisal")) ??
+            "Lease appraisal could not compute a weekly rent range",
+        );
+      }
+
       await updateDeliveryListingScrapedJson(listing.id, enriched);
 
       const lease = await generateHeadlessLeaseAppraisal({

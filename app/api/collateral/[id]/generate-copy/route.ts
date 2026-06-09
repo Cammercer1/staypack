@@ -8,6 +8,8 @@ import { withBrochureContentSaved } from "@/lib/collateral/sales-brochure/brochu
 import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { provisionCollateralQr } from "@/lib/collateral/provisionCollateralQr";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
+import { assertTemplateGranted } from "@/lib/templates/grants/assertTemplateGranted";
+import { templateGrantErrorResponse } from "@/lib/templates/grants/apiErrors";
 import {
   SalesBrochureCopyOpenAIError,
   SalesBrochureCopyValidationError,
@@ -59,6 +61,15 @@ export async function POST(
       });
 
     const templateId = resolveCollateralTemplateId(agency, collateral);
+    try {
+      await assertTemplateGranted(agency.id, templateId);
+    } catch (grantError) {
+      const denied = templateGrantErrorResponse(grantError);
+      if (denied) {
+        return denied;
+      }
+      throw grantError;
+    }
     const built =
       collateral.type === "rental_brochure"
         ? buildRentalBrochureDocument({

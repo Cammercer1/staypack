@@ -85,8 +85,7 @@ export function SalesBrochureWizard({
     "idle" | "publishing" | "generating-pdf"
   >("idle");
   const copyEditorRef = useRef<BrochureCopyEditorHandle>(null);
-  const pendingPreviewSyncRef = useRef(false);
-  const previewSyncStartedAtRef = useRef(0);
+  const previewSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [previewSyncing, setPreviewSyncing] = useState(false);
   const [previewDraftDocument, setPreviewDraftDocument] =
     useState<BrochureDocumentJson | null>(() => {
@@ -102,43 +101,41 @@ export function SalesBrochureWizard({
   }, [collateral.document_json]);
 
   useEffect(() => {
-    if (!pendingPreviewSyncRef.current || step !== "preview") {
-      return;
-    }
-
-    pendingPreviewSyncRef.current = false;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-    const frame = requestAnimationFrame(() => {
-      const elapsed = Date.now() - previewSyncStartedAtRef.current;
-      const remaining = Math.max(0, PREVIEW_SYNC_MIN_MS - elapsed);
-      timeoutId = setTimeout(() => {
-        setPreviewSyncing(false);
-      }, remaining);
-    });
-
     return () => {
-      cancelAnimationFrame(frame);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (previewSyncTimeoutRef.current) {
+        clearTimeout(previewSyncTimeoutRef.current);
       }
     };
-  }, [previewDraftDocument, step]);
+  }, []);
 
   function handleStepChange(next: string) {
     if (next === "preview") {
-      pendingPreviewSyncRef.current = true;
-      previewSyncStartedAtRef.current = Date.now();
-      setPreviewSyncing(true);
+      if (step === "preview") {
+        return;
+      }
+
       copyEditorRef.current?.flushPendingEdits();
       const liveDocument = copyEditorRef.current?.getPreviewDocument();
       if (liveDocument) {
         setPreviewDraftDocument(liveDocument);
       }
+
+      if (previewSyncTimeoutRef.current) {
+        clearTimeout(previewSyncTimeoutRef.current);
+      }
+      setPreviewSyncing(true);
       setStep("preview");
+      previewSyncTimeoutRef.current = setTimeout(() => {
+        previewSyncTimeoutRef.current = null;
+        setPreviewSyncing(false);
+      }, PREVIEW_SYNC_MIN_MS);
       return;
     }
 
+    if (previewSyncTimeoutRef.current) {
+      clearTimeout(previewSyncTimeoutRef.current);
+      previewSyncTimeoutRef.current = null;
+    }
     setPreviewSyncing(false);
     setStep(next);
   }

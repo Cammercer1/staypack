@@ -1,3 +1,10 @@
+import { PAGE_ONE_BULLET_COUNT } from "@/lib/copy/pageOneMarketingCopy";
+import {
+  blurbVariantsParagraphsToStored,
+  enforceBlurbVariantsParagraphs,
+  variantTextToParagraphs,
+} from "@/lib/copy/blurbVariants";
+import type { BlurbVariantsStored } from "@/lib/copy/blurbVariantConstants";
 import {
   deriveComparableEvidence,
   LEASE_APPRAISAL_COMPARABLE_DISCLAIMER,
@@ -7,6 +14,7 @@ import type { Agency, Listing, LtrRentalCompCard, LtrSuburbMarketJson, ParsedLis
 export type LeaseAppraisalCopy = {
   heading: string;
   blurb: string;
+  blurb_variants?: BlurbVariantsStored;
   key_metrics_line: string;
   appeal_points: string[];
   supporting_factors: string[];
@@ -152,7 +160,7 @@ export function deriveLeaseAppraisalCopy({
   const descriptionLead = firstSentences(
     parsed.description ?? listing.listing_description ?? "",
     2,
-    360,
+    280,
   );
 
   const propertyLead =
@@ -165,33 +173,33 @@ export function deriveLeaseAppraisalCopy({
   const rentLine = rentPositionLine(weeklyMid, suburbMarket, compCount);
   const suburbLine = suburbContextLine(suburbMarket ?? parsed.ltrSuburbMarket);
 
-  const blurbParts = [propertyLead, rentLine, suburbLine].filter(Boolean);
-  const blurb = blurbParts.join("\n\n");
+  const blurbBody = [propertyLead, rentLine, suburbLine].filter(Boolean).join(" ");
+  const blurb_variants = blurbVariantsParagraphsToStored(
+    enforceBlurbVariantsParagraphs({
+      short: variantTextToParagraphs(blurbBody).slice(0, 1).length
+        ? variantTextToParagraphs(blurbBody).slice(0, 1)
+        : [blurbBody],
+      medium: (() => {
+        const parts = variantTextToParagraphs(blurbBody);
+        if (parts.length >= 2) return parts.slice(0, 2);
+        return [parts[0] ?? blurbBody, rentLine || ""];
+      })(),
+      long: (() => {
+        const parts = variantTextToParagraphs(blurbBody);
+        if (parts.length >= 3) return parts.slice(0, 3);
+        return [propertyLead || blurbBody, rentLine || "", suburbLine || ""];
+      })(),
+    }),
+  );
+  const blurb = blurb_variants.medium || blurbBody;
 
   const suburb = listing.suburb ?? parsed.suburb ?? "the area";
-  const bullets: string[] = [];
-
-  const market = suburbMarket ?? parsed.ltrSuburbMarket;
-
-  if (market?.gross_yield_pct != null) {
-    bullets.push(
-      `Approx. ${formatPct(market.gross_yield_pct)} gross yield for ${market.property_segment === "unit" ? "units" : "houses"} in ${suburb}.`,
-    );
-  }
-
-  if (market?.population != null && market.renter_pct != null) {
-    bullets.push(
-      `Suburb population ~${new Intl.NumberFormat("en-AU").format(market.population)} with ${formatPct(market.renter_pct)} renting.`,
-    );
-  } else if (compCount > 0) {
-    bullets.push(`Rent band informed by ${compCount} active comparable listings (see page 2).`);
-  }
-
-  if (parsed.bedrooms && parsed.bathrooms) {
-    bullets.push(
-      `${parsed.bedrooms} bed · ${parsed.bathrooms} bath${parsed.carSpaces ? ` · ${parsed.carSpaces} car` : ""} configuration.`,
-    );
-  }
+  const appeal_points = [
+    propertyLead || `Well-located ${(listing.property_type ?? parsed.propertyType ?? "property").toLowerCase()} in ${suburb}.`,
+    rentLine || "Rent range informed by comparable lease listings nearby.",
+    suburbLine || "Suburb rental fundamentals support long-term leasing demand.",
+    "Confirm inclusions, condition and letting strategy when finalising rent.",
+  ].slice(0, PAGE_ONE_BULLET_COUNT);
 
   const comparable_evidence = deriveComparableEvidence({
     suburb: listing.suburb ?? parsed.suburb,
@@ -209,8 +217,9 @@ export function deriveLeaseAppraisalCopy({
   return {
     heading: deriveHeading(listing, parsed),
     blurb,
+    blurb_variants,
     key_metrics_line: "",
-    appeal_points: bullets.slice(0, 4),
+    appeal_points,
     supporting_factors: [],
     buyer_checks: [
       "Confirm body corporate, furnishing and inclusions when setting achievable rent.",

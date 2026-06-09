@@ -2,15 +2,18 @@ import { BedDouble, DollarSign, Percent } from "lucide-react";
 import type { StrCompCard } from "@/lib/types";
 import { formatCurrency, formatDistanceMeters, formatNumber, formatPercent } from "@/lib/reports/formatters";
 
-const DEFAULT_FEATURED_COMP_COUNT = 3;
+export const STR_PAGE_TWO_FEATURED_COMP_COUNT = 4;
+export const STR_PAGE_TWO_COMP_IMAGE_ASPECT = "aspect-[3/1]";
+
+const DEFAULT_FEATURED_COMP_COUNT = STR_PAGE_TWO_FEATURED_COMP_COUNT;
 
 type Props = {
   comps: StrCompCard[];
   suburb?: string;
   totalCompCount?: number;
-  /** How many comp cards to render (default 3). */
+  /** How many comp cards to render (default 4). */
   featuredCount?: number;
-  /** Tailwind aspect class for comp photos (default 5:3). */
+  /** Tailwind aspect class for comp photos (default 3:1 — wide, short). */
   imageAspectClass?: string;
   /** Override subtitle under "Comparable listings" (default derives from counts). */
   compPoolDescription?: string;
@@ -25,7 +28,7 @@ export function ClassicCompsGrid({
   suburb,
   totalCompCount,
   featuredCount = DEFAULT_FEATURED_COMP_COUNT,
-  imageAspectClass = "aspect-[5/3]",
+  imageAspectClass = STR_PAGE_TWO_COMP_IMAGE_ASPECT,
   compPoolDescription,
   showPoolSubtitle = true,
   compact = false,
@@ -66,7 +69,7 @@ export function ClassicCompsGrid({
       </div>
 
       <div
-        className={`grid ${compact ? "gap-4" : "gap-5"} ${
+        className={`grid ${compact ? "gap-3" : "gap-4"} ${
           featured.length <= 4 ? "grid-cols-2" : "grid-cols-3"
         }`}
       >
@@ -83,7 +86,7 @@ export function ClassicCompsGrid({
               <div className={`${imageAspectClass} w-full bg-neutral-100`} />
             )}
 
-            <div className={compact ? "pt-2" : "pt-3"}>
+            <div className={compact ? "pt-1.5" : "pt-2"}>
               {comp.distance_m != null ? (
                 <p
                   className={`font-semibold uppercase tracking-wide text-neutral-600 ${

@@ -1,7 +1,7 @@
 import type { BrochureBlurbBlock, SalesBrochureCopyJson } from "@/lib/collateral/templates/types";
 
 export const BLURB_HEADING_MAX = 80;
-export const BLURB_PARAGRAPH_MAX = 600;
+export const BLURB_PARAGRAPH_MAX = 350;
 export const BLURB_BLOCKS_MAX = 16;
 export const BLURB_TOTAL_RECOMMENDED = 1200;
 

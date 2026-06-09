@@ -1,6 +1,5 @@
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { z } from "zod";
 import {
   deriveLeaseAppraisalCopy,
   type LeaseAppraisalCopy,
@@ -8,20 +7,14 @@ import {
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import { isDevelopment } from "@/lib/env";
 import { LEASE_APPRAISAL_COMPARABLE_DISCLAIMER } from "@/lib/lease-appraisal/comparableEvidenceCopy";
+import {
+  PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
+  getPageOneMarketingCopyPromptLimits,
+  pageOneFromAiShape,
+  pageOneMediumBlurb,
+  pageOneMarketingCopyAiSchema,
+} from "@/lib/copy/pageOneMarketingCopy";
 import type { Agency, Listing, LtrRentalCompCard, LtrSuburbMarketJson, ParsedListing } from "@/lib/types";
-
-const leaseAppraisalCopySchema = z.object({
-  heading: z.string(),
-  blurb: z.string(),
-  key_metrics_line: z.string(),
-  appeal_points: z.array(z.string()).max(4),
-  supporting_factors: z.array(z.string()).max(2),
-  buyer_checks: z.array(z.string()).max(3),
-  methodology_note: z.string(),
-  disclaimer: z.string(),
-  comparable_evidence: z.string(),
-  comparable_disclaimer: z.string(),
-});
 
 const SYSTEM_PROMPT = `You write page-1 copy for an Australian long-term rental appraisal aimed at property investors.
 
@@ -31,21 +24,11 @@ Inputs include the REA listing description, rent comparable range, and suburb st
 
 Rules:
 - Australian English, confident but conservative — no hype, no guaranteed income.
-- heading: one engaging line drawn from the listing (feature or positioning), max 14 words. Not the street address alone.
-- blurb: exactly 2–3 short paragraphs separated by blank lines:
-  1) Property story from listing_description (rewrite, do not copy verbatim).
-  2) How rent compares to the suburb — never state dollar amounts (the sidebar shows the range).
-  3) Optional one sentence on suburb rental conditions (yield, vacancy, renters) if provided.
-- key_metrics_line: always return an empty string "" (rent is shown separately in the layout).
-- appeal_points: 3 bullets — each a DISTINCT fact (suburb stat, configuration, or investment angle). Never repeat the comp count if already in the blurb.
-- supporting_factors: leave as empty array [].
-- buyer_checks: 2 practical underwriting reminders.
-- methodology_note: one sentence on REA comps + PropRadar suburb data.
-- comparable_evidence: exactly 2 short paragraphs separated by a blank line for page 2 under comparable listing photos:
-  1) How comps were reviewed (use comp_count and featured_comp_rents range), drivers of rent (views, building, parking, amenities, location near beach/light rail/suburb centre).
-  2) Why the subject appraisal range is reasonable — reference subject features from listing_description and weekly_min/weekly_max with dollar amounts.
-- comparable_disclaimer: use this exact text unless agency.default_disclaimer requires merging: "${LEASE_APPRAISAL_COMPARABLE_DISCLAIMER}"
-- Do not mention OpenAI or AI.`;
+- heading: one engaging line drawn from the listing (feature or positioning), not the street address alone.
+- Blurbs: rewrite listing_description; weave in how rent sits vs the suburb without dollar amounts (range is in the sidebar). Provide three lengths per the contract — short (1 paragraph), medium (2 paragraphs), long (3 paragraphs). Each length must add detail; do not repeat the same paragraph across all three.
+- bullets: exactly four short feature bullets drawn from the listing (layout, location, parking, amenities, etc.).
+- Do not mention OpenAI or AI.
+- Output valid JSON only with exactly the fields in the contract.`;
 
 export type GenerateLeaseAppraisalCopyInput = {
   agency: Agency;
@@ -140,17 +123,22 @@ export async function generateLeaseAppraisalCopy(
       name: input.agency.name,
       default_disclaimer: input.agency.default_disclaimer,
     },
+    copy_limits: getPageOneMarketingCopyPromptLimits(),
+    output_schema: PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
   };
 
   try {
     const response = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
-      response_format: zodResponseFormat(leaseAppraisalCopySchema, "lease_appraisal_copy"),
+      model: "gpt-5.4-mini",
+      response_format: zodResponseFormat(
+        pageOneMarketingCopyAiSchema,
+        "lease_appraisal_copy",
+      ),
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
-          content: `Write copy:\n${JSON.stringify(payload, null, 2)}`,
+          content: `${JSON.stringify(payload, null, 2)}\n\n${PAGE_ONE_MARKETING_COPY_JSON_CONTRACT}\n\n${getPageOneMarketingCopyPromptLimits()}`,
         },
       ],
     });
@@ -160,20 +148,30 @@ export async function generateLeaseAppraisalCopy(
       return fallback;
     }
 
-    const parsed = leaseAppraisalCopySchema.safeParse(JSON.parse(text));
+    const parsed = pageOneMarketingCopyAiSchema.safeParse(JSON.parse(text));
     if (!parsed.success) {
       console.error("Lease appraisal copy validation failed:", parsed.error.flatten());
       return fallback;
     }
 
+    const pageOne = pageOneFromAiShape(parsed.data);
+
     return {
-      ...parsed.data,
+      ...fallback,
+      heading: pageOne.heading,
+      blurb: pageOneMediumBlurb(pageOne),
+      blurb_variants: pageOne.blurb_variants,
+      appeal_points: pageOne.bullets,
       key_metrics_line: "",
       supporting_factors: [],
-      comparable_evidence:
-        parsed.data.comparable_evidence.trim() || fallback.comparable_evidence,
+      buyer_checks: fallback.buyer_checks,
+      methodology_note: fallback.methodology_note,
+      comparable_evidence: fallback.comparable_evidence,
       comparable_disclaimer:
-        parsed.data.comparable_disclaimer.trim() || fallback.comparable_disclaimer,
+        input.agency.default_disclaimer?.trim() ||
+        fallback.comparable_disclaimer ||
+        LEASE_APPRAISAL_COMPARABLE_DISCLAIMER,
+      disclaimer: fallback.disclaimer,
       cta: input.agency.default_cta || fallback.cta,
     };
   } catch (error) {

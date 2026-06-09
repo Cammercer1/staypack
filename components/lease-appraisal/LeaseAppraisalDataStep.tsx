@@ -1,0 +1,347 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { Check, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  hasLeaseAppraisalComps,
+} from "@/lib/lease-appraisal/generateLeaseAppraisalForListing";
+import {
+  MAX_LEASE_APPRAISAL_FEATURED_COMPS,
+  defaultSelectedCompListingIds,
+  orderLeaseAppraisalCompPool,
+} from "@/lib/lease-appraisal/leaseAppraisalData";
+import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
+import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
+import { cn } from "@/lib/utils";
+import type { Listing } from "@/lib/types";
+
+type Props = {
+  listing: Listing;
+  compsPrefetching?: boolean;
+  onListingChange: (listing: Listing) => void;
+  onContinue: () => void;
+};
+
+type ApiError = {
+  error?: string;
+};
+
+export function LeaseAppraisalDataStep({
+  listing,
+  compsPrefetching = false,
+  onListingChange,
+  onContinue,
+}: Props) {
+  const parsed = listing.scraped_listing_json;
+  const pool = parsed ? orderLeaseAppraisalCompPool(parsed) : [];
+  const appraisal = parsed?.rentalAppraisal;
+
+  const [fetching, setFetching] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [weeklyMin, setWeeklyMin] = useState<string>(
+    () => String(appraisal?.weeklyMin ?? ""),
+  );
+  const [weeklyMax, setWeeklyMax] = useState<string>(
+    () => String(appraisal?.weeklyMax ?? ""),
+  );
+  const [weeklyMid, setWeeklyMid] = useState<string>(
+    () => String(appraisal?.weeklyMidpoint ?? ""),
+  );
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => {
+    if (appraisal?.selectedCompListingIds?.length) {
+      return appraisal.selectedCompListingIds;
+    }
+    if (parsed) {
+      return defaultSelectedCompListingIds(parsed);
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    setWeeklyMin(String(appraisal?.weeklyMin ?? ""));
+    setWeeklyMax(String(appraisal?.weeklyMax ?? ""));
+    setWeeklyMid(String(appraisal?.weeklyMidpoint ?? ""));
+    if (appraisal?.selectedCompListingIds?.length) {
+      setSelectedIds(appraisal.selectedCompListingIds);
+    } else if (parsed && pool.length > 0) {
+      setSelectedIds(defaultSelectedCompListingIds(parsed));
+    }
+  }, [listing.updated_at, appraisal, parsed, pool.length]);
+
+  const compRows = useMemo(
+    () =>
+      pool.map((comp, index) => ({
+        comp,
+        id: rentalCompListingId(comp, index),
+      })),
+    [pool],
+  );
+
+  const rentSummary = useMemo(() => {
+    const min = Number(weeklyMin);
+    const max = Number(weeklyMax);
+    if (Number.isFinite(min) && Number.isFinite(max) && min > 0 && max > 0) {
+      return formatWeeklyRentRange(min, max);
+    }
+    const mid = Number(weeklyMid);
+    if (Number.isFinite(mid) && mid > 0) {
+      return formatWeeklyRentRange(mid, mid);
+    }
+    return null;
+  }, [weeklyMin, weeklyMax, weeklyMid]);
+
+  const compsReady = hasLeaseAppraisalComps(parsed);
+  const canContinue = compsReady && selectedIds.length > 0;
+
+  function toggleComp(id: string) {
+    setSelectedIds((current) => {
+      if (current.includes(id)) {
+        return current.filter((item) => item !== id);
+      }
+      if (current.length >= MAX_LEASE_APPRAISAL_FEATURED_COMPS) {
+        toast.error(`Select up to ${MAX_LEASE_APPRAISAL_FEATURED_COMPS} comparables`);
+        return current;
+      }
+      return [...current, id];
+    });
+  }
+
+  async function fetchComps(options?: { silent?: boolean }) {
+    setFetching(true);
+    try {
+      const response = await fetch(`/api/listings/${listing.id}/lease-appraisal/enrich`, {
+        method: "POST",
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to fetch rental comps");
+      }
+      if (payload.listing) {
+        onListingChange(payload.listing as Listing);
+      }
+      if (!options?.silent) {
+        toast.success("Rental comps updated");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to fetch rental comps",
+      );
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  async function saveAndContinue() {
+    if (!canContinue) {
+      toast.error("Fetch comps and select at least one comparable");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(
+        `/api/listings/${listing.id}/lease-appraisal/data`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            weekly_min: parseRent(weeklyMin),
+            weekly_max: parseRent(weeklyMax),
+            weekly_midpoint: parseRent(weeklyMid),
+            selected_comp_listing_ids: selectedIds,
+          }),
+        },
+      );
+      const payload = (await response.json()) as ApiError & { listing?: Listing };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to save appraisal data");
+      }
+      if (payload.listing) {
+        onListingChange(payload.listing);
+      }
+      toast.success("Appraisal data saved");
+      onContinue();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to save appraisal data",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const loading = fetching || saving || compsPrefetching;
+
+  return (
+    <AsyncLoadingOverlay
+      active={loading}
+      title={
+        compsPrefetching || fetching
+          ? "Fetching rental comps"
+          : "Saving appraisal data"
+      }
+      description={
+        compsPrefetching || fetching
+          ? "Searching comparable rentals and suburb context. This can take 1–3 minutes."
+          : "Saving your rent band and comparable selection."
+      }
+      className="space-y-8"
+    >
+      <div>
+        <h2 className="text-lg font-semibold">Appraisal data</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {compsReady
+            ? `Comps are sorted with ${listing.suburb ?? "your suburb"} first, then nearby areas. Review the rent band, pick up to four for page 2, and use Refresh to re-fetch from REA.`
+            : "Comparable rentals load when you start the appraisal. Adjust the weekly rent band if needed, then choose featured comps."}
+        </p>
+      </div>
+
+      <div className="surface-card space-y-4 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="font-medium">Comparable rentals</p>
+          {compsReady ? (
+            <Badge variant="secondary">Ready</Badge>
+          ) : (
+            <Badge variant="outline">Required</Badge>
+          )}
+        </div>
+
+        <Button variant="outline" onClick={() => void fetchComps()} disabled={loading}>
+          {compsPrefetching || fetching ? (
+            <>
+              <Loader2 className="animate-spin" />
+              Fetching comps...
+            </>
+          ) : compsReady ? (
+            "Refresh comps"
+          ) : (
+            "Fetch rental comps"
+          )}
+        </Button>
+      </div>
+
+      {compsReady ? (
+        <>
+          <div className="surface-card grid gap-4 p-6 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="weekly-min">Weekly min ($)</Label>
+              <Input
+                id="weekly-min"
+                type="number"
+                min={0}
+                value={weeklyMin}
+                onChange={(e) => setWeeklyMin(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="weekly-max">Weekly max ($)</Label>
+              <Input
+                id="weekly-max"
+                type="number"
+                min={0}
+                value={weeklyMax}
+                onChange={(e) => setWeeklyMax(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="weekly-mid">Weekly midpoint ($)</Label>
+              <Input
+                id="weekly-mid"
+                type="number"
+                min={0}
+                value={weeklyMid}
+                onChange={(e) => setWeeklyMid(e.target.value)}
+              />
+            </div>
+            {rentSummary ? (
+              <p className="text-sm text-muted-foreground sm:col-span-3">
+                Guide range: <span className="font-medium text-foreground">{rentSummary}</span>
+              </p>
+            ) : null}
+          </div>
+
+          <div className="surface-card space-y-4 p-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium">Featured comparables</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedIds.length} / {MAX_LEASE_APPRAISAL_FEATURED_COMPS} selected
+              </p>
+            </div>
+
+            {compRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No comparables returned — try refreshing comps.
+              </p>
+            ) : (
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {compRows.map(({ comp, id }) => {
+                  const selected = selectedIds.includes(id);
+                  return (
+                    <li key={id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleComp(id)}
+                        className={cn(
+                          "flex w-full gap-3 rounded-xl border p-3 text-left transition-colors",
+                          selected
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/40",
+                        )}
+                      >
+                        <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md bg-muted">
+                          {comp.imageUrl ? (
+                            <Image
+                              src={comp.imageUrl}
+                              alt=""
+                              fill
+                              className="object-cover"
+                              sizes="96px"
+                              unoptimized
+                            />
+                          ) : null}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-sm font-medium">{comp.address}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {comp.bedrooms ?? "?"} bed · ${comp.weeklyRent}/wk
+                            {comp.suburb ? ` · ${comp.suburb}` : ""}
+                          </p>
+                        </div>
+                        {selected ? (
+                          <Check className="h-5 w-5 shrink-0 text-primary" />
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </>
+      ) : null}
+
+      <Button onClick={saveAndContinue} disabled={loading || !canContinue}>
+        {saving ? (
+          <>
+            <Loader2 className="animate-spin" />
+            Saving...
+          </>
+        ) : (
+          "Continue to content generation"
+        )}
+      </Button>
+    </AsyncLoadingOverlay>
+  );
+}
+
+function parseRent(value: string) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}

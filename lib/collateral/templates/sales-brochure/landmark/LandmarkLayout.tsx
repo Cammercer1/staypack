@@ -338,16 +338,6 @@ function LandmarkLeftColumn({
             />
           ) : null}
         </div>
-        {document.copy.disclaimer ? (
-          <Editable
-            as="p"
-            path="copy.disclaimer"
-            className="mt-1.5 text-[0.56rem] leading-relaxed text-neutral-400"
-            style={{ fontFamily: bodyFont }}
-          >
-            {document.copy.disclaimer}
-          </Editable>
-        ) : null}
       </div>
     </div>
   );

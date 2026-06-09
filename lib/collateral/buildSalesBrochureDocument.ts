@@ -10,6 +10,7 @@ import {
 } from "@/lib/collateral/templates/types";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
 import { resolveListingImageMetaForPool } from "@/lib/listings/syncListingImageMeta";
+import { mockBlurbVariantsFromText } from "@/lib/copy/blurbVariantEnforce";
 import { coerceSalesBrochureCopy } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
 import {
@@ -187,18 +188,18 @@ export function getMockSalesBrochureCopy(
     : "Your next home awaits";
 
   const blurb = `Discover ${address} — a well-presented opportunity in a sought-after pocket. Arrange an inspection to experience the layout, natural light and lifestyle appeal for yourself.`;
+  const blurb_variants = mockBlurbVariantsFromText(blurb);
 
   return {
     heading,
     blurb,
     blurb_blocks: [{ type: "paragraph", text: blurb }],
+    blurb_variants,
     property_highlights: [
       "Practical floor plan suited to everyday living.",
       "Convenient access to local amenities and transport.",
       "Presented for buyers seeking quality and location.",
       "Generous living zones with flexible accommodation.",
-      "Low-maintenance outdoor areas for relaxed entertaining.",
-      "Secure parking and storage where applicable.",
     ],
     inspection_cta:
       agency.default_cta || "Contact us to arrange your private inspection.",
@@ -225,18 +226,18 @@ export function getMockRentalBrochureCopy(
     : "Your next rental awaits";
 
   const blurb = `Discover ${address} — a well-presented rental in a sought-after pocket. Arrange an inspection to experience the layout, natural light and lifestyle appeal for yourself.`;
+  const blurb_variants = mockBlurbVariantsFromText(blurb);
 
   return {
     heading,
     blurb,
     blurb_blocks: [{ type: "paragraph", text: blurb }],
+    blurb_variants,
     property_highlights: [
       "Practical floor plan suited to everyday living.",
       "Convenient access to local amenities and transport.",
       "Presented for tenants seeking quality and location.",
       "Generous living zones with flexible accommodation.",
-      "Low-maintenance outdoor areas for relaxed entertaining.",
-      "Secure parking and storage where applicable.",
     ],
     inspection_cta:
       agency.default_cta || "Contact us to arrange your inspection.",

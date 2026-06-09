@@ -15,6 +15,13 @@ import {
   HAVEN_BRAND,
   HAVEN_LEASE_APPRAISAL_AGENT_PHOTO_CLASS,
 } from "@/lib/reports/templates/haven-properties/brand";
+import { ReportEditableImage } from "@/components/reports/inline/ReportEditableImage";
+import { ReportCopyFeatureBullet } from "@/components/reports/inline/ReportCopyFeatureBullet";
+import {
+  ReportCopyBlurb,
+  ReportCopyDisclaimer,
+  ReportCopyHeading,
+} from "@/components/reports/inline/ReportCopyFields";
 import type { FinalReportJson } from "@/lib/types";
 
 const headingFont = "var(--report-heading-font, inherit)";
@@ -106,10 +113,9 @@ export function HavenLeaseAppraisalPageOne({ report }: { report: FinalReportJson
       : null;
   const rentSubline = formatRentCalloutSubline(report.ltr_enrichment?.comp_count);
 
-  const features = [
-    ...(report.copy.appeal_points ?? []),
-    ...(report.copy.supporting_factors ?? []),
-  ]
+  const appealPoints = report.copy.appeal_points ?? [];
+  const supportingFactors = report.copy.supporting_factors ?? [];
+  const features = [...appealPoints, ...supportingFactors]
     .filter((v, i, arr) => arr.indexOf(v) === i)
     .slice(0, 9);
 
@@ -124,8 +130,12 @@ export function HavenLeaseAppraisalPageOne({ report }: { report: FinalReportJson
     >
       <div className="relative shrink-0 overflow-hidden" style={{ height: "125mm" }}>
         {hero ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={hero} alt="" className="h-full w-full object-cover" />
+          <ReportEditableImage
+            slot="hero"
+            src={hero}
+            className="h-full w-full"
+            imgClassName="h-full w-full object-cover"
+          />
         ) : (
           <div className="h-full bg-neutral-300" />
         )}
@@ -169,25 +179,21 @@ export function HavenLeaseAppraisalPageOne({ report }: { report: FinalReportJson
         <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
           {report.copy.heading &&
           !isDuplicateLeaseBannerHeading(report.copy.heading) ? (
-            <h1
+            <ReportCopyHeading
+              text={report.copy.heading}
+              as="h1"
               className="text-[1.1rem] font-bold leading-[1.2] text-neutral-900"
               style={{ fontFamily: headingFont }}
-            >
-              {report.copy.heading}
-            </h1>
+            />
           ) : null}
 
-          {report.copy.blurb
-            ? report.copy.blurb.split(/\n\n+/).map((para) => (
-                <p
-                  key={para.slice(0, 48)}
-                  className="text-[0.74rem] leading-[1.7] text-neutral-700"
-                  style={{ fontFamily: bodyFont }}
-                >
-                  {para.trim()}
-                </p>
-              ))
-            : null}
+          {report.copy.blurb ? (
+            <ReportCopyBlurb
+              blurb={report.copy.blurb}
+              paraClassName="text-[0.74rem] leading-[1.7] text-neutral-700"
+              style={{ fontFamily: bodyFont }}
+            />
+          ) : null}
 
           {features.length > 0 ? (
             <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5">
@@ -201,7 +207,11 @@ export function HavenLeaseAppraisalPageOne({ report }: { report: FinalReportJson
                     className="mt-[0.3rem] h-[5px] w-[5px] shrink-0 rounded-full"
                     style={{ backgroundColor: accent }}
                   />
-                  <span>{item}</span>
+                  <ReportCopyFeatureBullet
+                    item={item}
+                    appealPoints={appealPoints}
+                    supportingFactors={supportingFactors}
+                  />
                 </li>
               ))}
             </ul>
@@ -248,23 +258,23 @@ export function HavenLeaseAppraisalPageOne({ report }: { report: FinalReportJson
               </div>
             ) : agents.length === 0 && secondary.length > 0 ? (
               <div className="w-full shrink-0 overflow-hidden" style={{ height: "52mm" }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={secondary[secondary.length - 1]}
-                  alt=""
-                  className="h-full w-full object-cover"
+                <ReportEditableImage
+                  slot={{ kind: "secondary", index: secondary.length - 1 }}
+                  src={secondary[secondary.length - 1]!}
+                  className="h-full w-full"
+                  imgClassName="h-full w-full object-cover"
                 />
               </div>
             ) : null}
           </div>
 
           {report.copy.disclaimer ? (
-            <p
+            <ReportCopyDisclaimer
+              text={report.copy.disclaimer}
+              as="p"
               className="shrink-0 text-[0.56rem] leading-relaxed text-neutral-400"
               style={{ fontFamily: bodyFont }}
-            >
-              {report.copy.disclaimer}
-            </p>
+            />
           ) : null}
         </div>
       </div>

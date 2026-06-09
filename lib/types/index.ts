@@ -47,7 +47,9 @@ export type ParsedListing = {
     weeklyMin?: number;
     weeklyMax?: number;
     weeklyMidpoint?: number;
-    source?: "rea_discover";
+    /** Up to 4 listing URLs (or synthetic ids) shown on page 2. */
+    selectedCompListingIds?: string[];
+    source?: "rea_discover" | "apify_rea";
     compCount?: number;
     searchUrl?: string;
     premiumTier?: boolean;
@@ -167,6 +169,12 @@ export type LtrEnrichmentJson = {
 export type AiCopyJson = {
   sales_pack_heading: string;
   sales_pack_blurb: string;
+  /** Short / medium / long page-one blurbs from AI (paragraphs joined with blank lines). */
+  sales_pack_blurb_variants?: {
+    short: string;
+    medium: string;
+    long: string;
+  };
   key_metrics_line: string;
   property_appeal_points: string[];
   performance_supporting_factors: string[];
@@ -263,6 +271,15 @@ export type FinalReportJson = {
   copy: {
     heading: string;
     blurb: string;
+    blurb_variants?: {
+      short: string;
+      medium: string;
+      long: string;
+    };
+    /** template_id → short | medium | long */
+    template_blurb_length?: Partial<
+      Record<string, import("@/lib/copy/blurbVariantConstants").BlurbLength>
+    >;
     key_metrics_line: string;
     appeal_points: string[];
     supporting_factors: string[];
@@ -410,6 +427,7 @@ export type CollateralType =
   | "str_report"
   | "sales_brochure"
   | "rental_brochure"
+  | "lease_appraisal"
   | "social_posts"
   | "investor_snapshot"
   | "agent_business_card";

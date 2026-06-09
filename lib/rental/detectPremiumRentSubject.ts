@@ -1,4 +1,5 @@
 import type { RentBandTier } from "@/lib/rental/computeRentBand";
+import { propertyTypeFamily } from "@/lib/rental/computeRentBand";
 import type { ListingPremiumSignals } from "@/lib/rental/parseListingPremiumSignals";
 import { LARGE_LAND_SQM, PREMIUM_LAND_SQM } from "@/lib/rental/parseListingPremiumSignals";
 
@@ -9,6 +10,7 @@ export type PremiumRentSubjectInput = {
   tierSetting?: RentAppraisalTierSetting;
   subjectBedrooms?: number;
   subjectBathrooms?: number;
+  subjectPropertyType?: string;
   signals?: ListingPremiumSignals;
 };
 
@@ -34,8 +36,17 @@ export function detectPremiumRentSubject(
   const signals = input.signals;
   const beds = input.subjectBedrooms;
   const baths = input.subjectBathrooms;
+  const typeFamily = propertyTypeFamily(input.subjectPropertyType);
   let score = 0;
   const reasons: string[] = [];
+
+  if (typeFamily === "unit" && (signals?.luxuryScore ?? 0) >= 2) {
+    score += 2;
+    reasons.push("luxury apartment/unit copy");
+  } else if (typeFamily === "unit" && (signals?.luxuryScore ?? 0) >= 1) {
+    score += 1;
+    reasons.push("premium unit listing language");
+  }
 
   if (signals?.premiumLand) {
     score += 2;

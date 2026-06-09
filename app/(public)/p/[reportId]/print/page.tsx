@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
+import { resolveFinalReportForPrint } from "@/lib/reports/resolveFinalReportForPrint";
+import { resolveStoredFinalReport } from "@/lib/reports/resolveStoredFinalReport";
 import { verifyPrintAccessToken } from "@/lib/reports/printAccessToken";
 import { ReportPreview } from "@/components/reports/ReportPreview";
 import type { Agency, FinalReportJson, Listing } from "@/lib/types";
@@ -24,7 +26,7 @@ export default async function DraftReportPrintPage({
   const admin = createAdminClient();
   const { data: report } = await admin
     .from("reports")
-    .select("final_report_json, agency_id, listing_id")
+    .select("final_report_json, agency_id, listing_id, template_id")
     .eq("id", reportId)
     .maybeSingle();
 
@@ -58,15 +60,21 @@ export default async function DraftReportPrintPage({
       ? agencyAgents?.find((agent) => agent.id === listing.agent_profile_id) ?? null
       : null;
 
+  const storedReport =
+    resolveStoredFinalReport(report) ??
+    (report.final_report_json as FinalReportJson);
+  const mergedForPrint = resolveFinalReportForPrint(
+    report,
+    listing as Listing | null,
+    storedReport,
+  );
+
   const finalReport = enrichFinalReportMetrics(
     (listing ?? { display_price: null, scraped_listing_json: null }) as Pick<
       Listing,
       "display_price" | "scraped_listing_json"
     >,
-    mergeAgencyBrandIntoFinalReport(
-      agency as Agency,
-      report.final_report_json as FinalReportJson,
-    ),
+    mergeAgencyBrandIntoFinalReport(agency as Agency, mergedForPrint),
     { agentProfile, agencyAgents: agencyAgents ?? [] },
   );
 

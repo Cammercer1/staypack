@@ -1,4 +1,5 @@
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
+import { resolveBrochureBrandBand } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureBrandBand";
 import type { FinalReportJson } from "@/lib/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
 import { BrochureSlotImage } from "@/components/collateral/sales-brochure/inline/BrochureSlotImage";
@@ -21,7 +22,7 @@ const headingFont = "var(--report-heading-font, var(--collateral-heading-font, i
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
 
 function buildRefinedFeatures(document: BrochureDocumentJson) {
-  return getPropertyHighlights(document.copy).slice(0, 6);
+  return getPropertyHighlights(document.copy).slice(0, 4);
 }
 
 function formatSpecsLine(document: BrochureDocumentJson) {
@@ -62,17 +63,17 @@ export function RefinedHeader({
   document: BrochureDocumentJson;
 }) {
   const specs = formatSpecsLine(document);
-  const highlight = document.agency.accent_colour || document.agency.primary_colour;
+  const band = resolveBrochureBrandBand(document.agency);
   const logoUrl = getAgencyLogoUrl(document.agency, "dark");
 
   return (
     <header
-      className="shrink-0 px-10 pb-6 pt-9 text-white"
-      style={{ backgroundColor: highlight }}
+      className="shrink-0 px-10 pb-6 pt-9"
+      style={{ backgroundColor: band.background, color: band.text }}
     >
       <p
-        className="text-[0.65rem] font-medium uppercase tracking-[0.28em] text-white/75"
-        style={{ fontFamily: headingFont }}
+        className="text-[0.65rem] font-medium uppercase tracking-[0.28em]"
+        style={{ fontFamily: headingFont, color: band.text, opacity: 0.75 }}
       >
         Introducing
       </p>
@@ -80,16 +81,19 @@ export function RefinedHeader({
       <div className="mt-3 flex items-start justify-between gap-6">
         <div className="min-w-0 flex-1">
           <h1
-            className="text-[1.75rem] font-bold uppercase leading-tight tracking-tight text-white"
-            style={{ fontFamily: headingFont }}
+            className="text-[1.75rem] font-bold uppercase leading-tight tracking-tight"
+            style={{ fontFamily: headingFont, color: band.text }}
           >
             {document.property.address}
           </h1>
-          <div className="mt-2 h-px w-full max-w-[280px] bg-white/40" />
+          <div
+            className="mt-2 h-px w-full max-w-[280px]"
+            style={{ backgroundColor: band.text, opacity: 0.4 }}
+          />
           {specs ? (
             <p
-              className="mt-3 text-[0.8rem] font-medium uppercase tracking-[0.12em] text-white/90"
-              style={{ fontFamily: bodyFont }}
+              className="mt-3 text-[0.8rem] font-medium uppercase tracking-[0.12em]"
+              style={{ fontFamily: bodyFont, color: band.text, opacity: 0.9 }}
             >
               {specs}
             </p>
@@ -115,27 +119,25 @@ export function RefinedBody({
 }) {
   const features = buildRefinedFeatures(document);
   const { side } = resolveRefinedImages(document);
-  const priceBoxBg = document.agency.accent_colour || "#f3f4f6";
-  const priceBoxText =
-    document.agency.callout_heading_colour ||
-    document.agency.callout_text_colour ||
-    document.agency.text_colour ||
-    "#111111";
+  const band = resolveBrochureBrandBand(document.agency);
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[1.05fr_0.95fr] gap-6 overflow-hidden px-10 pb-5 pt-10">
       <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
         <BrochureBlurbContent
           document={document}
-          paragraphClassName="text-[0.76rem] leading-[1.65] text-neutral-700"
-          headingClassName="text-[0.8rem] font-bold uppercase tracking-wide text-neutral-900"
+          paragraphClassName="text-[0.76rem] leading-[1.65] text-[var(--report-text-colour,#404040)]"
+          headingClassName="text-[0.8rem] font-bold uppercase tracking-wide text-[var(--report-headline-colour,#111111)]"
         />
 
         {features.length > 0 ? (
           <div className="min-h-0 flex-1 overflow-hidden">
             <h2
-              className="text-[1rem] font-bold uppercase tracking-wide text-neutral-900"
-              style={{ fontFamily: headingFont }}
+              className="text-[1rem] font-bold uppercase tracking-wide"
+              style={{
+                fontFamily: headingFont,
+                color: "var(--report-headline-colour, #111111)",
+              }}
             >
               Property highlights
             </h2>
@@ -143,10 +145,16 @@ export function RefinedBody({
               {features.map((item, index) => (
                 <li
                   key={`highlight-${index}`}
-                  className="flex gap-2 text-[0.72rem] leading-snug text-neutral-700"
-                  style={{ fontFamily: bodyFont }}
+                  className="flex gap-2 text-[0.72rem] leading-snug"
+                  style={{
+                    fontFamily: bodyFont,
+                    color: "var(--report-text-colour, #404040)",
+                  }}
                 >
-                  <span className="mt-[0.35rem] h-1 w-1 shrink-0 rounded-full bg-neutral-800" />
+                  <span
+                    className="mt-[0.35rem] h-1 w-1 shrink-0 rounded-full"
+                    style={{ backgroundColor: band.background }}
+                  />
                   <Editable
                     as="span"
                     path={`copy.property_highlights.${index}`}
@@ -165,20 +173,23 @@ export function RefinedBody({
             <Editable
               as="p"
               path="copy.price_label"
-              className="text-[0.65rem] font-medium uppercase tracking-[0.22em] text-neutral-500"
-              style={{ fontFamily: headingFont }}
+              className="text-[0.65rem] font-medium uppercase tracking-[0.22em]"
+              style={{
+                fontFamily: headingFont,
+                color: "var(--report-headline-colour, #525252)",
+              }}
             >
               {resolveBrochurePriceLabel(document)}
             </Editable>
             <div
               className="mt-1.5 inline-block px-4 py-2.5"
-              style={{ backgroundColor: priceBoxBg }}
+              style={{ backgroundColor: band.background }}
             >
               <Editable
                 as="p"
                 path="copy.price_value"
                 className="text-[1.5rem] font-bold leading-none"
-                style={{ fontFamily: headingFont, color: priceBoxText }}
+                style={{ fontFamily: headingFont, color: band.text }}
               >
                 {resolveBrochurePrice(document)}
               </Editable>

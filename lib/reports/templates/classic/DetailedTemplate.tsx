@@ -5,7 +5,7 @@ import { ClassicPageTwo } from "@/lib/reports/templates/classic/PageTwo";
 export function ClassicDetailedTemplate({ report }: ReportTemplateProps) {
   return (
     <>
-      <ClassicPageOne report={report} variant="detailed" />
+      <ClassicPageOne report={report} tier="detailed" />
       <ClassicPageTwo report={report} />
     </>
   );

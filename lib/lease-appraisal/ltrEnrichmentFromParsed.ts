@@ -1,15 +1,10 @@
+import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
+import { resolveSelectedRentalComps } from "@/lib/lease-appraisal/leaseAppraisalData";
 import type { LtrEnrichmentJson, LtrRentalCompCard, ParsedListing } from "@/lib/types";
-
-function compId(comp: { listingUrl?: string; address: string }, index: number) {
-  if (comp.listingUrl) {
-    return comp.listingUrl.replace(/[^a-z0-9]+/gi, "-").slice(-40) || `comp-${index}`;
-  }
-  return `comp-${index}-${comp.address.slice(0, 24)}`;
-}
 
 export function ltrEnrichmentFromParsed(listing: ParsedListing): LtrEnrichmentJson | null {
   const appraisal = listing.rentalAppraisal;
-  const comps = listing.rentalComps ?? [];
+  const comps = resolveSelectedRentalComps(listing);
 
   const suburbMarket = listing.ltrSuburbMarket ?? null;
 
@@ -18,7 +13,7 @@ export function ltrEnrichmentFromParsed(listing: ParsedListing): LtrEnrichmentJs
   }
 
   const mappedComps: LtrRentalCompCard[] = comps.map((comp, index) => ({
-    listing_id: compId(comp, index),
+    listing_id: rentalCompListingId(comp, index),
     name: comp.address,
     thumbnail_url: comp.imageUrl ?? "",
     listing_url: comp.listingUrl ?? "",

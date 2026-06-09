@@ -1,15 +1,17 @@
 import type { FinalReportJson } from "@/lib/types";
-import { ClassicCompsGrid } from "@/lib/reports/templates/classic/ClassicCompsGrid";
+import {
+  ClassicCompsGrid,
+  STR_PAGE_TWO_COMP_IMAGE_ASPECT,
+} from "@/lib/reports/templates/classic/ClassicCompsGrid";
 import { ClassicMarketInsights } from "@/lib/reports/templates/classic/ClassicMarketInsights";
 import { ClassicPageHeader } from "@/lib/reports/templates/classic/ClassicPageHeader";
 import { ClassicMonthlyRevenueChart } from "@/lib/reports/templates/classic/ClassicMonthlyRevenueChart";
-import { ClassicAgentFooter } from "@/lib/reports/templates/classic/ClassicAgentFooter";
 import { ClassicSeasonalityChart } from "@/lib/reports/templates/classic/ClassicSeasonalityChart";
 import { getReportBrandColours } from "@/lib/reports/brandColours";
 
-/** Haven STR page 2 — compact comp cards (wide, short photos) to fit A4 with snapshot footer. */
+/** Haven STR page 2 — compact comp cards (wide, short photos) to fit A4 with market snapshot. */
 export const HAVEN_FEATURED_COMP_COUNT = 6;
-export const HAVEN_COMP_IMAGE_ASPECT = "aspect-[5/2]";
+export const HAVEN_COMP_IMAGE_ASPECT = STR_PAGE_TWO_COMP_IMAGE_ASPECT;
 
 type Props = {
   report: FinalReportJson;
@@ -69,12 +71,8 @@ export function HavenPageTwo({ report }: Props) {
           </section>
 
           <section className="border-t border-neutral-200/80 pt-4">
-            <ClassicMarketInsights report={report} invertedHighlight compact />
+            <ClassicMarketInsights report={report} compact />
           </section>
-        </div>
-
-        <div className="mt-auto shrink-0 pt-4">
-          <ClassicAgentFooter report={report} compact />
         </div>
       </div>
     </section>

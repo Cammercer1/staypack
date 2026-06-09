@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pageOneMarketingCopyAiSchema } from "@/lib/copy/pageOneMarketingCopy";
 import { isValidReportTemplateId } from "@/lib/reports/templates/ids";
 import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
 
@@ -140,6 +141,7 @@ const listingImageMetaSchema = z.record(z.string(), listingImageMetaEntrySchema)
 const collateralImageChannelSchema = z.enum([
   "landing",
   "str_report",
+  "lease_appraisal",
   "sales_brochure",
   "rental_brochure",
   "social_posts",
@@ -254,9 +256,16 @@ export const airbticsEstimateSchema = z.object({
   accommodates: z.coerce.number().optional(),
 });
 
+const blurbVariantsSchema = z.object({
+  short: z.string(),
+  medium: z.string(),
+  long: z.string(),
+});
+
 export const aiCopySchema = z.object({
   sales_pack_heading: z.string(),
   sales_pack_blurb: z.string(),
+  sales_pack_blurb_variants: blurbVariantsSchema.optional(),
   key_metrics_line: z.string(),
   property_appeal_points: z.array(z.string()),
   performance_supporting_factors: z.array(z.string()),
@@ -272,16 +281,18 @@ export const brochureBlurbBlockSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("paragraph"), text: z.string() }),
 ]);
 
-export const salesBrochureCopyAiSchema = z.object({
+/** OpenAI structured output — heading, single-paragraph blurb, exactly 4 bullets. */
+export const salesBrochureCopyAiSchema = pageOneMarketingCopyAiSchema;
+
+export const salesBrochureCopySchema = z.object({
   heading: z.string(),
   blurb: z.string(),
+  blurb_variants: blurbVariantsSchema.optional(),
+  template_blurb_length: z.record(z.string(), z.enum(["short", "medium", "long"])).optional(),
   property_highlights: z.array(z.string()),
   inspection_cta: z.string(),
   disclaimer: z.string(),
-});
-
-export const salesBrochureCopySchema = salesBrochureCopyAiSchema.extend({
-  blurb_blocks: z.array(brochureBlurbBlockSchema).optional(),
+  blurb_blocks: z.array(brochureBlurbBlockSchema).default([]),
   page_two_note: z.string().optional(),
   price_label: z.string().optional(),
   price_value: z.string().optional(),
@@ -338,6 +349,7 @@ export const collateralTypeSchema = z.enum([
   "str_report",
   "sales_brochure",
   "rental_brochure",
+  "lease_appraisal",
   "social_posts",
   "investor_snapshot",
   "agent_business_card",

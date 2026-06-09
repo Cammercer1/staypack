@@ -26,14 +26,34 @@ export function formatNumber(value: number | null | undefined) {
   return new Intl.NumberFormat("en-AU").format(value);
 }
 
+/** Fixed en-AU short labels — avoids SSR/client `toLocaleDateString` mismatches (e.g. Jun vs June). */
+const SHORT_MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
 export function formatMonthLabel(monthKey: string) {
   const match = monthKey.match(/^(\d{4})-(\d{2})$/);
   if (!match) {
     return monthKey;
   }
 
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, 1);
-  return date.toLocaleDateString("en-AU", { month: "short" });
+  const monthIndex = Number(match[2]) - 1;
+  if (monthIndex < 0 || monthIndex > 11) {
+    return monthKey;
+  }
+
+  return SHORT_MONTH_LABELS[monthIndex]!;
 }
 
 export function formatDistanceMeters(value: number | null | undefined) {

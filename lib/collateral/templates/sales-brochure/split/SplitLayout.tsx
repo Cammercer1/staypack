@@ -193,10 +193,15 @@ export function SplitContentColumn({
   const showAddressLine = !headlineIncludesAddress(headline, document.property.address);
   const subline = document.copy.inspection_cta?.trim() || "";
   const logoUrl = getAgencyLogoUrl(document.agency, "light");
+  const allBlurbBlocks = getBlurbBlocks(document.copy);
+  const paragraphCount = allBlurbBlocks.filter((block) => block.type === "paragraph").length;
+  const maxParagraphs = compact ? 2 : Math.max(paragraphCount, 3);
   const { visible: blurbPreviewBlocks } = sliceBlurbBlocksByParagraphs(
-    getBlurbBlocks(document.copy),
-    compact ? 2 : 3,
+    allBlurbBlocks,
+    maxParagraphs,
   );
+  const blurbLineClampClass =
+    paragraphCount >= 3 ? undefined : compact ? "line-clamp-4" : "line-clamp-5";
 
   return (
     <div
@@ -236,7 +241,7 @@ export function SplitContentColumn({
         <BrochureBlurbContent
           document={document}
           blocks={blurbPreviewBlocks}
-          className={compact ? "line-clamp-4" : "line-clamp-5"}
+          className={blurbLineClampClass}
           paragraphClassName="text-[0.72rem] leading-[1.65] text-neutral-600"
           headingClassName="text-[0.7rem] font-bold uppercase tracking-wide text-neutral-800"
         />

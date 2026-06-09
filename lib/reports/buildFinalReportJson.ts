@@ -9,6 +9,7 @@ import type {
   StrEstimate,
 } from "@/lib/types";
 import { DEFAULT_DISCLAIMER } from "@/lib/types";
+import { mockBlurbVariantsFromText } from "@/lib/copy/blurbVariantEnforce";
 import { calculateAccommodates } from "@/lib/reports/formatters";
 import { calculateStrGrossYield } from "@/lib/reports/calculateStrYield";
 import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
@@ -132,6 +133,7 @@ export function buildFinalReportJson({
     copy: {
       heading: copy.sales_pack_heading,
       blurb: copy.sales_pack_blurb,
+      blurb_variants: copy.sales_pack_blurb_variants,
       key_metrics_line: copy.key_metrics_line,
       appeal_points: copy.property_appeal_points,
       supporting_factors: copy.performance_supporting_factors,
@@ -156,14 +158,19 @@ export function buildFinalReportJson({
 export function getMockAiCopy(listing: Listing, agency: Agency): AiCopyJson {
   const address = listing.property_address ?? "this property";
 
+  const sales_pack_blurb = `This report outlines the estimated gross short-term rental revenue potential for ${address}. Figures are indicative only and should be reviewed alongside local market conditions and buyer objectives.`;
+
   return {
     sales_pack_heading: `${agency.default_report_title}`,
-    sales_pack_blurb: `This report outlines the estimated gross short-term rental revenue potential for ${address}. Figures are indicative only and should be reviewed alongside local market conditions and buyer objectives.`,
+    sales_pack_blurb,
+    sales_pack_blurb_variants: mockBlurbVariantsFromText(sales_pack_blurb),
     key_metrics_line:
       "Estimated gross STR revenue before costs, based on comparable short-term rental performance nearby.",
     property_appeal_points: [
       "Location and property configuration may suit short-stay demand.",
       "Flexible accommodation layout can appeal to a range of guest profiles.",
+      "Comparable short-term rental activity supports income potential nearby.",
+      "Review council, strata and operating costs before committing.",
     ],
     performance_supporting_factors: [
       "Comparable short-term rental activity in the surrounding area.",

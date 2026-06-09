@@ -6,6 +6,8 @@ import { normalizeAiCopy } from "@/lib/reports/normalizeAiCopy";
 import { enforceTemplateCopyLimits } from "@/lib/reports/enforceTemplateCopyLimits";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
 import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
+import { assertTemplateGranted } from "@/lib/templates/grants/assertTemplateGranted";
+import { templateGrantErrorResponse } from "@/lib/templates/grants/apiErrors";
 import { aiCopySchema, updateReportSchema, type UpdateReportInput } from "@/lib/validation/schemas";
 import type { Agency, AiCopyJson, Listing, Report } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -83,6 +85,18 @@ export async function PATCH(
     const { id } = await params;
     const { supabase, agency, report, listing } = await requireReportWithListing(id);
     const body = updateReportSchema.parse(await request.json());
+
+    if (body.template_id) {
+      try {
+        await assertTemplateGranted(agency.id, body.template_id);
+      } catch (grantError) {
+        const denied = templateGrantErrorResponse(grantError);
+        if (denied) {
+          return denied;
+        }
+        throw grantError;
+      }
+    }
 
     if (body.ai_copy_json) {
       const parsedCopy = aiCopySchema.safeParse(

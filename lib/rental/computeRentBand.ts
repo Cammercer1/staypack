@@ -4,6 +4,8 @@ import {
   type RentAppraisalTierSetting,
 } from "@/lib/rental/detectPremiumRentSubject";
 import type { ListingPremiumSignals } from "@/lib/rental/parseListingPremiumSignals";
+import { MIN_RENT_COMPS_FOR_BAND } from "@/lib/rental/rentCompThresholds";
+import { resolveRentalCompPropertyType } from "@/lib/rental/resolveRentalCompPropertyType";
 import type { RentalComp } from "@/lib/rental/types";
 
 export type RentBandResult = {
@@ -27,6 +29,8 @@ export type RentBandOptions = {
   tier?: RentBandTier;
   tierSetting?: RentAppraisalTierSetting;
   premiumSignals?: ListingPremiumSignals;
+  /** Featured comps must match subject property type when any type-matched comps exist. */
+  strictFeaturedPropertyType?: boolean;
   /** Lower percentile for band min (default 0.35 standard, 0.25 premium). */
   percentileLow?: number;
   /** Upper percentile for band max (default 0.65 standard, 0.75 premium). */
@@ -45,6 +49,7 @@ function toPremiumInput(options?: RentBandOptions): PremiumRentSubjectInput {
     tierSetting: options?.tierSetting,
     subjectBedrooms: options?.subjectBedrooms,
     subjectBathrooms: options?.subjectBathrooms,
+    subjectPropertyType: options?.subjectPropertyType,
     signals: options?.premiumSignals,
   };
 }
@@ -63,7 +68,7 @@ function rentBandProfile(options?: RentBandOptions): RentBandOptions {
   };
 }
 
-const MIN_COMPS = 5;
+const MIN_COMPS = MIN_RENT_COMPS_FOR_BAND;
 
 function percentile(sorted: number[], p: number) {
   if (!sorted.length) {
@@ -75,7 +80,12 @@ function percentile(sorted: number[], p: number) {
 
 export function propertyTypeFamily(propertyType?: string) {
   const normalized = propertyType?.trim().toLowerCase() ?? "";
-  if (normalized.includes("apartment") || normalized.includes("unit")) {
+  if (
+    normalized.includes("apartment") ||
+    normalized.includes("unit") ||
+    normalized.includes("flat") ||
+    normalized.includes("studio")
+  ) {
     return "unit";
   }
   if (normalized.includes("townhouse")) {
@@ -87,14 +97,24 @@ export function propertyTypeFamily(propertyType?: string) {
   return "other";
 }
 
+export function matchesSubjectPropertyType(
+  comp: RentalComp,
+  subjectType?: string,
+): boolean {
+  return matchesSubjectType(comp, subjectType);
+}
+
 function matchesSubjectType(comp: RentalComp, subjectType?: string) {
   if (!subjectType?.trim()) {
     return true;
   }
   const subjectFamily = propertyTypeFamily(subjectType);
-  const compFamily = propertyTypeFamily(comp.propertyType);
-  if (subjectFamily === "other" || compFamily === "other") {
+  const compFamily = propertyTypeFamily(resolveRentalCompPropertyType(comp));
+  if (subjectFamily === "other") {
     return true;
+  }
+  if (compFamily === "other") {
+    return false;
   }
   return subjectFamily === compFamily;
 }
@@ -130,6 +150,59 @@ function filterUpperRentHalf(
   return upper.length >= minKeep ? upper : comps;
 }
 
+function filterIqrOutliers(
+  comps: RentalComp[],
+  minKeep = MIN_COMPS,
+): RentalComp[] {
+  if (comps.length < minKeep + 2) {
+    return comps;
+  }
+
+  const rents = comps.map((comp) => comp.weeklyRent).sort((a, b) => a - b);
+  const q1 = percentile(rents, 0.25);
+  const q3 = percentile(rents, 0.75);
+  const iqr = q3 - q1;
+  if (iqr <= 0) {
+    return comps;
+  }
+
+  const lo = q1 - 1.5 * iqr;
+  const hi = q3 + 1.5 * iqr;
+  const next = comps.filter(
+    (comp) => comp.weeklyRent >= lo && comp.weeklyRent <= hi,
+  );
+
+  return next.length >= minKeep ? next : comps;
+}
+
+/** Prevent absurdly wide bands when REA mixes cheap + trophy stock in one SERP. */
+function capRentBandWidth(
+  band: RentBandResult,
+  maxSpreadPct = 0.2,
+): RentBandResult {
+  const mid = band.weeklyMidpoint;
+  if (mid <= 0) {
+    return band;
+  }
+
+  const halfSpread = mid * (maxSpreadPct / 2);
+  const cappedMin = Math.round(Math.max(band.weeklyMin, mid - halfSpread));
+  const cappedMax = Math.round(Math.min(band.weeklyMax, mid + halfSpread));
+  const weeklyMin = Math.min(cappedMin, cappedMax);
+  const weeklyMax = Math.max(cappedMin, cappedMax);
+
+  if (weeklyMin === band.weeklyMin && weeklyMax === band.weeklyMax) {
+    return band;
+  }
+
+  return {
+    ...band,
+    weeklyMin,
+    weeklyMax,
+    weeklyMidpoint: Math.round((weeklyMin + weeklyMax) / 2),
+  };
+}
+
 function filterByMedianProximity(
   comps: RentalComp[],
   deviationPct = 0.3,
@@ -156,6 +229,14 @@ function subjectSimilarityScore(comp: RentalComp, options?: RentBandOptions) {
   }
 
   let score = 0;
+
+  const preferSuburb = options.preferSuburb?.trim().toLowerCase();
+  const compSuburb = comp.suburb?.trim().toLowerCase();
+  if (preferSuburb && compSuburb === preferSuburb) {
+    score += 100;
+  } else if (preferSuburb && compSuburb) {
+    score -= 15;
+  }
 
   if (options.subjectBedrooms != null && comp.bedrooms != null) {
     const diff = Math.abs(comp.bedrooms - options.subjectBedrooms);
@@ -246,7 +327,7 @@ export function computeRentBandFromComps(
     );
   }
 
-  if (profile.preferSuburb?.trim()) {
+  if (profile.preferSuburb?.trim() && !premium) {
     const preferSuburb = profile.preferSuburb.trim().toLowerCase();
     filtered = applyFilterIfEnough(
       filtered,
@@ -279,12 +360,16 @@ export function computeRentBandFromComps(
     }
   }
 
-  filtered = filterByMedianProximity(
-    filtered,
-    profile.medianDeviationPct ?? (premium ? 0.4 : 0.3),
-  );
+  filtered = filterIqrOutliers(filtered);
 
-  const band = computeRentBandFromWeeklyRents(
+  const deviationPct =
+    filtered.length >= 12
+      ? Math.min(profile.medianDeviationPct ?? (premium ? 0.4 : 0.3), 0.25)
+      : (profile.medianDeviationPct ?? (premium ? 0.4 : 0.3));
+
+  filtered = filterByMedianProximity(filtered, deviationPct);
+
+  let band = computeRentBandFromWeeklyRents(
     filtered.map((comp) => comp.weeklyRent),
     profile,
   );
@@ -293,8 +378,22 @@ export function computeRentBandFromComps(
     return null;
   }
 
+  band = capRentBandWidth(band, premium ? 0.22 : 0.18);
+
   const midpoint = band.weeklyMidpoint;
-  const featuredComps = [...filtered]
+  const strictFeatured = profile.strictFeaturedPropertyType !== false;
+  let featuredPool = filtered;
+
+  if (strictFeatured && profile.subjectPropertyType?.trim()) {
+    const typeMatched = filtered.filter((comp) =>
+      matchesSubjectType(comp, profile.subjectPropertyType),
+    );
+    if (typeMatched.length > 0) {
+      featuredPool = typeMatched;
+    }
+  }
+
+  const featuredComps = [...featuredPool]
     .sort((a, b) => {
       const scoreDiff =
         subjectSimilarityScore(b, profile) - subjectSimilarityScore(a, profile);

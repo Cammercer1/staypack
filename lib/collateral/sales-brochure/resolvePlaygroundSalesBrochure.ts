@@ -1,5 +1,9 @@
-import { buildSalesBrochureDocument } from "@/lib/collateral/buildSalesBrochureDocument";
-import { getMockSalesBrochureCopy } from "@/lib/collateral/buildSalesBrochureDocument";
+import {
+  buildSalesBrochureDocument,
+  getMockSalesBrochureCopy,
+} from "@/lib/collateral/buildSalesBrochureDocument";
+import { enrichSalesBrochureDocumentAgents } from "@/lib/collateral/enrichSalesBrochureDocument";
+import { mergeAgencyBrandIntoCollateralDocument } from "@/lib/collateral/mergeAgencyBrand";
 import { createPlaygroundSalesBrochureDocument } from "@/lib/collateral/sales-brochure/playgroundFixture";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
 import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
@@ -21,26 +25,55 @@ export async function resolvePlaygroundSalesBrochure({
   listing,
   collateral,
 }: ResolveInput): Promise<BrochureDocumentJson> {
+  const agentProfile = await loadListingAgentProfile(supabase, listing);
+  const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
+
   if (
     collateral?.document_json &&
     isBrochureDocument(collateral.document_json)
   ) {
-    return collateral.document_json;
-  }
+    const branded = mergeAgencyBrandIntoCollateralDocument(
+      agency,
+      collateral.document_json,
+    ) as BrochureDocumentJson;
 
-  const agentProfile = await loadListingAgentProfile(supabase, listing);
-  const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
+    return enrichSalesBrochureDocumentAgents(branded, listing, {
+      agentProfile,
+      agencyAgents,
+    });
+  }
   const templateId = collateral
     ? resolveCollateralTemplateId(agency, collateral)
     : createPlaygroundSalesBrochureDocument().template_id;
 
   const copy = getMockSalesBrochureCopy(listing, agency);
 
-  if (collateral) {
+  if (collateral || listing.scraped_listing_json) {
+    const collateralRow: CollateralItem =
+      collateral ??
+      ({
+        id: "",
+        listing_id: listing.id,
+        agency_id: agency.id,
+        type: "sales_brochure",
+        status: "draft",
+        template_id: null,
+        report_id: null,
+        document_json: null,
+        public_slug: null,
+        public_url: null,
+        pdf_url: null,
+        qr_code_url: null,
+        generated_at: null,
+        published_at: null,
+        created_at: "",
+        updated_at: "",
+      } as CollateralItem);
+
     return buildSalesBrochureDocument({
       agency,
       listing,
-      collateral: { ...collateral, template_id: templateId },
+      collateral: { ...collateralRow, template_id: templateId },
       copy,
       agentProfile,
       agencyAgents,

@@ -1,3 +1,8 @@
+import {
+  ReportCopyComparableDisclaimer,
+  ReportCopyComparableEvidence,
+} from "@/components/reports/inline/ReportCopyFields";
+
 const bodyFont = "var(--report-body-font, inherit)";
 const headingFont = "var(--report-heading-font, inherit)";
 
@@ -10,9 +15,7 @@ export function HavenLeaseComparableEvidence({
   comparableEvidence,
   comparableDisclaimer,
 }: Props) {
-  const paragraphs = comparableEvidence.split(/\n\n+/).filter(Boolean);
-
-  if (!paragraphs.length) {
+  if (!comparableEvidence.trim()) {
     return null;
   }
 
@@ -25,23 +28,19 @@ export function HavenLeaseComparableEvidence({
         Comparable rental evidence
       </h3>
       <div className="space-y-2">
-        {paragraphs.map((para) => (
-          <p
-            key={para.slice(0, 48)}
-            className="text-[0.68rem] leading-[1.65] text-neutral-600"
-            style={{ fontFamily: bodyFont }}
-          >
-            {para.trim()}
-          </p>
-        ))}
+        <ReportCopyComparableEvidence
+          text={comparableEvidence}
+          className="text-[0.68rem] leading-[1.65] text-neutral-600"
+          style={{ fontFamily: bodyFont }}
+        />
       </div>
       {comparableDisclaimer ? (
-        <p
+        <ReportCopyComparableDisclaimer
+          text={comparableDisclaimer}
+          as="p"
           className="pt-1 text-[0.56rem] leading-relaxed text-neutral-400"
           style={{ fontFamily: bodyFont }}
-        >
-          {comparableDisclaimer}
-        </p>
+        />
       ) : null}
     </div>
   );

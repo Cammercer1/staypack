@@ -51,6 +51,16 @@ export async function POST(
       );
     }
 
+    if (body.type === "lease_appraisal") {
+      return NextResponse.json(
+        {
+          error:
+            "Use the Long-term rental appraisal flow to create this report",
+        },
+        { status: 400 },
+      );
+    }
+
     const purposeError = collateralPurposeMismatchError(listing, body.type);
     if (purposeError) {
       return NextResponse.json({ error: purposeError }, { status: 400 });

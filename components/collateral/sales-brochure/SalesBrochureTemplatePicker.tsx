@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAvailableTemplates } from "@/components/templates/useAvailableTemplates";
 import { getCollateralPageFormatLabel } from "@/lib/collateral/pageFormat";
-import { getSalesBrochureTemplatesByPageCount } from "@/lib/collateral/templates/sales-brochure/registry";
-import { getRentalBrochureTemplatesByPageCount } from "@/lib/collateral/templates/rental-brochure/registry";
-import type { CollateralTemplateDefinition } from "@/lib/collateral/templates/types";
+import type { TemplateApiEntry } from "@/lib/templates/serializeForApi";
 import type { CollateralType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -29,20 +28,17 @@ export function SalesBrochureTemplatePicker({
   defaultTemplateId,
   collateralType = "sales_brochure",
 }: Props) {
-  const onePageTemplates = useMemo(() => {
-    const getTemplates =
-      collateralType === "rental_brochure"
-        ? getRentalBrochureTemplatesByPageCount
-        : getSalesBrochureTemplatesByPageCount;
-    return getTemplates(1);
-  }, [collateralType]);
-  const twoPageTemplates = useMemo(() => {
-    const getTemplates =
-      collateralType === "rental_brochure"
-        ? getRentalBrochureTemplatesByPageCount
-        : getSalesBrochureTemplatesByPageCount;
-    return getTemplates(2);
-  }, [collateralType]);
+  const product =
+    collateralType === "rental_brochure" ? "rental_brochure" : "sales_brochure";
+  const { data, loading } = useAvailableTemplates(product);
+  const onePageTemplates = useMemo(
+    () => (data?.templates ?? []).filter((t) => t.pages === 1),
+    [data?.templates],
+  );
+  const twoPageTemplates = useMemo(
+    () => (data?.templates ?? []).filter((t) => t.pages === 2),
+    [data?.templates],
+  );
 
   const selectedPages = useMemo(() => {
     const match =
@@ -68,6 +64,10 @@ export function SalesBrochureTemplatePicker({
     if (!pool.some((template) => template.id === value) && pool[0]) {
       onChange(pool[0].id);
     }
+  }
+
+  if (loading && onePageTemplates.length === 0 && twoPageTemplates.length === 0) {
+    return <p className="text-sm text-muted-foreground">Loading templates…</p>;
   }
 
   return (
@@ -111,7 +111,7 @@ function TemplateOptionList({
   value,
   onChange,
 }: {
-  templates: CollateralTemplateDefinition[];
+  templates: TemplateApiEntry[];
   value: string;
   onChange: (templateId: string) => void;
 }) {
@@ -119,7 +119,7 @@ function TemplateOptionList({
     <>
       {templates.map((template) => {
         const selected = value === template.id;
-        const formatLabel = getCollateralPageFormatLabel(template.pageFormat);
+        const formatLabel = getCollateralPageFormatLabel("a4-portrait");
 
         return (
           <button

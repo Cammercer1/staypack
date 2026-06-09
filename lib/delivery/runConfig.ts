@@ -3,6 +3,8 @@ import type { DeliveryTenant, PartnerSource } from "@/lib/delivery/types";
 const ABSOLUTE_MAX_LISTINGS_PER_RUN = 25;
 const ABSOLUTE_MAX_LISTINGS_PER_SOURCE = 20;
 const DEFAULT_MAX_LISTINGS_PER_SOURCE = 5;
+/** How many URLs to scan per partner index when picking undelivered listings. */
+export const DISCOVERY_CANDIDATES_PER_SOURCE = 30;
 
 /** Per-tenant cap on listings processed per cron/run invocation. */
 export function maxListingsPerRun(tenant: DeliveryTenant): number {

@@ -9,15 +9,22 @@ export type ReaRentSearchInput = {
   carSpaces?: number;
   propertyType?: string;
   /**
-   * REA amenity keywords (e.g. swimming pool, balcony). Often returns far fewer
-   * comps and biases toward premium stock — omit unless you explicitly need them.
+   * REA amenity keywords (e.g. luxury, pool). Narrows SERP toward premium stock.
    */
   featureKeywords?: string[];
 };
 
+export type BuildReaRentSearchUrlOptions = {
+  /**
+   * When false, uses `with-{n}-bedrooms` (no property-type segment).
+   * Typed lease discovery always keeps the type segment when propertyType is set.
+   */
+  includePropertyTypeInPath?: boolean;
+};
+
 function reaPropertyTypeSegment(propertyType?: string) {
   const normalized = propertyType?.trim().toLowerCase() ?? "";
-  if (normalized.includes("apartment") || normalized.includes("unit")) {
+  if (normalized.includes("apartment") || normalized.includes("unit") || normalized.includes("flat")) {
     return "property-unit+apartment";
   }
   if (normalized.includes("townhouse")) {
@@ -29,22 +36,18 @@ function reaPropertyTypeSegment(propertyType?: string) {
   return null;
 }
 
-/**
- * REA rent SERP for Bright Data `discover_new`.
- *
- * Matches live REA paths such as:
- * `/rent/property-unit+apartment-with-3-bedrooms-in-surfers+paradise,+qld+4217/list-1?...`
- *
- * We intentionally omit `keywords` / `checkedFeatures` — those refine the SERP
- * and often return too few comps (or premium-only stock).
- */
-export function buildReaRentSearchUrl(input: ReaRentSearchInput) {
+export function buildReaRentSearchUrl(
+  input: ReaRentSearchInput,
+  options?: BuildReaRentSearchUrlOptions,
+) {
   const suburbSlug = slugifySuburbSegment(input.suburb);
   const state = input.state.trim().toLowerCase();
   const postcode = input.postcode.trim();
   const beds = Math.max(1, Math.round(input.bedrooms));
 
-  const typeSegment = reaPropertyTypeSegment(input.propertyType);
+  const includeType =
+    options?.includePropertyTypeInPath !== false && Boolean(input.propertyType?.trim());
+  const typeSegment = includeType ? reaPropertyTypeSegment(input.propertyType) : null;
   const pathPrefix = typeSegment
     ? `${typeSegment}-with-${beds}-bedrooms`
     : `with-${beds}-bedrooms`;

@@ -1,7 +1,13 @@
 import type { ComponentType } from "react";
 import type { BusinessCardVariantId } from "@/lib/collateral/business-card/formats";
 import type { SocialPostVariantId } from "@/lib/collateral/social/formats";
-import type { AgencyBrandAdvanced, CollateralType, ListingImageMetaMap } from "@/lib/types";
+import type { ReportPageVariant } from "@/lib/reports/templates/shared/reportPageVariant";
+import type {
+  AgencyBrandAdvanced,
+  CollateralType,
+  FinalReportJson,
+  ListingImageMetaMap,
+} from "@/lib/types";
 
 export type CollateralPageFormatId =
   | "a4-portrait"
@@ -255,6 +261,12 @@ export type BrochureCopyJson = {
   blurb: string;
   /** Structured description — preferred for editing and layout. */
   blurb_blocks: BrochureBlurbBlock[];
+  /** AI-generated short (1¶), medium (2¶), and long (3¶) blurbs. */
+  blurb_variants?: import("@/lib/copy/blurbVariantConstants").BlurbVariantsStored;
+  /** Which blurb length each brochure/report template uses. */
+  template_blurb_length?: Partial<
+    Record<string, import("@/lib/copy/blurbVariantConstants").BlurbLength>
+  >;
   /** Up to 8 short bullets — layout may show fewer depending on template. */
   property_highlights: string[];
   inspection_cta: string;
@@ -413,6 +425,9 @@ export type CollateralTemplateProps = {
   document: CollateralDocumentJson;
   pageFormat?: CollateralPageFormatId;
   variantId?: string;
+  /** STR + LTR listing metrics merged onto brochure preview (Classic page 1). */
+  metricsReport?: FinalReportJson;
+  reportVariant?: ReportPageVariant;
 };
 
 export type CollateralTemplateDefinition = {

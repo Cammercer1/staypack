@@ -13,6 +13,7 @@ import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
+import { resolveStoredFinalReport } from "@/lib/reports/resolveStoredFinalReport";
 import type { Agency, AgentProfile, FinalReportJson, Listing, Report } from "@/lib/types";
 
 const steps = [
@@ -91,7 +92,7 @@ export function ReportWizard({
   }, [step]);
 
   const finalReport = useMemo(() => {
-    const cached = report.final_report_json as FinalReportJson | null;
+    const cached = resolveStoredFinalReport(report);
     if (!cached) {
       return null;
     }
