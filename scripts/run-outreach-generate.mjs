@@ -10,9 +10,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-function loadEnvFile() {
+function loadEnvFile(filename) {
   try {
-    const raw = readFileSync(resolve(process.cwd(), ".env"), "utf8");
+    const raw = readFileSync(resolve(process.cwd(), filename), "utf8");
     for (const line of raw.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith("#")) continue;
@@ -31,8 +31,13 @@ function loadEnvFile() {
       }
     }
   } catch {
-    // optional .env
+    // optional env file
   }
+}
+
+function loadEnv() {
+  loadEnvFile(".env");
+  loadEnvFile(".env.local");
 }
 
 function parseArgs(argv) {
@@ -56,7 +61,7 @@ function parseArgs(argv) {
   return args;
 }
 
-loadEnvFile();
+loadEnv();
 
 const { url, tenant, deliverables, baseUrl } = parseArgs(process.argv);
 const secret = process.env.DELIVERY_CRON_SECRET?.trim();
