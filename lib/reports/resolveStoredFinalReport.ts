@@ -1,7 +1,9 @@
 import { hydrateFinalReportBlurbVariants } from "@/lib/reports/hydrateFinalReportBlurbVariants";
 import type { AiCopyJson, FinalReportJson, Report } from "@/lib/types";
 
-type ReportWithFinalJson = Pick<Report, "final_report_json" | "ai_copy_json">;
+type ReportWithFinalJson = Pick<Report, "final_report_json"> & {
+  ai_copy_json?: Report["ai_copy_json"];
+};
 
 /** Load final_report_json with blurb variants hydrated from ai_copy_json when needed. */
 export function resolveStoredFinalReport(

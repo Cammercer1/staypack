@@ -80,7 +80,9 @@ export function blurbVariantsStoredToParagraphs(
 }
 
 export function normalizeBlurbVariantsFromCopy(
-  copy: Pick<BrochureCopyJson, "blurb" | "blurb_blocks" | "blurb_variants">,
+  copy: Pick<BrochureCopyJson, "blurb" | "blurb_variants"> & {
+    blurb_blocks?: BrochureBlurbBlock[];
+  },
 ): BlurbVariantsStored {
   if (copy.blurb_variants) {
     const paragraphs = blurbVariantsStoredToParagraphs(copy.blurb_variants);

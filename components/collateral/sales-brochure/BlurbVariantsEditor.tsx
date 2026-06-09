@@ -12,8 +12,18 @@ import {
 } from "@/lib/copy/blurbVariants";
 import type { BrochureCopyJson } from "@/lib/collateral/templates/types";
 
+type BlurbVariantsEditorCopy = Pick<
+  BrochureCopyJson,
+  | "heading"
+  | "blurb"
+  | "blurb_variants"
+  | "property_highlights"
+  | "inspection_cta"
+  | "disclaimer"
+> & { blurb_blocks?: BrochureCopyJson["blurb_blocks"] };
+
 type Props = {
-  copy: BrochureCopyJson;
+  copy: BlurbVariantsEditorCopy;
   onChange: (copy: BrochureCopyJson) => void;
 };
 

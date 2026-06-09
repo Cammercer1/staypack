@@ -43,7 +43,7 @@ export async function loadPlaygroundListingAgents(
 }
 
 export function enrichPlaygroundFinalReportAgents(
-  listing: Listing,
+  listing: Pick<Listing, "display_price" | "scraped_listing_json">,
   report: FinalReportJson,
   agents: { agentProfile: AgentProfile | null; agencyAgents: AgentProfile[] },
 ): FinalReportJson {

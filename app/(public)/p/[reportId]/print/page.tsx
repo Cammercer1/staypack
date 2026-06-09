@@ -26,7 +26,7 @@ export default async function DraftReportPrintPage({
   const admin = createAdminClient();
   const { data: report } = await admin
     .from("reports")
-    .select("final_report_json, agency_id, listing_id, template_id")
+    .select("final_report_json, ai_copy_json, agency_id, listing_id, template_id")
     .eq("id", reportId)
     .maybeSingle();
 

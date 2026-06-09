@@ -5,6 +5,7 @@ import { rebuildLeaseAppraisalFinalReport } from "@/lib/lease-appraisal/rebuildL
 import { hasLeaseAppraisalComps } from "@/lib/lease-appraisal/generateLeaseAppraisalForListing";
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
+import type { ReportPropertyImageSelection } from "@/lib/reports/editable/reportImageSlots";
 
 const blurbVariantsSchema = z.object({
   short: z.string(),
@@ -67,6 +68,14 @@ export async function PATCH(
     const agentProfile = await loadListingAgentProfile(supabase, listing);
     const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
 
+    const propertyImages: ReportPropertyImageSelection | undefined =
+      body.property_images?.hero_image_url != null
+        ? {
+            hero_image_url: body.property_images.hero_image_url,
+            selected_image_urls: body.property_images.selected_image_urls ?? [],
+          }
+        : undefined;
+
     const finalReportJson = rebuildLeaseAppraisalFinalReport({
       agency,
       listing,
@@ -76,7 +85,7 @@ export async function PATCH(
         ? [agentProfile, ...agencyAgents.filter((a) => a.id !== agentProfile.id)]
         : agencyAgents,
       templateId,
-      propertyImages: body.property_images,
+      propertyImages,
       existingFinalReport: report.final_report_json as
         | import("@/lib/types").FinalReportJson
         | null,

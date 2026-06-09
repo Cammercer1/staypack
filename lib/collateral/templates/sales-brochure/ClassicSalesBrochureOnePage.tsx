@@ -15,6 +15,8 @@ export function ClassicSalesBrochureOnePage({
   }
 
   const report = salesBrochureToReportShape(document);
+  const a4PageFormat: "a4-portrait" | "a4-landscape" =
+    pageFormat === "a4-landscape" ? "a4-landscape" : "a4-portrait";
 
   return (
     <ClassicBrochurePageOneShell
@@ -22,7 +24,7 @@ export function ClassicSalesBrochureOnePage({
       report={report}
       metricsReport={metricsReport}
       reportVariant={reportVariant}
-      pageFormat={pageFormat}
+      pageFormat={a4PageFormat}
     />
   );
 }

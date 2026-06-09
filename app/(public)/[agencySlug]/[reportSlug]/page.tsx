@@ -41,7 +41,7 @@ export default async function PublicReportPage({
 
   const { data: report } = await admin
     .from("reports")
-    .select("final_report_json, status, listing_id")
+    .select("final_report_json, ai_copy_json, status, listing_id")
     .eq("agency_id", agency.id)
     .eq("public_slug", reportSlug)
     .eq("status", "published")
