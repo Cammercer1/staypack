@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import type { StrEstimate, StrEstimatePositioning } from "@/lib/types";
+import { filterEntireHomeComps } from "@/lib/airbtics/compFilters";
 
 /**
  * Intelligence layer over the raw Airbtics estimate.
@@ -82,6 +83,7 @@ export type CompAnchors = {
   nearby_same_bed_max: number | null;
   all_comp_median: number | null;
   all_comp_max: number | null;
+  kpi_p25: number | null;
   kpi_p50: number | null;
   kpi_p75: number | null;
   kpi_p90: number | null;
@@ -177,7 +179,9 @@ export function extractComps(raw: unknown): RawComp[] {
   if (!raw || typeof raw !== "object") return [];
 
   const message = unwrapRawEnvelope(raw as Record<string, unknown>);
-  return Array.isArray(message.comps) ? (message.comps as RawComp[]) : [];
+  return Array.isArray(message.comps)
+    ? filterEntireHomeComps(message.comps as RawComp[])
+    : [];
 }
 
 function compAnnualRevenue(comp: RawComp) {
@@ -418,6 +422,8 @@ export function buildCompAnchors(
 
   const kpiP50 =
     kpiPoints.find((point) => point.percentile === 50)?.revenue ?? null;
+  const kpiP25 =
+    kpiPoints.find((point) => point.percentile === 25)?.revenue ?? null;
   const kpiP75 =
     kpiPoints.find((point) => point.percentile === 75)?.revenue ?? null;
   const kpiP90 =
@@ -438,6 +444,7 @@ export function buildCompAnchors(
     sameBedP75,
     sameBedMax,
     nearbySameBedMax,
+    kpiP25,
     kpiP50,
     kpiP75,
     kpiP90,
@@ -455,6 +462,7 @@ export function buildCompAnchors(
     all_comp_median: percentileOfSorted(allRevenues, 0.5),
     all_comp_max:
       allRevenues.length > 0 ? allRevenues[allRevenues.length - 1] : null,
+    kpi_p25: kpiP25,
     kpi_p50: kpiP50,
     kpi_p75: kpiP75,
     kpi_p90: kpiP90,
@@ -471,6 +479,7 @@ export function deriveCompAwareBounds({
   sameBedP75,
   sameBedMax,
   nearbySameBedMax,
+  kpiP25,
   kpiP50,
   kpiP75,
   kpiP90,
@@ -481,6 +490,7 @@ export function deriveCompAwareBounds({
   sameBedP75: number | null;
   sameBedMax: number | null;
   nearbySameBedMax: number | null;
+  kpiP25: number | null;
   kpiP50: number | null;
   kpiP75: number | null;
   kpiP90: number | null;
@@ -514,15 +524,18 @@ export function deriveCompAwareBounds({
       ceiling = Math.min(ceiling, kpiP75);
     }
 
-    const floor = roundRevenue(
+    const compFloor = roundRevenue(
       Math.max(
         sameBedMin != null ? sameBedMin * 0.95 : sameBedMedian * 0.85,
         sameBedMedian * 0.85,
       ),
     );
-    const target = roundRevenue(
+    const floor =
+      kpiP25 != null ? Math.max(compFloor, roundRevenue(kpiP25)) : compFloor;
+    const rawTarget = roundRevenue(
       sameBedMedian + (sameBedMax - sameBedMedian) * 0.55,
     );
+    const target = Math.max(rawTarget, floor);
 
     // Ceiling must never sit below the calibrated target.
     if (target != null) {
@@ -533,10 +546,11 @@ export function deriveCompAwareBounds({
   }
 
   if (kpiP50 != null) {
-    const kpiP25 =
+    const floor =
+      kpiP25 ??
       kpiP50 * 0.75; /* fallback when only p50 known in sparse sets */
     return {
-      floor: roundRevenue(kpiP25),
+      floor: roundRevenue(floor),
       ceiling: kpiP90 ?? kpiP75 ?? roundRevenue(kpiP50 * 1.35),
       target: roundRevenue(kpiP50),
     };

@@ -7,6 +7,7 @@ import {
   deriveMetricsFromRevenue,
   estimateAtPercentile,
   estimateAtRevenue,
+  extractComps,
   extractStrQualitySignals,
   extractPercentileKpis,
   percentileFromRevenue,
@@ -55,6 +56,32 @@ describe("extractPercentileKpis", () => {
   it("returns empty for missing kpis", () => {
     expect(extractPercentileKpis(null)).toEqual([]);
     expect(extractPercentileKpis({})).toEqual([]);
+  });
+});
+
+describe("extractComps", () => {
+  it("drops Airbtics room comps before positioning", () => {
+    const comps = extractComps({
+      comps: [
+        {
+          listingID: "entire-1",
+          room_type: "entire_home",
+          annual_revenue_ltm: 40_000,
+        },
+        {
+          listingID: "private-1",
+          room_type: "private_room",
+          annual_revenue_ltm: 10_000,
+        },
+        {
+          listingID: "hotel-1",
+          room_type: "hotel_room",
+          annual_revenue_ltm: 12_000,
+        },
+      ],
+    });
+
+    expect(comps.map((comp) => comp.listingID)).toEqual(["entire-1"]);
   });
 });
 
@@ -274,6 +301,7 @@ describe("deriveCompAwareBounds", () => {
       sameBedP75: 183058,
       sameBedMax: 219231,
       nearbySameBedMax: null,
+      kpiP25: 194384,
       kpiP50: 259352,
       kpiP75: 391368,
       kpiP90: 521220,
@@ -292,6 +320,7 @@ describe("deriveCompAwareBounds", () => {
       sameBedP75: 50483,
       sameBedMax: 92950,
       nearbySameBedMax: 92950,
+      kpiP25: 43347,
       kpiP50: 58486,
       kpiP75: 74393,
       kpiP90: 95179,
@@ -326,6 +355,39 @@ describe("deriveCompAwareBounds", () => {
     expect(resolved.annualRevenue).toBeGreaterThanOrEqual(
       anchors.suggested_target ?? 0,
     );
+  });
+
+  it("does not let weak same-bedroom comps pull revenue below market p25", () => {
+    const anchors = buildCompAnchors(
+      [
+        { bedrooms: 1, annual_revenue_ltm: 4630, distance: 489 },
+        { bedrooms: 1, annual_revenue_ltm: 7213, distance: 194 },
+        { bedrooms: 1, annual_revenue_ltm: 7367, distance: 312 },
+        { bedrooms: 1, annual_revenue_ltm: 8070, distance: 579 },
+        { bedrooms: 1, annual_revenue_ltm: 9308, distance: 194 },
+        { bedrooms: 1, annual_revenue_ltm: 9513, distance: 194 },
+        { bedrooms: 1, annual_revenue_ltm: 10444, distance: 194 },
+        { bedrooms: 1, annual_revenue_ltm: 18707, distance: 194 },
+        { bedrooms: 1, annual_revenue_ltm: 26340, distance: 149 },
+      ],
+      1,
+      extractPercentileKpis({
+        kpis: {
+          "25": { ltm_revenue: 28061 },
+          "50": { ltm_revenue: 37408 },
+          "75": { ltm_revenue: 56035 },
+          "90": { ltm_revenue: 74518 },
+        },
+      }),
+    );
+
+    expect(anchors.same_bed_median).toBe(9308);
+    expect(anchors.suggested_floor).toBe(28061);
+    expect(anchors.suggested_target).toBe(28061);
+
+    const resolved = resolvePositionedAnnualRevenue(18676, anchors);
+    expect(resolved.wasAdjusted).toBe(true);
+    expect(resolved.annualRevenue).toBe(28061);
   });
 
   it("clamps an aggressive LLM revenue pick to the comp-aware ceiling", () => {

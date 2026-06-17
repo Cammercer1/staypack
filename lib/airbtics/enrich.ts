@@ -1,4 +1,5 @@
 import type { FinalReportJson, StrCompCard, StrEnrichmentJson } from "@/lib/types";
+import { filterEntireHomeComps } from "@/lib/airbtics/compFilters";
 
 function numberOrNull(value: unknown) {
   if (value == null || value === "") return null;
@@ -224,7 +225,7 @@ export function buildStrEnrichment(
   }
 
   const comps = Array.isArray(message.comps)
-    ? (message.comps as Record<string, unknown>[])
+    ? filterEntireHomeComps(message.comps as Record<string, unknown>[])
     : [];
   const kpis = message.kpis as
     | Record<string, Record<string, unknown>>
