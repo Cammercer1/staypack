@@ -39,6 +39,7 @@ describe("hydrateFinalReportBlurbVariants", () => {
         disclaimer: "",
         comparable_evidence: "",
         comparable_disclaimer: "",
+        cta: "",
       }),
       {
         sales_pack_heading: "Heading",
@@ -73,6 +74,7 @@ describe("hydrateFinalReportBlurbVariants", () => {
         disclaimer: "",
         comparable_evidence: "",
         comparable_disclaimer: "",
+        cta: "",
       }),
       null,
     );

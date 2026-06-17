@@ -188,12 +188,12 @@ export async function generateLeaseAppraisalReportContent({
 
   let listing = initialListing;
 
-  const parsed = await ensureLeaseAppraisalPositioning(
-    listing.scraped_listing_json,
-  );
-  if (!parsed) {
+  const scrapedListing = listing.scraped_listing_json;
+  if (!scrapedListing) {
     throw new Error("Import the listing URL before generating the appraisal");
   }
+
+  const parsed = await ensureLeaseAppraisalPositioning(scrapedListing);
 
   if (parsed !== listing.scraped_listing_json) {
     const { data: updatedListing, error: listingError } = await supabase

@@ -162,8 +162,8 @@ describe("deriveMetricsFromRevenue", () => {
     const metrics = deriveMetricsFromRevenue(160_000, 63);
     expect(metrics.occupancyRate).toBe(63);
     expect(metrics.bookedNights).toBe(Math.round(0.63 * 365));
-    expect(metrics.nightlyRate * metrics.bookedNights).toBeGreaterThanOrEqual(159_000);
-    expect(metrics.nightlyRate * metrics.bookedNights).toBeLessThanOrEqual(161_000);
+    expect(metrics.nightlyRate! * metrics.bookedNights!).toBeGreaterThanOrEqual(159_000);
+    expect(metrics.nightlyRate! * metrics.bookedNights!).toBeLessThanOrEqual(161_000);
   });
 });
 

@@ -10,6 +10,7 @@ const variants = mockBlurbVariantsFromText(
 
 function belleReport(): FinalReportJson {
   return {
+    version: "standard_2_page_v1",
     template_id: "belle-property-str",
     generated_at: new Date().toISOString(),
     agency: {
@@ -21,21 +22,27 @@ function belleReport(): FinalReportJson {
       secondary_colour: "",
       accent_colour: "",
       text_colour: "",
-      callout_heading_colour: null,
-      callout_text_colour: null,
+      callout_heading_colour: undefined,
+      callout_text_colour: undefined,
       background_colour: "#ffffff",
       heading_font_family: "",
       body_font_family: "",
       font_family: "",
-      heading_font_file_url: null,
-      body_font_file_url: null,
-      font_file_url: null,
+      heading_font_file_url: "",
+      body_font_file_url: "",
+      font_file_url: "",
       website_url: "",
       phone: "",
       email: "",
       brand_advanced: null,
     },
-    agent: null,
+    agent: {
+      name: "",
+      role_title: "",
+      phone: "",
+      email: "",
+      photo_url: "",
+    },
     agents: [],
     property: {
       address: "61 Bream Street, Coogee",
@@ -53,13 +60,21 @@ function belleReport(): FinalReportJson {
       selected_image_urls: [],
       listing_url: "",
     },
-    estimate: {
+    str: {
       annual_revenue: 180000,
       monthly_revenue: 15000,
       weekly_revenue: 3462,
       nightly_rate: 500,
       occupancy_rate: 70,
       booked_nights: 255,
+      radius_m: null,
+    },
+    ltr: {
+      weekly_min: null,
+      weekly_max: null,
+      weekly_midpoint: null,
+      annual_midpoint: null,
+      difference_before_costs: null,
     },
     copy: {
       heading: "Test heading",
