@@ -3,6 +3,7 @@ import { requireReportWithListing } from "@/lib/auth/requireUser";
 import { geocodeReportAddress } from "@/lib/geocoding";
 import { airbticsEstimateSchema } from "@/lib/validation/schemas";
 import { fetchAirbticsEstimate } from "@/lib/airbtics/client";
+import { DEFAULT_AIRBTICS_TIER } from "@/lib/airbtics/constants";
 import { positionStrEstimate } from "@/lib/airbtics/positionEstimate";
 import { calculateAccommodates } from "@/lib/reports/formatters";
 
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
       bedrooms,
       body.accommodates ?? listing.accommodates,
     );
+    const estimateTier = DEFAULT_AIRBTICS_TIER;
 
     const result = await fetchAirbticsEstimate(
       {
@@ -49,13 +51,12 @@ export async function POST(request: Request) {
         bathrooms,
         accommodates,
       },
-      body.tier,
+      estimateTier,
     );
     const { estimate, tier, reportId, costCents, enrichment } = result;
     const scrapedListing = listing.scraped_listing_json;
 
-    // Position the subject within the comp distribution (full tier only —
-    // summary responses have no comps, so this falls back to the median).
+    // Position the subject within the comp distribution from the full Airbtics response.
     const { estimate: positionedEstimate, positioning } =
       await positionStrEstimate({
         subject: {

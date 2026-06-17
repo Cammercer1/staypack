@@ -2,6 +2,7 @@ import { z } from "zod";
 import { pageOneMarketingCopyAiSchema } from "@/lib/copy/pageOneMarketingCopy";
 import { isValidReportTemplateId } from "@/lib/reports/templates/ids";
 import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
+import { DEFAULT_AIRBTICS_TIER } from "@/lib/airbtics/constants";
 
 function normalizeOptionalUrl(value: unknown) {
   if (typeof value !== "string" || !value.trim()) {
@@ -247,7 +248,7 @@ export const scrapeListingSchema = z.object({
 
 export const airbticsEstimateSchema = z.object({
   report_id: z.string().uuid(),
-  tier: z.enum(["summary", "full"]).default("summary"),
+  tier: z.enum(["summary", "full"]).default(DEFAULT_AIRBTICS_TIER),
   address: z.string().optional(),
   latitude: z.coerce.number().nullable().optional(),
   longitude: z.coerce.number().nullable().optional(),

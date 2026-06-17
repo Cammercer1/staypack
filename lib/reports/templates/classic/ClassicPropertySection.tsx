@@ -2,10 +2,6 @@ import { Bath, BedDouble, Car, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { FinalReportJson } from "@/lib/types";
 import { formatCurrency, formatNumber } from "@/lib/reports/formatters";
-import {
-  formatStrGrossYield,
-  resolveStrGrossYield,
-} from "@/lib/reports/calculateStrYield";
 import { STR_ANNUAL_REVENUE_LABEL } from "@/lib/reports/resolveStrBrochurePrice";
 import {
   ReportCopyAppealPoint,
@@ -23,23 +19,16 @@ import {
 
 type Props = {
   report: FinalReportJson;
-  tier?: "light" | "detailed";
   reportVariant?: ReportPageVariant;
 };
 
 export function ClassicPropertySection({
   report,
-  tier = "light",
   reportVariant = "str",
 }: Props) {
   const { property, str, copy } = report;
   const isLease = isLeasePageVariant(reportVariant);
   const isSale = isSalePageVariant(reportVariant);
-  const grossYield = resolveStrGrossYield({
-    display_price: property.display_price,
-    annual_revenue: str.annual_revenue,
-    str_yield: report.str_yield,
-  });
 
   const propertyStats = [
     { id: "bedrooms", icon: BedDouble, value: formatNumber(property.bedrooms), label: "Beds" },
@@ -92,7 +81,7 @@ export function ClassicPropertySection({
           <p className="text-[0.95rem] leading-7 text-neutral-800">{property.summary}</p>
         ) : null}
 
-        {tier === "detailed" && copy.appeal_points?.length ? (
+        {copy.appeal_points?.length ? (
           <ul className="flex flex-col gap-2.5 pt-1">
             {copy.appeal_points.slice(0, 4).map((point, index) => (
               <li
@@ -163,12 +152,6 @@ export function ClassicPropertySection({
               {formatCurrency(str.annual_revenue)}
             </p>
             <p className="mt-2 text-sm font-medium text-neutral-700">per year before costs</p>
-            {tier === "light" && grossYield ? (
-              <p className="mt-2 text-xs leading-5 text-neutral-600">
-                Est. gross STR yield {formatStrGrossYield(grossYield)} before costs
-                {" "}(listing price {grossYield.display_price})
-              </p>
-            ) : null}
             {copy.key_metrics_line ? (
               <ReportCopyKeyMetricsLine
                 text={copy.key_metrics_line}

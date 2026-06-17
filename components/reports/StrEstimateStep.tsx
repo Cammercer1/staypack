@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import { calculateAccommodates, formatCurrency, formatPercent } from "@/lib/reports/formatters";
 import {
   applyStrEstimateAdjustments,
@@ -16,7 +15,6 @@ import {
   type StrRevenueBand,
 } from "@/lib/reports/strEstimateAdjustments";
 import type {
-  AirbticsTier,
   Listing,
   Report,
   StrEstimate,
@@ -31,39 +29,6 @@ type Props = {
   onContinue?: () => void;
 };
 
-type TierOption = {
-  id: AirbticsTier;
-  title: string;
-  description: string;
-  features: string[];
-};
-
-const TIER_OPTIONS: TierOption[] = [
-  {
-    id: "summary",
-    title: "Summary estimate",
-    description: "Headline STR numbers for the report.",
-    features: [
-      "Annual, monthly and weekly revenue",
-      "Average nightly rate and occupancy",
-      "Booked nights and search radius",
-      "Fast result, lower data cost",
-    ],
-  },
-  {
-    id: "full",
-    title: "Detailed estimate",
-    description: "Same headline numbers plus market evidence for page 2.",
-    features: [
-      "Everything in the summary estimate",
-      "Revenue range (25th to 90th percentile)",
-      "Up to 40 comparable listings with photos",
-      "Monthly seasonality for charts and copy",
-      "More data for a stronger buyer report",
-    ],
-  },
-];
-
 export function StrEstimateStep({ listing, report, onComplete, onContinue }: Props) {
   const [estimate, setEstimate] = useState<StrEstimate | null>(
     report.final_estimate_json,
@@ -73,9 +38,6 @@ export function StrEstimateStep({ listing, report, onComplete, onContinue }: Pro
   );
   const [positioning, setPositioning] = useState<StrEstimatePositioning | null>(
     report.str_enrichment_json?.positioning ?? null,
-  );
-  const [selectedTier, setSelectedTier] = useState<AirbticsTier>(
-    report.airbtics_tier ?? "summary",
   );
   const [overrideAnnual, setOverrideAnnual] = useState(
     String(report.final_estimate_json?.annualRevenue ?? ""),
@@ -144,7 +106,6 @@ export function StrEstimateStep({ listing, report, onComplete, onContinue }: Pro
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         report_id: report.id,
-        tier: selectedTier,
         address: listing.property_address,
         latitude: listing.latitude,
         longitude: listing.longitude,
@@ -168,7 +129,6 @@ export function StrEstimateStep({ listing, report, onComplete, onContinue }: Pro
     setEstimate(nextEstimate);
     setEnrichment((payload.enrichment as StrEnrichmentJson | null) ?? null);
     setPositioning(nextPositioning);
-    setSelectedTier(payload.tier ?? selectedTier);
     setOverrideAnnual(String(nextEstimate.annualRevenue ?? ""));
     setOverrideOccupancy(String(nextEstimate.occupancyRate ?? ""));
     setRecommendedAnnualRevenue(
@@ -180,11 +140,7 @@ export function StrEstimateStep({ listing, report, onComplete, onContinue }: Pro
       listing: (payload.listing as Listing) ?? listing,
       report: payload.report as Report,
     });
-    toast.success(
-      selectedTier === "full"
-        ? "Detailed STR estimate generated"
-        : "Light STR estimate generated",
-    );
+    toast.success("STR estimate generated");
     setEstimating(false);
   }
 
@@ -292,18 +248,12 @@ export function StrEstimateStep({ listing, report, onComplete, onContinue }: Pro
   }
 
   const estimateLoadingMessage =
-    selectedTier === "full"
-      ? "Pulling comparable listings and seasonality data. This can take up to 30 seconds."
-      : "Fetching headline revenue numbers. This usually takes 10–20 seconds.";
+    "Pulling comparable listings and seasonality data. This can take up to 30 seconds.";
 
   return (
     <AsyncLoadingOverlay
       active={estimating}
-      title={
-        selectedTier === "full"
-          ? "Running detailed STR estimate"
-          : "Running light STR estimate"
-      }
+      title="Running STR estimate"
       description={estimateLoadingMessage}
     >
     <div className="space-y-6">
@@ -350,57 +300,6 @@ export function StrEstimateStep({ listing, report, onComplete, onContinue }: Pro
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div>
-          <Label>Estimate type</Label>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Choose how much market data to pull for this report.
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          {TIER_OPTIONS.map((option) => {
-            const isSelected = selectedTier === option.id;
-
-            return (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setSelectedTier(option.id)}
-                disabled={loading}
-                className={cn(
-                  "rounded-xl border p-4 text-left transition-colors",
-                  isSelected
-                    ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                    : "border-border/70 bg-background hover:bg-muted/30",
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{option.title}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {option.description}
-                    </p>
-                  </div>
-                  {isSelected ? <Badge>Selected</Badge> : null}
-                </div>
-
-                <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-                  {option.features.map((feature) => (
-                    <li key={feature} className="flex gap-2">
-                      <span aria-hidden className="text-primary">
-                        •
-                      </span>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       <div className="flex flex-wrap items-center gap-3">
         <Button onClick={runEstimate} disabled={loading}>
           {estimating ? (
@@ -408,16 +307,13 @@ export function StrEstimateStep({ listing, report, onComplete, onContinue }: Pro
               <Loader2 className="animate-spin" />
               Estimating...
             </>
-          ) : selectedTier === "full" ? (
-            "Run detailed STR estimate"
           ) : (
-            "Run summary STR estimate"
+            "Run STR estimate"
           )}
         </Button>
-        {report.airbtics_tier ? (
+        {report.airbtics_fetched_at ? (
           <p className="text-sm text-muted-foreground">
-            Last run:{" "}
-            {report.airbtics_tier === "full" ? "Detailed" : "Summary"} estimate
+            Last STR estimate saved.
           </p>
         ) : null}
       </div>

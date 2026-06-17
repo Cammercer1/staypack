@@ -4,15 +4,9 @@ import { ClassicDetailedTemplate } from "@/lib/reports/templates/classic/Detaile
 
 export { ClassicLightTemplate, ClassicDetailedTemplate };
 
-/** @deprecated Use ClassicLightTemplate */
-export const ClassicTemplate = ClassicLightTemplate;
+/** @deprecated Use ClassicDetailedTemplate */
+export const ClassicTemplate = ClassicDetailedTemplate;
 
 export function ClassicTemplateRouter({ report }: ReportTemplateProps) {
-  const templateId = report.template_id;
-
-  if (templateId === "classic-detailed") {
-    return <ClassicDetailedTemplate report={report} />;
-  }
-
-  return <ClassicLightTemplate report={report} />;
+  return <ClassicDetailedTemplate report={report} />;
 }

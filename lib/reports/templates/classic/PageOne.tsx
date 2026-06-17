@@ -3,9 +3,15 @@ import { ReportBrochureStylePageOne } from "@/lib/reports/templates/shared/Repor
 
 type Props = ReportPageOneProps & {
   /** Kept for template API compatibility; brochure classic layout ignores tier. */
-  tier?: "light" | "detailed";
+  tier?: "detailed";
 };
 
-export function ClassicPageOne({ tier: _tier, ...props }: Props) {
-  return <ReportBrochureStylePageOne {...props} family="classic" />;
+export function ClassicPageOne({ report, reportVariant }: Props) {
+  return (
+    <ReportBrochureStylePageOne
+      report={report}
+      reportVariant={reportVariant}
+      family="classic"
+    />
+  );
 }

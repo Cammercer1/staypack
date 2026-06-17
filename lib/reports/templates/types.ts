@@ -7,7 +7,7 @@ export type ReportTemplateProps = {
   report: FinalReportJson;
 };
 
-export type ReportTemplateTier = "light" | "detailed";
+export type ReportTemplateTier = "detailed";
 
 export type ReportTemplateDefinition = {
   id: string;

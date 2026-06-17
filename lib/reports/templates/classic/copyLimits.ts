@@ -10,7 +10,7 @@ import {
   normalizeReportTemplateId,
 } from "@/lib/reports/templates/ids";
 
-export const CLASSIC_LIGHT_COPY_LIMITS = {
+export const CLASSIC_COPY_LIMITS = {
   sales_pack_heading: {
     max: PAGE_ONE_HEADING_MAX,
     label: "Heading",
@@ -28,9 +28,9 @@ export const CLASSIC_LIGHT_COPY_LIMITS = {
   },
 } as const;
 
-export const CLASSIC_DETAILED_COPY_LIMITS = CLASSIC_LIGHT_COPY_LIMITS;
+export const CLASSIC_DETAILED_COPY_LIMITS = CLASSIC_COPY_LIMITS;
 
-export type ClassicCopyField = keyof typeof CLASSIC_LIGHT_COPY_LIMITS;
+export type ClassicCopyField = keyof typeof CLASSIC_COPY_LIMITS;
 
 export function getClassicCopyLimits(templateId: string) {
   const normalized = normalizeReportTemplateId(templateId);
@@ -39,7 +39,7 @@ export function getClassicCopyLimits(templateId: string) {
     return CLASSIC_DETAILED_COPY_LIMITS;
   }
 
-  return CLASSIC_LIGHT_COPY_LIMITS;
+  return CLASSIC_COPY_LIMITS;
 }
 
 export function trimToWordBoundary(text: string, max: number) {
@@ -96,12 +96,8 @@ export function enforceClassicCopyLimits(
 
 export function getClassicCopyPromptLimits(templateId: string) {
   const limits = getClassicCopyLimits(templateId);
-  const tier =
-    normalizeReportTemplateId(templateId) === CLASSIC_DETAILED_TEMPLATE_ID
-      ? "detailed (2 pages)"
-      : "light (1 page)";
 
-  return `Classic ${tier} layout hard maximums:
+  return `Classic detailed (2 pages) layout hard maximums:
 - sales_pack_heading: ${limits.sales_pack_heading.max} characters
 - sales_pack_blurb: ${limits.sales_pack_blurb.max} characters (single paragraph)
 - property_appeal_points: exactly ${PAGE_ONE_BULLET_COUNT} bullets, ${PAGE_ONE_BULLET_MAX} characters each

@@ -3,6 +3,7 @@ import { isDevelopment } from "@/lib/env";
 import {
   AIRBTICS_TIER_COST_CENTS,
   AIRBTICS_TIER_ENDPOINT,
+  DEFAULT_AIRBTICS_TIER,
 } from "@/lib/airbtics/constants";
 import { buildStrEnrichment } from "@/lib/airbtics/enrich";
 
@@ -306,12 +307,122 @@ async function pollAirbticsReport(
   throw new Error("STR estimate is still processing. Try again in a moment.");
 }
 
+function buildMockMonthlySeries(base: number) {
+  return {
+    "2025-07": Math.round(base * 0.82),
+    "2025-08": Math.round(base * 0.78),
+    "2025-09": Math.round(base * 0.86),
+    "2025-10": Math.round(base * 0.94),
+    "2025-11": Math.round(base * 1.02),
+    "2025-12": Math.round(base * 1.18),
+    "2026-01": Math.round(base * 1.22),
+    "2026-02": Math.round(base * 1.1),
+    "2026-03": Math.round(base * 1.04),
+    "2026-04": Math.round(base * 0.98),
+    "2026-05": Math.round(base * 0.9),
+    "2026-06": Math.round(base * 0.86),
+  };
+}
+
+function buildMockAirbticsRaw(
+  input: AirbticsInput,
+  tier: AirbticsTier,
+): Record<string, unknown> {
+  if (tier !== "full") {
+    return { mock: true, tier, input };
+  }
+
+  return {
+    mock: true,
+    tier,
+    input,
+    report_type: "all",
+    comps_status: "success",
+    radius: 500,
+    bedrooms: input.bedrooms,
+    kpis: {
+      "25": {
+        ltm_revenue: 58000,
+        ltm_nightly_rate: 245,
+        ltm_occupancy_rate: 65,
+        monthly_revenue: buildMockMonthlySeries(4833),
+      },
+      "50": {
+        ltm_revenue: 72000,
+        ltm_nightly_rate: 285,
+        ltm_occupancy_rate: 69,
+        monthly_revenue: buildMockMonthlySeries(6000),
+        monthly_occupancy_rate: buildMockMonthlySeries(69),
+        monthly_adr: buildMockMonthlySeries(285),
+      },
+      "75": {
+        ltm_revenue: 86000,
+        ltm_nightly_rate: 325,
+        ltm_occupancy_rate: 73,
+        monthly_revenue: buildMockMonthlySeries(7167),
+      },
+      "90": {
+        ltm_revenue: 98000,
+        ltm_nightly_rate: 365,
+        ltm_occupancy_rate: 76,
+      },
+    },
+    comps: [
+      {
+        listingID: "mock-comp-1",
+        name: "Beachside family retreat",
+        thumbnail_url: "",
+        listing_url: "",
+        bedrooms: input.bedrooms,
+        bathrooms: input.bathrooms,
+        accommodates: input.accommodates,
+        distance: 180,
+        annual_revenue_ltm: 91000,
+        avg_occupancy_rate_ltm: 74,
+        avg_booked_daily_rate_ltm: 337,
+        similarity_score: 0.94,
+        similarity_score_meta: { revenue_score: 0.82 },
+      },
+      {
+        listingID: "mock-comp-2",
+        name: "Modern coastal stay",
+        thumbnail_url: "",
+        listing_url: "",
+        bedrooms: input.bedrooms,
+        bathrooms: input.bathrooms,
+        accommodates: input.accommodates,
+        distance: 320,
+        annual_revenue_ltm: 78000,
+        avg_occupancy_rate_ltm: 70,
+        avg_booked_daily_rate_ltm: 305,
+        similarity_score: 0.9,
+        similarity_score_meta: { revenue_score: 0.76 },
+      },
+      {
+        listingID: "mock-comp-3",
+        name: "Quiet suburb short stay",
+        thumbnail_url: "",
+        listing_url: "",
+        bedrooms: input.bedrooms,
+        bathrooms: input.bathrooms,
+        accommodates: input.accommodates,
+        distance: 470,
+        annual_revenue_ltm: 64000,
+        avg_occupancy_rate_ltm: 66,
+        avg_booked_daily_rate_ltm: 266,
+        similarity_score: 0.86,
+        similarity_score_meta: { revenue_score: 0.68 },
+      },
+    ],
+  };
+}
+
 export async function fetchAirbticsEstimate(
   input: AirbticsInput,
-  tier: AirbticsTier = "summary",
+  tier: AirbticsTier = DEFAULT_AIRBTICS_TIER,
 ): Promise<AirbticsEstimateResult> {
   if (isDevelopment() && !process.env.AIRBTICS_API_KEY) {
-    const raw = { mock: true, tier, input };
+    const raw = buildMockAirbticsRaw(input, tier);
     const estimate = {
       annualRevenue: 72000,
       monthlyRevenue: 6000,
