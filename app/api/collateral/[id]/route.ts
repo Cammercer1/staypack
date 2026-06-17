@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
 import { buildBusinessCardListingSlice } from "@/lib/collateral/buildBusinessCardDocument";
 import { ensureBusinessCardDocument } from "@/lib/collateral/business-card/normalizeBusinessCardDocument";
@@ -22,10 +23,10 @@ import {
   isSocialPostsDocument,
   isBusinessCardDocument,
   type BusinessCardDocumentJson,
-  type BrochureDocumentJson,
   type SocialPostsDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { isValidCollateralTemplateId } from "@/lib/collateral/templates/ids";
+import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
 import { assertTemplateGranted } from "@/lib/templates/grants/assertTemplateGranted";
 import { templateGrantErrorResponse } from "@/lib/templates/grants/apiErrors";
 import type { Agency } from "@/lib/types";
@@ -35,6 +36,21 @@ import {
   updateBusinessCardDocumentSchema,
   updateSocialPostsDocumentSchema,
 } from "@/lib/validation/schemas";
+
+const updateLeaseAppraisalCollateralSchema = z
+  .object({
+    template_id: z
+      .string()
+      .nullable()
+      .optional()
+      .refine(
+        (value) => value == null || isLeaseAppraisalTemplateId(value),
+        { message: "Select a valid lease appraisal template" },
+      ),
+  })
+  .refine((data) => data.template_id !== undefined, {
+    message: "Provide template_id",
+  });
 
 export async function PATCH(
   request: Request,
@@ -56,6 +72,10 @@ export async function PATCH(
       return patchBusinessCard(request, supabase, agency, collateral);
     }
 
+    if (collateral.type === "lease_appraisal") {
+      return patchLeaseAppraisal(request, supabase, agency, collateral);
+    }
+
     return NextResponse.json(
       { error: "This collateral type cannot be updated with this endpoint" },
       { status: 400 },
@@ -69,6 +89,40 @@ export async function PATCH(
       { status: 400 },
     );
   }
+}
+
+async function patchLeaseAppraisal(
+  request: Request,
+  supabase: Awaited<ReturnType<typeof requireCollateralAccess>>["supabase"],
+  agency: Awaited<ReturnType<typeof requireCollateralAccess>>["agency"],
+  collateral: Awaited<ReturnType<typeof requireCollateralAccess>>["collateral"],
+) {
+  const body = updateLeaseAppraisalCollateralSchema.parse(await request.json());
+
+  if (body.template_id) {
+    try {
+      await assertTemplateGranted(agency.id, body.template_id);
+    } catch (grantError) {
+      const denied = templateGrantErrorResponse(grantError);
+      if (denied) {
+        return denied;
+      }
+      throw grantError;
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("collateral_items")
+    .update({ template_id: body.template_id ?? null })
+    .eq("id", collateral.id)
+    .select("*")
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  return NextResponse.json({ collateral: data });
 }
 
 async function patchBusinessCard(
@@ -106,34 +160,37 @@ async function patchBusinessCard(
       const patch = body.variants[variantId];
       if (!patch) continue;
       const currentVariant = nextDocument.variants[variantId];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { layers, back_colour, ...variantPatch } = patch;
       nextDocument.variants[variantId] = {
         ...currentVariant,
-        ...(patch as any),
-        layers: patch.layers
+        ...variantPatch,
+        ...(back_colour !== undefined
+          ? { back_colour: back_colour ?? undefined }
+          : {}),
+        layers: layers
           ? {
               ...currentVariant.layers,
-              logo: { ...currentVariant.layers.logo, ...patch.layers.logo },
+              logo: { ...currentVariant.layers.logo, ...layers.logo },
               headline: {
                 ...currentVariant.layers.headline,
-                ...patch.layers.headline,
+                ...layers.headline,
               },
               subcopy: {
                 ...currentVariant.layers.subcopy,
-                ...patch.layers.subcopy,
+                ...layers.subcopy,
               },
               agent_photo: {
                 ...currentVariant.layers.agent_photo,
-                ...patch.layers.agent_photo,
+                ...layers.agent_photo,
               },
               agent_contact: {
                 ...currentVariant.layers.agent_contact,
-                ...patch.layers.agent_contact,
+                ...layers.agent_contact,
               },
-              qr: { ...currentVariant.layers.qr, ...patch.layers.qr },
+              qr: { ...currentVariant.layers.qr, ...layers.qr },
               agency_details: {
                 ...currentVariant.layers.agency_details,
-                ...patch.layers.agency_details,
+                ...layers.agency_details,
               },
             }
           : currentVariant.layers,

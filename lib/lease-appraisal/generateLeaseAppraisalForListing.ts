@@ -6,13 +6,10 @@ import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLea
 import { ltrEnrichmentFromParsed } from "@/lib/lease-appraisal/ltrEnrichmentFromParsed";
 import { generateLeaseAppraisalCopy } from "@/lib/openai/generateLeaseAppraisalCopy";
 import {
-  applyLeaseAppraisalCompSelection,
-  defaultSelectedCompListingIds,
   hasLeaseAppraisalSelectedComps,
 } from "@/lib/lease-appraisal/leaseAppraisalData";
+import { enrichParsedListingForLeaseAppraisal } from "@/lib/lease-appraisal/enrichParsedListingForLeaseAppraisal";
 import { ensureLeaseAppraisalPositioning } from "@/lib/lease-appraisal/positionLeaseAppraisal";
-import { enrichListingRentalAppraisal } from "@/lib/rental/enrichListingRentalAppraisal";
-import { stripInternalRentalAppraisalWarnings } from "@/lib/rental/userFacingRentalWarnings";
 import type {
   Agency,
   AgentProfile,
@@ -60,27 +57,6 @@ export function hasLeaseAppraisalComps(parsed: ParsedListing | null | undefined)
       (appraisal.weeklyMidpoint != null ||
         (appraisal.weeklyMin != null && appraisal.weeklyMax != null)),
   );
-}
-
-export async function enrichParsedListingForLeaseAppraisal(
-  parsed: ParsedListing,
-): Promise<{ parsed: ParsedListing; warnings: string[] }> {
-  let enrichedRaw = await enrichListingRentalAppraisal(parsed);
-  if (!hasLeaseAppraisalSelectedComps(enrichedRaw)) {
-    enrichedRaw = applyLeaseAppraisalCompSelection(
-      enrichedRaw,
-      defaultSelectedCompListingIds(enrichedRaw),
-    );
-  }
-  const enriched = {
-    ...enrichedRaw,
-    warnings: stripInternalRentalAppraisalWarnings(enrichedRaw.warnings ?? []),
-  };
-
-  return {
-    parsed: enriched,
-    warnings: [...enriched.warnings],
-  };
 }
 
 export async function createLeaseAppraisalDraft({

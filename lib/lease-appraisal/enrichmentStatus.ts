@@ -1,6 +1,6 @@
 import type { LeaseAppraisalEnrichmentStatus, ParsedListing } from "@/lib/types";
 
-const ACTIVE_ENRICHMENT_MAX_AGE_MS = 15 * 60 * 1000;
+const ACTIVE_ENRICHMENT_MAX_AGE_MS = 5 * 60 * 1000;
 
 export function leaseAppraisalEnrichmentStatus(
   parsed: ParsedListing | null | undefined,

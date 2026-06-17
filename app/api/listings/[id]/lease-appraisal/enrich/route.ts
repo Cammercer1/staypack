@@ -19,20 +19,19 @@ import { isDevelopment } from "@/lib/env";
 
 export const maxDuration = 60;
 
+const BACKGROUND_ENRICH_PATH = "/background/lease-appraisal-enrich";
+
 function shouldRunSynchronously() {
   return isDevelopment() || process.env.LEASE_APPRAISAL_ENRICH_SYNC === "1";
 }
 
-function backgroundUrl(request: Request, listingId: string) {
+function backgroundUrl(request: Request) {
   const override = process.env.LEASE_APPRAISAL_ENRICH_BACKGROUND_URL?.trim();
   if (override) {
     return override;
   }
 
-  return new URL(
-    `/api/listings/${listingId}/lease-appraisal/enrich-background`,
-    request.url,
-  ).toString();
+  return new URL(BACKGROUND_ENRICH_PATH, request.url).toString();
 }
 
 export async function POST(
@@ -101,7 +100,7 @@ export async function POST(
       requestId,
     });
     const { timestamp, signature } = signLeaseAppraisalEnrichBody(body);
-    const invokeResponse = await fetch(backgroundUrl(request, listing.id), {
+    const invokeResponse = await fetch(backgroundUrl(request), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

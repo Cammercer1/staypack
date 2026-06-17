@@ -37,5 +37,5 @@ export default async function handler(request: Request) {
 
 export const config = {
   background: true,
-  path: "/api/listings/:id/lease-appraisal/enrich-background",
+  path: "/background/lease-appraisal-enrich",
 };

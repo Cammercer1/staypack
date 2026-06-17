@@ -23,7 +23,7 @@ import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import { cn } from "@/lib/utils";
 import type { Listing } from "@/lib/types";
 
-const POLL_INTERVAL_MS = 5000;
+const POLL_INTERVAL_MS = 10000;
 
 type Props = {
   listing: Listing;
@@ -259,17 +259,14 @@ export function LeaseAppraisalDataStep({
   }
 
   const loading = fetching || saving || compsPrefetching || enrichmentProcessing;
+  const fetchingComps = compsPrefetching || fetching || enrichmentProcessing;
 
   return (
     <AsyncLoadingOverlay
       active={loading}
-      title={
-        compsPrefetching || fetching
-          ? "Fetching rental comps"
-          : "Saving appraisal data"
-      }
+      title={fetchingComps ? "Fetching rental comps" : "Saving appraisal data"}
       description={
-        compsPrefetching || fetching
+        fetchingComps
           ? "Searching comparable rentals and suburb context. This can take 1–3 minutes."
           : "Saving your rent band and comparable selection."
       }
