@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { randomUUID } from "node:crypto";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { buildLeaseAppraisalReport } from "@/lib/lease-appraisal/buildLeaseAppraisalReport";
 import { DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/templates/lease-appraisal/ids";
@@ -8,6 +9,11 @@ import { generateLeaseAppraisalCopy } from "@/lib/openai/generateLeaseAppraisalC
 import {
   hasLeaseAppraisalSelectedComps,
 } from "@/lib/lease-appraisal/leaseAppraisalData";
+import {
+  completedLeaseAppraisalEnrichmentStatus,
+  leaseAppraisalEnrichmentStatus,
+  withLeaseAppraisalEnrichmentStatus,
+} from "@/lib/lease-appraisal/enrichmentStatus";
 import { enrichParsedListingForLeaseAppraisal } from "@/lib/lease-appraisal/enrichParsedListingForLeaseAppraisal";
 import { ensureLeaseAppraisalPositioning } from "@/lib/lease-appraisal/positionLeaseAppraisal";
 import type {
@@ -138,10 +144,18 @@ export async function enrichListingForLeaseAppraisal({
   const { parsed, warnings } = await enrichParsedListingForLeaseAppraisal(
     listing.scraped_listing_json!,
   );
+  const previousStatus = leaseAppraisalEnrichmentStatus(
+    listing.scraped_listing_json,
+  );
+  const requestId = previousStatus?.requestId ?? randomUUID();
+  const completedParsed = withLeaseAppraisalEnrichmentStatus(
+    parsed,
+    completedLeaseAppraisalEnrichmentStatus(previousStatus, requestId),
+  );
 
   const { data: updatedListing, error: listingError } = await supabase
     .from("listings")
-    .update({ scraped_listing_json: parsed })
+    .update({ scraped_listing_json: completedParsed })
     .eq("id", listing.id)
     .select("*")
     .single();
@@ -152,7 +166,7 @@ export async function enrichListingForLeaseAppraisal({
 
   return {
     listing: updatedListing as Listing,
-    parsed,
+    parsed: completedParsed,
     warnings,
   };
 }
