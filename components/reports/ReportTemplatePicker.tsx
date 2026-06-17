@@ -14,19 +14,17 @@ export function ReportTemplatePicker({ value, onChange }: Props) {
 
   const templates = data?.templates ?? [];
 
-  const families = templates.map((entry) => ({
-    family: entry.family ?? entry.id.replace(/-detailed$/, ""),
+  const options = templates.map((entry) => ({
+    id: entry.id,
     label: entry.label,
   }));
 
   const normalizedValue = normalizeReportTemplateId(value);
-  const currentFamily = normalizedValue.replace(/-detailed$/, "");
+  const selectedValue = options.some((option) => option.id === normalizedValue)
+    ? normalizedValue
+    : data?.default_template_id ?? normalizedValue;
 
-  function handleChange(family: string) {
-    onChange(`${family}-detailed`);
-  }
-
-  if (loading && families.length === 0) {
+  if (loading && options.length === 0) {
     return (
       <select
         disabled
@@ -39,13 +37,13 @@ export function ReportTemplatePicker({ value, onChange }: Props) {
 
   return (
     <select
-      value={currentFamily}
-      onChange={(e) => handleChange(e.target.value)}
+      value={selectedValue}
+      onChange={(e) => onChange(e.target.value)}
       className="h-8 rounded-md border border-input bg-background px-2.5 py-0 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
     >
-      {families.map((f) => (
-        <option key={f.family} value={f.family}>
-          {f.label}
+      {options.map((option) => (
+        <option key={option.id} value={option.id}>
+          {option.label}
         </option>
       ))}
     </select>

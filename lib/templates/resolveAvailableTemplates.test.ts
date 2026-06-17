@@ -31,6 +31,7 @@ describe("resolveAvailableTemplatesFromGrants", () => {
       true,
     );
     expect(result.defaultTemplateId).toBe("haven-properties-str");
+    expect(result.templates[0]?.id).toBe("haven-properties-str");
   });
 });
 

@@ -17,9 +17,16 @@ type LoginForm = {
   password: string;
 };
 
-export function LoginForm() {
+function safeNextPath(nextPath: string | undefined) {
+  return nextPath?.startsWith("/") && !nextPath.startsWith("//")
+    ? nextPath
+    : "/dashboard";
+}
+
+export function LoginForm({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const redirectTo = safeNextPath(nextPath);
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -37,7 +44,7 @@ export function LoginForm() {
     }
 
     toast.success("Signed in");
-    router.push("/dashboard");
+    router.push(redirectTo);
     router.refresh();
   }
 
@@ -64,7 +71,10 @@ export function LoginForm() {
       </form>
       <p className="mt-6 text-sm text-muted-foreground">
         No account yet?{" "}
-        <Link href="/signup" className="font-medium text-foreground underline-offset-4 hover:underline">
+        <Link
+          href={`/signup?next=${encodeURIComponent(redirectTo)}`}
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
           Create one
         </Link>
       </p>

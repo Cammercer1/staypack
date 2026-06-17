@@ -2,10 +2,7 @@ import { DEFAULT_COLLATERAL_TEMPLATE_IDS } from "@/lib/collateral/templates/ids"
 import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
 import { getTemplatesForProduct } from "@/lib/templates/catalog";
 import type { TemplateCatalogEntry } from "@/lib/templates/types";
-import {
-  getDefaultTemplateIdFromGrants,
-  listGrantsForAgency,
-} from "@/lib/templates/grants/repository";
+import { listGrantsForAgency } from "@/lib/templates/grants/repository";
 import type {
   AvailableTemplatesResult,
   TemplateProduct,
@@ -69,6 +66,23 @@ function pickDefaultId(
   return available[0]?.id ?? platformDefaultForProduct(product);
 }
 
+function moveTemplateToFront(
+  templates: TemplateCatalogEntry[],
+  templateId: string,
+): TemplateCatalogEntry[] {
+  const index = templates.findIndex((entry) => entry.id === templateId);
+  if (index <= 0) {
+    return templates;
+  }
+
+  const selected = templates[index];
+  return [
+    selected,
+    ...templates.slice(0, index),
+    ...templates.slice(index + 1),
+  ];
+}
+
 export async function resolveAvailableTemplates(
   agency: Agency,
   product: TemplateProduct,
@@ -80,7 +94,9 @@ export async function resolveAvailableTemplates(
   );
   const templates = filterByGrants(allForProduct, grantedIds);
 
-  const grantDefault = await getDefaultTemplateIdFromGrants(agency.id, product);
+  const grantDefault =
+    grants.find((g) => g.product === product && g.is_default)?.template_id ??
+    null;
   const defaultTemplateId = pickDefaultId(
     templates,
     [grantDefault, agencyDefaultForProduct(agency, product)],
@@ -90,7 +106,7 @@ export async function resolveAvailableTemplates(
   return {
     product,
     defaultTemplateId,
-    templates,
+    templates: moveTemplateToFront(templates, defaultTemplateId),
   };
 }
 
@@ -117,6 +133,6 @@ export function resolveAvailableTemplatesFromGrants(
   return {
     product,
     defaultTemplateId,
-    templates,
+    templates: moveTemplateToFront(templates, defaultTemplateId),
   };
 }

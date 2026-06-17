@@ -19,9 +19,16 @@ type SignupForm = {
   confirmPassword: string;
 };
 
-export function SignupForm() {
+function safeNextPath(nextPath: string | undefined) {
+  return nextPath?.startsWith("/") && !nextPath.startsWith("//")
+    ? nextPath
+    : "/dashboard";
+}
+
+export function SignupForm({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const redirectTo = safeNextPath(nextPath);
   const form = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
     defaultValues: { email: "", password: "", confirmPassword: "" },
@@ -34,7 +41,7 @@ export function SignupForm() {
       email: values.email,
       password: values.password,
       options: {
-        emailRedirectTo: `${getSiteUrl()}/callback?next=/dashboard`,
+        emailRedirectTo: `${getSiteUrl()}/callback?next=${encodeURIComponent(redirectTo)}`,
       },
     });
 
@@ -45,7 +52,7 @@ export function SignupForm() {
     }
 
     toast.success("Account created. You can sign in now.");
-    router.push("/login");
+    router.push(`/login?next=${encodeURIComponent(redirectTo)}`);
   }
 
   return (
@@ -79,7 +86,10 @@ export function SignupForm() {
       </form>
       <p className="mt-6 text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
+        <Link
+          href={`/login?next=${encodeURIComponent(redirectTo)}`}
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
           Sign in
         </Link>
       </p>

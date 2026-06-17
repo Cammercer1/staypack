@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,12 @@ export function AgentProfileForm({
   initial,
   onSaved,
   fieldIdPrefix,
+  canEdit = true,
 }: {
   initial?: AgentProfile;
   onSaved: () => void;
   fieldIdPrefix?: string;
+  canEdit?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -55,10 +57,14 @@ export function AgentProfileForm({
     },
   });
 
-  const displayName = form.watch("name");
-  const photoUrl = form.watch("photo_url");
+  const displayName = useWatch({ control: form.control, name: "name" });
+  const photoUrl = useWatch({ control: form.control, name: "photo_url" });
 
   async function onSubmit(values: AgentProfileInput) {
+    if (!canEdit) {
+      return;
+    }
+
     setLoading(true);
     const response = await fetch("/api/agents", {
       method: initial ? "PATCH" : "POST",
@@ -82,7 +88,7 @@ export function AgentProfileForm({
   }
 
   async function deleteAgent() {
-    if (!initial) {
+    if (!initial || !canEdit) {
       return;
     }
 
@@ -115,6 +121,7 @@ export function AgentProfileForm({
             value={photoUrl ?? ""}
             fallbackInitial={displayName}
             hoverToChange={Boolean(initial)}
+            readOnly={!canEdit}
             onChange={(url) =>
               form.setValue("photo_url", url, { shouldDirty: true, shouldValidate: true })
             }
@@ -122,43 +129,55 @@ export function AgentProfileForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor={fieldId("name")}>Name</Label>
-          <Input id={fieldId("name")} {...form.register("name")} />
+          <Input id={fieldId("name")} disabled={!canEdit} {...form.register("name")} />
         </div>
         <div className="space-y-2">
           <Label htmlFor={fieldId("role_title")}>Role title</Label>
-          <Input id={fieldId("role_title")} {...form.register("role_title")} />
+          <Input
+            id={fieldId("role_title")}
+            disabled={!canEdit}
+            {...form.register("role_title")}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor={fieldId("email")}>Email</Label>
-          <Input id={fieldId("email")} type="email" {...form.register("email")} />
+          <Input
+            id={fieldId("email")}
+            type="email"
+            disabled={!canEdit}
+            {...form.register("email")}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor={fieldId("phone")}>Phone</Label>
-          <Input id={fieldId("phone")} {...form.register("phone")} />
+          <Input id={fieldId("phone")} disabled={!canEdit} {...form.register("phone")} />
         </div>
         <div className="flex items-center gap-2 md:col-span-2">
           <input
             id={fieldId("is_default")}
             type="checkbox"
+            disabled={!canEdit}
             {...form.register("is_default")}
           />
           <Label htmlFor={fieldId("is_default")}>Default agent</Label>
         </div>
-        <div className="flex flex-wrap gap-2 md:col-span-2">
-          <Button type="submit" disabled={loading || deleting}>
-            {loading ? "Saving..." : initial ? "Update agent" : "Add agent"}
-          </Button>
-          {initial ? (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={loading || deleting}
-              onClick={() => setDeleteOpen(true)}
-            >
-              Delete agent
+        {canEdit ? (
+          <div className="flex flex-wrap gap-2 md:col-span-2">
+            <Button type="submit" disabled={loading || deleting}>
+              {loading ? "Saving..." : initial ? "Update agent" : "Add agent"}
             </Button>
-          ) : null}
-        </div>
+            {initial ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={loading || deleting}
+                onClick={() => setDeleteOpen(true)}
+              >
+                Delete agent
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </form>
 
       {initial ? (

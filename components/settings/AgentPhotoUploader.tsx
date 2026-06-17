@@ -14,6 +14,7 @@ type Props = {
   fallbackInitial?: string;
   /** Hover-to-change photo on the avatar instead of a replace button. */
   hoverToChange?: boolean;
+  readOnly?: boolean;
 };
 
 export function AgentPhotoUploader({
@@ -22,11 +23,16 @@ export function AgentPhotoUploader({
   fieldId,
   fallbackInitial = "?",
   hoverToChange = false,
+  readOnly = false,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
   async function uploadPhoto(file: File) {
+    if (readOnly) {
+      return;
+    }
+
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image file.");
       return;
@@ -53,7 +59,7 @@ export function AgentPhotoUploader({
   }
 
   function openFilePicker() {
-    if (!uploading) {
+    if (!uploading && !readOnly) {
       inputRef.current?.click();
     }
   }
@@ -68,7 +74,16 @@ export function AgentPhotoUploader({
       {!hoverToChange ? <Label htmlFor={fieldId}>Photo</Label> : null}
 
       <div className="flex flex-wrap items-center gap-4">
-        {hoverToChange ? (
+        {hoverToChange && readOnly ? (
+          value ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={value} alt="" className={avatarClassName} />
+          ) : (
+            <div className={placeholderClassName}>
+              {fallbackInitial.trim().charAt(0) || "?"}
+            </div>
+          )
+        ) : hoverToChange ? (
           <button
             type="button"
             aria-label={value ? "Change photo" : "Add photo"}
@@ -101,7 +116,7 @@ export function AgentPhotoUploader({
           </div>
         )}
 
-        {!hoverToChange ? (
+        {!hoverToChange && !readOnly ? (
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -126,7 +141,7 @@ export function AgentPhotoUploader({
               </Button>
             ) : null}
           </div>
-        ) : value ? (
+        ) : hoverToChange && !readOnly && value ? (
           <Button
             type="button"
             variant="ghost"
@@ -144,6 +159,7 @@ export function AgentPhotoUploader({
           ref={inputRef}
           type="file"
           accept="image/png,image/jpeg,image/webp,image/avif"
+          disabled={readOnly}
           className="hidden"
           onChange={(event) => {
             const file = event.target.files?.[0];

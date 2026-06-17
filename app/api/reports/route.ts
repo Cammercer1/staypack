@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAgency, requireListingAccess } from "@/lib/auth/requireUser";
 import { collateralPhotoRequirementError } from "@/lib/listings/collateralPhotoRequirements";
+import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
 import { createReportSchema } from "@/lib/validation/schemas";
 
 export async function GET(request: Request) {
@@ -65,12 +66,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: photoError }, { status: 400 });
     }
 
+    const availableTemplates = await resolveAvailableTemplates(agency, "str");
+
     const { data, error } = await supabase
       .from("reports")
       .insert({
         agency_id: agency.id,
         listing_id: listing.id,
         created_by: user.id,
+        template_id: availableTemplates.defaultTemplateId,
         status: "draft",
       })
       .select("*")

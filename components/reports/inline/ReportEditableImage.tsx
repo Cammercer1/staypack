@@ -36,7 +36,7 @@ export function ReportEditableImage({
       type="button"
       data-report-editable-image
       className={cn(
-        "group relative z-[1] block w-full cursor-pointer border-0 bg-transparent p-0 text-left",
+        "group relative block w-full cursor-pointer border-0 bg-transparent p-0 text-left",
         className,
       )}
       onClick={() => openImagePicker(slot)}
