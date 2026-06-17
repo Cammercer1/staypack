@@ -62,6 +62,27 @@ export function hasLeaseAppraisalComps(parsed: ParsedListing | null | undefined)
   );
 }
 
+export async function enrichParsedListingForLeaseAppraisal(
+  parsed: ParsedListing,
+): Promise<{ parsed: ParsedListing; warnings: string[] }> {
+  let enrichedRaw = await enrichListingRentalAppraisal(parsed);
+  if (!hasLeaseAppraisalSelectedComps(enrichedRaw)) {
+    enrichedRaw = applyLeaseAppraisalCompSelection(
+      enrichedRaw,
+      defaultSelectedCompListingIds(enrichedRaw),
+    );
+  }
+  const enriched = {
+    ...enrichedRaw,
+    warnings: stripInternalRentalAppraisalWarnings(enrichedRaw.warnings ?? []),
+  };
+
+  return {
+    parsed: enriched,
+    warnings: [...enriched.warnings],
+  };
+}
+
 export async function createLeaseAppraisalDraft({
   supabase,
   agency,
@@ -138,22 +159,13 @@ export async function enrichListingForLeaseAppraisal({
   assertSaleListing(listing);
   assertScrapedListing(listing);
 
-  let enrichedRaw = await enrichListingRentalAppraisal(listing.scraped_listing_json!);
-  if (!hasLeaseAppraisalSelectedComps(enrichedRaw)) {
-    enrichedRaw = applyLeaseAppraisalCompSelection(
-      enrichedRaw,
-      defaultSelectedCompListingIds(enrichedRaw),
-    );
-  }
-  const enriched = {
-    ...enrichedRaw,
-    warnings: stripInternalRentalAppraisalWarnings(enrichedRaw.warnings ?? []),
-  };
-  const warnings = [...enriched.warnings];
+  const { parsed, warnings } = await enrichParsedListingForLeaseAppraisal(
+    listing.scraped_listing_json!,
+  );
 
   const { data: updatedListing, error: listingError } = await supabase
     .from("listings")
-    .update({ scraped_listing_json: enriched })
+    .update({ scraped_listing_json: parsed })
     .eq("id", listing.id)
     .select("*")
     .single();
@@ -164,7 +176,7 @@ export async function enrichListingForLeaseAppraisal({
 
   return {
     listing: updatedListing as Listing,
-    parsed: enriched,
+    parsed,
     warnings,
   };
 }

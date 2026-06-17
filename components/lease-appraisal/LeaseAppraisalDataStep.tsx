@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -17,10 +17,13 @@ import {
   defaultSelectedCompListingIds,
   orderLeaseAppraisalCompPool,
 } from "@/lib/lease-appraisal/leaseAppraisalData";
+import { isLeaseAppraisalEnrichmentActive } from "@/lib/lease-appraisal/enrichmentStatus";
 import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import { cn } from "@/lib/utils";
 import type { Listing } from "@/lib/types";
+
+const POLL_INTERVAL_MS = 5000;
 
 type Props = {
   listing: Listing;
@@ -40,11 +43,20 @@ export function LeaseAppraisalDataStep({
   onContinue,
 }: Props) {
   const parsed = listing.scraped_listing_json;
-  const pool = parsed ? orderLeaseAppraisalCompPool(parsed) : [];
+  const pool = useMemo(
+    () => (parsed ? orderLeaseAppraisalCompPool(parsed) : []),
+    [parsed],
+  );
   const appraisal = parsed?.rentalAppraisal;
+  const enrichmentStatus = parsed?.leaseAppraisalEnrichment ?? null;
+  const enrichmentProcessing = isLeaseAppraisalEnrichmentActive(enrichmentStatus);
+  const enrichmentStale =
+    enrichmentStatus?.status === "processing" && !enrichmentProcessing;
+  const enrichmentFailed = enrichmentStatus?.status === "failed";
 
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const pollErrorShownRef = useRef(false);
   const [weeklyMin, setWeeklyMin] = useState<string>(
     () => String(appraisal?.weeklyMin ?? ""),
   );
@@ -64,6 +76,7 @@ export function LeaseAppraisalDataStep({
     return [];
   });
 
+  /* eslint-disable react-hooks/set-state-in-effect -- sync editable fields when async enrichment refreshes the listing. */
   useEffect(() => {
     setWeeklyMin(String(appraisal?.weeklyMin ?? ""));
     setWeeklyMax(String(appraisal?.weeklyMax ?? ""));
@@ -74,6 +87,7 @@ export function LeaseAppraisalDataStep({
       setSelectedIds(defaultSelectedCompListingIds(parsed));
     }
   }, [listing.updated_at, appraisal, parsed, pool.length]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const compRows = useMemo(
     () =>
@@ -99,6 +113,69 @@ export function LeaseAppraisalDataStep({
 
   const compsReady = hasLeaseAppraisalComps(parsed);
   const canContinue = compsReady && selectedIds.length > 0;
+
+  useEffect(() => {
+    if (!enrichmentProcessing) {
+      return;
+    }
+
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    async function pollListing() {
+      try {
+        const response = await fetch(`/api/listings/${listing.id}`, {
+          cache: "no-store",
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Unable to refresh appraisal data");
+        }
+
+        const nextListing = payload.listing as Listing | undefined;
+        if (!cancelled && nextListing) {
+          onListingChange(nextListing);
+          const nextParsed = nextListing.scraped_listing_json;
+          const nextStatus = nextParsed?.leaseAppraisalEnrichment?.status;
+          if (
+            hasLeaseAppraisalComps(nextParsed) ||
+            nextStatus === "completed" ||
+            nextStatus === "failed"
+          ) {
+            if (interval) {
+              clearInterval(interval);
+            }
+          }
+        }
+      } catch (error) {
+        if (!cancelled && !pollErrorShownRef.current) {
+          pollErrorShownRef.current = true;
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Unable to refresh appraisal data",
+          );
+        }
+      }
+    }
+
+    void pollListing();
+    interval = setInterval(() => {
+      void pollListing();
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [
+    enrichmentProcessing,
+    enrichmentStatus?.requestId,
+    listing.id,
+    onListingChange,
+  ]);
 
   function toggleComp(id: string) {
     setSelectedIds((current) => {
@@ -127,7 +204,11 @@ export function LeaseAppraisalDataStep({
         onListingChange(payload.listing as Listing);
       }
       if (!options?.silent) {
-        toast.success("Rental comps updated");
+        toast.success(
+          response.status === 202
+            ? "Rental comps are updating in the background"
+            : "Rental comps updated",
+        );
       }
     } catch (error) {
       toast.error(
@@ -177,7 +258,7 @@ export function LeaseAppraisalDataStep({
     }
   }
 
-  const loading = fetching || saving || compsPrefetching;
+  const loading = fetching || saving || compsPrefetching || enrichmentProcessing;
 
   return (
     <AsyncLoadingOverlay
@@ -199,7 +280,9 @@ export function LeaseAppraisalDataStep({
         <p className="mt-1 text-sm text-muted-foreground">
           {compsReady
             ? `Comps are sorted with ${listing.suburb ?? "your suburb"} first, then nearby areas. Review the rent band, pick up to four for page 2, and use Refresh to re-fetch from REA.`
-            : "Comparable rentals load when you start the appraisal. Adjust the weekly rent band if needed, then choose featured comps."}
+            : enrichmentProcessing
+              ? "Comparable rentals are being fetched in the background. This page will update when they are ready."
+              : "Comparable rentals load when you start the appraisal. Adjust the weekly rent band if needed, then choose featured comps."}
         </p>
       </div>
 
@@ -208,13 +291,19 @@ export function LeaseAppraisalDataStep({
           <p className="font-medium">Comparable rentals</p>
           {compsReady ? (
             <Badge variant="secondary">Ready</Badge>
+          ) : enrichmentProcessing ? (
+            <Badge variant="secondary">Fetching</Badge>
+          ) : enrichmentStale ? (
+            <Badge variant="outline">Retry needed</Badge>
+          ) : enrichmentFailed ? (
+            <Badge variant="destructive">Failed</Badge>
           ) : (
             <Badge variant="outline">Required</Badge>
           )}
         </div>
 
         <Button variant="outline" onClick={() => void fetchComps()} disabled={loading}>
-          {compsPrefetching || fetching ? (
+          {compsPrefetching || fetching || enrichmentProcessing ? (
             <>
               <Loader2 className="animate-spin" />
               Fetching comps...
@@ -225,6 +314,21 @@ export function LeaseAppraisalDataStep({
             "Fetch rental comps"
           )}
         </Button>
+        {enrichmentProcessing ? (
+          <p className="text-sm text-muted-foreground">
+            REA comps can take 1–3 minutes. You can keep this tab open while the
+            appraisal updates.
+          </p>
+        ) : enrichmentFailed ? (
+          <p className="text-sm text-destructive">
+            {enrichmentStatus?.error ??
+              "Rental comps failed to update. Refresh comps to try again."}
+          </p>
+        ) : enrichmentStale ? (
+          <p className="text-sm text-muted-foreground">
+            The last comp fetch did not finish. Refresh comps to try again.
+          </p>
+        ) : null}
       </div>
 
       {compsReady ? (

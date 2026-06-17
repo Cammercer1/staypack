@@ -13,6 +13,16 @@ export type ScrapeJobStatus = "pending" | "success" | "failed";
 
 export type ListingImageRole = "photo" | "floor_plan";
 
+export type LeaseAppraisalEnrichmentStatus = {
+  status: "processing" | "completed" | "failed";
+  requestId: string;
+  startedAt?: string;
+  completedAt?: string;
+  failedAt?: string;
+  updatedAt: string;
+  error?: string;
+};
+
 export type ListingImageMeta = {
   role: ListingImageRole;
   label?: string;
@@ -72,6 +82,8 @@ export type ParsedListing = {
   }[];
   /** PropRadar suburb medians / demographics for lease appraisal. */
   ltrSuburbMarket?: LtrSuburbMarketJson;
+  /** Async rental comp enrichment status for lease appraisal UI polling. */
+  leaseAppraisalEnrichment?: LeaseAppraisalEnrichmentStatus;
   outgoings?: {
     bodyCorporateWeekly?: number;
     councilRatesQuarterly?: number;
