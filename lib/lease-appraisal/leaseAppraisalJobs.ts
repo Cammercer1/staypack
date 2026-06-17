@@ -1,6 +1,7 @@
 import type { LeaseAppraisalJob, LeaseAppraisalJobStatus } from "@/lib/types";
 
 export const LEASE_APPRAISAL_JOB_ACTIVE_MS = 10 * 60 * 1000;
+export const LEASE_APPRAISAL_JOB_PENDING_MS = 90 * 1000;
 
 export function isLeaseAppraisalJobActive(
   job: Pick<
@@ -14,14 +15,29 @@ export function isLeaseAppraisalJobActive(
   }
 
   const timestamp =
-    job.heartbeat_at ?? job.started_at ?? job.created_at ?? undefined;
+    job.status === "pending"
+      ? job.created_at ?? undefined
+      : job.heartbeat_at ?? job.started_at ?? job.created_at ?? undefined;
   const started = timestamp ? Date.parse(timestamp) : NaN;
 
   if (!Number.isFinite(started)) {
     return true;
   }
 
-  return now - started < LEASE_APPRAISAL_JOB_ACTIVE_MS;
+  const timeoutMs =
+    job.status === "pending"
+      ? LEASE_APPRAISAL_JOB_PENDING_MS
+      : LEASE_APPRAISAL_JOB_ACTIVE_MS;
+
+  return now - started < timeoutMs;
+}
+
+export function leaseAppraisalJobTimeoutMessage(
+  job: Pick<LeaseAppraisalJob, "status">,
+) {
+  return job.status === "pending"
+    ? "Rental comps did not start in time. Refresh comps to try again."
+    : "Rental comps did not finish in time. Refresh comps to try again.";
 }
 
 export function leaseAppraisalJobsTableMissing(error: unknown) {

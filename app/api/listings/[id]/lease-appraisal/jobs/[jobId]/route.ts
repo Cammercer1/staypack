@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireListingAccess } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isLeaseAppraisalJobActive } from "@/lib/lease-appraisal/leaseAppraisalJobs";
+import {
+  isLeaseAppraisalJobActive,
+  leaseAppraisalJobTimeoutMessage,
+} from "@/lib/lease-appraisal/leaseAppraisalJobs";
 import type { LeaseAppraisalJob, Listing } from "@/lib/types";
 
 function failedJob(job: LeaseAppraisalJob, errorMessage: string): LeaseAppraisalJob {
@@ -17,10 +20,7 @@ function failedJob(job: LeaseAppraisalJob, errorMessage: string): LeaseAppraisal
 }
 
 async function markStaleJobFailed(job: LeaseAppraisalJob) {
-  const next = failedJob(
-    job,
-    "Rental comps did not finish in time. Refresh comps to try again.",
-  );
+  const next = failedJob(job, leaseAppraisalJobTimeoutMessage(job));
   const { data } = await createAdminClient()
     .from("lease_appraisal_jobs")
     .update({
