@@ -2,7 +2,10 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import type { StrEstimate, StrEstimatePositioning } from "@/lib/types";
-import { filterEntireHomeComps } from "@/lib/airbtics/compFilters";
+import {
+  filterEntireHomeComps,
+  isRoomTypeComp,
+} from "@/lib/airbtics/compFilters";
 
 /**
  * Intelligence layer over the raw Airbtics estimate.
@@ -25,7 +28,8 @@ You are given a subject property, Airbtics market percentile KPIs (p25–p90), c
 Your task: pick one annual gross revenue figure (AUD, whole dollars) that the subject would most likely achieve based on the evidence.
 
 How to weigh evidence:
-- Same-bedroom comps are the primary anchor. The suggested_floor, suggested_target, and suggested_ceiling in comp_anchors define a reasonable band — stay inside it unless you have very strong same-building evidence.
+- The market median (p50) is the default anchor. Same-bedroom comps can justify overperforming or slightly underperforming, but should not pull an investor-facing estimate materially below the market median unless there is clear negative evidence.
+- Same-bedroom comps are an evidence check. The suggested_floor, suggested_target, and suggested_ceiling in comp_anchors define a reasonable band — stay inside it unless you have very strong same-building evidence.
 - Comps under ~75m are often in the same building or complex. Same-building comps with the same bedroom count are the strongest evidence.
 - Use quality_signals plus the listing title/description and price for property quality: new development, premium finishes, ocean/water views, floor level, renovations, or obvious weakness.
 - A premium new build may sit above the same-bedroom median, but should not exceed the best nearby same-bedroom comp by more than a modest premium unless same-building comps support it.
@@ -98,6 +102,7 @@ export const MIN_POSITIONING_PERCENTILE = 25;
 export const MAX_POSITIONING_PERCENTILE = 90;
 /** Don't try to outsmart the median without a meaningful comp set. */
 export const MIN_COMPS_FOR_POSITIONING = 5;
+const MIN_SAME_BED_COMPS_FOR_DOWNWARD_POSITIONING = 5;
 const MAX_DESCRIPTION_CHARS = 1500;
 /** Max uplift over best same-bedroom comp without same-building evidence. */
 const SAME_BED_PREMIUM_CAP = 1.08;
@@ -105,6 +110,7 @@ const SAME_BED_PREMIUM_CAP = 1.08;
 const NEARBY_SAME_BED_PREMIUM_CAP = 1.15;
 const NEARBY_SAME_BED_DISTANCE_M = 120;
 const PROMPT_COMP_LIMIT = 18;
+const MIN_MARKET_MEDIAN_MULTIPLIER = 0.9;
 
 function numberOrNull(value: unknown) {
   if (value == null || value === "") return null;
@@ -175,13 +181,15 @@ function percentileOfSorted(sorted: number[], percentile: number) {
 
 type RawComp = Record<string, unknown>;
 
-export function extractComps(raw: unknown): RawComp[] {
+function extractRawComps(raw: unknown): RawComp[] {
   if (!raw || typeof raw !== "object") return [];
 
   const message = unwrapRawEnvelope(raw as Record<string, unknown>);
-  return Array.isArray(message.comps)
-    ? filterEntireHomeComps(message.comps as RawComp[])
-    : [];
+  return Array.isArray(message.comps) ? (message.comps as RawComp[]) : [];
+}
+
+export function extractComps(raw: unknown): RawComp[] {
+  return filterEntireHomeComps(extractRawComps(raw));
 }
 
 function compAnnualRevenue(comp: RawComp) {
@@ -444,7 +452,6 @@ export function buildCompAnchors(
     sameBedP75,
     sameBedMax,
     nearbySameBedMax,
-    kpiP25,
     kpiP50,
     kpiP75,
     kpiP90,
@@ -479,7 +486,6 @@ export function deriveCompAwareBounds({
   sameBedP75,
   sameBedMax,
   nearbySameBedMax,
-  kpiP25,
   kpiP50,
   kpiP75,
   kpiP90,
@@ -490,7 +496,6 @@ export function deriveCompAwareBounds({
   sameBedP75: number | null;
   sameBedMax: number | null;
   nearbySameBedMax: number | null;
-  kpiP25: number | null;
   kpiP50: number | null;
   kpiP75: number | null;
   kpiP90: number | null;
@@ -530,8 +535,14 @@ export function deriveCompAwareBounds({
         sameBedMedian * 0.85,
       ),
     );
+    const marketMedianFloor =
+      kpiP50 != null
+        ? roundRevenue(kpiP50 * MIN_MARKET_MEDIAN_MULTIPLIER)
+        : null;
     const floor =
-      kpiP25 != null ? Math.max(compFloor, roundRevenue(kpiP25)) : compFloor;
+      marketMedianFloor != null
+        ? Math.max(compFloor, marketMedianFloor)
+        : compFloor;
     const rawTarget = roundRevenue(
       sameBedMedian + (sameBedMax - sameBedMedian) * 0.55,
     );
@@ -546,11 +557,8 @@ export function deriveCompAwareBounds({
   }
 
   if (kpiP50 != null) {
-    const floor =
-      kpiP25 ??
-      kpiP50 * 0.75; /* fallback when only p50 known in sparse sets */
     return {
-      floor: roundRevenue(floor),
+      floor: roundRevenue(kpiP50 * MIN_MARKET_MEDIAN_MULTIPLIER),
       ceiling: kpiP90 ?? kpiP75 ?? roundRevenue(kpiP50 * 1.35),
       target: roundRevenue(kpiP50),
     };
@@ -840,6 +848,81 @@ function deterministicPositionFromAnchors({
   };
 }
 
+function premiumSparseMarketPercentile(qualitySignals: string[]) {
+  const hasCaution = qualitySignals.some((signal) => signal.startsWith("caution:"));
+  const positiveCount = qualitySignals.filter(
+    (signal) => !signal.startsWith("caution:"),
+  ).length;
+
+  return !hasCaution && positiveCount >= 2 ? 75 : 50;
+}
+
+function shouldUseMarketPositionForSparseSameBed({
+  anchors,
+  excludedRoomCompCount,
+}: {
+  anchors: CompAnchors;
+  excludedRoomCompCount: number;
+}) {
+  if (
+    anchors.same_bed_count <= 0 ||
+    anchors.same_bed_count >= MIN_SAME_BED_COMPS_FOR_DOWNWARD_POSITIONING ||
+    anchors.kpi_p50 == null
+  ) {
+    return false;
+  }
+
+  const sameBedMax = anchors.same_bed_max ?? 0;
+  const sameBedEvidenceIsWeak = sameBedMax < anchors.kpi_p50 * 0.75;
+
+  return excludedRoomCompCount > 0 || sameBedEvidenceIsWeak;
+}
+
+function marketPositionFromSparseSameBedEvidence({
+  estimate,
+  points,
+  anchors,
+  qualitySignals,
+}: {
+  estimate: StrEstimate;
+  points: PercentileKpiPoint[];
+  anchors: CompAnchors;
+  qualitySignals: string[];
+}): PositionEstimateResult {
+  const medianAnnualRevenue =
+    points.find((point) => point.percentile === 50)?.revenue ?? null;
+  const percentile = premiumSparseMarketPercentile(qualitySignals);
+  const positionedEstimate = estimateAtPercentile(estimate, points, percentile);
+  const annualRevenue = positionedEstimate.annualRevenue ?? estimate.annualRevenue;
+  const qualityRationale =
+    percentile >= 75
+      ? "The listing has multiple positive quality signals, so the stronger market case is more appropriate than a sparse weak same-bedroom sample."
+      : "The same-bedroom whole-property sample is too thin to justify a downward adjustment, so the market case is more appropriate.";
+
+  return {
+    estimate: positionedEstimate,
+    positioning: annualRevenue == null
+      ? null
+      : {
+          percentile,
+          confidence: "medium",
+          rationale: `Only ${anchors.same_bed_count} same-bedroom whole-property comparable listings were available after excluding room listings. ${qualityRationale}`,
+          median_annual_revenue: medianAnnualRevenue,
+          llm_annual_revenue: null,
+          annual_revenue: annualRevenue,
+          was_clamped: false,
+          comp_anchors: {
+            same_bed_count: anchors.same_bed_count,
+            same_bed_median: anchors.same_bed_median,
+            same_bed_max: anchors.same_bed_max,
+            suggested_floor: anchors.suggested_floor,
+            suggested_ceiling: anchors.suggested_ceiling,
+            suggested_target: anchors.suggested_target,
+          },
+        },
+  };
+}
+
 export async function positionStrEstimate({
   subject,
   estimate,
@@ -850,7 +933,9 @@ export async function positionStrEstimate({
   const unpositioned: PositionEstimateResult = { estimate, positioning: null };
 
   const points = extractPercentileKpis(estimate.raw);
-  const comps = extractComps(estimate.raw);
+  const rawComps = extractRawComps(estimate.raw);
+  const comps = filterEntireHomeComps(rawComps);
+  const excludedRoomCompCount = rawComps.filter(isRoomTypeComp).length;
 
   if (points.length < 2 || comps.length === 0) {
     return unpositioned;
@@ -869,14 +954,6 @@ export async function positionStrEstimate({
       reason,
     });
 
-  if (!process.env.OPENAI_API_KEY) {
-    return deterministicFallback("model_unavailable");
-  }
-
-  if (comps.length < MIN_COMPS_FOR_POSITIONING) {
-    return deterministicFallback("insufficient_prompt_evidence");
-  }
-
   const qualitySignals =
     subject.quality_signals?.length
       ? subject.quality_signals
@@ -885,6 +962,29 @@ export async function positionStrEstimate({
           description: subject.listing_description,
           propertyType: subject.property_type,
         });
+
+  if (
+    shouldUseMarketPositionForSparseSameBed({
+      anchors,
+      excludedRoomCompCount,
+    })
+  ) {
+    return marketPositionFromSparseSameBedEvidence({
+      estimate,
+      points,
+      anchors,
+      qualitySignals,
+    });
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return deterministicFallback("model_unavailable");
+  }
+
+  if (comps.length < MIN_COMPS_FOR_POSITIONING) {
+    return deterministicFallback("insufficient_prompt_evidence");
+  }
+
   const promptComps = selectPromptComps(comps, subject.bedrooms);
 
   const payload = {

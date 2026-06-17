@@ -246,6 +246,56 @@ describe("estimateAtRevenue", () => {
 });
 
 describe("positionStrEstimate deterministic fallback", () => {
+  it("uses premium market positioning when room filtering leaves sparse weak same-bed comps", async () => {
+    const estimate: StrEstimate = {
+      annualRevenue: 37_408,
+      monthlyRevenue: 3117,
+      weeklyRevenue: 719,
+      nightlyRate: 155,
+      occupancyRate: 66,
+      bookedNights: 241,
+      radiusM: 636,
+      raw: {
+        kpis: {
+          "25": { ltm_revenue: 28_061, ltm_nightly_rate: 124, ltm_occupancy_rate: 62 },
+          "50": { ltm_revenue: 37_408, ltm_nightly_rate: 155, ltm_occupancy_rate: 66 },
+          "75": { ltm_revenue: 56_035, ltm_nightly_rate: 202, ltm_occupancy_rate: 76 },
+          "90": { ltm_revenue: 74_518, ltm_nightly_rate: 260, ltm_occupancy_rate: 82 },
+        },
+        comps: [
+          { listingID: "entire-1", room_type: "entire_home", bedrooms: 1, annual_revenue_ltm: 8070, distance: 579 },
+          { listingID: "entire-2", room_type: "entire_home", bedrooms: 1, annual_revenue_ltm: 7367, distance: 312 },
+          { listingID: "entire-3", room_type: "entire_home", bedrooms: 1, annual_revenue_ltm: 4630, distance: 489 },
+          { listingID: "room-1", room_type: "private_room", bedrooms: 1, annual_revenue_ltm: 18_707, distance: 194 },
+          { listingID: "room-2", room_type: "private_room", bedrooms: 1, annual_revenue_ltm: 10_444, distance: 194 },
+          { listingID: "two-bed", room_type: "entire_home", bedrooms: 2, annual_revenue_ltm: 59_492, distance: 390 },
+          { listingID: "three-bed", room_type: "entire_home", bedrooms: 3, annual_revenue_ltm: 59_416, distance: 561 },
+        ],
+      },
+    };
+
+    const positioned = await positionStrEstimate({
+      subject: {
+        property_address: "2/1 Brett Street",
+        suburb: "Tweed Heads",
+        state: "NSW",
+        property_type: "apartment",
+        bedrooms: 1,
+        bathrooms: 1,
+        listing_title: "Fresh, Low-Maintenance Living in the Heart of Tweed Heads",
+        listing_description:
+          "Newly completed apartment with a pool, BBQ area, secure parking and walkable coastal lifestyle.",
+        display_price: "$795,000",
+      },
+      estimate,
+    });
+
+    expect(positioned.positioning?.llm_annual_revenue).toBeNull();
+    expect(positioned.positioning?.percentile).toBe(75);
+    expect(positioned.positioning?.comp_anchors?.same_bed_count).toBe(3);
+    expect(positioned.estimate.annualRevenue).toBe(56_035);
+  });
+
   it("uses same-bed comp anchors when model review is unavailable", async () => {
     const originalOpenAiKey = process.env.OPENAI_API_KEY;
     delete process.env.OPENAI_API_KEY;
@@ -301,7 +351,6 @@ describe("deriveCompAwareBounds", () => {
       sameBedP75: 183058,
       sameBedMax: 219231,
       nearbySameBedMax: null,
-      kpiP25: 194384,
       kpiP50: 259352,
       kpiP75: 391368,
       kpiP90: 521220,
@@ -320,7 +369,6 @@ describe("deriveCompAwareBounds", () => {
       sameBedP75: 50483,
       sameBedMax: 92950,
       nearbySameBedMax: 92950,
-      kpiP25: 43347,
       kpiP50: 58486,
       kpiP75: 74393,
       kpiP90: 95179,
@@ -357,7 +405,7 @@ describe("deriveCompAwareBounds", () => {
     );
   });
 
-  it("does not let weak same-bedroom comps pull revenue below market p25", () => {
+  it("does not let weak same-bedroom comps pull revenue materially below market median", () => {
     const anchors = buildCompAnchors(
       [
         { bedrooms: 1, annual_revenue_ltm: 4630, distance: 489 },
@@ -382,12 +430,12 @@ describe("deriveCompAwareBounds", () => {
     );
 
     expect(anchors.same_bed_median).toBe(9308);
-    expect(anchors.suggested_floor).toBe(28061);
-    expect(anchors.suggested_target).toBe(28061);
+    expect(anchors.suggested_floor).toBe(33667);
+    expect(anchors.suggested_target).toBe(33667);
 
     const resolved = resolvePositionedAnnualRevenue(18676, anchors);
     expect(resolved.wasAdjusted).toBe(true);
-    expect(resolved.annualRevenue).toBe(28061);
+    expect(resolved.annualRevenue).toBe(33667);
   });
 
   it("clamps an aggressive LLM revenue pick to the comp-aware ceiling", () => {

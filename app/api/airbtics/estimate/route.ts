@@ -142,6 +142,7 @@ export async function POST(request: Request) {
         airbtics_fetched_at: new Date().toISOString(),
         original_estimate_json: estimate,
         final_estimate_json: positionedEstimate,
+        user_overrides_json: null,
         raw_airbtics_json: estimate.raw,
         str_enrichment_json: enrichmentWithPositioning,
         status: "estimated",

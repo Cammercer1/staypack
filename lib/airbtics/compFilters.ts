@@ -23,6 +23,10 @@ export function isEntireHomeComp(comp: AirbticsComp) {
   return !ROOM_TYPES_TO_EXCLUDE.has(roomType);
 }
 
+export function isRoomTypeComp(comp: AirbticsComp) {
+  return ROOM_TYPES_TO_EXCLUDE.has(normalizeRoomType(comp.room_type));
+}
+
 export function filterEntireHomeComps<T extends AirbticsComp>(comps: T[]) {
   return comps.filter(isEntireHomeComp);
 }
