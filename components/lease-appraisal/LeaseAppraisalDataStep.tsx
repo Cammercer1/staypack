@@ -112,6 +112,8 @@ export function LeaseAppraisalDataStep({
   }, [weeklyMin, weeklyMax, weeklyMid]);
 
   const compsReady = hasLeaseAppraisalComps(parsed);
+  const initialCompsProcessing = enrichmentProcessing && !compsReady;
+  const refreshingComps = enrichmentProcessing && compsReady;
   const canContinue = compsReady && selectedIds.length > 0;
 
   useEffect(() => {
@@ -258,8 +260,8 @@ export function LeaseAppraisalDataStep({
     }
   }
 
-  const loading = fetching || saving || compsPrefetching || enrichmentProcessing;
-  const fetchingComps = compsPrefetching || fetching || enrichmentProcessing;
+  const loading = fetching || saving || compsPrefetching || initialCompsProcessing;
+  const fetchingComps = compsPrefetching || fetching || initialCompsProcessing;
 
   return (
     <AsyncLoadingOverlay
@@ -276,7 +278,9 @@ export function LeaseAppraisalDataStep({
         <h2 className="text-lg font-semibold">Appraisal data</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {compsReady
-            ? `Comps are sorted with ${listing.suburb ?? "your suburb"} first, then nearby areas. Review the rent band, pick up to four for page 2, and use Refresh to re-fetch from REA.`
+            ? refreshingComps
+              ? "Comparable rentals are refreshing in the background. Current comps remain available while the appraisal updates."
+              : `Comps are sorted with ${listing.suburb ?? "your suburb"} first, then nearby areas. Review the rent band, pick up to four for page 2, and use Refresh to re-fetch from REA.`
             : enrichmentProcessing
               ? "Comparable rentals are being fetched in the background. This page will update when they are ready."
               : "Comparable rentals load when you start the appraisal. Adjust the weekly rent band if needed, then choose featured comps."}
@@ -286,7 +290,9 @@ export function LeaseAppraisalDataStep({
       <div className="surface-card space-y-4 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="font-medium">Comparable rentals</p>
-          {compsReady ? (
+          {refreshingComps ? (
+            <Badge variant="secondary">Refreshing</Badge>
+          ) : compsReady ? (
             <Badge variant="secondary">Ready</Badge>
           ) : enrichmentProcessing ? (
             <Badge variant="secondary">Fetching</Badge>
@@ -299,7 +305,11 @@ export function LeaseAppraisalDataStep({
           )}
         </div>
 
-        <Button variant="outline" onClick={() => void fetchComps()} disabled={loading}>
+        <Button
+          variant="outline"
+          onClick={() => void fetchComps()}
+          disabled={loading || refreshingComps}
+        >
           {compsPrefetching || fetching || enrichmentProcessing ? (
             <>
               <Loader2 className="animate-spin" />
@@ -311,7 +321,12 @@ export function LeaseAppraisalDataStep({
             "Fetch rental comps"
           )}
         </Button>
-        {enrichmentProcessing ? (
+        {refreshingComps ? (
+          <p className="text-sm text-muted-foreground">
+            The current comps are shown below. The refresh will replace them when
+            it finishes.
+          </p>
+        ) : enrichmentProcessing ? (
           <p className="text-sm text-muted-foreground">
             REA comps can take 1–3 minutes. You can keep this tab open while the
             appraisal updates.
