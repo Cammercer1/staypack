@@ -283,6 +283,17 @@ export function LeaseAppraisalWizard({
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            To change photos or edit copy inline, open the{" "}
+            <button
+              type="button"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+              onClick={() => handleStepChange("copy")}
+            >
+              Content generation
+            </button>{" "}
+            tab.
+          </p>
           <AsyncLoadingOverlay
             active={loading || previewSyncing}
             title={

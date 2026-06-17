@@ -20,6 +20,9 @@ export function resolveDeliveryPdfBrandPrefix(tenant: DeliveryTenant): string {
   if (tenant.str_template_pack_id === "haven_properties") {
     return "havenly-property";
   }
+  if (tenant.str_template_pack_id === "belle_property") {
+    return "belle-property";
+  }
 
   const displayName = tenant.brand?.displayName?.trim();
   if (displayName) {

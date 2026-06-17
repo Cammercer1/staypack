@@ -140,11 +140,11 @@ export function HavenLeaseAppraisalPageOne({ report }: { report: FinalReportJson
           <div className="h-full bg-neutral-300" />
         )}
         <div
-          className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/25"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/25"
           aria-hidden
         />
         {heroLogoUrl ? (
-          <div className="absolute left-6 top-5 z-10">
+          <div className="pointer-events-none absolute left-6 top-5 z-10">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={heroLogoUrl}
@@ -154,7 +154,7 @@ export function HavenLeaseAppraisalPageOne({ report }: { report: FinalReportJson
           </div>
         ) : null}
         {heroAddressLine ? (
-          <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 to-transparent px-6 pb-5 pt-10">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 to-transparent px-6 pb-5 pt-10">
             <h1
               className="text-[1.25rem] font-bold leading-[1.2] text-white drop-shadow-sm"
               style={{ fontFamily: headingFont }}

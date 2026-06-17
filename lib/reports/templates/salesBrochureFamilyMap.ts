@@ -1,4 +1,5 @@
 import {
+  SALES_BROCHURE_BELLE_2PG_TEMPLATE_ID,
   SALES_BROCHURE_BOLD_1PG_TEMPLATE_ID,
   SALES_BROCHURE_CLASSIC_1PG_TEMPLATE_ID,
   SALES_BROCHURE_EDITORIAL_1PG_TEMPLATE_ID,
@@ -48,6 +49,34 @@ export function salesBrochureTemplateIdForFamily(
 ) {
   const map = pages === 1 ? SALES_BROCHURE_1PG_BY_FAMILY : SALES_BROCHURE_2PG_BY_FAMILY;
   return map[family] ?? SALES_BROCHURE_CLASSIC_1PG_TEMPLATE_ID;
+}
+
+/** Brochure template id used to resolve page-1 blurb length for STR / lease reports. */
+export function resolveBrochureTemplateIdForReport(
+  reportTemplateId: string,
+  variant: "str" | "lease" | "sale",
+  layoutFamily?: string,
+): string {
+  if (reportTemplateId.startsWith("belle-property")) {
+    return SALES_BROCHURE_BELLE_2PG_TEMPLATE_ID;
+  }
+
+  if (
+    variant === "sale" &&
+    /^(?:sales|rental)-brochure-.+-(?:1pg|2pg)$/.test(reportTemplateId)
+  ) {
+    return reportTemplateId;
+  }
+
+  const pages =
+    variant === "lease" || reportTemplateId.includes("lease-appraisal") ? 2 : 1;
+  const family =
+    layoutFamily ??
+    (reportTemplateId.includes("haven-properties")
+      ? "classic"
+      : reportFamilyFromTemplateId(reportTemplateId));
+
+  return salesBrochureTemplateIdForFamily(family, pages);
 }
 
 export function reportFamilyFromTemplateId(templateId: string) {

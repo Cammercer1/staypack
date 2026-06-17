@@ -8,6 +8,9 @@ export const MINIMALIST_LEASE_APPRAISAL_TEMPLATE_ID = "minimalist-lease-appraisa
 export const LANDMARK_LEASE_APPRAISAL_TEMPLATE_ID = "landmark-lease-appraisal";
 
 export { HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/templates/ids";
+export {
+  BELLE_PROPERTY_LEASE_APPRAISAL_TEMPLATE_ID,
+} from "@/lib/reports/templates/ids";
 
 export const LEASE_APPRAISAL_TEMPLATE_IDS = [
   CLASSIC_LEASE_APPRAISAL_TEMPLATE_ID,
@@ -19,6 +22,7 @@ export const LEASE_APPRAISAL_TEMPLATE_IDS = [
   MINIMALIST_LEASE_APPRAISAL_TEMPLATE_ID,
   LANDMARK_LEASE_APPRAISAL_TEMPLATE_ID,
   "haven-properties-lease-appraisal",
+  "belle-property-lease-appraisal",
 ] as const;
 
 export const DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID = CLASSIC_LEASE_APPRAISAL_TEMPLATE_ID;

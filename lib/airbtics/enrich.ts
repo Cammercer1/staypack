@@ -88,10 +88,15 @@ function sortCompsByRevenueThenSimilarity(comps: Record<string, unknown>[]) {
 /** Max comp cards persisted on full-tier estimates (templates may show fewer). */
 export const STR_ENRICHMENT_FEATURED_COMP_LIMIT = 6;
 
+function compBedrooms(comp: Record<string, unknown>) {
+  return numberOrNull(comp.bedrooms);
+}
+
 function selectFeaturedComps(
   comps: Record<string, unknown>[],
   limit = STR_ENRICHMENT_FEATURED_COMP_LIMIT,
   marketMedianAnnualRevenue?: number | null,
+  subjectBedrooms?: number | null,
 ) {
   const bySimilarity = sortCompsBySimilarity(comps);
   const revenueQualified = bySimilarity.filter((comp) => {
@@ -108,20 +113,42 @@ function selectFeaturedComps(
 
   const ranked = sortCompsByRevenueThenSimilarity(pool);
 
-  if (marketMedianAnnualRevenue && marketMedianAnnualRevenue > 0) {
-    const floor =
-      marketMedianAnnualRevenue * MIN_COMP_ANNUAL_REVENUE_VS_MARKET_MEDIAN;
-    const aboveFloor = ranked.filter(
-      (comp) => getCompAnnualRevenue(comp) >= floor,
-    );
+  const sameBedRanked =
+    subjectBedrooms == null
+      ? []
+      : sortCompsByRevenueThenSimilarity(
+          ranked.filter((comp) => compBedrooms(comp) === subjectBedrooms),
+        );
 
-    // Prefer a smaller set of strong earners over padding with weak comps.
-    if (aboveFloor.length >= 3) {
-      return aboveFloor.slice(0, limit);
+  const pickFrom = (candidates: Record<string, unknown>[]) => {
+    if (marketMedianAnnualRevenue && marketMedianAnnualRevenue > 0) {
+      const floor =
+        marketMedianAnnualRevenue * MIN_COMP_ANNUAL_REVENUE_VS_MARKET_MEDIAN;
+      const aboveFloor = candidates.filter(
+        (comp) => getCompAnnualRevenue(comp) >= floor,
+      );
+
+      if (aboveFloor.length >= 3) {
+        return aboveFloor.slice(0, limit);
+      }
     }
+
+    return candidates.slice(0, limit);
+  };
+
+  if (sameBedRanked.length >= 3) {
+    return pickFrom(sameBedRanked);
   }
 
-  return ranked.slice(0, limit);
+  if (sameBedRanked.length > 0) {
+    const mixed = [
+      ...sameBedRanked,
+      ...ranked.filter((comp) => compBedrooms(comp) !== subjectBedrooms),
+    ];
+    return pickFrom(mixed).slice(0, limit);
+  }
+
+  return pickFrom(ranked);
 }
 
 function normalizeComp(raw: Record<string, unknown>): StrCompCard {
@@ -230,6 +257,7 @@ export function buildStrEnrichment(
       comps,
       STR_ENRICHMENT_FEATURED_COMP_LIMIT,
       numberOrNull(p50?.ltm_revenue),
+      numberOrNull(message.bedrooms),
     ).map(normalizeComp),
   };
 }

@@ -2,6 +2,7 @@ import { getTemplatesForProduct } from "@/lib/templates/catalog";
 import {
   DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID,
   HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID,
+  BELLE_PROPERTY_LEASE_APPRAISAL_TEMPLATE_ID,
 } from "@/lib/reports/templates/lease-appraisal/ids";
 import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
 import type { ReportTemplateCatalogEntry } from "@/lib/templates/types";
@@ -21,7 +22,8 @@ export function resolveLeaseAppraisalTemplateSelection(
 ) {
   if (
     !templateId ||
-    templateId === HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID
+    templateId === HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID ||
+    templateId === BELLE_PROPERTY_LEASE_APPRAISAL_TEMPLATE_ID
   ) {
     return DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID;
   }

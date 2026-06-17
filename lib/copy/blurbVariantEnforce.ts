@@ -8,19 +8,56 @@ import {
   type BlurbVariantsStored,
 } from "@/lib/copy/blurbVariantConstants";
 
-function truncate(value: string, max: number) {
-  const trimmed = value.trim();
+function clampLegacyParagraph(value: string, max: number) {
+  const trimmed = normalizeParagraph(value);
   if (trimmed.length <= max) {
     return trimmed;
   }
-  const slice = trimmed.slice(0, max - 1);
+
+  const slice = trimmed.slice(0, max);
+  const lastSentenceEnd = Math.max(
+    slice.lastIndexOf(". "),
+    slice.lastIndexOf("! "),
+    slice.lastIndexOf("? "),
+  );
+  if (lastSentenceEnd >= max * 0.55) {
+    return slice.slice(0, lastSentenceEnd + 1).trim();
+  }
+
   const lastSpace = slice.lastIndexOf(" ");
-  const cut = lastSpace > max * 0.6 ? slice.slice(0, lastSpace) : slice;
-  return `${cut.trimEnd()}…`;
+  if (lastSpace >= max * 0.55) {
+    return slice.slice(0, lastSpace).trim();
+  }
+
+  return slice.trim();
 }
 
 function normalizeParagraph(text: string): string {
   return text.replace(/\s+/g, " ").trim();
+}
+
+/** Normalize validated AI paragraphs — no truncation. */
+export function normalizeBlurbParagraphs(
+  paragraphs: string[],
+  count: number,
+): string[] {
+  const normalized = paragraphs
+    .map((paragraph) => normalizeParagraph(paragraph))
+    .slice(0, count);
+  while (normalized.length < count) {
+    normalized.push("");
+  }
+  return normalized;
+}
+
+export function normalizeBlurbVariantsParagraphs(
+  raw: Partial<BlurbVariantsParagraphs>,
+): BlurbVariantsParagraphs {
+  return {
+    short: normalizeBlurbParagraphs(raw.short ?? [], BLURB_PARAGRAPH_COUNTS.short),
+    medium: normalizeBlurbParagraphs(raw.medium ?? [], BLURB_PARAGRAPH_COUNTS.medium),
+    long: normalizeBlurbParagraphs(raw.long ?? [], BLURB_PARAGRAPH_COUNTS.long),
+  };
 }
 
 export function paragraphsToVariantText(paragraphs: string[]): string {
@@ -39,8 +76,8 @@ export function enforceBlurbParagraphs(
   paragraphs: string[],
   count: number,
 ): string[] {
-  const normalized = paragraphs.map((p) =>
-    truncate(normalizeParagraph(p), BLURB_PARAGRAPH_MAX),
+  const normalized = paragraphs.map((paragraph) =>
+    clampLegacyParagraph(paragraph, BLURB_PARAGRAPH_MAX),
   );
   const result = normalized.slice(0, count);
   while (result.length < count) {

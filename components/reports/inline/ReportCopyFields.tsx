@@ -2,9 +2,22 @@
 
 import { createElement, type CSSProperties, type ElementType } from "react";
 import { ReportEditable } from "@/components/reports/inline/ReportEditable";
+import { ReportEditableBlurbField } from "@/components/reports/inline/ReportEditableBlurbField";
 import { useReportEditableContext } from "@/components/reports/inline/ReportEditableContext";
 import type { ReportCopyFieldPath } from "@/lib/reports/editable/reportCopyPaths";
+import { PAGE_ONE_HEADING_MAX } from "@/lib/copy/pageOneMarketingCopy";
 import { cn } from "@/lib/utils";
+
+function stripLineClampForEditor(className?: string) {
+  if (!className) {
+    return undefined;
+  }
+  const stripped = className
+    .split(/\s+/)
+    .filter((token) => token && !token.startsWith("line-clamp-"))
+    .join(" ");
+  return stripped || undefined;
+}
 
 type TextFieldProps = {
   text: string;
@@ -12,6 +25,7 @@ type TextFieldProps = {
   as?: ElementType;
   className?: string;
   style?: CSSProperties;
+  recommendedMaxLength?: number;
 };
 
 export function ReportCopyTextField({
@@ -20,6 +34,7 @@ export function ReportCopyTextField({
   as = "p",
   className,
   style,
+  recommendedMaxLength,
 }: TextFieldProps) {
   const { editable } = useReportEditableContext();
   if (!text && !editable) {
@@ -28,7 +43,13 @@ export function ReportCopyTextField({
 
   if (editable) {
     return (
-      <ReportEditable as={as} path={path} className={className} style={style}>
+      <ReportEditable
+        as={as}
+        path={path}
+        className={className}
+        style={style}
+        recommendedMaxLength={recommendedMaxLength}
+      >
         {text}
       </ReportEditable>
     );
@@ -38,7 +59,13 @@ export function ReportCopyTextField({
 }
 
 export function ReportCopyHeading(props: Omit<TextFieldProps, "path">) {
-  return <ReportCopyTextField {...props} path="copy.heading" />;
+  return (
+    <ReportCopyTextField
+      {...props}
+      path="copy.heading"
+      recommendedMaxLength={props.recommendedMaxLength ?? PAGE_ONE_HEADING_MAX}
+    />
+  );
 }
 
 export function ReportCopyBlurb({
@@ -52,21 +79,22 @@ export function ReportCopyBlurb({
   paraClassName?: string;
   style?: CSSProperties;
 }) {
-  const { editable } = useReportEditableContext();
+  const { editable, setField } = useReportEditableContext();
   if (!blurb && !editable) {
     return null;
   }
 
   if (editable) {
+    const blurbClassName = stripLineClampForEditor(
+      cn("relative z-10 min-w-0 shrink-0 overflow-visible", className, paraClassName),
+    );
     return (
-      <ReportEditable
-        as="div"
-        path="copy.blurb"
-        className={cn("whitespace-pre-wrap", className, paraClassName)}
-        style={style}
-      >
-        {blurb}
-      </ReportEditable>
+      <ReportEditableBlurbField
+        blurb={blurb}
+        onChange={(value) => setField("copy.blurb", value)}
+        className={blurbClassName}
+        paragraphClassName={paraClassName}
+      />
     );
   }
 

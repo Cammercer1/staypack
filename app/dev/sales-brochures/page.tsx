@@ -3,9 +3,23 @@ import { notFound } from "next/navigation";
 import { SalesBrochurePlayground } from "@/components/dev/SalesBrochurePlayground";
 import { Button } from "@/components/ui/button";
 import { requireListingAccess } from "@/lib/auth/requireUser";
+import { loadDevListingAccess } from "@/lib/dev/loadDevListingAccess";
 import { createPlaygroundSalesBrochureDocument } from "@/lib/collateral/sales-brochure/playgroundFixture";
 import { resolvePlaygroundSalesBrochure } from "@/lib/collateral/sales-brochure/resolvePlaygroundSalesBrochure";
-import type { CollateralItem } from "@/lib/types";
+import type { Agency, CollateralItem, Listing } from "@/lib/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+async function loadSalesBrochureListingAccess(listingId: string): Promise<{
+  supabase: SupabaseClient;
+  agency: Agency;
+  listing: Listing;
+} | null> {
+  try {
+    return await requireListingAccess(listingId);
+  } catch {
+    return loadDevListingAccess(listingId);
+  }
+}
 
 export default async function DevSalesBrochuresPage({
   searchParams,
@@ -19,8 +33,26 @@ export default async function DevSalesBrochuresPage({
   const { listingId, collateralId, templateId } = await searchParams;
 
   if (listingId) {
-    try {
-      const { supabase, agency, listing } = await requireListingAccess(listingId);
+    const access = await loadSalesBrochureListingAccess(listingId);
+
+    if (!access) {
+      return (
+        <div className="flex min-h-screen items-center justify-center p-8">
+          <div className="max-w-md space-y-4 text-center">
+            <h1 className="text-xl font-semibold">Listing not found</h1>
+            <p className="text-sm text-muted-foreground">
+              Check <code className="text-xs">listingId</code> or open the playground
+              without params to use mock fixture data.
+            </p>
+            <Link href="/dev/sales-brochures">
+              <Button variant="outline">Mock fixture preview</Button>
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
+    const { supabase, agency, listing } = access;
 
       let collateral: CollateralItem | null = null;
 
@@ -62,22 +94,6 @@ export default async function DevSalesBrochuresPage({
           collateralId={collateral?.id ?? null}
         />
       );
-    } catch {
-      return (
-        <div className="flex min-h-screen items-center justify-center p-8">
-          <div className="max-w-md space-y-4 text-center">
-            <h1 className="text-xl font-semibold">Listing not found</h1>
-            <p className="text-sm text-muted-foreground">
-              Check <code className="text-xs">listingId</code> or open the playground
-              without params to use mock fixture data.
-            </p>
-            <Link href="/dev/sales-brochures">
-              <Button variant="outline">Mock fixture preview</Button>
-            </Link>
-          </div>
-        </div>
-      );
-    }
   }
 
   const document = createPlaygroundSalesBrochureDocument(

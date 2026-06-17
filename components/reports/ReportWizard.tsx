@@ -1,20 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { StrEstimateStep } from "@/components/reports/StrEstimateStep";
-import { GeneratedCopyEditor } from "@/components/reports/GeneratedCopyEditor";
+import {
+  GeneratedCopyEditor,
+  type StrCopyEditorHandle,
+} from "@/components/reports/GeneratedCopyEditor";
 import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
 import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
-import { resolveStoredFinalReport } from "@/lib/reports/resolveStoredFinalReport";
+import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import type { Agency, AgentProfile, FinalReportJson, Listing, Report } from "@/lib/types";
+
+const PREVIEW_SYNC_MIN_MS = 400;
 
 const steps = [
   { id: "estimate", label: "STR estimate" },
@@ -37,13 +42,19 @@ export function ReportWizard({
 }) {
   const [listing, setListing] = useState(initialListing);
   const [report, setReport] = useState(initialReport);
-  const [brandAgency, setBrandAgency] = useState(agency);
+  const [previewAgency, setPreviewAgency] = useState<Agency | null>(null);
   const [step, setStep] = useState(getInitialStep(initialReport));
   const [loading, setLoading] = useState(false);
   const [publishStage, setPublishStage] = useState<
     "idle" | "publishing" | "generating-pdf"
   >("idle");
   const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
+  const copyEditorRef = useRef<StrCopyEditorHandle>(null);
+  const previewSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [previewSyncing, setPreviewSyncing] = useState(false);
+  const [previewDraftReport, setPreviewDraftReport] = useState<FinalReportJson | null>(
+    () => (initialReport.final_report_json as FinalReportJson | null) ?? null,
+  );
 
   function updateListing(nextListing: Listing) {
     setListing(nextListing);
@@ -52,6 +63,10 @@ export function ReportWizard({
 
   function updateReport(nextReport: Report) {
     setReport(nextReport);
+    const cached = nextReport.final_report_json as FinalReportJson | null;
+    if (cached) {
+      setPreviewDraftReport(cached);
+    }
     onReportChange?.(nextReport);
   }
 
@@ -65,8 +80,12 @@ export function ReportWizard({
   }, []);
 
   useEffect(() => {
-    setBrandAgency(agency);
-  }, [agency]);
+    return () => {
+      if (previewSyncTimeoutRef.current) {
+        clearTimeout(previewSyncTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (step !== "preview") {
@@ -79,7 +98,7 @@ export function ReportWizard({
       .then((response) => response.json())
       .then((payload) => {
         if (!cancelled && payload.agency) {
-          setBrandAgency(payload.agency);
+          setPreviewAgency(payload.agency);
         }
       })
       .catch(() => {
@@ -91,18 +110,54 @@ export function ReportWizard({
     };
   }, [step]);
 
-  const finalReport = useMemo(() => {
-    const cached = resolveStoredFinalReport(report);
+  const brandAgency = previewAgency?.id === agency.id ? previewAgency : agency;
+
+  const previewReport = useMemo(() => {
+    const cached =
+      previewDraftReport ?? (report.final_report_json as FinalReportJson | null);
     if (!cached) {
       return null;
     }
 
-    return enrichFinalReportMetrics(
+    const enriched = enrichFinalReportMetrics(
       listing,
       mergeAgencyBrandIntoFinalReport(brandAgency, cached),
       { agencyAgents },
     );
-  }, [brandAgency, listing, report, agencyAgents]);
+    return resolveFinalReportForDisplay(enriched);
+  }, [brandAgency, listing, previewDraftReport, report.final_report_json, agencyAgents]);
+
+  function handleStepChange(next: string) {
+    if (next === "preview") {
+      if (step === "preview") {
+        return;
+      }
+
+      copyEditorRef.current?.flushPendingEdits();
+      const live = copyEditorRef.current?.getPreviewReport();
+      if (live) {
+        setPreviewDraftReport(live);
+      }
+
+      if (previewSyncTimeoutRef.current) {
+        clearTimeout(previewSyncTimeoutRef.current);
+      }
+      setPreviewSyncing(true);
+      setStep("preview");
+      previewSyncTimeoutRef.current = setTimeout(() => {
+        previewSyncTimeoutRef.current = null;
+        setPreviewSyncing(false);
+      }, PREVIEW_SYNC_MIN_MS);
+      return;
+    }
+
+    if (previewSyncTimeoutRef.current) {
+      clearTimeout(previewSyncTimeoutRef.current);
+      previewSyncTimeoutRef.current = null;
+    }
+    setPreviewSyncing(false);
+    setStep(next);
+  }
 
   async function publishReport() {
     setLoading(true);
@@ -141,7 +196,7 @@ export function ReportWizard({
 
   return (
     <div className="space-y-6">
-      <Tabs value={step} onValueChange={setStep}>
+      <Tabs value={step} onValueChange={handleStepChange}>
         <TabsList className="grid w-full grid-cols-3">
           {steps.map((item) => (
             <TabsTrigger key={item.id} value={item.id}>
@@ -157,13 +212,14 @@ export function ReportWizard({
             onComplete={({ listing: nextListing, report: nextReport }) => {
               updateListing(nextListing);
               updateReport(nextReport);
-              setStep("copy");
             }}
+            onContinue={() => setStep("copy")}
           />
         </TabsContent>
 
         <TabsContent value="copy">
           <GeneratedCopyEditor
+            ref={copyEditorRef}
             agency={agency}
             agencyAgents={agencyAgents}
             listing={listing}
@@ -171,27 +227,31 @@ export function ReportWizard({
             onComplete={(nextReport) => {
               updateReport(nextReport);
             }}
-            onContinueToPreview={() => setStep("preview")}
+            onContinueToPreview={() => handleStepChange("preview")}
           />
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-6">
           <AsyncLoadingOverlay
-            active={loading}
+            active={loading || previewSyncing}
             title={
-              publishStage === "generating-pdf"
-                ? "Generating PDF"
-                : "Publishing report"
+              previewSyncing
+                ? "Refreshing preview"
+                : publishStage === "generating-pdf"
+                  ? "Generating PDF"
+                  : "Publishing report"
             }
             description={
-              publishStage === "generating-pdf"
-                ? "Rendering the final buyer pack. This can take 15–30 seconds."
-                : "Saving the published report."
+              previewSyncing
+                ? "Applying your latest edits to the preview."
+                : publishStage === "generating-pdf"
+                  ? "Rendering the final buyer pack. This can take 15–30 seconds."
+                  : "Saving the published report."
             }
           >
-            {finalReport ? (
+            {previewReport ? (
               <FittedReportPreview
-                report={finalReport}
+                report={previewReport}
                 maxHeight="min(80vh, 900px)"
                 fitToWidth
               />
@@ -202,14 +262,11 @@ export function ReportWizard({
             )}
           </AsyncLoadingOverlay>
           <div className="flex flex-wrap gap-3 no-print">
-            <Button variant="outline" disabled={loading}>
-              Save draft
-            </Button>
             <DownloadPdfButton
               url={report.pdf_url}
               reportId={report.id}
               cacheVersion={report.updated_at}
-              canGenerate={Boolean(finalReport) && !loading}
+              canGenerate={Boolean(previewReport) && !loading}
               preview={report.status !== "published"}
               size="default"
               generateLabel="Generate PDF preview"
@@ -228,7 +285,7 @@ export function ReportWizard({
             {report.public_url ? (
               <CopyLinkButton url={report.public_url} />
             ) : null}
-            <Button onClick={publishReport} disabled={loading || !finalReport}>
+            <Button onClick={publishReport} disabled={loading || !previewReport}>
               {loading ? (
                 <>
                   <Loader2 className="animate-spin" />

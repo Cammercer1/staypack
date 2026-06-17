@@ -13,8 +13,23 @@ import type {
 import { salesBrochureFamilyFromTemplateId } from "@/lib/reports/templates/salesBrochureFamilyMap";
 import type { ReportTemplateDefinition } from "@/lib/reports/templates/types";
 
+function isAccountTemplateId(templateId: string): boolean {
+  return (
+    templateId.startsWith("haven-properties") ||
+    templateId.startsWith("belle-property")
+  );
+}
+
 function isHavenTemplateId(templateId: string): boolean {
   return templateId.startsWith("haven-properties");
+}
+
+function isBelleTemplateId(templateId: string): boolean {
+  return templateId.startsWith("belle-property");
+}
+
+function isBelleBrochureTemplateId(templateId: string): boolean {
+  return templateId.startsWith("sales-brochure-belle");
 }
 
 function reportProduct(templateId: string): TemplateProduct {
@@ -22,11 +37,17 @@ function reportProduct(templateId: string): TemplateProduct {
 }
 
 function reportScope(templateId: string): TemplateScope {
-  return isHavenTemplateId(templateId) ? "account" : "platform";
+  return isAccountTemplateId(templateId) ? "account" : "platform";
 }
 
 function reportBrandMode(templateId: string): TemplateBrandMode {
-  return isHavenTemplateId(templateId) ? "fixed" : "agency";
+  return isAccountTemplateId(templateId) ? "fixed" : "agency";
+}
+
+function fixedBrandKitIdForReport(templateId: string): string | undefined {
+  if (isHavenTemplateId(templateId)) return "haven";
+  if (isBelleTemplateId(templateId)) return "belle";
+  return undefined;
 }
 
 function brochureFamily(templateId: string): string {
@@ -45,6 +66,7 @@ export function enrichReportTemplate(
   const family = template.family;
   const locked = isBoldFamily(family);
   const isHaven = isHavenTemplateId(template.id);
+  const isBelle = isBelleTemplateId(template.id);
 
   return {
     kind: "report",
@@ -58,11 +80,11 @@ export function enrichReportTemplate(
     product: reportProduct(template.id),
     scope: reportScope(template.id),
     brandMode: reportBrandMode(template.id),
-    defaultBlurbLength: isHaven
+    defaultBlurbLength: isHaven || isBelle
       ? "long"
       : defaultBlurbLengthForFamily(family),
     blurbLengthLocked: locked,
-    fixedBrandKitId: isHaven ? "haven" : undefined,
+    fixedBrandKitId: fixedBrandKitIdForReport(template.id),
   };
 }
 
@@ -78,6 +100,7 @@ export function enrichBrochureTemplate(
 
   const family = brochureFamily(template.id);
   const locked = isBoldFamily(family);
+  const isBelle = isBelleBrochureTemplateId(template.id);
 
   return {
     kind: "collateral",
@@ -89,9 +112,10 @@ export function enrichBrochureTemplate(
     pages: template.pages,
     family,
     product: brochureProduct(template.collateralType),
-    scope: "platform",
-    brandMode: "agency",
-    defaultBlurbLength: defaultBlurbLengthForFamily(family),
+    scope: isBelle ? "account" : "platform",
+    brandMode: isBelle ? "fixed" : "agency",
+    defaultBlurbLength: isBelle ? "long" : defaultBlurbLengthForFamily(family),
     blurbLengthLocked: locked,
+    fixedBrandKitId: isBelle ? "belle" : undefined,
   };
 }

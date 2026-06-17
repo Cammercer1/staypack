@@ -27,7 +27,11 @@ async function rebuildFinalReportJson({
   body: UpdateReportInput;
   copy: AiCopyJson;
 }) {
-  const estimate = resolveReportEstimate(report);
+  const reportForBuild = {
+    ...report,
+    ...(body as Partial<Report>),
+  };
+  const estimate = resolveReportEstimate(reportForBuild);
 
   if (!estimate) {
     return {
@@ -48,10 +52,7 @@ async function rebuildFinalReportJson({
     agentProfile,
     agencyAgents,
     listing,
-    report: {
-      ...report,
-      ...(body as Partial<Report>),
-    },
+    report: reportForBuild,
     estimate,
     copy,
     scraped: listing.scraped_listing_json,
@@ -139,6 +140,19 @@ export async function PATCH(
       report.ai_copy_json &&
       body.template_id !== report.template_id
     ) {
+      const rebuildResult = await rebuildFinalReportJson({
+        supabase,
+        agency,
+        listing,
+        report,
+        body,
+        copy: report.ai_copy_json,
+      });
+
+      if (rebuildResult.error) {
+        return rebuildResult.error;
+      }
+    } else if (body.final_estimate_json !== undefined && report.ai_copy_json) {
       const rebuildResult = await rebuildFinalReportJson({
         supabase,
         agency,

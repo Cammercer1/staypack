@@ -305,6 +305,23 @@
   margin-top: 0.5rem;
 }
 
+/* Report inline TipTap blurb (STR + lease appraisal) */
+.report-inline-edit .report-blurb-editor .tiptap {
+  display: block;
+  min-height: 2.5em;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.report-inline-edit .report-blurb-editor .tiptap p {
+  line-height: 1.5;
+}
+
+.report-inline-edit .report-blurb-editor .tiptap > * + * {
+  margin-top: 0.5rem;
+}
+
 /* Tiptap placeholder */
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

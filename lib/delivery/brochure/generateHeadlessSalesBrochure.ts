@@ -5,6 +5,7 @@ import {
   generateCollateralSlug,
 } from "@/lib/collateral/slugs";
 import { withBrochureContentSaved, withBrochurePdfSynced } from "@/lib/collateral/sales-brochure/brochurePublishSync";
+import { applyFixedBrandKitToBrochureDocument } from "@/lib/collateral/applyFixedBrandKitToBrochureDocument";
 import { getCollateralTemplate } from "@/lib/collateral/templates/registry";
 import { DEFAULT_COLLATERAL_TEMPLATE_IDS } from "@/lib/collateral/templates/ids";
 import { resolveDeliveryAgency } from "@/lib/delivery/brand/ensureShadowAgency";
@@ -110,7 +111,10 @@ export async function generateHeadlessSalesBrochure({
     qrTargetUrl,
   });
 
-  const documentJson = withBrochureContentSaved(built);
+  const documentJson = applyFixedBrandKitToBrochureDocument(
+    withBrochureContentSaved(built),
+    templateId,
+  );
   const generatedAt = new Date().toISOString();
 
   const { data: generatedCollateral, error: generatedError } = await admin

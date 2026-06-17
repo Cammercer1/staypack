@@ -61,7 +61,7 @@ export function CreateLeaseAppraisalButton({
       {loading ? (
         <>
           <Loader2 className="animate-spin" />
-          Fetching comps…
+          Creating…
         </>
       ) : (
         label

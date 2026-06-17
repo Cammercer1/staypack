@@ -10,12 +10,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { calculateAccommodates, formatCurrency, formatPercent } from "@/lib/reports/formatters";
-import type { AirbticsTier, Listing, Report, StrEstimate } from "@/lib/types";
+import {
+  applyStrEstimateAdjustments,
+  resolveStrRevenueBand,
+  type StrRevenueBand,
+} from "@/lib/reports/strEstimateAdjustments";
+import type {
+  AirbticsTier,
+  Listing,
+  Report,
+  StrEstimate,
+  StrEnrichmentJson,
+  StrEstimatePositioning,
+} from "@/lib/types";
 
 type Props = {
   listing: Listing;
   report: Report;
   onComplete: (state: { listing: Listing; report: Report }) => void;
+  onContinue?: () => void;
 };
 
 type TierOption = {
@@ -51,15 +64,39 @@ const TIER_OPTIONS: TierOption[] = [
   },
 ];
 
-export function StrEstimateStep({ listing, report, onComplete }: Props) {
+export function StrEstimateStep({ listing, report, onComplete, onContinue }: Props) {
   const [estimate, setEstimate] = useState<StrEstimate | null>(
     report.final_estimate_json,
+  );
+  const [enrichment, setEnrichment] = useState<StrEnrichmentJson | null>(
+    report.str_enrichment_json ?? null,
+  );
+  const [positioning, setPositioning] = useState<StrEstimatePositioning | null>(
+    report.str_enrichment_json?.positioning ?? null,
   );
   const [selectedTier, setSelectedTier] = useState<AirbticsTier>(
     report.airbtics_tier ?? "summary",
   );
   const [overrideAnnual, setOverrideAnnual] = useState(
     String(report.final_estimate_json?.annualRevenue ?? ""),
+  );
+  const [overrideOccupancy, setOverrideOccupancy] = useState(
+    String(report.final_estimate_json?.occupancyRate ?? ""),
+  );
+  const [recommendedAnnualRevenue, setRecommendedAnnualRevenue] = useState<
+    number | null
+  >(
+    report.user_overrides_json?.recommendedAnnualRevenue ??
+      report.str_enrichment_json?.positioning?.annual_revenue ??
+      report.final_estimate_json?.annualRevenue ??
+      null,
+  );
+  const [recommendedOccupancyRate, setRecommendedOccupancyRate] = useState<
+    number | null
+  >(
+    report.user_overrides_json?.recommendedOccupancyRate ??
+      report.final_estimate_json?.occupancyRate ??
+      null,
   );
   const defaultAccommodates = useMemo(
     () => calculateAccommodates(listing.bedrooms, listing.accommodates),
@@ -69,6 +106,26 @@ export function StrEstimateStep({ listing, report, onComplete }: Props) {
   const [estimating, setEstimating] = useState(false);
   const [saving, setSaving] = useState(false);
   const loading = estimating || saving;
+  const revenueBand = useMemo(
+    () => resolveStrRevenueBand(enrichment, estimate),
+    [enrichment, estimate],
+  );
+  const annualSliderValue = clampToRange(
+    Number(overrideAnnual || estimate?.annualRevenue || 0),
+    revenueBand?.min ?? 0,
+    revenueBand?.max ?? 0,
+  );
+  const occupancySliderValue = clampToRange(
+    Number(overrideOccupancy || estimate?.occupancyRate || 70),
+    1,
+    100,
+  );
+  const revenueStep = revenueBand
+    ? Math.max(250, Math.round((revenueBand.max - revenueBand.min) / 100 / 250) * 250)
+    : 500;
+  const isEstimateDirty =
+    estimate != null &&
+    !sameEstimateValues(estimate, report.final_estimate_json);
 
   async function runEstimate() {
     if (!listing.property_address?.trim()) {
@@ -104,9 +161,20 @@ export function StrEstimateStep({ listing, report, onComplete }: Props) {
       return;
     }
 
-    setEstimate(payload.estimate);
+    const nextEstimate = payload.estimate as StrEstimate;
+    const nextPositioning =
+      (payload.positioning as StrEstimatePositioning | null) ?? null;
+
+    setEstimate(nextEstimate);
+    setEnrichment((payload.enrichment as StrEnrichmentJson | null) ?? null);
+    setPositioning(nextPositioning);
     setSelectedTier(payload.tier ?? selectedTier);
-    setOverrideAnnual(String(payload.estimate.annualRevenue ?? ""));
+    setOverrideAnnual(String(nextEstimate.annualRevenue ?? ""));
+    setOverrideOccupancy(String(nextEstimate.occupancyRate ?? ""));
+    setRecommendedAnnualRevenue(
+      nextPositioning?.annual_revenue ?? nextEstimate.annualRevenue ?? null,
+    );
+    setRecommendedOccupancyRate(nextEstimate.occupancyRate ?? null);
     setAccommodates(String(payload.accommodates ?? resolvedAccommodates));
     onComplete({
       listing: (payload.listing as Listing) ?? listing,
@@ -120,21 +188,80 @@ export function StrEstimateStep({ listing, report, onComplete }: Props) {
     setEstimating(false);
   }
 
-  async function saveOverride() {
+  function applyAnnualRevenue(value: number) {
+    if (!estimate) {
+      return;
+    }
+
+    const annualRevenue = revenueBand
+      ? clampToRange(value, revenueBand.min, revenueBand.max)
+      : value;
+    const nextEstimate = applyStrEstimateAdjustments(estimate, {
+      annualRevenue,
+      occupancyRate: Number(overrideOccupancy || estimate.occupancyRate || 70),
+    });
+    setEstimate(nextEstimate);
+    setOverrideAnnual(String(nextEstimate.annualRevenue ?? ""));
+    setOverrideOccupancy(String(nextEstimate.occupancyRate ?? ""));
+  }
+
+  function applyOccupancyRate(value: number) {
+    if (!estimate) {
+      return;
+    }
+
+    const nextEstimate = applyStrEstimateAdjustments(estimate, {
+      annualRevenue: Number(overrideAnnual || estimate.annualRevenue || 0),
+      occupancyRate: value,
+    });
+    setEstimate(nextEstimate);
+    setOverrideAnnual(String(nextEstimate.annualRevenue ?? ""));
+    setOverrideOccupancy(String(nextEstimate.occupancyRate ?? ""));
+  }
+
+  async function saveOverride({ continueAfter = false } = {}) {
+    if (!estimate) {
+      toast.error("Run an STR estimate before saving adjustments");
+      return;
+    }
+
+    const annualRevenue = Number(overrideAnnual);
+    const occupancyRate = Number(overrideOccupancy);
+
+    if (!Number.isFinite(annualRevenue) || annualRevenue <= 0) {
+      toast.error("Enter a valid annual revenue");
+      return;
+    }
+
+    if (!Number.isFinite(occupancyRate) || occupancyRate <= 0) {
+      toast.error("Enter a valid occupancy rate");
+      return;
+    }
+
+    const adjustedEstimate = applyStrEstimateAdjustments(estimate, {
+      annualRevenue,
+      occupancyRate,
+    });
+
     setSaving(true);
     const response = await fetch(`/api/reports/${report.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         user_overrides_json: {
-          annualRevenue: Number(overrideAnnual),
+          annualRevenue: adjustedEstimate.annualRevenue,
+          occupancyRate: adjustedEstimate.occupancyRate,
+          recommendedAnnualRevenue,
+          recommendedOccupancyRate,
+          revenueBand: revenueBand
+            ? {
+                min: revenueBand.min,
+                max: revenueBand.max,
+                source: revenueBand.source,
+              }
+            : null,
         },
-        final_estimate_json: {
-          ...(estimate ?? {}),
-          annualRevenue: Number(overrideAnnual),
-          monthlyRevenue: Math.round(Number(overrideAnnual) / 12),
-          weeklyRevenue: Math.round(Number(overrideAnnual) / 52),
-        },
+        final_estimate_json: adjustedEstimate,
       }),
     });
     const payload = await response.json();
@@ -145,9 +272,23 @@ export function StrEstimateStep({ listing, report, onComplete }: Props) {
       return;
     }
 
-    onComplete({ listing, report: payload.report as Report });
+    const nextReport = payload.report as Report;
+    setEstimate(adjustedEstimate);
+    onComplete({ listing, report: nextReport });
     toast.success("Estimate saved");
     setSaving(false);
+    if (continueAfter) {
+      onContinue?.();
+    }
+  }
+
+  function continueToCopy() {
+    if (isEstimateDirty) {
+      void saveOverride({ continueAfter: true });
+      return;
+    }
+
+    onContinue?.();
   }
 
   const estimateLoadingMessage =
@@ -292,25 +433,167 @@ export function StrEstimateStep({ listing, report, onComplete }: Props) {
         </div>
       ) : null}
 
-      <div className="space-y-2">
-        <Label htmlFor="overrideAnnual">Manual annual override</Label>
-        <Input
-          id="overrideAnnual"
-          value={overrideAnnual}
-          onChange={(event) => setOverrideAnnual(event.target.value)}
-        />
-      </div>
+      {estimate && positioning ? (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium">Comp-aware positioning applied</p>
+            <Badge variant="secondary" className="capitalize">
+              {positioning.confidence} confidence
+            </Badge>
+          </div>
+          {positioning.median_annual_revenue != null &&
+          positioning.median_annual_revenue !== estimate.annualRevenue ? (
+            <p className="mt-2 text-muted-foreground">
+              Market median {formatCurrency(positioning.median_annual_revenue)}{" "}
+              adjusted to {formatCurrency(estimate.annualRevenue)} based on
+              comparable evidence.
+            </p>
+          ) : null}
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            {positioning.rationale}
+          </p>
+        </div>
+      ) : null}
 
-      <Button variant="outline" onClick={saveOverride} disabled={loading || !overrideAnnual}>
-        {saving ? (
-          <>
-            <Loader2 className="animate-spin" />
-            Saving...
-          </>
-        ) : (
-          "Save estimate override"
-        )}
-      </Button>
+      {estimate ? (
+        <div className="space-y-5 rounded-xl border border-border/70 bg-background p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-medium">STR figure adjustments</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {revenueBand?.source === "airbtics"
+                  ? "Airbtics percentile band with StayPacks recommendation marked."
+                  : "Estimate adjustment band with StayPacks recommendation marked."}
+              </p>
+            </div>
+            {isEstimateDirty ? (
+              <Badge variant="secondary">Unsaved changes</Badge>
+            ) : (
+              <Badge variant="outline">Saved figures</Badge>
+            )}
+          </div>
+
+          {revenueBand ? (
+            <div className="space-y-3">
+              <SliderHeader
+                label="Annual revenue"
+                value={formatCurrency(estimate.annualRevenue)}
+                recommendation={
+                  recommendedAnnualRevenue != null
+                    ? formatCurrency(recommendedAnnualRevenue)
+                    : null
+                }
+              />
+              <div className="relative pt-3">
+                <RecommendationTick
+                  value={recommendedAnnualRevenue}
+                  min={revenueBand.min}
+                  max={revenueBand.max}
+                />
+                <input
+                  id="annualRevenueScale"
+                  type="range"
+                  min={revenueBand.min}
+                  max={revenueBand.max}
+                  step={revenueStep}
+                  value={annualSliderValue}
+                  onChange={(event) => applyAnnualRevenue(Number(event.target.value))}
+                  disabled={loading}
+                  className="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
+                />
+              </div>
+              <ScaleLabels band={revenueBand} />
+              <div className="grid gap-3 sm:max-w-xs">
+                <Label htmlFor="overrideAnnual">Exact annual revenue</Label>
+                <Input
+                  id="overrideAnnual"
+                  type="number"
+                  inputMode="numeric"
+                  min={revenueBand.min}
+                  max={revenueBand.max}
+                  step={revenueStep}
+                  value={overrideAnnual}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setOverrideAnnual(next);
+                    const parsed = Number(next);
+                    if (next && Number.isFinite(parsed) && parsed > 0) {
+                      applyAnnualRevenue(parsed);
+                    }
+                  }}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-3">
+            <SliderHeader
+              label="Occupancy"
+              value={formatPercent(estimate.occupancyRate)}
+              recommendation={
+                recommendedOccupancyRate != null
+                  ? formatPercent(recommendedOccupancyRate)
+                  : null
+              }
+            />
+            <div className="relative pt-3">
+              <RecommendationTick
+                value={recommendedOccupancyRate}
+                min={1}
+                max={100}
+              />
+              <input
+                id="occupancyScale"
+                type="range"
+                min={1}
+                max={100}
+                step={1}
+                value={occupancySliderValue}
+                onChange={(event) => applyOccupancyRate(Number(event.target.value))}
+                disabled={loading}
+                className="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs tabular-nums text-muted-foreground">
+              <span>1%</span>
+              <span>100%</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              onClick={() => saveOverride()}
+              disabled={loading || !overrideAnnual || !overrideOccupancy}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save adjusted figures"
+              )}
+            </Button>
+            {onContinue ? (
+              <Button
+                onClick={continueToCopy}
+                disabled={loading || !overrideAnnual || !overrideOccupancy}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Continue to collateral"
+                )}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
     </AsyncLoadingOverlay>
   );
@@ -322,5 +605,103 @@ function Metric({ label, value }: { label: string; value: string }) {
       <p className="text-sm text-muted-foreground">{label}</p>
       <p className="mt-2 text-xl font-semibold">{value}</p>
     </div>
+  );
+}
+
+function SliderHeader({
+  label,
+  value,
+  recommendation,
+}: {
+  label: string;
+  value: string;
+  recommendation: string | null;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <Label>{label}</Label>
+        <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      </div>
+      {recommendation ? (
+        <Badge variant="secondary">Recommended {recommendation}</Badge>
+      ) : null}
+    </div>
+  );
+}
+
+function ScaleLabels({ band }: { band: StrRevenueBand }) {
+  const middle = band.p50 ?? (band.min + band.max) / 2;
+
+  return (
+    <div className="flex items-center justify-between text-xs tabular-nums text-muted-foreground">
+      <span>{formatCurrency(band.min)}</span>
+      <span>{formatCurrency(middle)}</span>
+      <span>{formatCurrency(band.max)}</span>
+    </div>
+  );
+}
+
+function RecommendationTick({
+  value,
+  min,
+  max,
+}: {
+  value: number | null;
+  min: number;
+  max: number;
+}) {
+  if (value == null || max <= min) {
+    return null;
+  }
+
+  const left = scalePositionPercent(value, min, max);
+
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute top-0 h-6 w-px bg-primary"
+      style={{ left: `${left}%` }}
+    >
+      <span className="absolute -left-1 top-0 h-2 w-2 rounded-full bg-primary" />
+    </span>
+  );
+}
+
+function scalePositionPercent(value: number, min: number, max: number) {
+  if (max <= min) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
+}
+
+function clampToRange(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  if (max <= min) {
+    return value;
+  }
+
+  return Math.min(max, Math.max(min, value));
+}
+
+function sameEstimateValues(
+  left: StrEstimate | null,
+  right: StrEstimate | null,
+) {
+  if (!left || !right) {
+    return left === right;
+  }
+
+  return (
+    left.annualRevenue === right.annualRevenue &&
+    left.monthlyRevenue === right.monthlyRevenue &&
+    left.weeklyRevenue === right.weeklyRevenue &&
+    left.nightlyRate === right.nightlyRate &&
+    left.occupancyRate === right.occupancyRate &&
+    left.bookedNights === right.bookedNights
   );
 }

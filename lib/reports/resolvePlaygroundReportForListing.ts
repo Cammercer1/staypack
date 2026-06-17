@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolvePlaygroundFinalReport } from "@/lib/reports/resolvePlaygroundFinalReport";
+import {
+  isLeaseAppraisalReport,
+  isLeaseAppraisalTemplateId,
+} from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
 import type { Agency, Listing, Report } from "@/lib/types";
 
 export type PlaygroundListingBundle = {
@@ -7,6 +11,48 @@ export type PlaygroundListingBundle = {
   listing: Listing;
   report: Report;
 };
+
+async function resolveStrPlaygroundBundle(
+  supabase: SupabaseClient,
+  agency: Agency,
+  listing: Listing,
+  candidates: Report[],
+): Promise<PlaygroundListingBundle | null> {
+  const { data: strCollateral } = await supabase
+    .from("collateral_items")
+    .select("report_id")
+    .eq("listing_id", listing.id)
+    .eq("type", "str_report")
+    .neq("status", "archived")
+    .maybeSingle();
+
+  const preferredReportId = strCollateral?.report_id ?? null;
+  const orderedCandidates = preferredReportId
+    ? [
+        ...candidates.filter((report) => report.id === preferredReportId),
+        ...candidates.filter((report) => report.id !== preferredReportId),
+      ]
+    : candidates;
+
+  for (const report of orderedCandidates) {
+    if (isLeaseAppraisalTemplateId(report.template_id)) {
+      continue;
+    }
+
+    const finalReport = await resolvePlaygroundFinalReport(
+      supabase,
+      agency,
+      listing,
+      report,
+    );
+
+    if (finalReport && !isLeaseAppraisalReport(finalReport)) {
+      return { agency, listing, report };
+    }
+  }
+
+  return null;
+}
 
 /** Latest STR report for a listing that has preview data (or can be built from estimate + copy). */
 export async function resolvePlaygroundReportForListing(
@@ -39,23 +85,10 @@ export async function resolvePlaygroundReportForListing(
     .eq("listing_id", listingId)
     .order("updated_at", { ascending: false });
 
-  const candidates = (reports ?? []) as Report[];
-
-  for (const report of candidates) {
-    const finalReport = await resolvePlaygroundFinalReport(
-      supabase,
-      agency as Agency,
-      listing as Listing,
-      report,
-    );
-    if (finalReport) {
-      return {
-        agency: agency as Agency,
-        listing: listing as Listing,
-        report,
-      };
-    }
-  }
-
-  return null;
+  return resolveStrPlaygroundBundle(
+    supabase,
+    agency as Agency,
+    listing as Listing,
+    (reports ?? []) as Report[],
+  );
 }

@@ -56,6 +56,8 @@ export type ParsedListing = {
     premiumReasons?: string[];
     rentFloorWeekly?: number;
     rentFloorSource?: "domain_bed_median" | "rea_bed_median" | "propradar_house_median";
+    /** LLM-adjusted rent band after reviewing comps and listing quality. */
+    positioning?: LtrAppraisalPositioning;
   };
   /** Featured rental comps (e.g. from REA rent discover). */
   rentalComps?: {
@@ -106,6 +108,52 @@ export type StrCompCard = {
   nightly_rate: number | null;
 };
 
+/** LLM positioning of the subject within the Airbtics revenue distribution. */
+export type StrEstimatePositioning = {
+  percentile: number;
+  confidence: "low" | "medium" | "high";
+  rationale: string;
+  /** Airbtics p50 before positioning, for auditability. */
+  median_annual_revenue: number | null;
+  /** LLM-suggested annual revenue before comp-aware clamping. */
+  llm_annual_revenue?: number | null;
+  /** Final annual revenue after comp-aware clamping. */
+  annual_revenue?: number | null;
+  was_clamped?: boolean;
+  comp_anchors?: {
+    same_bed_count: number;
+    same_bed_median: number | null;
+    same_bed_max: number | null;
+    suggested_floor: number | null;
+    suggested_ceiling: number | null;
+    suggested_target?: number | null;
+  };
+};
+
+/** LLM positioning of weekly rent after reviewing REA comps and listing quality. */
+export type LtrAppraisalPositioning = {
+  confidence: "low" | "medium" | "high";
+  rationale: string;
+  /** Statistical band midpoint before LLM review. */
+  statistical_weekly_midpoint: number | null;
+  llm_weekly_min?: number | null;
+  llm_weekly_max?: number | null;
+  llm_weekly_midpoint?: number | null;
+  weekly_min?: number | null;
+  weekly_max?: number | null;
+  weekly_midpoint?: number | null;
+  was_clamped?: boolean;
+  comp_anchors?: {
+    same_bed_count: number;
+    same_bed_min: number | null;
+    same_bed_median: number | null;
+    same_bed_max: number | null;
+    suggested_floor: number | null;
+    suggested_ceiling: number | null;
+    suggested_target?: number | null;
+  };
+};
+
 export type StrEnrichmentJson = {
   tier: "full";
   comp_count: number;
@@ -116,6 +164,7 @@ export type StrEnrichmentJson = {
     p75: number | null;
     p90: number | null;
   } | null;
+  positioning?: StrEstimatePositioning | null;
   seasonality: {
     month: string;
     revenue_low: number | null;
@@ -125,6 +174,16 @@ export type StrEnrichmentJson = {
     adr: number | null;
   }[];
   comps: StrCompCard[];
+};
+
+export type StrEstimateOverrides = Partial<StrEstimate> & {
+  recommendedAnnualRevenue?: number | null;
+  recommendedOccupancyRate?: number | null;
+  revenueBand?: {
+    min: number;
+    max: number;
+    source: "airbtics" | "fallback";
+  } | null;
 };
 
 /** Long-term rental comps from REA discover (lease appraisal for investors). */
@@ -164,6 +223,7 @@ export type LtrEnrichmentJson = {
   source?: string;
   search_url?: string;
   suburb_market?: LtrSuburbMarketJson | null;
+  positioning?: LtrAppraisalPositioning | null;
 };
 
 export type AiCopyJson = {
@@ -485,7 +545,7 @@ export type Report = {
   airbtics_cost_cents: number | null;
   airbtics_fetched_at: string | null;
   original_estimate_json: StrEstimate | null;
-  user_overrides_json: Partial<StrEstimate> | null;
+  user_overrides_json: StrEstimateOverrides | null;
   final_estimate_json: StrEstimate | null;
   ai_copy_json: AiCopyJson | null;
   final_report_json: FinalReportJson | null;

@@ -3,7 +3,12 @@ import { requireReportWithListing } from "@/lib/auth/requireUser";
 import { geocodeReportAddress } from "@/lib/geocoding";
 import { airbticsEstimateSchema } from "@/lib/validation/schemas";
 import { fetchAirbticsEstimate } from "@/lib/airbtics/client";
+import { positionStrEstimate } from "@/lib/airbtics/positionEstimate";
 import { calculateAccommodates } from "@/lib/reports/formatters";
+
+// Full-tier Airbtics polling (~30s) + comp positioning LLM call.
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   try {
     const body = airbticsEstimateSchema.parse(await request.json());
@@ -47,6 +52,32 @@ export async function POST(request: Request) {
       body.tier,
     );
     const { estimate, tier, reportId, costCents, enrichment } = result;
+    const scrapedListing = listing.scraped_listing_json;
+
+    // Position the subject within the comp distribution (full tier only —
+    // summary responses have no comps, so this falls back to the median).
+    const { estimate: positionedEstimate, positioning } =
+      await positionStrEstimate({
+        subject: {
+          property_address:
+            listing.property_address ?? scrapedListing?.address ?? null,
+          suburb: listing.suburb,
+          state: listing.state,
+          property_type:
+            listing.property_type ?? scrapedListing?.propertyType ?? null,
+          bedrooms,
+          bathrooms,
+          listing_title: listing.listing_title ?? scrapedListing?.title ?? null,
+          listing_description:
+            listing.listing_description ?? scrapedListing?.description ?? null,
+          display_price: listing.display_price,
+        },
+        estimate,
+      });
+
+    const enrichmentWithPositioning = enrichment
+      ? { ...enrichment, positioning }
+      : enrichment;
 
     // #region agent log
     fetch("http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f", {
@@ -109,9 +140,9 @@ export async function POST(request: Request) {
         airbtics_cost_cents: costCents,
         airbtics_fetched_at: new Date().toISOString(),
         original_estimate_json: estimate,
-        final_estimate_json: estimate,
+        final_estimate_json: positionedEstimate,
         raw_airbtics_json: estimate.raw,
-        str_enrichment_json: enrichment,
+        str_enrichment_json: enrichmentWithPositioning,
         status: "estimated",
       })
       .eq("id", report.id)
@@ -129,16 +160,17 @@ export async function POST(request: Request) {
       .single();
 
     return NextResponse.json({
-      ...estimate,
+      ...positionedEstimate,
       tier,
-      enrichment,
-      annual_revenue: estimate.annualRevenue,
-      monthly_revenue: estimate.monthlyRevenue,
-      weekly_revenue: estimate.weeklyRevenue,
-      nightly_rate: estimate.nightlyRate,
-      occupancy_rate: estimate.occupancyRate,
-      booked_nights: estimate.bookedNights,
-      radius_m: estimate.radiusM,
+      enrichment: enrichmentWithPositioning,
+      positioning,
+      annual_revenue: positionedEstimate.annualRevenue,
+      monthly_revenue: positionedEstimate.monthlyRevenue,
+      weekly_revenue: positionedEstimate.weeklyRevenue,
+      nightly_rate: positionedEstimate.nightlyRate,
+      occupancy_rate: positionedEstimate.occupancyRate,
+      booked_nights: positionedEstimate.bookedNights,
+      radius_m: positionedEstimate.radiusM,
       latitude,
       longitude,
       bedrooms,
@@ -146,7 +178,7 @@ export async function POST(request: Request) {
       accommodates,
       formatted_address: formattedAddress,
       raw: estimate.raw,
-      estimate,
+      estimate: positionedEstimate,
       report: data,
       listing: updatedListing,
     });

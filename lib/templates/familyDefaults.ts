@@ -11,6 +11,8 @@ export const FAMILY_DEFAULT_BLURB_LENGTH: Record<string, BlurbLength> = {
   editorial: "short",
   landmark: "long",
   "haven-properties": "long",
+  "belle-property": "long",
+  belle: "long",
 };
 
 export function defaultBlurbLengthForFamily(family: string): BlurbLength {

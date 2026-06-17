@@ -10,6 +10,7 @@ import {
   defaultSelectedCompListingIds,
   hasLeaseAppraisalSelectedComps,
 } from "@/lib/lease-appraisal/leaseAppraisalData";
+import { ensureLeaseAppraisalPositioning } from "@/lib/lease-appraisal/positionLeaseAppraisal";
 import { enrichListingRentalAppraisal } from "@/lib/rental/enrichListingRentalAppraisal";
 import { stripInternalRentalAppraisalWarnings } from "@/lib/rental/userFacingRentalWarnings";
 import type {
@@ -171,7 +172,7 @@ export async function enrichListingForLeaseAppraisal({
 export async function generateLeaseAppraisalReportContent({
   supabase,
   agency,
-  listing,
+  listing: initialListing,
   report,
   agencyAgents = [],
   templateId,
@@ -183,11 +184,30 @@ export async function generateLeaseAppraisalReportContent({
   agencyAgents?: AgentProfile[];
   templateId?: string;
 }): Promise<{ report: Report; listing: Listing; parsed: ParsedListing }> {
-  assertSaleListing(listing);
+  assertSaleListing(initialListing);
 
-  const parsed = listing.scraped_listing_json;
+  let listing = initialListing;
+
+  const parsed = await ensureLeaseAppraisalPositioning(
+    listing.scraped_listing_json,
+  );
   if (!parsed) {
     throw new Error("Import the listing URL before generating the appraisal");
+  }
+
+  if (parsed !== listing.scraped_listing_json) {
+    const { data: updatedListing, error: listingError } = await supabase
+      .from("listings")
+      .update({ scraped_listing_json: parsed })
+      .eq("id", listing.id)
+      .select("*")
+      .single();
+
+    if (listingError || !updatedListing) {
+      throw new Error(listingError?.message ?? "Failed to save lease positioning");
+    }
+
+    listing = updatedListing as Listing;
   }
 
   if (!hasLeaseAppraisalComps(parsed)) {

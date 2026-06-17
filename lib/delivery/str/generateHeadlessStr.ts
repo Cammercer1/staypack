@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAirbticsEstimate } from "@/lib/airbtics/client";
+import { positionStrEstimate } from "@/lib/airbtics/positionEstimate";
 import { geocodeReportAddress } from "@/lib/geocoding";
 import { getPrintRenderBaseUrl, getReportsUrl } from "@/lib/env";
 import { renderPdfFromUrl, buildPdfImagePath, buildPdfStylesheetPath } from "@/lib/browserless/pdf";
@@ -166,6 +167,29 @@ export async function generateHeadlessStrReport({
   const { estimate, tier, reportId: airbticsReportId, costCents, enrichment } =
     estimateResult;
 
+  // Position the subject within the comp distribution (falls back to median).
+  const scrapedListing = listing.scraped_listing_json;
+  const { estimate: positionedEstimate, positioning } =
+    await positionStrEstimate({
+      subject: {
+        property_address: listing.property_address ?? scrapedListing?.address ?? null,
+        suburb: listing.suburb,
+        state: listing.state,
+        property_type: listing.property_type ?? scrapedListing?.propertyType ?? null,
+        bedrooms: listing.bedrooms,
+        bathrooms: listing.bathrooms,
+        listing_title: listing.listing_title ?? scrapedListing?.title ?? null,
+        listing_description:
+          listing.listing_description ?? scrapedListing?.description ?? null,
+        display_price: listing.display_price,
+      },
+      estimate,
+    });
+
+  const enrichmentWithPositioning = enrichment
+    ? { ...enrichment, positioning }
+    : enrichment;
+
   const templateId =
     packTemplateId || resolveReportTemplateId(agency as Agency, report as Report);
 
@@ -189,9 +213,9 @@ export async function generateHeadlessStrReport({
       airbtics_cost_cents: costCents,
       airbtics_fetched_at: new Date().toISOString(),
       original_estimate_json: estimate,
-      final_estimate_json: estimate,
+      final_estimate_json: positionedEstimate,
       raw_airbtics_json: estimate.raw,
-      str_enrichment_json: enrichment,
+      str_enrichment_json: enrichmentWithPositioning,
       status: "estimated",
     })
     .eq("id", report.id)
@@ -221,7 +245,7 @@ export async function generateHeadlessStrReport({
     agency: agency as Agency,
     listing,
     report: reportForCopy,
-    estimate,
+    estimate: positionedEstimate,
   });
 
   const finalReportJson = resolveFinalReportForDisplay(
@@ -231,7 +255,7 @@ export async function generateHeadlessStrReport({
       agencyAgents,
       listing,
       report: { ...reportForCopy, template_id: templateId },
-      estimate,
+      estimate: positionedEstimate,
       copy,
       scraped: listing.scraped_listing_json,
       resolvedAgents,

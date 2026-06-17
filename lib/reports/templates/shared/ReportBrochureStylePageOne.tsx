@@ -14,8 +14,9 @@ import { applyBrandForTemplate } from "@/lib/branding/applyBrandForTemplate";
 import { finalReportToBrochureShape } from "@/lib/reports/finalReportToBrochureShape";
 import { getReportBrandColours } from "@/lib/reports/brandColours";
 import { salesBrochureTemplateIdForFamily } from "@/lib/reports/templates/salesBrochureFamilyMap";
+import { ReportBrochureEditableLayer } from "@/components/reports/inline/ReportBrochureEditableBridge";
 import type { ReportPageOneProps } from "@/lib/reports/templates/shared/reportPageVariant";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 export type ReportBrochureLayoutFamily =
   | "classic"
@@ -52,17 +53,25 @@ export function ReportBrochureStylePageOne({ report, reportVariant, family }: Pr
   const hero =
     document.property.page_one_image_urls[0] ?? document.property.hero_image_url ?? "";
 
-  if (family === "classic") {
+  function withInlineEdit(layer: ReactNode) {
     return (
+      <ReportBrochureEditableLayer report={displayReport} reportVariant={reportVariant}>
+        {layer}
+      </ReportBrochureEditableLayer>
+    );
+  }
+
+  if (family === "classic") {
+    return withInlineEdit(
       <ClassicBrochurePageOneShell
         document={document}
         report={displayReport}
         reportVariant={reportVariant}
-      />
+      />,
     );
   }
 
-  return (
+  return withInlineEdit(
     <section
       className="report-page mx-auto flex flex-col overflow-hidden shadow-sm"
       style={{
@@ -99,6 +108,6 @@ export function ReportBrochureStylePageOne({ report, reportVariant, family }: Pr
           ) : null}
         </div>
       </BrochurePageShell>
-    </section>
+    </section>,
   );
 }

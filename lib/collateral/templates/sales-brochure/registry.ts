@@ -1,4 +1,5 @@
 import { BoldBrochure } from "@/lib/collateral/templates/sales-brochure/BoldBrochure";
+import { BelleBrochure } from "@/lib/collateral/templates/sales-brochure/BelleBrochure";
 import { BoldBrochureOnePage } from "@/lib/collateral/templates/sales-brochure/BoldBrochureOnePage";
 import { ClassicSalesBrochure } from "@/lib/collateral/templates/sales-brochure/ClassicSalesBrochure";
 import { ClassicSalesBrochureOnePage } from "@/lib/collateral/templates/sales-brochure/ClassicSalesBrochureOnePage";
@@ -16,6 +17,7 @@ import { SplitBrochureOnePage } from "@/lib/collateral/templates/sales-brochure/
 import {
   SALES_BROCHURE_BOLD_1PG_TEMPLATE_ID,
   SALES_BROCHURE_BOLD_2PG_TEMPLATE_ID,
+  SALES_BROCHURE_BELLE_2PG_TEMPLATE_ID,
   SALES_BROCHURE_CLASSIC_1PG_TEMPLATE_ID,
   SALES_BROCHURE_CLASSIC_2PG_TEMPLATE_ID,
   SALES_BROCHURE_EDITORIAL_1PG_TEMPLATE_ID,
@@ -158,6 +160,15 @@ export const SALES_BROCHURE_TEMPLATES: CollateralTemplateDefinition[] = [
     pageFormat: "a4-portrait",
     pages: 2,
     Component: BoldBrochure,
+  },
+  {
+    id: SALES_BROCHURE_BELLE_2PG_TEMPLATE_ID,
+    collateralType: "sales_brochure",
+    label: "Belle Property Group",
+    description: "Belle bespoke Bold-style page 1; photo gallery page 2.",
+    pageFormat: "a4-portrait",
+    pages: 2,
+    Component: BelleBrochure,
   },
   {
     id: SALES_BROCHURE_REFINED_2PG_TEMPLATE_ID,

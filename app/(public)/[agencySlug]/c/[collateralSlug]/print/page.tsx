@@ -33,7 +33,7 @@ export default async function PublicCollateralPrintPage({
 
   const { data: collateral } = await admin
     .from("collateral_items")
-    .select("document_json, type, status, listing_id, agency_id")
+    .select("document_json, type, status, listing_id, agency_id, template_id")
     .eq("agency_id", agency.id)
     .eq("public_slug", collateralSlug)
     .in("status", ["generated", "published"])
@@ -50,6 +50,7 @@ export default async function PublicCollateralPrintPage({
       document_json: collateral.document_json as CollateralDocumentJson,
       listing_id: collateral.listing_id,
       agency_id: collateral.agency_id,
+      template_id: collateral.template_id,
     },
   });
 

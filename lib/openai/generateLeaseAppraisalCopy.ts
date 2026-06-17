@@ -9,6 +9,8 @@ import { isDevelopment } from "@/lib/env";
 import { LEASE_APPRAISAL_COMPARABLE_DISCLAIMER } from "@/lib/lease-appraisal/comparableEvidenceCopy";
 import {
   PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
+  PAGE_ONE_COPY_MAX_ATTEMPTS,
+  buildPageOneCopyRepairPrompt,
   getPageOneMarketingCopyPromptLimits,
   pageOneFromAiShape,
   pageOneMediumBlurb,
@@ -28,6 +30,7 @@ Rules:
 - Blurbs: rewrite listing_description; weave in how rent sits vs the suburb without dollar amounts (range is in the sidebar). Provide three lengths per the contract — short (1 paragraph), medium (2 paragraphs), long (3 paragraphs). Each length must add detail; do not repeat the same paragraph across all three.
 - bullets: exactly four short feature bullets drawn from the listing (layout, location, parking, amenities, etc.).
 - Do not mention OpenAI or AI.
+- Character limits in copy_limits are strict maximums. Stay under every limit — over-limit responses are rejected and rewritten.
 - Output valid JSON only with exactly the fields in the contract.`;
 
 export type GenerateLeaseAppraisalCopyInput = {
@@ -128,52 +131,66 @@ export async function generateLeaseAppraisalCopy(
   };
 
   try {
-    const response = await client.chat.completions.create({
-      model: "gpt-5.4-mini",
-      response_format: zodResponseFormat(
-        pageOneMarketingCopyAiSchema,
-        "lease_appraisal_copy",
-      ),
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `${JSON.stringify(payload, null, 2)}\n\n${PAGE_ONE_MARKETING_COPY_JSON_CONTRACT}\n\n${getPageOneMarketingCopyPromptLimits()}`,
-        },
-      ],
-    });
+    let raw: unknown = null;
+    let validationErrors: unknown = null;
 
-    const text = response.choices[0]?.message?.content;
-    if (!text) {
-      return fallback;
+    for (let attempt = 0; attempt < PAGE_ONE_COPY_MAX_ATTEMPTS; attempt += 1) {
+      const response = await client.chat.completions.create({
+        model: "gpt-5.4-mini",
+        response_format: zodResponseFormat(
+          pageOneMarketingCopyAiSchema,
+          "lease_appraisal_copy",
+        ),
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          {
+            role: "user",
+            content:
+              attempt === 0
+                ? `${JSON.stringify(payload, null, 2)}\n\n${PAGE_ONE_MARKETING_COPY_JSON_CONTRACT}\n\n${getPageOneMarketingCopyPromptLimits()}`
+                : buildPageOneCopyRepairPrompt(payload, raw, validationErrors),
+          },
+        ],
+      });
+
+      const text = response.choices[0]?.message?.content;
+      if (!text) {
+        break;
+      }
+
+      raw = JSON.parse(text);
+      const parsedAttempt = pageOneMarketingCopyAiSchema.safeParse(raw);
+      if (parsedAttempt.success) {
+        const pageOne = pageOneFromAiShape(parsedAttempt.data);
+
+        return {
+          ...fallback,
+          heading: pageOne.heading,
+          blurb: pageOneMediumBlurb(pageOne),
+          blurb_variants: pageOne.blurb_variants,
+          appeal_points: pageOne.bullets,
+          key_metrics_line: "",
+          supporting_factors: [],
+          buyer_checks: fallback.buyer_checks,
+          methodology_note: fallback.methodology_note,
+          comparable_evidence: fallback.comparable_evidence,
+          comparable_disclaimer:
+            input.agency.default_disclaimer?.trim() ||
+            fallback.comparable_disclaimer ||
+            LEASE_APPRAISAL_COMPARABLE_DISCLAIMER,
+          disclaimer: fallback.disclaimer,
+          cta: input.agency.default_cta || fallback.cta,
+        };
+      }
+
+      validationErrors = parsedAttempt.error.flatten();
+      console.error(
+        `Lease appraisal copy validation failed (attempt ${attempt + 1}/${PAGE_ONE_COPY_MAX_ATTEMPTS}):`,
+        validationErrors,
+      );
     }
 
-    const parsed = pageOneMarketingCopyAiSchema.safeParse(JSON.parse(text));
-    if (!parsed.success) {
-      console.error("Lease appraisal copy validation failed:", parsed.error.flatten());
-      return fallback;
-    }
-
-    const pageOne = pageOneFromAiShape(parsed.data);
-
-    return {
-      ...fallback,
-      heading: pageOne.heading,
-      blurb: pageOneMediumBlurb(pageOne),
-      blurb_variants: pageOne.blurb_variants,
-      appeal_points: pageOne.bullets,
-      key_metrics_line: "",
-      supporting_factors: [],
-      buyer_checks: fallback.buyer_checks,
-      methodology_note: fallback.methodology_note,
-      comparable_evidence: fallback.comparable_evidence,
-      comparable_disclaimer:
-        input.agency.default_disclaimer?.trim() ||
-        fallback.comparable_disclaimer ||
-        LEASE_APPRAISAL_COMPARABLE_DISCLAIMER,
-      disclaimer: fallback.disclaimer,
-      cta: input.agency.default_cta || fallback.cta,
-    };
+    return fallback;
   } catch (error) {
     console.error("Lease appraisal copy generation failed:", error);
     return fallback;

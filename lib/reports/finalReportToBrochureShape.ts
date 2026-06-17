@@ -2,7 +2,7 @@ import { splitBrochureImages } from "@/lib/collateral/buildSalesBrochureDocument
 import { blurbStringToBlocks } from "@/lib/collateral/sales-brochure/blurbBlocks";
 import { resolveBrochureCopyForTemplate } from "@/lib/copy/resolveBrochureCopyForTemplate";
 import { resolveReportForTemplatePreview } from "@/lib/copy/resolveReportBlurb";
-import { salesBrochureTemplateIdForFamily } from "@/lib/reports/templates/salesBrochureFamilyMap";
+import { resolveBrochureTemplateIdForReport } from "@/lib/reports/templates/salesBrochureFamilyMap";
 import { familyFromTemplateId } from "@/lib/reports/templates/playgroundResolve";
 import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
 import { resolveLeaseBrochurePriceValue } from "@/lib/reports/resolveLeaseBrochurePriceValue";
@@ -30,6 +30,8 @@ function buildPropertyImagesFromReport(report: FinalReportJson) {
 export type FinalReportToBrochureShapeOptions = {
   /** Preview a layout family (e.g. classic) independent of report.template_id. */
   layoutFamily?: string;
+  /** Override brochure template used for blurb-length resolution. */
+  brochureTemplateId?: string;
   allowDevBlurbLengthMap?: boolean;
 };
 
@@ -42,13 +44,12 @@ export function finalReportToBrochureShape(
   const variant = resolveReportPageVariant(report, reportVariant);
   const images = buildPropertyImagesFromReport(report);
   const brochureTemplateId =
-    variant === "sale"
-      ? report.template_id
-      : salesBrochureTemplateIdForFamily(
-          options?.layoutFamily ??
-            familyFromTemplateId(report.template_id, variant),
-          1,
-        );
+    options?.brochureTemplateId ??
+    resolveBrochureTemplateIdForReport(
+      report.template_id,
+      variant,
+      options?.layoutFamily ?? familyFromTemplateId(report.template_id, variant),
+    );
   const resolvedReport = resolveReportForTemplatePreview(report, {
     templateId: brochureTemplateId,
     collateral: variant,

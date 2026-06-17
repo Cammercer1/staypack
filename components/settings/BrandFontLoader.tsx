@@ -1,5 +1,6 @@
 "use client";
 
+import { BELLE_TYPEKIT_STYLESHEET_URL } from "@/lib/branding/kits/belle";
 import {
   buildBrandGoogleFontsUrl,
   getFontDisplayName,
@@ -21,6 +22,8 @@ export function BrandFontLoader({ fonts }: { fonts: BrandFonts }) {
     fonts.heading_font_file_url,
     fonts.body_font_file_url,
   );
+  const usesBelleTypekit =
+    fonts.heading_font_family.trim().toLowerCase() === "quiche-sans";
 
   return (
     <>
@@ -39,6 +42,9 @@ export function BrandFontLoader({ fonts }: { fonts: BrandFonts }) {
             src: url("${fonts.body_font_file_url}");
           }
         `}</style>
+      ) : null}
+      {usesBelleTypekit ? (
+        <link rel="stylesheet" href={BELLE_TYPEKIT_STYLESHEET_URL} />
       ) : null}
       {googleFontsUrl ? <link rel="stylesheet" href={googleFontsUrl} /> : null}
     </>

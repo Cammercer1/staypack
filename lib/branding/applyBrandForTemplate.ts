@@ -1,3 +1,4 @@
+import { applyBelleBrandKitToReport } from "@/lib/branding/kits/belle";
 import { applyHavenBrandKitToReport } from "@/lib/branding/kits/haven";
 import { getTemplateMetadata } from "@/lib/templates/getTemplateMetadata";
 import type { FinalReportJson } from "@/lib/types";
@@ -6,6 +7,7 @@ const BRAND_KIT_APPLIERS: Record<
   string,
   (report: FinalReportJson) => FinalReportJson
 > = {
+  belle: applyBelleBrandKitToReport,
   haven: applyHavenBrandKitToReport,
 };
 

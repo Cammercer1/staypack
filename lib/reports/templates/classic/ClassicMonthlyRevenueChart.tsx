@@ -125,7 +125,10 @@ export function ClassicMonthlyRevenueChart({
         {report.str.annual_revenue != null ? (
           <div className="shrink-0 text-right">
             <p className="text-[0.58rem] font-medium uppercase tracking-wide text-neutral-500">
-              Median annual
+              {enrichment?.positioning != null &&
+              enrichment.positioning.percentile !== 50
+                ? "Est. annual"
+                : "Median annual"}
             </p>
             <p
               className="text-[0.85rem] font-semibold leading-tight"

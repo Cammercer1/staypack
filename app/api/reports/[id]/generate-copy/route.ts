@@ -60,6 +60,17 @@ export async function POST(
       report: reportForBuild,
       estimate,
     });
+    const existingFinal = report.final_report_json as
+      | import("@/lib/types").FinalReportJson
+      | null;
+    const preservedImages =
+      existingFinal?.property?.hero_image_url != null
+        ? {
+            hero_image_url: existingFinal.property.hero_image_url,
+            selected_image_urls: existingFinal.property.selected_image_urls,
+          }
+        : null;
+
     const finalReportJson = buildFinalReportJson({
       agency,
       agentProfile,
@@ -69,6 +80,7 @@ export async function POST(
       estimate,
       copy,
       scraped: listing.scraped_listing_json,
+      propertyImages: preservedImages,
     });
 
     const { data, error } = await supabase

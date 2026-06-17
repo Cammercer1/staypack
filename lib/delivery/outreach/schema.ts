@@ -21,6 +21,20 @@ const salesBrochureTemplateIdSchema = z.string().refine(
   { message: "Invalid sales brochure template id" },
 );
 
+const rentOverrideSchema = z
+  .object({
+    weekly_low: z.number().positive().optional(),
+    weekly_median: z.number().positive().optional(),
+    weekly_high: z.number().positive().optional(),
+  })
+  .refine(
+    (value) =>
+      value.weekly_low == null ||
+      value.weekly_high == null ||
+      value.weekly_low <= value.weekly_high,
+    { message: "weekly_low must be less than or equal to weekly_high" },
+  );
+
 export const outreachGenerateRequestSchema = z.object({
   tenant_slug: z.string().min(1),
   listing_url: z.string().url(),
@@ -36,6 +50,8 @@ export const outreachGenerateRequestSchema = z.object({
     })
     .optional(),
   agent_profile_ids: z.array(z.string().uuid()).max(2).optional(),
+  /** Lease appraisal indicative weekly rent overrides; comps still come from enrichment. */
+  rent_override: rentOverrideSchema.optional(),
   skip_ledger: z.boolean().default(true),
 });
 

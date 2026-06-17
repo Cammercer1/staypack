@@ -32,6 +32,11 @@ export const STR_TEMPLATE_PACKS: Record<string, StrTemplatePack> = {
     label: "Haven Properties STR",
     templateId: "haven-properties-str",
   },
+  belle_property: {
+    id: "belle_property",
+    label: "Belle Property Group STR",
+    templateId: "belle-property-str",
+  },
 };
 
 export function resolveStrTemplatePack(packId: string | null | undefined): StrTemplatePack {

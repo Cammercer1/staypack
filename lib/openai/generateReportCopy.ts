@@ -7,6 +7,8 @@ import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplate
 import { isDevelopment } from "@/lib/env";
 import {
   PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
+  PAGE_ONE_COPY_MAX_ATTEMPTS,
+  buildPageOneCopyRepairPrompt,
   getPageOneMarketingCopyPromptLimits,
   pageOneFromAiShape,
   pageOneMarketingCopyAiSchema,
@@ -30,7 +32,8 @@ Blurb must NOT contain disclaimer or hedge language. A separate disclaimer block
 - Occupancy or ADR stats used as warnings rather than positive market context
 
 Revenue in blurb:
-- You may reference estimated gross short-term rental revenue once, framed as an opportunity (not a promise).
+- If you mention estimated gross short-term rental revenue, use EXACTLY estimate.annual_revenue from the payload (formatted as in estimate). Never invent a figure from comparable listings or the listing's sale marketing copy.
+- You may reference that revenue once, framed as an opportunity (not a promise).
 - Do not call revenue profit.
 - Do not guarantee income.
 
@@ -39,6 +42,7 @@ Other rules:
 - Do not invent amenities, distances, approvals, regulations, or tax treatment.
 - Use only the supplied property data.
 - Do not mention Airbtics or OpenAI.
+- Character limits in copy_limits are strict maximums. Count characters carefully and stay under every limit — over-limit responses are rejected and rewritten.
 - Output valid JSON only with exactly the fields in the contract (heading, three blurb lengths, bullets).`;
 
 export class CopyValidationError extends Error {
@@ -84,27 +88,31 @@ export async function generateReportCopy({
   const templateId = resolveReportTemplateId(agency, report);
   const userPayload = buildUserPayload({ agency, listing, report, estimate, templateId });
 
-  const first = await requestCopy(client, userPayload);
-  const parsed = parseCopyResponse(first, agency, estimate, templateId);
+  let raw: unknown = await requestCopy(client, userPayload);
 
-  if (parsed.success) {
-    return parsed.data;
+  for (let attempt = 0; attempt < PAGE_ONE_COPY_MAX_ATTEMPTS; attempt += 1) {
+    const parsed = parseCopyResponse(raw, agency, estimate, templateId);
+
+    if (parsed.success) {
+      return parsed.data;
+    }
+
+    console.error(
+      `Copy validation failed (attempt ${attempt + 1}/${PAGE_ONE_COPY_MAX_ATTEMPTS}):`,
+      parsed.error.flatten(),
+    );
+
+    if (attempt === PAGE_ONE_COPY_MAX_ATTEMPTS - 1) {
+      throw new CopyValidationError();
+    }
+
+    raw = await requestCopy(client, userPayload, {
+      invalidJson: raw,
+      validationErrors: parsed.error.flatten(),
+    });
   }
 
-  console.error("Initial copy validation failed:", parsed.error.flatten());
-
-  const repaired = await requestCopy(client, userPayload, {
-    invalidJson: first,
-    validationErrors: parsed.error.flatten(),
-  });
-  const repairedParsed = parseCopyResponse(repaired, agency, estimate, templateId);
-
-  if (!repairedParsed.success) {
-    console.error("Repair copy validation failed:", repairedParsed.error.flatten());
-    throw new CopyValidationError();
-  }
-
-  return repairedParsed.data;
+  throw new CopyValidationError();
 }
 
 function buildUserPayload({
@@ -215,7 +223,7 @@ async function requestCopy(
         {
           role: "user",
           content: repair
-            ? `Repair the invalid JSON below. Fix only validation issues and return valid JSON matching the schema.\n\nValidation errors:\n${JSON.stringify(repair.validationErrors)}\n\nInvalid JSON:\n${JSON.stringify(repair.invalidJson)}\n\nSource payload:\n${JSON.stringify(payload)}`
+            ? buildPageOneCopyRepairPrompt(payload, repair.invalidJson, repair.validationErrors)
             : `${JSON.stringify(payload)}\n\n${PAGE_ONE_MARKETING_COPY_JSON_CONTRACT}${
                 copyLimits ? `\n\n${copyLimits}` : ""
               }`,

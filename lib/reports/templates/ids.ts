@@ -52,6 +52,13 @@ export const HAVEN_PROPERTIES_STR_TEMPLATE_ID = "haven-properties-str";
 export const HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID =
   "haven-properties-lease-appraisal";
 
+/** Managed delivery — bespoke Belle Property Group STR layout */
+export const BELLE_PROPERTY_STR_TEMPLATE_ID = "belle-property-str";
+
+/** Managed delivery — Belle Property Group lease appraisal */
+export const BELLE_PROPERTY_LEASE_APPRAISAL_TEMPLATE_ID =
+  "belle-property-lease-appraisal";
+
 export {
   CLASSIC_LEASE_APPRAISAL_TEMPLATE_ID,
   BOLD_LEASE_APPRAISAL_TEMPLATE_ID,
@@ -75,6 +82,8 @@ export const REPORT_TEMPLATE_IDS = [
   LANDMARK_DETAILED_TEMPLATE_ID,
   HAVEN_PROPERTIES_STR_TEMPLATE_ID,
   HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID,
+  BELLE_PROPERTY_STR_TEMPLATE_ID,
+  BELLE_PROPERTY_LEASE_APPRAISAL_TEMPLATE_ID,
   "classic-lease-appraisal",
   "bold-lease-appraisal",
   "gallery-lease-appraisal",

@@ -202,7 +202,10 @@ async function preparePrintStyles(
     const cssBuffer = Buffer.from(await response.arrayBuffer());
     const cssText = cssBuffer.toString("utf8");
 
-    if (stylesheetUrl.includes("fonts.googleapis.com")) {
+    if (
+      stylesheetUrl.includes("fonts.googleapis.com") ||
+      stylesheetUrl.includes("use.typekit.net")
+    ) {
       inlineStyles.push(cssText);
       inlinedStylesheetCount += 1;
       continue;

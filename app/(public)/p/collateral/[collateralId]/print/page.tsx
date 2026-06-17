@@ -27,7 +27,7 @@ export default async function DraftCollateralPrintPage({
   const admin = createAdminClient();
   const { data: collateral } = await admin
     .from("collateral_items")
-    .select("document_json, type, agency_id, listing_id")
+    .select("document_json, type, agency_id, listing_id, template_id")
     .eq("id", collateralId)
     .maybeSingle();
 
@@ -52,6 +52,7 @@ export default async function DraftCollateralPrintPage({
       document_json: collateral.document_json as CollateralDocumentJson,
       listing_id: collateral.listing_id,
       agency_id: collateral.agency_id,
+      template_id: collateral.template_id,
     },
   });
 

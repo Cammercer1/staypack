@@ -70,8 +70,11 @@ if (!extracted.ok) {
 }
 
 const parsed = extracted.listing;
-// Off-market / agency rental pages are still valid STR appraisal subjects.
-if (/\/rental\//i.test(LISTING_URL)) {
+// Off-market / agency rental pages and REA for-sale property pages are valid STR subjects.
+if (
+  /\/rental\//i.test(LISTING_URL) ||
+  /realestate\.com\.au\/property-/i.test(LISTING_URL)
+) {
   parsed.purpose = "sale";
 }
 console.log("   Address:", parsed.address);

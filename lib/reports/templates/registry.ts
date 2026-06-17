@@ -8,6 +8,8 @@ import { MinimalistDetailedTemplate } from "@/lib/reports/templates/minimalist/M
 import { LandmarkDetailedTemplate } from "@/lib/reports/templates/landmark/LandmarkTemplate";
 import { HavenPropertiesStrTemplate } from "@/lib/reports/templates/haven-properties/HavenPropertiesStrTemplate";
 import { HavenPropertiesLeaseAppraisalTemplate } from "@/lib/reports/templates/haven-properties/HavenPropertiesLeaseAppraisalTemplate";
+import { BellePropertyStrTemplate } from "@/lib/reports/templates/belle-property/BellePropertyStrTemplate";
+import { BellePropertyLeaseAppraisalTemplate } from "@/lib/reports/templates/belle-property/BellePropertyLeaseAppraisalTemplate";
 import {
   BoldLeaseAppraisalTemplate,
   ClassicLeaseAppraisalTemplate,
@@ -30,6 +32,8 @@ import {
   LANDMARK_DETAILED_TEMPLATE_ID,
   HAVEN_PROPERTIES_STR_TEMPLATE_ID,
   HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID,
+  BELLE_PROPERTY_STR_TEMPLATE_ID,
+  BELLE_PROPERTY_LEASE_APPRAISAL_TEMPLATE_ID,
   CLASSIC_LEASE_APPRAISAL_TEMPLATE_ID,
   BOLD_LEASE_APPRAISAL_TEMPLATE_ID,
   GALLERY_LEASE_APPRAISAL_TEMPLATE_ID,
@@ -231,6 +235,26 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
     pages: 2,
     sourcePath: "lib/reports/templates/haven-properties",
     Component: HavenPropertiesLeaseAppraisalTemplate,
+  },
+  {
+    id: BELLE_PROPERTY_STR_TEMPLATE_ID,
+    family: "belle-property",
+    tier: "detailed",
+    label: "Belle Property Group",
+    description: "Belle bespoke Bold-style STR cover; page 2 market evidence.",
+    pages: 2,
+    sourcePath: "lib/reports/templates/belle-property",
+    Component: BellePropertyStrTemplate,
+  },
+  {
+    id: BELLE_PROPERTY_LEASE_APPRAISAL_TEMPLATE_ID,
+    family: "belle-property",
+    tier: "detailed",
+    label: "Belle Property Group",
+    description: "Belle bespoke Bold-style lease cover; page 2 REA comparables.",
+    pages: 2,
+    sourcePath: "lib/reports/templates/belle-property",
+    Component: BellePropertyLeaseAppraisalTemplate,
   },
 ];
 

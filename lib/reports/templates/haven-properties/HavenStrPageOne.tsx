@@ -10,40 +10,18 @@ import {
   resolveReportAgents,
   StrRevenueBlock,
 } from "@/lib/reports/templates/shared/StrRevenueBlock";
+import { ReportEditableImage } from "@/components/reports/inline/ReportEditableImage";
+import {
+  ReportCopyAppealPoint,
+  ReportCopyBlurb,
+  ReportCopySupportingFactor,
+} from "@/components/reports/inline/ReportCopyFields";
 import type { FinalReportJson } from "@/lib/types";
 
 const headingFont = "var(--report-heading-font, inherit)";
 const bodyFont = "var(--report-body-font, inherit)";
 
 export const HAVEN_STR_PAGE_ONE_BULLET_COUNT = 6;
-
-function HavenStrBlurb({ text }: { text: string }) {
-  const paragraphs = text.split(/\n\n+/).filter(Boolean);
-  const paraClass =
-    "text-[0.74rem] leading-[1.7] text-neutral-700";
-
-  if (paragraphs.length <= 1) {
-    return (
-      <p className={paraClass} style={{ fontFamily: bodyFont }}>
-        {text}
-      </p>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-2.5">
-      {paragraphs.map((para) => (
-        <p
-          key={para.slice(0, 48)}
-          className={paraClass}
-          style={{ fontFamily: bodyFont }}
-        >
-          {para.trim()}
-        </p>
-      ))}
-    </div>
-  );
-}
 
 function HavenStrStatStrip({ report }: { report: FinalReportJson }) {
   const { property } = report;
@@ -95,14 +73,13 @@ function HavenStrStatStrip({ report }: { report: FinalReportJson }) {
 /** Haven STR page 1 — hero, stat strip, blurb + revenue callout + agents. */
 export function HavenStrPageOne({ report }: { report: FinalReportJson }) {
   const brand = getReportBrandColours(report.agency);
-  const { hero } = resolveHeroGalleryImages(report.property);
+  const { hero, secondary } = resolveHeroGalleryImages(report.property);
   const logoUrl = HAVEN_BRAND.logoOnDarkUrl;
   const accent = report.agency.primary_colour || HAVEN_BRAND.statBar;
   const agents = resolveReportAgents(report).slice(0, 2);
-  const features = [
-    ...(report.copy.appeal_points ?? []),
-    ...(report.copy.supporting_factors ?? []),
-  ]
+  const appealPoints = report.copy.appeal_points ?? [];
+  const supportingFactors = report.copy.supporting_factors ?? [];
+  const features = [...appealPoints, ...supportingFactors]
     .filter((v, i, arr) => arr.indexOf(v) === i)
     .slice(0, HAVEN_STR_PAGE_ONE_BULLET_COUNT);
 
@@ -117,8 +94,12 @@ export function HavenStrPageOne({ report }: { report: FinalReportJson }) {
     >
       <div className="relative shrink-0 overflow-hidden" style={{ height: "125mm" }}>
         {hero ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={hero} alt="" className="h-full w-full object-cover" />
+          <ReportEditableImage
+            slot="hero"
+            src={hero}
+            className="h-full w-full"
+            imgClassName="h-full w-full object-cover"
+          />
         ) : (
           <div className="h-full bg-neutral-300" />
         )}
@@ -132,7 +113,7 @@ export function HavenStrPageOne({ report }: { report: FinalReportJson }) {
           aria-hidden
         />
         {logoUrl ? (
-          <div className="absolute left-7 top-6">
+          <div className="pointer-events-none absolute left-7 top-6">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={logoUrl}
@@ -141,7 +122,7 @@ export function HavenStrPageOne({ report }: { report: FinalReportJson }) {
             />
           </div>
         ) : null}
-        <div className="absolute inset-x-0 bottom-0 px-8 pb-7">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 px-8 pb-7">
           <p
             className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-white/75"
             style={{ fontFamily: headingFont }}
@@ -171,22 +152,43 @@ export function HavenStrPageOne({ report }: { report: FinalReportJson }) {
 
       <div className="grid min-h-0 flex-1 grid-cols-[1.45fr_1fr] gap-8 px-8 pt-5 pb-4">
         <div className="flex min-h-0 flex-col gap-3">
-          {report.copy.blurb ? <HavenStrBlurb text={report.copy.blurb} /> : null}
+          {report.copy.blurb ? (
+            <ReportCopyBlurb
+              blurb={report.copy.blurb}
+              paraClassName="text-[0.74rem] leading-[1.7] text-neutral-700"
+              style={{ fontFamily: bodyFont }}
+            />
+          ) : null}
           {features.length > 0 ? (
             <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-              {features.map((item) => (
-                <li
-                  key={item}
-                  className="flex gap-2 text-[0.7rem] leading-snug text-neutral-800"
-                  style={{ fontFamily: bodyFont }}
-                >
-                  <span
-                    className="mt-[0.3rem] h-[5px] w-[5px] shrink-0 rounded-full"
-                    style={{ backgroundColor: accent }}
-                  />
-                  <span>{item}</span>
-                </li>
-              ))}
+              {features.map((item) => {
+                const appealIndex = appealPoints.indexOf(item);
+                const supportingIndex =
+                  appealIndex >= 0 ? -1 : supportingFactors.indexOf(item);
+                return (
+                  <li
+                    key={item}
+                    className="flex gap-2 text-[0.7rem] leading-snug text-neutral-800"
+                    style={{ fontFamily: bodyFont }}
+                  >
+                    <span
+                      className="mt-[0.3rem] h-[5px] w-[5px] shrink-0 rounded-full"
+                      style={{ backgroundColor: accent }}
+                    />
+                    {appealIndex >= 0 ? (
+                      <ReportCopyAppealPoint index={appealIndex} text={item} as="span" />
+                    ) : supportingIndex >= 0 ? (
+                      <ReportCopySupportingFactor
+                        index={supportingIndex}
+                        text={item}
+                        as="span"
+                      />
+                    ) : (
+                      <span>{item}</span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
         </div>
@@ -200,9 +202,20 @@ export function HavenStrPageOne({ report }: { report: FinalReportJson }) {
                 agent={agent}
                 accent={accent}
                 photoClassName={HAVEN_AGENT_PHOTO_CLASS}
+                size="prominent"
               />
             ))}
           </div>
+          {agents.length === 0 && secondary.length > 0 ? (
+            <div className="w-full shrink-0 overflow-hidden" style={{ height: "52mm" }}>
+              <ReportEditableImage
+                slot={{ kind: "secondary", index: secondary.length - 1 }}
+                src={secondary[secondary.length - 1]!}
+                className="h-full w-full"
+                imgClassName="h-full w-full object-cover"
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 

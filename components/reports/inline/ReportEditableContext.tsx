@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useMemo,
+  type MutableRefObject,
   type ReactNode,
 } from "react";
 import type { ReportCopyFieldPath } from "@/lib/reports/editable/reportCopyPaths";
@@ -15,6 +16,7 @@ export type ReportEditableContextValue = {
   setField: (path: ReportCopyFieldPath, value: string) => void;
   onFieldFocus?: (path: ReportCopyFieldPath | null) => void;
   openImagePicker: (slot: ReportImageSlot) => void;
+  blurbFlushRef?: MutableRefObject<(() => string | null) | null>;
 };
 
 const defaultValue: ReportEditableContextValue = {
@@ -36,12 +38,14 @@ export function ReportEditableProvider({
   setField,
   onFieldFocus,
   openImagePicker,
+  blurbFlushRef,
 }: {
   children: ReactNode;
   brandPrimaryColour: string;
   setField: (path: ReportCopyFieldPath, value: string) => void;
   onFieldFocus?: (path: ReportCopyFieldPath | null) => void;
   openImagePicker: (slot: ReportImageSlot) => void;
+  blurbFlushRef?: MutableRefObject<(() => string | null) | null>;
 }) {
   const value = useMemo(
     (): ReportEditableContextValue => ({
@@ -50,8 +54,9 @@ export function ReportEditableProvider({
       setField,
       onFieldFocus,
       openImagePicker,
+      blurbFlushRef,
     }),
-    [brandPrimaryColour, setField, onFieldFocus, openImagePicker],
+    [brandPrimaryColour, setField, onFieldFocus, openImagePicker, blurbFlushRef],
   );
 
   return (

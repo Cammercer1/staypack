@@ -22,7 +22,12 @@ Internal endpoint for on-demand PDF generation from a listing URL. StayPacks gen
     "lease_appraisal": "refined-lease-appraisal",
     "sales_brochure": "sales-brochure-refined-2pg"
   },
-  "agent_profile_ids": ["uuid-of-agent-1"]
+  "agent_profile_ids": ["uuid-of-agent-1"],
+  "rent_override": {
+    "weekly_low": 850,
+    "weekly_median": 900,
+    "weekly_high": 950
+  }
 }
 ```
 
@@ -34,6 +39,7 @@ Internal endpoint for on-demand PDF generation from a listing URL. StayPacks gen
 | `deliverables` | no | Default: all three types |
 | `templates` | no | Per-type template overrides |
 | `agent_profile_ids` | no | Max 2 agency `agent_profiles` UUIDs |
+| `rent_override` | no | Lease appraisal indicative weekly rent: `weekly_low` / `weekly_median` / `weekly_high` (all optional). Overrides the computed band; comparables still come from the built-in enrichment. If `weekly_median` is omitted but low and high are given, the midpoint is derived. |
 | `skip_ledger` | no | Default `true` (no cron dedupe) |
 
 STR templates must be detailed variants (`refined-detailed`, `haven-properties-str`, etc.). Light variants are rejected.
@@ -93,3 +99,22 @@ node scripts/run-outreach-generate.mjs \
 ```
 
 Requires `DELIVERY_CRON_SECRET` and `SITE_URL` in `.env`.
+
+## Belle Property Group example
+
+Provision tenant once: `POST /api/delivery/tenants` with body from `lib/delivery/tenants/config/belle.json`.
+
+```json
+{
+  "tenant_slug": "belle",
+  "listing_url": "https://www.realestate.com.au/property-duplex+semi-detached-nsw-coogee-150904328",
+  "deliverables": ["str", "lease_appraisal", "sales_brochure"],
+  "templates": {
+    "str": "belle-property-str",
+    "lease_appraisal": "belle-property-lease-appraisal",
+    "sales_brochure": "sales-brochure-belle-2pg"
+  }
+}
+```
+
+Dev preview: `/dev/belle-property?listingId={uuid}` and `/dev/belle-property/lease-appraisal`.

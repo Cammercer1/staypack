@@ -27,10 +27,13 @@ function buildSnapshotStats(report: FinalReportJson): ReportSnapshotStat[] {
 
   const stats: ReportSnapshotStat[] = [];
 
+  const positioned =
+    enrichment?.positioning != null && enrichment.positioning.percentile !== 50;
+
   if (str.annual_revenue != null) {
     stats.push({
       id: "median",
-      label: "Median gross revenue",
+      label: positioned ? "Est. gross revenue" : "Median gross revenue",
       value: formatCurrency(str.annual_revenue),
       footnote: "per year before costs",
     });

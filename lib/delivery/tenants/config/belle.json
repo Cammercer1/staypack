@@ -1,0 +1,30 @@
+{
+  "slug": "belle",
+  "name": "Belle Property Group",
+  "timezone": "Australia/Sydney",
+  "enabled": true,
+  "scrape_enabled": false,
+  "scrape_schedule": {
+    "type": "cron",
+    "cron": "0 7 * * *"
+  },
+  "partner_sources": [
+    {
+      "label": "Belle outreach placeholder",
+      "url": "https://www.belleproperty.com/",
+      "adapter": "generic_links",
+      "config": { "max_listings": 1 }
+    }
+  ],
+  "email_recipients": ["cameronmercer1991@gmail.com"],
+  "email_subject_template": "Belle Property Group reports",
+  "str_template_pack_id": "belle_property",
+  "deliverables": ["str", "lease_appraisal"],
+  "billing_mode": "production",
+  "brand": {
+    "displayName": "belle PROPERTY"
+  },
+  "feature_flags": {
+    "rent_appraisal": { "tier": "auto" }
+  }
+}

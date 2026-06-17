@@ -40,6 +40,10 @@ import {
 } from "@/lib/rental/resolveSuburbRentFloor";
 import { resolveRentSubjectPropertyType } from "@/lib/rental/resolveRentSubjectPropertyType";
 import { defaultSelectedCompListingIds } from "@/lib/lease-appraisal/leaseAppraisalData";
+import {
+  positionLeaseAppraisal,
+  subjectFromParsedListing,
+} from "@/lib/lease-appraisal/positionLeaseAppraisal";
 import type { ParsedListing } from "@/lib/types";
 import type { RentalComp } from "@/lib/rental/types";
 
@@ -355,6 +359,36 @@ export async function enrichListingRentalAppraisal(
       );
     }
 
+    const statisticalBand = { ...band };
+    const positioned = await positionLeaseAppraisal({
+      subject: subjectFromParsedListing(withSuburb, premiumResult.premium),
+      band,
+      comps,
+      suburbMarket: withSuburb.ltrSuburbMarket,
+    });
+
+    if (positioned.positioning) {
+      band = positioned.band;
+      pushUniqueWarning(
+        warnings,
+        `Lease appraisal rent band reviewed against comps (${positioned.positioning.confidence} confidence).`,
+      );
+      if (positioned.positioning.was_clamped) {
+        pushUniqueWarning(
+          warnings,
+          "Lease appraisal LLM band adjusted to stay within comp-derived bounds.",
+        );
+      }
+    }
+
+    const compSelectionBase = {
+      ...withSuburb,
+      rentalComps: comps,
+    };
+    const selectedCompListingIds =
+      positioned.selectedCompListingIds ??
+      defaultSelectedCompListingIds(compSelectionBase);
+
     const displayPrice = formatWeeklyRentRange(band.weeklyMin, band.weeklyMax);
 
     if (
@@ -409,10 +443,7 @@ export async function enrichListingRentalAppraisal(
         weeklyMin: band.weeklyMin,
         weeklyMax: band.weeklyMax,
         weeklyMidpoint: band.weeklyMidpoint,
-        selectedCompListingIds: defaultSelectedCompListingIds({
-          ...withSuburb,
-          rentalComps: comps,
-        }),
+        selectedCompListingIds,
         source: provider === "apify" ? "apify_rea" : "rea_discover",
         compCount: comps.length,
         searchUrl,
@@ -420,6 +451,12 @@ export async function enrichListingRentalAppraisal(
         premiumReasons: premiumResult.reasons,
         rentFloorWeekly: rentFloor?.weeklyRent,
         rentFloorSource: rentFloor?.source,
+        positioning: positioned.positioning
+          ? {
+              ...positioned.positioning,
+              statistical_weekly_midpoint: statisticalBand.weeklyMidpoint,
+            }
+          : undefined,
       },
       rentalComps: comps,
       warnings,

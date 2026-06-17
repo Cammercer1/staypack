@@ -34,5 +34,6 @@ export function ltrEnrichmentFromParsed(listing: ParsedListing): LtrEnrichmentJs
     source: appraisal?.source,
     search_url: appraisal?.searchUrl,
     suburb_market: suburbMarket,
+    positioning: appraisal?.positioning ?? null,
   };
 }

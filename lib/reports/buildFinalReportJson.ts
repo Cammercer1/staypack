@@ -9,6 +9,7 @@ import type {
   StrEstimate,
 } from "@/lib/types";
 import { DEFAULT_DISCLAIMER } from "@/lib/types";
+import { enforceCanonicalStrRevenueInText } from "@/lib/copy/pageOneMarketingCopy";
 import { mockBlurbVariantsFromText } from "@/lib/copy/blurbVariantEnforce";
 import { calculateAccommodates } from "@/lib/reports/formatters";
 import { calculateStrGrossYield } from "@/lib/reports/calculateStrYield";
@@ -20,6 +21,7 @@ import {
 } from "@/lib/reports/resolveReportAgents";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
 import { ensureStrEnrichmentFeaturedComps } from "@/lib/airbtics/enrich";
+import type { ReportPropertyImageSelection } from "@/lib/reports/editable/reportImageSlots";
 import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
 
 type BuildFinalReportInput = {
@@ -32,6 +34,7 @@ type BuildFinalReportInput = {
   copy: AiCopyJson;
   scraped?: ParsedListing | null;
   resolvedAgents?: ReportAgent[];
+  propertyImages?: ReportPropertyImageSelection | null;
 };
 
 export function buildFinalReportJson({
@@ -44,6 +47,7 @@ export function buildFinalReportJson({
   copy,
   scraped,
   resolvedAgents,
+  propertyImages,
 }: BuildFinalReportInput): FinalReportJson {
   const scrapedListing = scraped ?? listing.scraped_listing_json;
   const weeklyMin = scrapedListing?.rentalAppraisal?.weeklyMin ?? null;
@@ -68,7 +72,9 @@ export function buildFinalReportJson({
     });
   const displayPrice = resolveReportDisplayPrice(listing, scrapedListing);
   const strYield = calculateStrGrossYield(displayPrice, estimate.annualRevenue);
-  const strImages = resolveCollateralImageSelection(listing, "str_report");
+  const strImages =
+    propertyImages ?? resolveCollateralImageSelection(listing, "str_report");
+  const reportCopy = alignCopyWithEstimate(copy, estimate.annualRevenue);
 
   return {
     version: "standard_2_page_v1",
@@ -136,15 +142,15 @@ export function buildFinalReportJson({
       difference_before_costs: differenceBeforeCosts,
     },
     copy: {
-      heading: copy.sales_pack_heading,
-      blurb: copy.sales_pack_blurb,
-      blurb_variants: copy.sales_pack_blurb_variants,
-      key_metrics_line: copy.key_metrics_line,
-      appeal_points: copy.property_appeal_points,
-      supporting_factors: copy.performance_supporting_factors,
-      buyer_checks: copy.buyer_checks,
-      methodology_note: copy.methodology_note,
-      disclaimer: copy.disclaimer || agency.default_disclaimer || DEFAULT_DISCLAIMER,
+      heading: reportCopy.sales_pack_heading,
+      blurb: reportCopy.sales_pack_blurb,
+      blurb_variants: reportCopy.sales_pack_blurb_variants,
+      key_metrics_line: reportCopy.key_metrics_line,
+      appeal_points: reportCopy.property_appeal_points,
+      supporting_factors: reportCopy.performance_supporting_factors,
+      buyer_checks: reportCopy.buyer_checks,
+      methodology_note: reportCopy.methodology_note,
+      disclaimer: reportCopy.disclaimer || agency.default_disclaimer || DEFAULT_DISCLAIMER,
       comparable_evidence: "",
       comparable_disclaimer: "",
       cta: agency.default_cta,
@@ -156,6 +162,43 @@ export function buildFinalReportJson({
     str_enrichment: ensureStrEnrichmentFeaturedComps(
       report.str_enrichment_json ?? null,
       report.raw_airbtics_json,
+    ),
+  };
+}
+
+function alignCopyWithEstimate(
+  copy: AiCopyJson,
+  annualRevenue: number | null | undefined,
+): AiCopyJson {
+  if (annualRevenue == null) {
+    return copy;
+  }
+
+  return {
+    ...copy,
+    sales_pack_blurb: enforceCanonicalStrRevenueInText(
+      copy.sales_pack_blurb,
+      annualRevenue,
+    ),
+    sales_pack_blurb_variants: copy.sales_pack_blurb_variants
+      ? {
+          short: enforceCanonicalStrRevenueInText(
+            copy.sales_pack_blurb_variants.short,
+            annualRevenue,
+          ),
+          medium: enforceCanonicalStrRevenueInText(
+            copy.sales_pack_blurb_variants.medium,
+            annualRevenue,
+          ),
+          long: enforceCanonicalStrRevenueInText(
+            copy.sales_pack_blurb_variants.long,
+            annualRevenue,
+          ),
+        }
+      : undefined,
+    key_metrics_line: enforceCanonicalStrRevenueInText(
+      copy.key_metrics_line,
+      annualRevenue,
     ),
   };
 }

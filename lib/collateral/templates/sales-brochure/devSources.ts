@@ -43,6 +43,10 @@ export const SALES_BROCHURE_DEV_SOURCES: Record<string, string[]> = {
     "lib/collateral/templates/sales-brochure/BoldBrochure.tsx",
     "lib/collateral/templates/sales-brochure/bold/BoldLayout.tsx",
   ],
+  "sales-brochure-belle-2pg": [
+    "lib/collateral/templates/sales-brochure/BelleBrochure.tsx",
+    "lib/collateral/templates/sales-brochure/belle/BelleLayout.tsx",
+  ],
   "sales-brochure-refined-1pg": [
     "lib/collateral/templates/sales-brochure/RefinedBrochureOnePage.tsx",
     "lib/collateral/templates/sales-brochure/refined/RefinedLayout.tsx",

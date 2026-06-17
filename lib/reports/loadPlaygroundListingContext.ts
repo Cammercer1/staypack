@@ -1,4 +1,5 @@
 import { requireListingAccess } from "@/lib/auth/requireUser";
+import { loadDevListingAccess } from "@/lib/dev/loadDevListingAccess";
 import { resolvePlaygroundSalesBrochure } from "@/lib/collateral/sales-brochure/resolvePlaygroundSalesBrochure";
 import { resolvePlaygroundLeaseAppraisal } from "@/lib/lease-appraisal/resolvePlaygroundLeaseAppraisal";
 import {
@@ -9,7 +10,10 @@ import {
   type PlaygroundListingPreview,
 } from "@/lib/reports/playgroundListingPreview";
 import { resolvePlaygroundFinalReport } from "@/lib/reports/resolvePlaygroundFinalReport";
-import { isLeaseAppraisalReport } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
+import {
+  isLeaseAppraisalReport,
+  isLeaseAppraisalTemplateId,
+} from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
 import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
 import type { Agency, AgentProfile, CollateralItem, FinalReportJson, Listing, Report } from "@/lib/types";
 
@@ -45,14 +49,17 @@ async function loadReport(
   return (data as Report | null) ?? null;
 }
 
-/** Listing-scoped playground data: STR, lease, and sales brochure with current agency brand. */
-export async function loadPlaygroundListingContext(
+async function loadPlaygroundListingContextForAccess(
   listingId: string,
-): Promise<PlaygroundListingContext | null> {
-  try {
-    const { supabase, agency, listing } = await requireListingAccess(listingId);
+  access: {
+    supabase: Awaited<ReturnType<typeof requireListingAccess>>["supabase"];
+    agency: Agency;
+    listing: Listing;
+  },
+): Promise<PlaygroundListingContext> {
+  const { supabase, agency, listing } = access;
 
-    const { data: collaterals } = await supabase
+  const { data: collaterals } = await supabase
       .from("collateral_items")
       .select("*")
       .eq("listing_id", listingId)
@@ -122,6 +129,32 @@ export async function loadPlaygroundListingContext(
       }
     }
 
+    if (!leaseReport) {
+      const { data: leaseReports } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("listing_id", listingId)
+        .order("updated_at", { ascending: false });
+
+      for (const report of (leaseReports ?? []) as Report[]) {
+        if (!isLeaseAppraisalTemplateId(report.template_id)) {
+          continue;
+        }
+        const candidate = await resolvePlaygroundLeaseAppraisal({
+          supabase,
+          agency,
+          listing,
+          report,
+          collateral: leaseCollateral ?? null,
+        });
+        if (candidate) {
+          leaseReport = candidate;
+          leaseReportId = report.id;
+          break;
+        }
+      }
+    }
+
     const listingAgents = await loadPlaygroundListingAgents(supabase, agency, listing);
 
     if (strReport) {
@@ -149,25 +182,38 @@ export async function loadPlaygroundListingContext(
           listing.scraped_listing_json),
     );
 
-    return {
-      listingId,
-      agency,
-      listing,
-      propertyAddress: listing.property_address,
-      strReport,
-      strReportId,
-      leaseReport,
-      leaseReportId,
-      salesBrochure,
-      salesCollateralId: salesCollateral?.id ?? null,
-      hasLiveStr: Boolean(strReport),
-      hasLiveLease: Boolean(leaseReport),
-      hasLiveSales,
-      listingPreview: toPlaygroundListingPreview(listing),
-      agentProfile: listingAgents.agentProfile,
-      agencyAgents: listingAgents.agencyAgents,
-    };
+  return {
+    listingId,
+    agency,
+    listing,
+    propertyAddress: listing.property_address,
+    strReport,
+    strReportId,
+    leaseReport,
+    leaseReportId,
+    salesBrochure,
+    salesCollateralId: salesCollateral?.id ?? null,
+    hasLiveStr: Boolean(strReport),
+    hasLiveLease: Boolean(leaseReport),
+    hasLiveSales,
+    listingPreview: toPlaygroundListingPreview(listing),
+    agentProfile: listingAgents.agentProfile,
+    agencyAgents: listingAgents.agencyAgents,
+  };
+}
+
+/** Listing-scoped playground data: STR, lease, and sales brochure with current agency brand. */
+export async function loadPlaygroundListingContext(
+  listingId: string,
+): Promise<PlaygroundListingContext | null> {
+  try {
+    const access = await requireListingAccess(listingId);
+    return await loadPlaygroundListingContextForAccess(listingId, access);
   } catch {
-    return null;
+    const devAccess = await loadDevListingAccess(listingId);
+    if (!devAccess) {
+      return null;
+    }
+    return loadPlaygroundListingContextForAccess(listingId, devAccess);
   }
 }

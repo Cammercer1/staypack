@@ -1,4 +1,5 @@
 import { mergeAgencyBrandIntoCollateralDocument } from "@/lib/collateral/mergeAgencyBrand";
+import { applyFixedBrandKitToBrochureDocument } from "@/lib/collateral/applyFixedBrandKitToBrochureDocument";
 import { SALES_BROCHURE_CLASSIC_1PG_TEMPLATE_ID } from "@/lib/collateral/templates/ids";
 import { loadClassicBrochureMetricsForListing } from "@/lib/collateral/templates/sales-brochure/shared/loadClassicBrochureMetricsForListing";
 import {
@@ -70,6 +71,7 @@ export async function resolveSalesBrochurePrintDocument({
     document_json: CollateralDocumentJson;
     listing_id: string | null;
     agency_id: string;
+    template_id?: string | null;
   };
 }): Promise<CollateralDocumentJson> {
   let document = mergeAgencyBrandIntoCollateralDocument(agency, collateral.document_json);
@@ -107,7 +109,7 @@ export async function resolveSalesBrochurePrintDocument({
     return withAgents;
   }
 
-  return {
+  const withMeta = {
     ...withAgents,
     listing_image_meta: resolveListingImageMetaForPool(
       listing as Pick<
@@ -116,6 +118,12 @@ export async function resolveSalesBrochurePrintDocument({
       >,
     ),
   };
+
+  if (collateral.template_id) {
+    return applyFixedBrandKitToBrochureDocument(withMeta, collateral.template_id);
+  }
+
+  return withMeta;
 }
 
 export async function resolveBrochurePrintDocument(

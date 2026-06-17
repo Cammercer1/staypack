@@ -9,6 +9,8 @@ import { getMockSalesBrochureCopy } from "@/lib/collateral/buildSalesBrochureDoc
 import type { SalesBrochureCopyJson } from "@/lib/collateral/templates/types";
 import {
   PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
+  PAGE_ONE_COPY_MAX_ATTEMPTS,
+  buildPageOneCopyRepairPrompt,
   pageOneFromAiShape,
   pageOneMarketingCopyAiSchema,
 } from "@/lib/copy/pageOneMarketingCopy";
@@ -69,23 +71,26 @@ export async function generateSalesBrochureCopy({
   const userPayload = buildUserPayload({ agency, listing });
 
   const first = await requestCopy(client, userPayload);
-  const parsed = parseCopyResponse(first, agency);
+  let raw: unknown = first;
 
-  if (parsed.success) {
-    return parsed.data;
+  for (let attempt = 0; attempt < PAGE_ONE_COPY_MAX_ATTEMPTS; attempt += 1) {
+    const parsed = parseCopyResponse(raw, agency);
+
+    if (parsed.success) {
+      return parsed.data;
+    }
+
+    if (attempt === PAGE_ONE_COPY_MAX_ATTEMPTS - 1) {
+      throw new SalesBrochureCopyValidationError();
+    }
+
+    raw = await requestCopy(client, userPayload, {
+      invalidJson: raw,
+      validationErrors: parsed.error.flatten(),
+    });
   }
 
-  const repaired = await requestCopy(client, userPayload, {
-    invalidJson: first,
-    validationErrors: parsed.error.flatten(),
-  });
-  const repairedParsed = parseCopyResponse(repaired, agency);
-
-  if (!repairedParsed.success) {
-    throw new SalesBrochureCopyValidationError();
-  }
-
-  return repairedParsed.data;
+  throw new SalesBrochureCopyValidationError();
 }
 
 function buildUserPayload({ agency, listing }: { agency: Agency; listing: Listing }) {
@@ -165,7 +170,7 @@ async function requestCopy(
         {
           role: "user",
           content: repair
-            ? `Repair the invalid JSON below. Fix only validation issues and return valid JSON matching the schema.\n\nValidation errors:\n${JSON.stringify(repair.validationErrors)}\n\nInvalid JSON:\n${JSON.stringify(repair.invalidJson)}\n\nSource payload:\n${JSON.stringify(payload)}`
+            ? buildPageOneCopyRepairPrompt(payload, repair.invalidJson, repair.validationErrors)
             : `${JSON.stringify(payload)}\n\n${PAGE_ONE_MARKETING_COPY_JSON_CONTRACT}${
                 copyLimits ? `\n\n${copyLimits}` : ""
               }`,

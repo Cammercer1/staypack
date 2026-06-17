@@ -2,10 +2,12 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 import { ReportPreview } from "@/components/reports/ReportPreview";
+import { ReportBrochureInlineEditProvider } from "@/components/reports/inline/ReportBrochureEditableBridge";
 import { ReportEditableProvider } from "@/components/reports/inline/ReportEditableContext";
 import { cn } from "@/lib/utils";
 import type { ReportCopyFieldPath } from "@/lib/reports/editable/reportCopyPaths";
 import type { ReportImageSlot } from "@/lib/reports/editable/reportImageSlots";
+import type { MutableRefObject } from "react";
 import {
   getReportPageFormat,
   mmToPx,
@@ -26,6 +28,7 @@ type Props = {
     openImagePicker: (slot: ReportImageSlot) => void;
     brandPrimaryColour?: string;
     onFieldFocus?: (path: ReportCopyFieldPath | null) => void;
+    blurbFlushRef?: MutableRefObject<(() => string | null) | null>;
   };
 };
 
@@ -161,6 +164,7 @@ export function FittedReportPreview({
         )}
       >
         <div
+          className={editable ? "sales-brochure-inline-edit report-inline-edit" : undefined}
           style={{
             width: scaledWidth,
             height: scaledHeight,
@@ -192,14 +196,15 @@ export function FittedReportPreview({
                   setField={editable.setField}
                   openImagePicker={editable.openImagePicker}
                   onFieldFocus={editable.onFieldFocus}
+                  blurbFlushRef={editable.blurbFlushRef}
                 >
-                  <div className="report-inline-edit">
+                  <ReportBrochureInlineEditProvider config={editable}>
                     <ReportPreview
                       report={report}
                       printMode
                       orientation={orientation}
                     />
-                  </div>
+                  </ReportBrochureInlineEditProvider>
                 </ReportEditableProvider>
               ) : (
                 <ReportPreview report={report} printMode orientation={orientation} />

@@ -42,6 +42,17 @@ describe("template catalog metadata", () => {
     expect(entry?.defaultBlurbLength).toBe("long");
   });
 
+  it("marks belle templates as long blurb account layouts", () => {
+    for (const templateId of [
+      "belle-property-str",
+      "belle-property-lease-appraisal",
+      "sales-brochure-belle-2pg",
+    ]) {
+      const entry = getTemplateCatalogEntry(templateId);
+      expect(entry?.defaultBlurbLength).toBe("long");
+    }
+  });
+
   it("marks classic-detailed as platform with agency brand", () => {
     const entry = getTemplateCatalogEntry("classic-detailed");
     expect(entry?.scope).toBe("platform");

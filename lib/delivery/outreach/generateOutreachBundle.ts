@@ -1,4 +1,5 @@
 import { generateHeadlessSalesBrochure } from "@/lib/delivery/brochure/generateHeadlessSalesBrochure";
+import { applyLeaseAppraisalRentOverrides } from "@/lib/lease-appraisal/leaseAppraisalData";
 import { resolveDeliveryAgency } from "@/lib/delivery/brand/ensureShadowAgency";
 import { generateHeadlessLeaseAppraisal } from "@/lib/delivery/lease/generateHeadlessLeaseAppraisal";
 import { updateDeliveryListingScrapedJson } from "@/lib/delivery/listing/createDeliveryListing";
@@ -120,11 +121,35 @@ export async function generateOutreachBundle(
 
   if (deliverables.includes("lease_appraisal")) {
     try {
-      const enriched = await enrichListingRentalAppraisal(parsed, {
+      let enriched = await enrichListingRentalAppraisal(parsed, {
         rentAppraisalConfig: {
           tier: rentAppraisalTierSetting(tenant) ?? "auto",
         },
       });
+
+      const rentOverride = request.rent_override;
+      if (
+        rentOverride &&
+        (rentOverride.weekly_low != null ||
+          rentOverride.weekly_median != null ||
+          rentOverride.weekly_high != null)
+      ) {
+        const weeklyMidpoint =
+          rentOverride.weekly_median ??
+          (rentOverride.weekly_low != null && rentOverride.weekly_high != null
+            ? Math.round((rentOverride.weekly_low + rentOverride.weekly_high) / 2)
+            : null);
+
+        enriched = applyLeaseAppraisalRentOverrides(enriched, {
+          weeklyMin: rentOverride.weekly_low ?? null,
+          weeklyMax: rentOverride.weekly_high ?? null,
+          weeklyMidpoint,
+        });
+
+        warnings.push(
+          `Lease appraisal indicative rent overridden by request (low ${rentOverride.weekly_low ?? "—"}, median ${weeklyMidpoint ?? "—"}, high ${rentOverride.weekly_high ?? "—"}).`,
+        );
+      }
 
       if (
         enriched.rentalAppraisal?.weeklyMin == null ||

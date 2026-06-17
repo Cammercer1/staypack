@@ -13,11 +13,7 @@ import { ChevronDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Button } from "@/components/ui/button";
-import {
-  CopyEditorContextMetric,
-  CopyEditorField,
-  CopyEditorUnsavedBar,
-} from "@/components/copy-editor/primitives";
+import { CopyEditorContextMetric, CopyEditorField } from "@/components/copy-editor/primitives";
 import { BlurbVariantsEditor } from "@/components/collateral/sales-brochure/BlurbVariantsEditor";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { ReportImagePickerDialog } from "@/components/reports/inline/ReportImagePickerDialog";
@@ -115,6 +111,7 @@ export const LeaseAppraisalCopyEditor = forwardRef<
     copyFromReport(report),
   );
   const copyRef = useRef(copy);
+  const blurbFlushRef = useRef<(() => string | null) | null>(null);
   const [propertyImages, setPropertyImages] = useState<ReportPropertyImageSelection | null>(
     () => propertyImagesFromReport(report),
   );
@@ -225,6 +222,16 @@ export const LeaseAppraisalCopyEditor = forwardRef<
   const flushPendingEdits = useCallback(() => {
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
+    }
+    const flushedBlurb = blurbFlushRef.current?.();
+    if (flushedBlurb != null && copyRef.current) {
+      const next = setReportCopyValueAtPath(
+        copyRef.current,
+        "copy.blurb",
+        flushedBlurb,
+      ) as LeaseAppraisalCopy;
+      copyRef.current = next;
+      setCopy(next);
     }
   }, []);
 
@@ -532,6 +539,7 @@ export const LeaseAppraisalCopyEditor = forwardRef<
                 setField: handleInlineSetField,
                 openImagePicker: handleOpenImagePicker,
                 brandPrimaryColour: previewReport.agency.primary_colour,
+                blurbFlushRef,
               }}
             />
 
@@ -655,13 +663,35 @@ export const LeaseAppraisalCopyEditor = forwardRef<
       </div>
 
       {copy && isDirty ? (
-        <CopyEditorUnsavedBar
-          saving={saving}
-          generating={generating}
-          saveLabel="Save appraisal"
-          description="Save your appraisal before continuing to preview."
-          onSave={() => void persistCopy()}
-        />
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-x-0 bottom-0 z-50 border-t border-amber-200/90 bg-amber-50/95 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm dark:border-amber-800/60 dark:bg-amber-950/95"
+        >
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap">
+            <div className="min-w-0 space-y-0.5">
+              <p className="text-sm font-semibold text-foreground">Unsaved changes</p>
+              <p className="text-xs text-muted-foreground">
+                Save your appraisal before continuing to preview.
+              </p>
+            </div>
+            <Button
+              size="lg"
+              className="shrink-0 shadow-md"
+              disabled={saving || generating}
+              onClick={() => void persistCopy()}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                "Save appraisal"
+              )}
+            </Button>
+          </div>
+        </div>
       ) : null}
     </AsyncLoadingOverlay>
   );

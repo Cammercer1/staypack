@@ -50,6 +50,12 @@ export const HEADING_FONT_PRESETS: FontPreset[] = [
     googleFont: "Oswald",
   },
   {
+    id: "quiche-sans",
+    label: "Quiche Sans · Belle",
+    description: "Adobe Typekit serif for Belle Property Group headings.",
+    family: '"quiche-sans", Georgia, "Times New Roman", Times, serif',
+  },
+  {
     id: "libre-baskerville",
     label: "Libre Baskerville · traditional",
     description: "Traditional serif for established agencies.",

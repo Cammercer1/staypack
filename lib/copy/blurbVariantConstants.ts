@@ -30,7 +30,7 @@ export function getBlurbVariantsAiContract(): string {
 }
 
 export function getBlurbVariantsPromptLimits(): string {
-  return `Blurb limits:
+  return `Strict character limits (responses over these limits are rejected — rewrite shorter, never truncate):
 - blurb_short: 1 paragraph, max ${BLURB_PARAGRAPH_MAX} characters
 - blurb_medium_paragraphs: exactly 2 paragraphs, max ${BLURB_PARAGRAPH_MAX} characters each
 - blurb_long_paragraphs: exactly 3 paragraphs, max ${BLURB_PARAGRAPH_MAX} characters each`;
