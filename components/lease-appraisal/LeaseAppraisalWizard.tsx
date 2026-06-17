@@ -20,7 +20,15 @@ import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportFo
 import { hasLeaseAppraisalComps } from "@/lib/lease-appraisal/generateLeaseAppraisalForListing";
 import { hasLeaseAppraisalSelectedComps } from "@/lib/lease-appraisal/leaseAppraisalData";
 import { LEASE_APPRAISAL_LABEL } from "@/lib/listings/collateralTypes";
-import type { Agency, AgentProfile, CollateralItem, FinalReportJson, Listing, Report } from "@/lib/types";
+import type {
+  Agency,
+  AgentProfile,
+  CollateralItem,
+  FinalReportJson,
+  LeaseAppraisalJob,
+  Listing,
+  Report,
+} from "@/lib/types";
 
 const PREVIEW_SYNC_MIN_MS = 400;
 
@@ -62,8 +70,11 @@ export function LeaseAppraisalWizard({
     () => (initialReport.final_report_json as FinalReportJson | null) ?? null,
   );
   const [compsPrefetching, setCompsPrefetching] = useState(false);
+  const [leaseAppraisalJob, setLeaseAppraisalJob] =
+    useState<LeaseAppraisalJob | null>(null);
   const compsPrefetchStartedRef = useRef(false);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- wizard state mirrors server-provided props and refreshed listing/report payloads. */
   useEffect(() => {
     setListing(initialListing);
   }, [initialListing]);
@@ -89,6 +100,7 @@ export function LeaseAppraisalWizard({
 
   useEffect(() => {
     compsPrefetchStartedRef.current = false;
+    setLeaseAppraisalJob(null);
   }, [listing.id]);
 
   useEffect(() => {
@@ -113,6 +125,9 @@ export function LeaseAppraisalWizard({
         if (!cancelled && payload.listing) {
           setListing(payload.listing as Listing);
         }
+        if (!cancelled && payload.job) {
+          setLeaseAppraisalJob(payload.job as LeaseAppraisalJob);
+        }
       })
       .catch(() => {
         // User can refresh on the Appraisal data step.
@@ -127,6 +142,7 @@ export function LeaseAppraisalWizard({
       cancelled = true;
     };
   }, [listing.id, listing.scraped_listing_json]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     return () => {
@@ -255,8 +271,10 @@ export function LeaseAppraisalWizard({
           {hasTemplate ? (
             <LeaseAppraisalDataStep
               listing={listing}
+              activeJob={leaseAppraisalJob}
               compsPrefetching={compsPrefetching}
               onListingChange={setListing}
+              onJobChange={setLeaseAppraisalJob}
               onContinue={() => setStep("copy")}
             />
           ) : (

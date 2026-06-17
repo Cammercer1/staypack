@@ -134,9 +134,11 @@ export async function createLeaseAppraisalDraft({
 export async function enrichListingForLeaseAppraisal({
   supabase,
   listing,
+  requestId,
 }: {
   supabase: SupabaseClient;
   listing: Listing;
+  requestId?: string;
 }): Promise<{ listing: Listing; parsed: ParsedListing; warnings: string[] }> {
   assertSaleListing(listing);
   assertScrapedListing(listing);
@@ -147,10 +149,10 @@ export async function enrichListingForLeaseAppraisal({
   const previousStatus = leaseAppraisalEnrichmentStatus(
     listing.scraped_listing_json,
   );
-  const requestId = previousStatus?.requestId ?? randomUUID();
+  const enrichmentRequestId = requestId ?? previousStatus?.requestId ?? randomUUID();
   const completedParsed = withLeaseAppraisalEnrichmentStatus(
     parsed,
-    completedLeaseAppraisalEnrichmentStatus(previousStatus, requestId),
+    completedLeaseAppraisalEnrichmentStatus(previousStatus, enrichmentRequestId),
   );
 
   const { data: updatedListing, error: listingError } = await supabase

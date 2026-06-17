@@ -17,18 +17,19 @@ import {
   defaultSelectedCompListingIds,
   orderLeaseAppraisalCompPool,
 } from "@/lib/lease-appraisal/leaseAppraisalData";
-import { isLeaseAppraisalEnrichmentActive } from "@/lib/lease-appraisal/enrichmentStatus";
 import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import { cn } from "@/lib/utils";
-import type { Listing } from "@/lib/types";
+import type { LeaseAppraisalJob, Listing } from "@/lib/types";
 
 const POLL_INTERVAL_MS = 10000;
 
 type Props = {
   listing: Listing;
+  activeJob?: LeaseAppraisalJob | null;
   compsPrefetching?: boolean;
   onListingChange: (listing: Listing) => void;
+  onJobChange?: (job: LeaseAppraisalJob | null) => void;
   onContinue: () => void;
 };
 
@@ -38,8 +39,10 @@ type ApiError = {
 
 export function LeaseAppraisalDataStep({
   listing,
+  activeJob = null,
   compsPrefetching = false,
   onListingChange,
+  onJobChange,
   onContinue,
 }: Props) {
   const parsed = listing.scraped_listing_json;
@@ -48,15 +51,14 @@ export function LeaseAppraisalDataStep({
     [parsed],
   );
   const appraisal = parsed?.rentalAppraisal;
-  const enrichmentStatus = parsed?.leaseAppraisalEnrichment ?? null;
-  const enrichmentProcessing = isLeaseAppraisalEnrichmentActive(enrichmentStatus);
-  const enrichmentStale =
-    enrichmentStatus?.status === "processing" && !enrichmentProcessing;
-  const enrichmentFailed = enrichmentStatus?.status === "failed";
+  const jobProcessing =
+    activeJob?.status === "pending" || activeJob?.status === "processing";
+  const jobFailed = activeJob?.status === "failed";
 
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
   const pollErrorShownRef = useRef(false);
+  const jobCompletionToastRef = useRef<string | null>(null);
   const [weeklyMin, setWeeklyMin] = useState<string>(
     () => String(appraisal?.weeklyMin ?? ""),
   );
@@ -76,7 +78,7 @@ export function LeaseAppraisalDataStep({
     return [];
   });
 
-  /* eslint-disable react-hooks/set-state-in-effect -- sync editable fields when async enrichment refreshes the listing. */
+  /* eslint-disable react-hooks/set-state-in-effect -- sync editable fields when job polling refreshes the listing. */
   useEffect(() => {
     setWeeklyMin(String(appraisal?.weeklyMin ?? ""));
     setWeeklyMax(String(appraisal?.weeklyMax ?? ""));
@@ -112,40 +114,53 @@ export function LeaseAppraisalDataStep({
   }, [weeklyMin, weeklyMax, weeklyMid]);
 
   const compsReady = hasLeaseAppraisalComps(parsed);
-  const initialCompsProcessing = enrichmentProcessing && !compsReady;
-  const refreshingComps = enrichmentProcessing && compsReady;
+  const initialCompsProcessing = jobProcessing && !compsReady;
+  const refreshingComps = jobProcessing && compsReady;
   const canContinue = compsReady && selectedIds.length > 0;
 
   useEffect(() => {
-    if (!enrichmentProcessing) {
+    if (!jobProcessing || !activeJob?.id) {
       return;
     }
 
+    const jobId = activeJob.id;
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | null = null;
 
     async function pollListing() {
       try {
-        const response = await fetch(`/api/listings/${listing.id}`, {
-          cache: "no-store",
-        });
+        const response = await fetch(
+          `/api/listings/${listing.id}/lease-appraisal/jobs/${jobId}`,
+          { cache: "no-store" },
+        );
         const payload = await response.json();
         if (!response.ok) {
           throw new Error(payload.error ?? "Unable to refresh appraisal data");
         }
 
+        const nextJob = payload.job as LeaseAppraisalJob | undefined;
         const nextListing = payload.listing as Listing | undefined;
+        if (!cancelled && nextJob) {
+          onJobChange?.(nextJob);
+        }
         if (!cancelled && nextListing) {
           onListingChange(nextListing);
-          const nextParsed = nextListing.scraped_listing_json;
-          const nextStatus = nextParsed?.leaseAppraisalEnrichment?.status;
-          if (
-            hasLeaseAppraisalComps(nextParsed) ||
-            nextStatus === "completed" ||
-            nextStatus === "failed"
-          ) {
+        }
+        if (!cancelled && nextJob) {
+          if (nextJob.status === "completed" || nextJob.status === "failed") {
             if (interval) {
               clearInterval(interval);
+            }
+            if (jobCompletionToastRef.current !== nextJob.id) {
+              jobCompletionToastRef.current = nextJob.id;
+              if (nextJob.status === "completed") {
+                toast.success("Rental comps updated");
+              } else {
+                toast.error(
+                  nextJob.error_message ??
+                    "Rental comps failed to update. Refresh comps to try again.",
+                );
+              }
             }
           }
         }
@@ -173,9 +188,10 @@ export function LeaseAppraisalDataStep({
       }
     };
   }, [
-    enrichmentProcessing,
-    enrichmentStatus?.requestId,
+    activeJob?.id,
     listing.id,
+    jobProcessing,
+    onJobChange,
     onListingChange,
   ]);
 
@@ -204,6 +220,9 @@ export function LeaseAppraisalDataStep({
       }
       if (payload.listing) {
         onListingChange(payload.listing as Listing);
+      }
+      if (payload.job) {
+        onJobChange?.(payload.job as LeaseAppraisalJob);
       }
       if (!options?.silent) {
         toast.success(
@@ -281,7 +300,7 @@ export function LeaseAppraisalDataStep({
             ? refreshingComps
               ? "Comparable rentals are refreshing in the background. Current comps remain available while the appraisal updates."
               : `Comps are sorted with ${listing.suburb ?? "your suburb"} first, then nearby areas. Review the rent band, pick up to four for page 2, and use Refresh to re-fetch from REA.`
-            : enrichmentProcessing
+            : jobProcessing
               ? "Comparable rentals are being fetched in the background. This page will update when they are ready."
               : "Comparable rentals load when you start the appraisal. Adjust the weekly rent band if needed, then choose featured comps."}
         </p>
@@ -294,11 +313,9 @@ export function LeaseAppraisalDataStep({
             <Badge variant="secondary">Refreshing</Badge>
           ) : compsReady ? (
             <Badge variant="secondary">Ready</Badge>
-          ) : enrichmentProcessing ? (
+          ) : jobProcessing ? (
             <Badge variant="secondary">Fetching</Badge>
-          ) : enrichmentStale ? (
-            <Badge variant="outline">Retry needed</Badge>
-          ) : enrichmentFailed ? (
+          ) : jobFailed ? (
             <Badge variant="destructive">Failed</Badge>
           ) : (
             <Badge variant="outline">Required</Badge>
@@ -310,7 +327,7 @@ export function LeaseAppraisalDataStep({
           onClick={() => void fetchComps()}
           disabled={loading || refreshingComps}
         >
-          {compsPrefetching || fetching || enrichmentProcessing ? (
+          {compsPrefetching || fetching || jobProcessing ? (
             <>
               <Loader2 className="animate-spin" />
               Fetching comps...
@@ -326,19 +343,15 @@ export function LeaseAppraisalDataStep({
             The current comps are shown below. The refresh will replace them when
             it finishes.
           </p>
-        ) : enrichmentProcessing ? (
+        ) : jobProcessing ? (
           <p className="text-sm text-muted-foreground">
             REA comps can take 1–3 minutes. You can keep this tab open while the
             appraisal updates.
           </p>
-        ) : enrichmentFailed ? (
+        ) : jobFailed ? (
           <p className="text-sm text-destructive">
-            {enrichmentStatus?.error ??
+            {activeJob?.error_message ??
               "Rental comps failed to update. Refresh comps to try again."}
-          </p>
-        ) : enrichmentStale ? (
-          <p className="text-sm text-muted-foreground">
-            The last comp fetch did not finish. Refresh comps to try again.
           </p>
         ) : null}
       </div>

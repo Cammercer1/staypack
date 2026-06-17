@@ -11,6 +11,30 @@ export type ReportStatus =
 
 export type ScrapeJobStatus = "pending" | "success" | "failed";
 
+export type LeaseAppraisalJobStatus =
+  | "pending"
+  | "processing"
+  | "completed"
+  | "failed";
+
+export type LeaseAppraisalJob = {
+  id: string;
+  agency_id: string;
+  listing_id: string;
+  created_by: string | null;
+  status: LeaseAppraisalJobStatus;
+  attempts: number;
+  request_json: Record<string, unknown>;
+  result_json: Record<string, unknown> | null;
+  error_message: string | null;
+  started_at: string | null;
+  heartbeat_at: string | null;
+  completed_at: string | null;
+  failed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ListingImageRole = "photo" | "floor_plan";
 
 export type LeaseAppraisalEnrichmentStatus = {
