@@ -1,8 +1,10 @@
 import { formatCurrency } from "@/lib/reports/formatters";
 import { STR_ANNUAL_REVENUE_LABEL } from "@/lib/reports/resolveStrBrochurePrice";
 import { LtrRentBlock } from "@/lib/reports/templates/shared/LtrRentBlock";
+import { SalePriceBlock } from "@/lib/reports/templates/shared/SalePriceBlock";
 import {
   isLeasePageVariant,
+  isSalesAppraisalPageVariant,
   resolveReportPageVariant,
   type ReportPageVariant,
 } from "@/lib/reports/templates/shared/reportPageVariant";
@@ -61,6 +63,9 @@ export function StrRevenueBlock({
   if (isLeasePageVariant(variant)) {
     return <LtrRentBlock report={report} compact={compact} onAccent={onAccent} />;
   }
+  if (isSalesAppraisalPageVariant(variant)) {
+    return <SalePriceBlock report={report} compact={compact} onAccent={onAccent} />;
+  }
 
   const { str, copy } = report;
   if (!str.annual_revenue) return null;
@@ -115,7 +120,8 @@ export function StrStatRow({
   report: FinalReportJson;
   reportVariant?: ReportPageVariant;
 }) {
-  if (isLeasePageVariant(resolveReportPageVariant(report, reportVariant))) {
+  const variant = resolveReportPageVariant(report, reportVariant);
+  if (isLeasePageVariant(variant) || isSalesAppraisalPageVariant(variant)) {
     return null;
   }
 

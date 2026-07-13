@@ -6,7 +6,13 @@ import { serializeTemplateForApi } from "@/lib/templates/serializeForApi";
 import type { TemplateProduct } from "@/lib/templates/types";
 
 const querySchema = z.object({
-  product: z.enum(["str", "lease", "sales_brochure", "rental_brochure"]),
+  product: z.enum([
+    "str",
+    "lease",
+    "sales_appraisal",
+    "sales_brochure",
+    "rental_brochure",
+  ]),
 });
 
 export async function GET(request: Request) {
@@ -19,7 +25,7 @@ export async function GET(request: Request) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Query param product is required (str, lease, sales_brochure, rental_brochure)" },
+        { error: "Query param product is required (str, lease, sales_appraisal, sales_brochure, rental_brochure)" },
         { status: 400 },
       );
     }

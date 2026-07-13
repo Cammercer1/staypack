@@ -11,6 +11,7 @@ import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics
 import { resolveFinalReportForPrint } from "@/lib/reports/resolveFinalReportForPrint";
 import { resolveStoredFinalReport } from "@/lib/reports/resolveStoredFinalReport";
 import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
+import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSalesAppraisalReport";
 import { ReportPreview } from "@/components/reports/ReportPreview";
 import type { Agency, FinalReportJson, Listing } from "@/lib/types";
 
@@ -68,6 +69,10 @@ export default async function PublicReportPrintPage({
     report.template_id ??
       (report.final_report_json as FinalReportJson).template_id,
   );
+  const isSalesAppraisal = isSalesAppraisalTemplateId(
+    report.template_id ??
+      (report.final_report_json as FinalReportJson).template_id,
+  );
 
   const storedReport =
     resolveStoredFinalReport(report) ??
@@ -89,7 +94,7 @@ export default async function PublicReportPrintPage({
     { agentProfile, agencyAgents: agencyAgents ?? [] },
   );
 
-  if (!isLease && report.raw_airbtics_json) {
+  if (!isLease && !isSalesAppraisal && report.raw_airbtics_json) {
     enriched = refreshStrEnrichmentInFinalReport(enriched, report.raw_airbtics_json);
   }
 

@@ -2,10 +2,12 @@ import type { CollateralType, ListingPurpose } from "@/lib/types";
 
 export const STR_REPORT_LABEL = "Short-Term Rental Report";
 export const LEASE_APPRAISAL_LABEL = "Long-term rental appraisal";
+export const SALES_APPRAISAL_LABEL = "Sales appraisal";
 
 export const COLLATERAL_TYPE_ORDER: CollateralType[] = [
-  "sales_brochure",
+  "sales_appraisal",
   "lease_appraisal",
+  "sales_brochure",
   "rental_brochure",
   "investor_snapshot",
   "str_report",
@@ -18,7 +20,10 @@ export function collateralOrderForPurpose(
 ): CollateralType[] {
   return COLLATERAL_TYPE_ORDER.filter((type) =>
     purpose === "lease"
-      ? type !== "str_report" && type !== "sales_brochure" && type !== "lease_appraisal"
+      ? type !== "str_report" &&
+        type !== "sales_brochure" &&
+        type !== "lease_appraisal" &&
+        type !== "sales_appraisal"
       : type !== "rental_brochure",
   );
 }
@@ -43,6 +48,11 @@ export const COLLATERAL_TYPE_META: Record<
     label: LEASE_APPRAISAL_LABEL,
     description:
       "Investor-facing rental appraisal with REA rent comps, weekly rent range, and suburb context (for sale listings).",
+  },
+  sales_appraisal: {
+    label: SALES_APPRAISAL_LABEL,
+    description:
+      "Vendor-facing sales appraisal with recently sold and for-sale REA comps and an estimated sale price range.",
   },
   social_posts: {
     label: "Social posts",
@@ -72,6 +82,8 @@ export function collateralEditorPath(
       return `/listings/${listingId}/lease-brochure`;
     case "lease_appraisal":
       return `/listings/${listingId}/lease-appraisal`;
+    case "sales_appraisal":
+      return `/listings/${listingId}/sales-appraisal`;
     case "social_posts":
       return `/listings/${listingId}/social`;
     default:
@@ -85,4 +97,8 @@ export function reportEditorPath(listingId: string, reportId: string): string {
 
 export function leaseAppraisalEditorPath(listingId: string): string {
   return `/listings/${listingId}/lease-appraisal`;
+}
+
+export function salesAppraisalEditorPath(listingId: string): string {
+  return `/listings/${listingId}/sales-appraisal`;
 }

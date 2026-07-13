@@ -61,6 +61,9 @@ export function resolveCopyForTemplate({
 }
 
 export function collateralForReportTemplate(templateId: string): ReportPageVariant {
+  if (templateId.includes("sales-appraisal")) {
+    return "sales_appraisal";
+  }
   if (templateId.includes("lease-appraisal")) {
     return "lease";
   }

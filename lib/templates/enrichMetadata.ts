@@ -33,6 +33,7 @@ function isBelleBrochureTemplateId(templateId: string): boolean {
 }
 
 function reportProduct(templateId: string): TemplateProduct {
+  if (templateId.includes("sales-appraisal")) return "sales_appraisal";
   return templateId.includes("lease-appraisal") ? "lease" : "str";
 }
 

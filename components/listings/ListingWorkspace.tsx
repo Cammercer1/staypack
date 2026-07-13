@@ -15,6 +15,7 @@ import {
   FileText,
   Globe,
   IdCard,
+  Landmark,
   Link2,
   Loader2,
   PieChart,
@@ -35,6 +36,7 @@ import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
 import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
 import { ScrapedListingReviewStep } from "@/components/reports/ScrapedListingReviewStep";
 import { CreateLeaseAppraisalButton } from "@/components/listings/CreateLeaseAppraisalButton";
+import { CreateSalesAppraisalButton } from "@/components/listings/CreateSalesAppraisalButton";
 import { CreateStrReportButton } from "@/components/listings/CreateStrReportButton";
 import { ListingAgentsStrip } from "@/components/listings/ListingAgentsStrip";
 import { CollateralPdfButton } from "@/components/collateral/CollateralPdfButton";
@@ -50,9 +52,12 @@ import {
   collateralEditorPath,
   collateralOrderForPurpose,
   leaseAppraisalEditorPath,
+  salesAppraisalEditorPath,
 } from "@/lib/listings/collateralTypes";
 import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
+import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSalesAppraisalReport";
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
+import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
 import { formatCurrency } from "@/lib/reports/formatters";
 import type {
   CollateralItem,
@@ -70,6 +75,7 @@ const COLLATERAL_ICONS: Record<CollateralType, typeof FileText> = {
   sales_brochure: ScrollText,
   rental_brochure: BookOpen,
   lease_appraisal: ClipboardList,
+  sales_appraisal: Landmark,
   social_posts: Share2,
   investor_snapshot: PieChart,
   agent_business_card: IdCard,
@@ -507,7 +513,8 @@ function CollateralTab({
                 ? reports.find(
                     (report) =>
                       report.status !== "archived" &&
-                      !isLeaseAppraisalTemplateId(report.template_id),
+                      !isLeaseAppraisalTemplateId(report.template_id) &&
+                      !isSalesAppraisalTemplateId(report.template_id),
                   ) ?? null
                 : null;
           const leaseAppraisalReport =
@@ -520,7 +527,21 @@ function CollateralTab({
                       isLeaseAppraisalTemplateId(report.template_id),
                   ) ?? null
                 : null;
+          const salesAppraisalReport =
+            type === "sales_appraisal" && item?.report_id
+              ? reportsById.get(item.report_id) ?? null
+              : type === "sales_appraisal"
+                ? reports.find(
+                    (report) =>
+                      report.status !== "archived" &&
+                      isSalesAppraisalTemplateId(report.template_id),
+                  ) ?? null
+                : null;
           const leaseAppraisalFinal = leaseAppraisalReport?.final_report_json as
+            | FinalReportJson
+            | null
+            | undefined;
+          const salesAppraisalFinal = salesAppraisalReport?.final_report_json as
             | FinalReportJson
             | null
             | undefined;
@@ -529,7 +550,9 @@ function CollateralTab({
               ? Boolean(strReport)
               : type === "lease_appraisal"
                 ? Boolean(leaseAppraisalReport)
-                : Boolean(item);
+                : type === "sales_appraisal"
+                  ? Boolean(salesAppraisalReport)
+                  : Boolean(item);
           const photosRemaining = Math.max(
             photoRequirement.minimum - photoRequirement.count,
             1,
@@ -554,6 +577,8 @@ function CollateralTab({
                   <StatusBadge status={strReport.status} />
                 ) : leaseAppraisalReport ? (
                   <StatusBadge status={leaseAppraisalReport.status} />
+                ) : salesAppraisalReport ? (
+                  <StatusBadge status={salesAppraisalReport.status} />
                 ) : item ? (
                   <Badge variant="secondary">{item.status}</Badge>
                 ) : null}
@@ -599,6 +624,12 @@ function CollateralTab({
                   market context — not a tenant lease brochure.
                 </p>
               ) : null}
+              {type === "sales_appraisal" && salesAppraisalFinal ? (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Two-page vendor appraisal with recently sold and for-sale REA
+                  comparables and an estimated sale price range.
+                </p>
+              ) : null}
               {(type === "sales_brochure" || type === "rental_brochure") &&
               !item?.document_json ? (
                 <p className="mt-4 text-sm text-muted-foreground">
@@ -628,6 +659,24 @@ function CollateralTab({
                     <>
                       {" "}
                       · {leaseAppraisalFinal.ltr_enrichment.comp_count} comps
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
+              {salesAppraisalFinal?.sale_estimate?.price_min != null &&
+              salesAppraisalFinal.sale_estimate.price_max != null ? (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Estimated sale price:{" "}
+                  <span className="font-medium text-foreground">
+                    {formatSalePriceRange(
+                      salesAppraisalFinal.sale_estimate.price_min,
+                      salesAppraisalFinal.sale_estimate.price_max,
+                    )}
+                  </span>
+                  {salesAppraisalFinal.sales_enrichment?.comp_count ? (
+                    <>
+                      {" "}
+                      · {salesAppraisalFinal.sales_enrichment.comp_count} comps
                     </>
                   ) : null}
                 </p>
@@ -692,6 +741,28 @@ function CollateralTab({
                     </>
                   ) : (
                     <CreateLeaseAppraisalButton
+                      listingId={listing.id}
+                      photoRequirement={photoRequirement}
+                    />
+                  )
+                ) : type === "sales_appraisal" ? (
+                  salesAppraisalReport ? (
+                    <>
+                      <Link href={salesAppraisalEditorPath(listing.id)}>
+                        <Button size="sm">Edit</Button>
+                      </Link>
+                      {salesAppraisalReport.pdf_url ? (
+                        <DownloadPdfButton
+                          url={salesAppraisalReport.pdf_url}
+                          reportId={salesAppraisalReport.id}
+                          cacheVersion={salesAppraisalReport.updated_at}
+                          canGenerate={false}
+                          downloadLabel="Download asset"
+                        />
+                      ) : null}
+                    </>
+                  ) : (
+                    <CreateSalesAppraisalButton
                       listingId={listing.id}
                       photoRequirement={photoRequirement}
                     />

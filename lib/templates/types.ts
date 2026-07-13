@@ -6,6 +6,7 @@ import type { CollateralType } from "@/lib/types";
 export type TemplateProduct =
   | "str"
   | "lease"
+  | "sales_appraisal"
   | "sales_brochure"
   | "rental_brochure";
 

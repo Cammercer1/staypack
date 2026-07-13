@@ -32,6 +32,15 @@ export async function POST(
       );
     }
 
+    if (collateral.type === "sales_appraisal") {
+      return NextResponse.json(
+        {
+          error: "Use the Sales appraisal editor to regenerate this report",
+        },
+        { status: 400 },
+      );
+    }
+
     if (listing) {
       const purposeError = collateralPurposeMismatchError(listing, collateral.type);
       if (purposeError) {

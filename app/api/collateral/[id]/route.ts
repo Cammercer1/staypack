@@ -27,6 +27,7 @@ import {
 } from "@/lib/collateral/templates/types";
 import { isValidCollateralTemplateId } from "@/lib/collateral/templates/ids";
 import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
+import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSalesAppraisalReport";
 import { assertTemplateGranted } from "@/lib/templates/grants/assertTemplateGranted";
 import { templateGrantErrorResponse } from "@/lib/templates/grants/apiErrors";
 import type { Agency } from "@/lib/types";
@@ -46,6 +47,21 @@ const updateLeaseAppraisalCollateralSchema = z
       .refine(
         (value) => value == null || isLeaseAppraisalTemplateId(value),
         { message: "Select a valid lease appraisal template" },
+      ),
+  })
+  .refine((data) => data.template_id !== undefined, {
+    message: "Provide template_id",
+  });
+
+const updateSalesAppraisalCollateralSchema = z
+  .object({
+    template_id: z
+      .string()
+      .nullable()
+      .optional()
+      .refine(
+        (value) => value == null || isSalesAppraisalTemplateId(value),
+        { message: "Select a valid sales appraisal template" },
       ),
   })
   .refine((data) => data.template_id !== undefined, {
@@ -76,6 +92,10 @@ export async function PATCH(
       return patchLeaseAppraisal(request, supabase, agency, collateral);
     }
 
+    if (collateral.type === "sales_appraisal") {
+      return patchSalesAppraisal(request, supabase, agency, collateral);
+    }
+
     return NextResponse.json(
       { error: "This collateral type cannot be updated with this endpoint" },
       { status: 400 },
@@ -98,6 +118,40 @@ async function patchLeaseAppraisal(
   collateral: Awaited<ReturnType<typeof requireCollateralAccess>>["collateral"],
 ) {
   const body = updateLeaseAppraisalCollateralSchema.parse(await request.json());
+
+  if (body.template_id) {
+    try {
+      await assertTemplateGranted(agency.id, body.template_id);
+    } catch (grantError) {
+      const denied = templateGrantErrorResponse(grantError);
+      if (denied) {
+        return denied;
+      }
+      throw grantError;
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("collateral_items")
+    .update({ template_id: body.template_id ?? null })
+    .eq("id", collateral.id)
+    .select("*")
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  return NextResponse.json({ collateral: data });
+}
+
+async function patchSalesAppraisal(
+  request: Request,
+  supabase: Awaited<ReturnType<typeof requireCollateralAccess>>["supabase"],
+  agency: Awaited<ReturnType<typeof requireCollateralAccess>>["agency"],
+  collateral: Awaited<ReturnType<typeof requireCollateralAccess>>["collateral"],
+) {
+  const body = updateSalesAppraisalCollateralSchema.parse(await request.json());
 
   if (body.template_id) {
     try {

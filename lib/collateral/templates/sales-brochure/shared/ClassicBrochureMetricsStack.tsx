@@ -1,4 +1,5 @@
 import { resolveLeaseBrochurePriceValue } from "@/lib/reports/resolveLeaseBrochurePriceValue";
+import { resolveSalesAppraisalBrochurePriceValue } from "@/lib/reports/resolveSalesAppraisalBrochurePriceValue";
 import {
   resolveStrBrochurePriceLabel,
   resolveStrBrochurePriceValue,
@@ -8,6 +9,7 @@ import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
 import {
   isLeasePageVariant,
   isSalePageVariant,
+  isSalesAppraisalPageVariant,
   isStrPageVariant,
   resolveReportPageVariant,
   type ReportPageVariant,
@@ -51,6 +53,19 @@ function resolveClassicBrochureMetric(
       label: "Indicative rent",
       value: leaseRent,
       subline: "per week",
+    };
+  }
+
+  if (isSalesAppraisalPageVariant(variant)) {
+    const salePrice = resolveSalesAppraisalBrochurePriceValue(report);
+    if (!salePrice) {
+      return null;
+    }
+    return {
+      id: "sale_price",
+      label: "Estimated sale price",
+      value: salePrice,
+      subline: "indicative guide",
     };
   }
 

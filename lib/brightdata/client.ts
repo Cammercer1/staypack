@@ -129,13 +129,14 @@ function isReaDiscoverListingRecord(entry: Record<string, unknown>) {
   if (entry.error) {
     return false;
   }
-  if (entry.snapshot_id && !entry.street_address && entry.rent_price == null) {
+  if (entry.snapshot_id && !entry.street_address && entry.rent_price == null && entry.estimated_price == null) {
     return false;
   }
   return (
     typeof entry.url === "string" ||
     typeof entry.street_address === "string" ||
-    typeof entry.rent_price === "number"
+    typeof entry.rent_price === "number" ||
+    typeof entry.estimated_price === "string"
   );
 }
 

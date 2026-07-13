@@ -6,12 +6,14 @@ import { resolveBrochureTemplateIdForReport } from "@/lib/reports/templates/sale
 import { familyFromTemplateId } from "@/lib/reports/templates/playgroundResolve";
 import type { SalesBrochureDocumentJson } from "@/lib/collateral/templates/types";
 import { resolveLeaseBrochurePriceValue } from "@/lib/reports/resolveLeaseBrochurePriceValue";
+import { resolveSalesAppraisalBrochurePriceValue } from "@/lib/reports/resolveSalesAppraisalBrochurePriceValue";
 import {
   resolveStrBrochurePriceLabel,
   resolveStrBrochurePriceValue,
 } from "@/lib/reports/resolveStrBrochurePrice";
 import {
   isLeasePageVariant,
+  isSalesAppraisalPageVariant,
   isStrPageVariant,
   resolveReportPageVariant,
   type ReportPageVariant,
@@ -133,14 +135,18 @@ export function finalReportToBrochureShape(
       disclaimer: report.copy.disclaimer ?? "",
       price_label: isLeasePageVariant(variant)
         ? "Indicative rent"
-        : isStrPageVariant(variant)
-          ? resolveStrBrochurePriceLabel()
-          : "Price",
+        : isSalesAppraisalPageVariant(variant)
+          ? "Estimated sale price"
+          : isStrPageVariant(variant)
+            ? resolveStrBrochurePriceLabel()
+            : "Price",
       price_value: isLeasePageVariant(variant)
         ? (resolveLeaseBrochurePriceValue(report) ?? "")
-        : isStrPageVariant(variant)
-          ? (resolveStrBrochurePriceValue(report) ?? "")
-          : (report.property.display_price ?? ""),
+        : isSalesAppraisalPageVariant(variant)
+          ? (resolveSalesAppraisalBrochurePriceValue(report) ?? "")
+          : isStrPageVariant(variant)
+            ? (resolveStrBrochurePriceValue(report) ?? "")
+            : (report.property.display_price ?? ""),
     },
     qr_target_url: report.property.listing_url ?? "",
     assets: {

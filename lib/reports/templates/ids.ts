@@ -71,6 +71,18 @@ export {
   DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID,
 } from "@/lib/reports/templates/lease-appraisal/ids";
 
+export {
+  CLASSIC_SALES_APPRAISAL_TEMPLATE_ID,
+  BOLD_SALES_APPRAISAL_TEMPLATE_ID,
+  GALLERY_SALES_APPRAISAL_TEMPLATE_ID,
+  EDITORIAL_SALES_APPRAISAL_TEMPLATE_ID,
+  SPLIT_SALES_APPRAISAL_TEMPLATE_ID,
+  REFINED_SALES_APPRAISAL_TEMPLATE_ID,
+  MINIMALIST_SALES_APPRAISAL_TEMPLATE_ID,
+  LANDMARK_SALES_APPRAISAL_TEMPLATE_ID,
+  DEFAULT_SALES_APPRAISAL_TEMPLATE_ID,
+} from "@/lib/reports/templates/sales-appraisal/ids";
+
 export const REPORT_TEMPLATE_IDS = [
   CLASSIC_DETAILED_TEMPLATE_ID,
   BOLD_DETAILED_TEMPLATE_ID,
@@ -92,6 +104,14 @@ export const REPORT_TEMPLATE_IDS = [
   "refined-lease-appraisal",
   "minimalist-lease-appraisal",
   "landmark-lease-appraisal",
+  "classic-sales-appraisal",
+  "bold-sales-appraisal",
+  "gallery-sales-appraisal",
+  "editorial-sales-appraisal",
+  "split-sales-appraisal",
+  "refined-sales-appraisal",
+  "minimalist-sales-appraisal",
+  "landmark-sales-appraisal",
 ] as const;
 
 export type ReportTemplateId = (typeof REPORT_TEMPLATE_IDS)[number];
@@ -142,7 +162,7 @@ export function isSelectableStrTemplateId(id: string): boolean {
   }
 
   const normalized = normalizeReportTemplateId(id);
-  if (normalized.includes("lease-appraisal")) {
+  if (normalized.includes("lease-appraisal") || normalized.includes("sales-appraisal")) {
     return false;
   }
 

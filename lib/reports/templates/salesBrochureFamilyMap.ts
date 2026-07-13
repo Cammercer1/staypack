@@ -51,10 +51,10 @@ export function salesBrochureTemplateIdForFamily(
   return map[family] ?? SALES_BROCHURE_CLASSIC_1PG_TEMPLATE_ID;
 }
 
-/** Brochure template id used to resolve page-1 blurb length for STR / lease reports. */
+/** Brochure template id used to resolve page-1 blurb length for STR / lease / sales appraisal reports. */
 export function resolveBrochureTemplateIdForReport(
   reportTemplateId: string,
-  variant: "str" | "lease" | "sale",
+  variant: "str" | "lease" | "sale" | "sales_appraisal",
   layoutFamily?: string,
 ): string {
   if (reportTemplateId.startsWith("belle-property")) {
@@ -69,7 +69,12 @@ export function resolveBrochureTemplateIdForReport(
   }
 
   const pages =
-    variant === "lease" || reportTemplateId.includes("lease-appraisal") ? 2 : 1;
+    variant === "lease" ||
+    variant === "sales_appraisal" ||
+    reportTemplateId.includes("lease-appraisal") ||
+    reportTemplateId.includes("sales-appraisal")
+      ? 2
+      : 1;
   const family =
     layoutFamily ??
     (reportTemplateId.includes("haven-properties")
@@ -82,6 +87,9 @@ export function resolveBrochureTemplateIdForReport(
 export function reportFamilyFromTemplateId(templateId: string) {
   if (templateId.includes("lease-appraisal")) {
     return templateId.replace(/-lease-appraisal$/, "");
+  }
+  if (templateId.includes("sales-appraisal")) {
+    return templateId.replace(/-sales-appraisal$/, "");
   }
   return templateId.replace(/-(?:light|detailed)$/, "");
 }

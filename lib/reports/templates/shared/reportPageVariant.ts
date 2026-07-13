@@ -1,8 +1,9 @@
 import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
+import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSalesAppraisalReport";
 import type { FinalReportJson } from "@/lib/types";
 
 /** Distinguishes page-1 layout intent across collateral types. */
-export type ReportPageVariant = "str" | "lease" | "sale";
+export type ReportPageVariant = "str" | "lease" | "sale" | "sales_appraisal";
 
 export type ReportPageOneProps = {
   report: FinalReportJson;
@@ -17,6 +18,9 @@ export function resolveReportPageVariant(
   if (explicit) {
     return explicit;
   }
+  if (isSalesAppraisalTemplateId(report.template_id)) {
+    return "sales_appraisal";
+  }
   return isLeaseAppraisalTemplateId(report.template_id) ? "lease" : "str";
 }
 
@@ -26,6 +30,10 @@ export function isLeasePageVariant(variant: ReportPageVariant) {
 
 export function isSalePageVariant(variant: ReportPageVariant) {
   return variant === "sale";
+}
+
+export function isSalesAppraisalPageVariant(variant: ReportPageVariant) {
+  return variant === "sales_appraisal";
 }
 
 export function isStrPageVariant(variant: ReportPageVariant) {
@@ -39,24 +47,28 @@ export function showGuestStat(variant: ReportPageVariant) {
 
 export function revenueSectionTitle(variant: ReportPageVariant) {
   if (variant === "lease") return "Estimated weekly rent";
+  if (variant === "sales_appraisal") return "Estimated sale price";
   if (variant === "sale") return "Price guide";
   return "STR Revenue";
 }
 
 export function reportTypeBannerLabel(variant: ReportPageVariant) {
   if (variant === "lease") return "Long-term rental appraisal";
+  if (variant === "sales_appraisal") return "Sales appraisal";
   if (variant === "sale") return "For sale";
   return "Short-Term Rental Report";
 }
 
 export function pageOneHeaderTagline(variant: ReportPageVariant) {
   if (variant === "lease") return "Long-term rental potential";
+  if (variant === "sales_appraisal") return "Sales appraisal";
   if (variant === "sale") return "Property for sale";
   return "Short-Term Rental Potential";
 }
 
 export function landmarkBannerTitle(variant: ReportPageVariant) {
   if (variant === "lease") return "Lease appraisal";
+  if (variant === "sales_appraisal") return "Sales appraisal";
   if (variant === "sale") return "Property brochure";
   return "STR Revenue Report";
 }

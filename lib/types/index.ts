@@ -35,6 +35,26 @@ export type LeaseAppraisalJob = {
   updated_at: string;
 };
 
+export type SalesAppraisalJobStatus = LeaseAppraisalJobStatus;
+
+export type SalesAppraisalJob = {
+  id: string;
+  agency_id: string;
+  listing_id: string;
+  created_by: string | null;
+  status: SalesAppraisalJobStatus;
+  attempts: number;
+  request_json: Record<string, unknown>;
+  result_json: Record<string, unknown> | null;
+  error_message: string | null;
+  started_at: string | null;
+  heartbeat_at: string | null;
+  completed_at: string | null;
+  failed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ListingImageRole = "photo" | "floor_plan";
 
 export type LeaseAppraisalEnrichmentStatus = {
@@ -108,6 +128,38 @@ export type ParsedListing = {
   ltrSuburbMarket?: LtrSuburbMarketJson;
   /** Async rental comp enrichment status for lease appraisal UI polling. */
   leaseAppraisalEnrichment?: LeaseAppraisalEnrichmentStatus;
+  salesAppraisal?: {
+    priceMin?: number;
+    priceMax?: number;
+    priceMidpoint?: number;
+    /** Up to 6 listing URLs (or synthetic ids) shown on page 2. */
+    selectedCompListingIds?: string[];
+    source?: "rea_discover" | "apify_rea";
+    compCount?: number;
+    soldCompCount?: number;
+    forSaleCompCount?: number;
+    searchUrl?: string;
+    premiumTier?: boolean;
+    premiumReasons?: string[];
+    /** LLM-adjusted price band after reviewing comps and listing quality. */
+    positioning?: SaleAppraisalPositioning;
+  };
+  /** Sale comps (recently sold + for sale) from REA for sales appraisal. */
+  salesComps?: {
+    address: string;
+    suburb?: string;
+    price: number;
+    saleStatus: "sold" | "for_sale";
+    soldDate?: string;
+    priceDisplay?: string;
+    bedrooms?: number;
+    bathrooms?: number;
+    propertyType?: string;
+    imageUrl?: string;
+    listingUrl?: string;
+  }[];
+  /** Async sale comp enrichment status for sales appraisal UI polling. */
+  salesAppraisalEnrichment?: LeaseAppraisalEnrichmentStatus;
   outgoings?: {
     bodyCorporateWeekly?: number;
     councilRatesQuarterly?: number;
@@ -190,6 +242,30 @@ export type LtrAppraisalPositioning = {
   };
 };
 
+/** LLM positioning of the sale price band after reviewing REA comps and listing quality. */
+export type SaleAppraisalPositioning = {
+  confidence: "low" | "medium" | "high";
+  rationale: string;
+  /** Statistical band midpoint before LLM review. */
+  statistical_price_midpoint: number | null;
+  llm_price_min?: number | null;
+  llm_price_max?: number | null;
+  llm_price_midpoint?: number | null;
+  price_min?: number | null;
+  price_max?: number | null;
+  price_midpoint?: number | null;
+  was_clamped?: boolean;
+  comp_anchors?: {
+    same_bed_count: number;
+    same_bed_min: number | null;
+    same_bed_median: number | null;
+    same_bed_max: number | null;
+    suggested_floor: number | null;
+    suggested_ceiling: number | null;
+    suggested_target?: number | null;
+  };
+};
+
 export type StrEnrichmentJson = {
   tier: "full";
   comp_count: number;
@@ -260,6 +336,36 @@ export type LtrEnrichmentJson = {
   search_url?: string;
   suburb_market?: LtrSuburbMarketJson | null;
   positioning?: LtrAppraisalPositioning | null;
+};
+
+/** Sale comps (recently sold + for sale) from REA (sales appraisal). */
+export type SaleCompCard = {
+  listing_id: string;
+  name: string;
+  thumbnail_url: string;
+  listing_url: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  price: number | null;
+  price_display: string | null;
+  sale_status: "sold" | "for_sale";
+  sold_date: string | null;
+  suburb: string | null;
+};
+
+export type SalesEnrichmentJson = {
+  comp_count: number;
+  sold_comp_count: number;
+  for_sale_comp_count: number;
+  price_range: {
+    p25: number | null;
+    p50: number | null;
+    p75: number | null;
+  };
+  comps: SaleCompCard[];
+  source?: string;
+  search_url?: string;
+  positioning?: SaleAppraisalPositioning | null;
 };
 
 export type AiCopyJson = {
@@ -364,6 +470,12 @@ export type FinalReportJson = {
     annual_midpoint: number | null;
     difference_before_costs: number | null;
   };
+  /** Estimated sale price band (sales appraisal reports). */
+  sale_estimate?: {
+    price_min: number | null;
+    price_max: number | null;
+    price_midpoint: number | null;
+  } | null;
   copy: {
     heading: string;
     blurb: string;
@@ -392,6 +504,7 @@ export type FinalReportJson = {
   };
   str_enrichment?: StrEnrichmentJson | null;
   ltr_enrichment?: LtrEnrichmentJson | null;
+  sales_enrichment?: SalesEnrichmentJson | null;
 };
 
 export type Agency = {
@@ -524,6 +637,7 @@ export type CollateralType =
   | "sales_brochure"
   | "rental_brochure"
   | "lease_appraisal"
+  | "sales_appraisal"
   | "social_posts"
   | "investor_snapshot"
   | "agent_business_card";

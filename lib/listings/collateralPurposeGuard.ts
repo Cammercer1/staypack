@@ -5,6 +5,7 @@ const SALE_ONLY: CollateralType[] = [
   "sales_brochure",
   "str_report",
   "lease_appraisal",
+  "sales_appraisal",
 ];
 
 export function collateralPurposeMismatchError(

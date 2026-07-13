@@ -16,7 +16,7 @@ function agencyDefaultForProduct(
   if (product === "str") {
     return agency.report_template_id || null;
   }
-  if (product === "lease") {
+  if (product === "lease" || product === "sales_appraisal") {
     return null;
   }
   const defaults = agency.collateral_template_defaults ?? {};
@@ -35,6 +35,9 @@ function platformDefaultForProduct(product: TemplateProduct): string {
   }
   if (product === "lease") {
     return "classic-lease-appraisal";
+  }
+  if (product === "sales_appraisal") {
+    return "classic-sales-appraisal";
   }
   const collateralDefault =
     DEFAULT_COLLATERAL_TEMPLATE_IDS[

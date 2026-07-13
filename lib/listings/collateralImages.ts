@@ -22,6 +22,7 @@ const CHANNEL_LIMITS: Record<CollateralImageChannel, number> = {
   landing: MAX_LANDING_IMAGES,
   str_report: MAX_REPORT_IMAGES,
   lease_appraisal: MAX_REPORT_IMAGES,
+  sales_appraisal: MAX_REPORT_IMAGES,
   sales_brochure: MAX_BROCHURE_IMAGES,
   rental_brochure: MAX_BROCHURE_IMAGES,
   social_posts: MAX_SNAPSHOT_IMAGES,

@@ -10,9 +10,11 @@ import {
   ReportCopyKeyMetricsLine,
 } from "@/components/reports/inline/ReportCopyFields";
 import { LtrRentBlock } from "@/lib/reports/templates/shared/LtrRentBlock";
+import { SalePriceBlock } from "@/lib/reports/templates/shared/SalePriceBlock";
 import {
   isLeasePageVariant,
   isSalePageVariant,
+  isSalesAppraisalPageVariant,
   showGuestStat,
   type ReportPageVariant,
 } from "@/lib/reports/templates/shared/reportPageVariant";
@@ -28,6 +30,7 @@ export function ClassicPropertySection({
 }: Props) {
   const { property, str, copy } = report;
   const isLease = isLeasePageVariant(reportVariant);
+  const isSalesAppraisal = isSalesAppraisalPageVariant(reportVariant);
   const isSale = isSalePageVariant(reportVariant);
 
   const propertyStats = [
@@ -110,6 +113,8 @@ export function ClassicPropertySection({
 
         {isLease ? (
           <LtrRentBlock report={report} />
+        ) : isSalesAppraisal ? (
+          <SalePriceBlock report={report} />
         ) : isSale && property.display_price ? (
           <div
             className="p-4"
