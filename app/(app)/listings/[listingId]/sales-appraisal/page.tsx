@@ -6,6 +6,7 @@ import { SalesAppraisalEditor } from "@/components/sales-appraisal/SalesAppraisa
 import { Button } from "@/components/ui/button";
 import { SALES_APPRAISAL_LABEL } from "@/lib/listings/collateralTypes";
 import { collateralPhotoRequirementError } from "@/lib/listings/collateralPhotoRequirements";
+import { loadAgencyAgentProfiles } from "@/lib/reports/loadReportAgent";
 import type { CollateralItem, Report } from "@/lib/types";
 
 export default async function ListingSalesAppraisalPage({
@@ -107,6 +108,8 @@ export default async function ListingSalesAppraisalPage({
     collateral = createdCollateral;
   }
 
+  const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -134,6 +137,7 @@ export default async function ListingSalesAppraisalPage({
         report={report}
         collateral={collateral as CollateralItem}
         agency={agency}
+        agencyAgents={agencyAgents}
       />
     </div>
   );

@@ -1,13 +1,20 @@
 "use client";
 
 import { SalesAppraisalWizard } from "@/components/sales-appraisal/SalesAppraisalWizard";
-import type { Agency, CollateralItem, Listing, Report } from "@/lib/types";
+import type {
+  Agency,
+  AgentProfile,
+  CollateralItem,
+  Listing,
+  Report,
+} from "@/lib/types";
 
 type Props = {
   listing: Listing;
   report: Report;
   collateral: CollateralItem;
   agency: Agency;
+  agencyAgents: AgentProfile[];
 };
 
 export function SalesAppraisalEditor({
@@ -15,6 +22,7 @@ export function SalesAppraisalEditor({
   report,
   collateral,
   agency,
+  agencyAgents,
 }: Props) {
   return (
     <SalesAppraisalWizard
@@ -22,6 +30,7 @@ export function SalesAppraisalEditor({
       initialReport={report}
       initialCollateral={collateral}
       agency={agency}
+      initialAgencyAgents={agencyAgents}
     />
   );
 }

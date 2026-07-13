@@ -4,7 +4,7 @@ import { DEFAULT_SALES_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/templates/sal
 import { calculateAccommodates } from "@/lib/reports/formatters";
 import {
   primaryReportAgent,
-  resolveAgencyAccountReportAgents,
+  resolveReportAgents,
   type ReportAgent,
 } from "@/lib/reports/resolveReportAgents";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
@@ -55,7 +55,8 @@ export function buildSalesAppraisalReport({
 }: BuildSalesAppraisalReportInput): FinalReportJson {
   const agents =
     resolvedAgents ??
-    resolveAgencyAccountReportAgents({
+    resolveReportAgents({
+      scraped: parsed,
       agentProfile,
       agencyAgents,
     });

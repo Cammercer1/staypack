@@ -16,6 +16,7 @@ import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
 import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
 import { mergeSalesAppraisalPreviewFromListing } from "@/lib/sales-appraisal/mergeSalesAppraisalPreviewFromListing";
+import { mergeSalesAppraisalPreviewAgents } from "@/lib/sales-appraisal/mergeSalesAppraisalPreviewAgents";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { hasSalesAppraisalComps } from "@/lib/sales-appraisal/generateSalesAppraisalForListing";
 import { hasSalesAppraisalSelectedComps } from "@/lib/sales-appraisal/salesAppraisalData";
@@ -44,6 +45,7 @@ type Props = {
   initialReport: Report;
   initialCollateral: CollateralItem;
   agency: Agency;
+  initialAgencyAgents: AgentProfile[];
 };
 
 export function SalesAppraisalWizard({
@@ -51,11 +53,12 @@ export function SalesAppraisalWizard({
   initialReport,
   initialCollateral,
   agency,
+  initialAgencyAgents,
 }: Props) {
   const [listing, setListing] = useState(initialListing);
   const [report, setReport] = useState(initialReport);
   const [collateral, setCollateral] = useState(initialCollateral);
-  const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
+  const agencyAgents = initialAgencyAgents;
   const [step, setStep] = useState(() =>
     getInitialStep(initialListing, initialReport, initialCollateral),
   );
@@ -90,13 +93,6 @@ export function SalesAppraisalWizard({
       setPreviewDraftReport(cached);
     }
   }, [report.final_report_json]);
-
-  useEffect(() => {
-    fetch("/api/agents")
-      .then((response) => response.json())
-      .then((payload) => setAgencyAgents(payload.agents ?? []))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     compsPrefetchStartedRef.current = false;
@@ -157,10 +153,11 @@ export function SalesAppraisalWizard({
     if (!cached) {
       return null;
     }
+    const withListing = mergeSalesAppraisalPreviewFromListing(cached, listing);
     return resolveFinalReportForDisplay(
-      mergeSalesAppraisalPreviewFromListing(cached, listing),
+      mergeSalesAppraisalPreviewAgents(withListing, listing, agencyAgents),
     );
-  }, [previewDraftReport, report.final_report_json, listing]);
+  }, [previewDraftReport, report.final_report_json, listing, agencyAgents]);
 
   function handleStepChange(next: string) {
     if (next === "preview") {
@@ -287,6 +284,7 @@ export function SalesAppraisalWizard({
             <SalesAppraisalCopyEditor
               ref={copyEditorRef}
               agency={agency}
+              agencyAgents={agencyAgents}
               listing={listing}
               report={report}
               collateral={collateral}

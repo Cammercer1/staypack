@@ -29,6 +29,7 @@ import {
   type ReportCopyFieldPath,
 } from "@/lib/reports/editable/reportCopyPaths";
 import { mergeSalesAppraisalPreviewFromListing } from "@/lib/sales-appraisal/mergeSalesAppraisalPreviewFromListing";
+import { mergeSalesAppraisalPreviewAgents } from "@/lib/sales-appraisal/mergeSalesAppraisalPreviewAgents";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { hasSalesAppraisalComps } from "@/lib/sales-appraisal/generateSalesAppraisalForListing";
 import { hasSalesAppraisalSelectedComps } from "@/lib/sales-appraisal/salesAppraisalData";
@@ -39,6 +40,7 @@ import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPri
 import { cn } from "@/lib/utils";
 import type {
   Agency,
+  AgentProfile,
   CollateralItem,
   FinalReportJson,
   Listing,
@@ -47,6 +49,7 @@ import type {
 
 type Props = {
   agency: Agency;
+  agencyAgents: AgentProfile[];
   listing: Listing;
   report: Report;
   collateral: CollateralItem;
@@ -93,6 +96,7 @@ export const SalesAppraisalCopyEditor = forwardRef<
   Props
 >(function SalesAppraisalCopyEditor(
   {
+    agencyAgents,
     listing,
     report,
     collateral,
@@ -184,8 +188,17 @@ export const SalesAppraisalCopyEditor = forwardRef<
           },
         }
       : withListing;
-    return resolveFinalReportForDisplay(withImages);
-  }, [report.final_report_json, copy, templateId, listing, propertyImages]);
+    return resolveFinalReportForDisplay(
+      mergeSalesAppraisalPreviewAgents(withImages, listing, agencyAgents),
+    );
+  }, [
+    report.final_report_json,
+    copy,
+    templateId,
+    listing,
+    propertyImages,
+    agencyAgents,
+  ]);
 
   const handleOpenImagePicker = useCallback((slot: ReportImageSlot) => {
     setImagePickerSlot(slot);
