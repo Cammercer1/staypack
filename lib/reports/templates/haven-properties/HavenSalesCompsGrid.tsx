@@ -40,19 +40,35 @@ function compPriceLabel(comp: SaleCompCard) {
   return comp.price_display?.trim() || "Price undisclosed";
 }
 
-function SaleStatusPill({ comp }: { comp: SaleCompCard }) {
+function SaleStatusLabel({
+  comp,
+  compact = false,
+}: {
+  comp: SaleCompCard;
+  compact?: boolean;
+}) {
+  const labelClass = `text-neutral-500 ${
+    compact ? "text-[0.58rem]" : "text-[0.62rem]"
+  }`;
+
   if (comp.sale_status === "sold") {
     const soldDate = formatSoldDate(comp.sold_date);
     return (
-      <span className="inline-flex rounded-full bg-emerald-100 px-1.5 py-0.5 text-[0.56rem] font-semibold uppercase tracking-[0.08em] text-emerald-800">
+      <p
+        className={labelClass}
+        style={{ fontFamily: "var(--report-body-font, inherit)" }}
+      >
         Recently sold{soldDate ? ` · ${soldDate}` : ""}
-      </span>
+      </p>
     );
   }
   return (
-    <span className="inline-flex rounded-full bg-sky-100 px-1.5 py-0.5 text-[0.56rem] font-semibold uppercase tracking-[0.08em] text-sky-800">
+    <p
+      className={labelClass}
+      style={{ fontFamily: "var(--report-body-font, inherit)" }}
+    >
       For sale
-    </span>
+    </p>
   );
 }
 
@@ -118,7 +134,7 @@ export function HavenSalesCompsGrid({
               />
             )}
             <div className={`space-y-0.5 ${denseSix ? "mt-1" : "mt-2"}`}>
-              <SaleStatusPill comp={comp} />
+              <SaleStatusLabel comp={comp} compact={denseSix || compact} />
               <p
                 className={`font-semibold leading-snug text-neutral-900 ${
                   denseSix ? "text-[0.62rem]" : compact ? "text-[0.68rem]" : "text-xs"
