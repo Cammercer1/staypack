@@ -1,4 +1,5 @@
 import type { ApifyReaListingRecord } from "@/lib/apify/types";
+import { loadComparableSearchThroughCache } from "@/lib/apify/comparableSearchCache";
 
 const DEFAULT_API_HOST = "api.apify.com";
 const DEFAULT_REA_ACTOR_ID = "qBUaDtdr6kYSBZE8J";
@@ -116,11 +117,32 @@ export async function scrapeApifyReaRentSearchUrls({
   includeSurroundingSuburbs?: boolean;
   datasetItemLimit?: number;
 }): Promise<ApifyReaListingRecord[]> {
-  return scrapeApifyReaUrls({
-    startUrls: searchUrls,
-    maxItems,
-    includeSurroundingSuburbs,
-    datasetItemLimit,
+  const normalizedMaxItems = Math.min(
+    Math.max(1, Math.round(maxItems ?? getApifyReaMaxListings())),
+    DEFAULT_REA_MAX_LISTINGS,
+  );
+  const normalizedDatasetItemLimit = datasetItemLimit == null
+    ? null
+    : Math.min(
+        Math.max(1, Math.round(datasetItemLimit)),
+        DEFAULT_REA_MAX_DATASET_ITEMS,
+      );
+
+  return loadComparableSearchThroughCache({
+    request: {
+      actorId: getApifyReaActorId(),
+      startUrls: searchUrls,
+      maxItems: normalizedMaxItems,
+      includeSurroundingSuburbs,
+      datasetItemLimit: normalizedDatasetItemLimit,
+      datasetFields: APIFY_REA_DATASET_FIELDS,
+    },
+    loader: () => scrapeApifyReaUrls({
+      startUrls: searchUrls,
+      maxItems: normalizedMaxItems,
+      includeSurroundingSuburbs,
+      datasetItemLimit: normalizedDatasetItemLimit ?? undefined,
+    }),
   });
 }
 

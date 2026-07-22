@@ -37,6 +37,7 @@ function mockSuccessfulRun() {
 describe("Apify REA search options", () => {
   beforeEach(() => {
     vi.stubEnv("APIFY_API_KEY", "test-token");
+    vi.stubEnv("APIFY_REA_COMPARABLE_CACHE_ENABLED", "false");
   });
 
   afterEach(() => {
@@ -104,5 +105,23 @@ describe("Apify REA search options", () => {
 
     const datasetUrl = String(fetchMock.mock.calls[2]![0]);
     expect(datasetUrl).toContain("limit=50");
+  });
+
+  it("preserves the per-URL actor limit when no combined dataset cap is set", async () => {
+    const fetchMock = mockSuccessfulRun();
+
+    await scrapeApifyReaRentSearchUrls({
+      searchUrls: [
+        "https://www.realestate.com.au/sold/randwick/list-1",
+        "https://www.realestate.com.au/sold/coogee/list-1",
+      ],
+      maxItems: 50,
+    });
+
+    const startBody = JSON.parse(
+      (fetchMock.mock.calls[0]![1] as RequestInit).body as string,
+    );
+    expect(startBody.maxItems).toBe(50);
+    expect(String(fetchMock.mock.calls[2]![0])).toContain("limit=50");
   });
 });
