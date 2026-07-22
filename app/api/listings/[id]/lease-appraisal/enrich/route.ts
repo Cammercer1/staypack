@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireListingAccess } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { enrichListingForLeaseAppraisal } from "@/lib/lease-appraisal/generateLeaseAppraisalForListing";
+import { enrichListingForLeaseAppraisal } from "@/lib/lease-appraisal/enrichListingForLeaseAppraisal";
 import {
   leaseAppraisalJobsTableMissing,
   isLeaseAppraisalJobActive,

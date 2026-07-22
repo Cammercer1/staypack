@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractListingFromUrl } from "@/lib/scraping/extractListing";
 import { mergeParsedListings } from "@/lib/scraping/mergeParsedListings";
-import { enrichListingForSalesAppraisal } from "@/lib/sales-appraisal/generateSalesAppraisalForListing";
+import { enrichListingForSalesAppraisal } from "@/lib/sales-appraisal/enrichListingForSalesAppraisal";
 import { buildSalesAppraisalReport } from "@/lib/sales-appraisal/buildSalesAppraisalReport";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { enrichSelectedSaleCompDetails } from "@/lib/sales/enrichSaleCompDetails";

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { enrichListingForLeaseAppraisal } from "@/lib/lease-appraisal/generateLeaseAppraisalForListing";
+import { enrichListingForLeaseAppraisal } from "@/lib/lease-appraisal/enrichListingForLeaseAppraisal";
 import type { LeaseAppraisalJob, Listing } from "@/lib/types";
 
 type RunLeaseAppraisalJobInput = {

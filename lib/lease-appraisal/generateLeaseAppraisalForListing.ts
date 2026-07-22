@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { randomUUID } from "node:crypto";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { buildLeaseAppraisalReport } from "@/lib/lease-appraisal/buildLeaseAppraisalReport";
 import { DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/templates/lease-appraisal/ids";
@@ -9,12 +8,6 @@ import { generateLeaseAppraisalCopy } from "@/lib/openai/generateLeaseAppraisalC
 import {
   hasLeaseAppraisalSelectedComps,
 } from "@/lib/lease-appraisal/leaseAppraisalData";
-import {
-  completedLeaseAppraisalEnrichmentStatus,
-  leaseAppraisalEnrichmentStatus,
-  withLeaseAppraisalEnrichmentStatus,
-} from "@/lib/lease-appraisal/enrichmentStatus";
-import { enrichParsedListingForLeaseAppraisal } from "@/lib/lease-appraisal/enrichParsedListingForLeaseAppraisal";
 import { ensureLeaseAppraisalPositioning } from "@/lib/lease-appraisal/positionLeaseAppraisal";
 import type {
   Agency,
@@ -129,49 +122,6 @@ export async function createLeaseAppraisalDraft({
   }
 
   return { report: createdReport as Report, listing };
-}
-
-export async function enrichListingForLeaseAppraisal({
-  supabase,
-  listing,
-  requestId,
-}: {
-  supabase: SupabaseClient;
-  listing: Listing;
-  requestId?: string;
-}): Promise<{ listing: Listing; parsed: ParsedListing; warnings: string[] }> {
-  assertSaleListing(listing);
-  assertScrapedListing(listing);
-
-  const { parsed, warnings } = await enrichParsedListingForLeaseAppraisal(
-    listing.scraped_listing_json!,
-    { subjectListingUrl: listing.listing_url },
-  );
-  const previousStatus = leaseAppraisalEnrichmentStatus(
-    listing.scraped_listing_json,
-  );
-  const enrichmentRequestId = requestId ?? previousStatus?.requestId ?? randomUUID();
-  const completedParsed = withLeaseAppraisalEnrichmentStatus(
-    parsed,
-    completedLeaseAppraisalEnrichmentStatus(previousStatus, enrichmentRequestId),
-  );
-
-  const { data: updatedListing, error: listingError } = await supabase
-    .from("listings")
-    .update({ scraped_listing_json: completedParsed })
-    .eq("id", listing.id)
-    .select("*")
-    .single();
-
-  if (listingError || !updatedListing) {
-    throw new Error(listingError?.message ?? "Failed to save rental appraisal data");
-  }
-
-  return {
-    listing: updatedListing as Listing,
-    parsed: completedParsed,
-    warnings,
-  };
 }
 
 export async function generateLeaseAppraisalReportContent({

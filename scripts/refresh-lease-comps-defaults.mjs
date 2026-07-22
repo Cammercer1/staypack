@@ -25,7 +25,7 @@ if (existsSync(resolve(ROOT, ".env.local"))) {
 
 const { createAdminClient } = await import("../lib/supabase/admin.ts");
 const { enrichListingForLeaseAppraisal } = await import(
-  "../lib/lease-appraisal/generateLeaseAppraisalForListing.ts"
+  "../lib/lease-appraisal/enrichListingForLeaseAppraisal.ts"
 );
 const { defaultSelectedCompListingIds } = await import(
   "../lib/lease-appraisal/leaseAppraisalData.ts"

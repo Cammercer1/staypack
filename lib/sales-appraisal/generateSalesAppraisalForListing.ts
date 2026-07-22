@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { randomUUID } from "node:crypto";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { buildSalesAppraisalReport } from "@/lib/sales-appraisal/buildSalesAppraisalReport";
 import { DEFAULT_SALES_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/templates/sales-appraisal/ids";
@@ -7,12 +6,6 @@ import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSal
 import { salesEnrichmentFromParsed } from "@/lib/sales-appraisal/salesEnrichmentFromParsed";
 import { generateSalesAppraisalCopy } from "@/lib/openai/generateSalesAppraisalCopy";
 import { hasSalesAppraisalSelectedComps } from "@/lib/sales-appraisal/salesAppraisalData";
-import {
-  completedSalesAppraisalEnrichmentStatus,
-  salesAppraisalEnrichmentStatus,
-  withSalesAppraisalEnrichmentStatus,
-} from "@/lib/sales-appraisal/enrichmentStatus";
-import { enrichParsedListingForSalesAppraisal } from "@/lib/sales-appraisal/enrichParsedListingForSalesAppraisal";
 import { resolveAgentProfile } from "@/lib/lease-appraisal/generateLeaseAppraisalForListing";
 import type {
   Agency,
@@ -114,49 +107,6 @@ export async function createSalesAppraisalDraft({
   }
 
   return { report: createdReport as Report, listing };
-}
-
-export async function enrichListingForSalesAppraisal({
-  supabase,
-  listing,
-  requestId,
-}: {
-  supabase: SupabaseClient;
-  listing: Listing;
-  requestId?: string;
-}): Promise<{ listing: Listing; parsed: ParsedListing; warnings: string[] }> {
-  assertSaleListing(listing);
-  assertScrapedListing(listing);
-
-  const { parsed, warnings } = await enrichParsedListingForSalesAppraisal(
-    listing.scraped_listing_json!,
-    { subjectListingUrl: listing.listing_url },
-  );
-  const previousStatus = salesAppraisalEnrichmentStatus(
-    listing.scraped_listing_json,
-  );
-  const enrichmentRequestId = requestId ?? previousStatus?.requestId ?? randomUUID();
-  const completedParsed = withSalesAppraisalEnrichmentStatus(
-    parsed,
-    completedSalesAppraisalEnrichmentStatus(previousStatus, enrichmentRequestId),
-  );
-
-  const { data: updatedListing, error: listingError } = await supabase
-    .from("listings")
-    .update({ scraped_listing_json: completedParsed })
-    .eq("id", listing.id)
-    .select("*")
-    .single();
-
-  if (listingError || !updatedListing) {
-    throw new Error(listingError?.message ?? "Failed to save sales appraisal data");
-  }
-
-  return {
-    listing: updatedListing as Listing,
-    parsed: completedParsed,
-    warnings,
-  };
 }
 
 export async function generateSalesAppraisalReportContent({
