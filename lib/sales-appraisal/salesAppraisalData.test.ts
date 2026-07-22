@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { applySalesAppraisalCompSelection } from "@/lib/sales-appraisal/salesAppraisalData";
+import {
+  applySalesAppraisalAgentReviewConfirmation,
+  applySalesAppraisalCompSelection,
+} from "@/lib/sales-appraisal/salesAppraisalData";
 import type { ParsedListing } from "@/lib/types";
 
 function parsedWithSalesComps(count: number): ParsedListing {
@@ -38,5 +41,23 @@ describe("applySalesAppraisalCompSelection", () => {
     expect(result.salesAppraisal?.compCount).toBe(18);
     expect(result.salesAppraisal?.featuredCompCount).toBe(6);
     expect(result.salesAppraisal?.selectedCompListingIds).toHaveLength(6);
+  });
+});
+
+describe("applySalesAppraisalAgentReviewConfirmation", () => {
+  it("persists an explicit review acknowledgement", () => {
+    const parsed = parsedWithSalesComps(6);
+    parsed.salesAppraisal = {
+      agencyGuideReview: {
+        required: true,
+        confirmed: false,
+        divergencePct: 0.4,
+        reasons: ["Material difference"],
+      },
+    };
+
+    const result = applySalesAppraisalAgentReviewConfirmation(parsed, true);
+
+    expect(result.salesAppraisal?.agencyGuideReview?.confirmed).toBe(true);
   });
 });

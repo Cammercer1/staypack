@@ -194,7 +194,7 @@ export function deriveSaleCompAwareBounds({
       sameBedP75 != null
         ? roundSalePrice(sameBedP75 * 1.08)
         : hardCeiling;
-    const ceiling = Math.min(softCeiling, hardCeiling);
+    const statisticalCeiling = Math.min(softCeiling, hardCeiling);
     const floor = roundSalePrice(
       Math.max(
         sameBedMin != null ? sameBedMin * 0.95 : sameBedMedian * 0.9,
@@ -203,6 +203,11 @@ export function deriveSaleCompAwareBounds({
     );
     const target = roundSalePrice(
       sameBedMedian + (sameBedMax - sameBedMedian) * (premiumTier ? 0.6 : 0.5),
+    );
+    const ceiling = Math.max(
+      statisticalCeiling,
+      target,
+      premiumTier ? sameBedMax : 0,
     );
 
     return { floor, ceiling, target };

@@ -143,6 +143,15 @@ export async function generateSalesAppraisalReportContent({
     );
   }
 
+  if (
+    parsed.salesAppraisal?.agencyGuideReview?.required &&
+    !parsed.salesAppraisal.agencyGuideReview.confirmed
+  ) {
+    throw new Error(
+      "Review and confirm the agency guide against the comparable evidence before generating content",
+    );
+  }
+
   const resolvedTemplateId =
     templateId ??
     (isSalesAppraisalTemplateId(report.template_id)

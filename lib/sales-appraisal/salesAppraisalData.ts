@@ -111,6 +111,27 @@ export function applySalesAppraisalPriceOverrides(
   };
 }
 
+export function applySalesAppraisalAgentReviewConfirmation(
+  parsed: ParsedListing,
+  confirmed: boolean,
+): ParsedListing {
+  const review = parsed.salesAppraisal?.agencyGuideReview;
+  if (!review) {
+    return parsed;
+  }
+
+  return {
+    ...parsed,
+    salesAppraisal: {
+      ...parsed.salesAppraisal,
+      agencyGuideReview: {
+        ...review,
+        confirmed,
+      },
+    },
+  };
+}
+
 export function applySalesAppraisalCompSelection(
   parsed: ParsedListing,
   selectedCompListingIds: string[],

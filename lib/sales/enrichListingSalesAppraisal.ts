@@ -35,6 +35,9 @@ import { mergeSaleComps } from "@/lib/sales/mergeSaleComps";
 import { parseApifyReaSaleListings } from "@/lib/sales/parseApifyReaSaleListings";
 import { parseReaSaleDiscoverRecords } from "@/lib/sales/parseReaSaleDiscover";
 import {
+  applyAgencyGuideToCompBand,
+} from "@/lib/sales/resolveAgencyGuidePriceBand";
+import {
   positionSalesAppraisal,
   saleSubjectFromParsedListing,
 } from "@/lib/sales/positionSalesAppraisal";
@@ -373,23 +376,32 @@ export async function enrichListingSalesAppraisal(
   try {
     const subjectPropertyType = resolveSaleSubjectPropertyType(listingWithSignals);
 
-    // Sold comps first (they drive the price band), then buy comps for context.
-    const soldResult = await discoverSaleCompsForChannel(
-      listingWithSignals,
-      premiumSignals,
-      "sold",
-      options,
-    );
-
-    let buyResult: SaleChannelDiscoverResult;
-    try {
-      buyResult = await discoverSaleCompsForChannel(
+    // These channels are independent. Discover them together, then preserve
+    // the existing sold-required / for-sale-optional error handling below.
+    const [soldOutcome, buyOutcome] = await Promise.allSettled([
+      discoverSaleCompsForChannel(
+        listingWithSignals,
+        premiumSignals,
+        "sold",
+        options,
+      ),
+      discoverSaleCompsForChannel(
         listingWithSignals,
         premiumSignals,
         "buy",
         options,
-      );
-    } catch (error) {
+      ),
+    ]);
+
+    if (soldOutcome.status === "rejected") {
+      throw soldOutcome.reason;
+    }
+    const soldResult = soldOutcome.value;
+
+    let buyResult: SaleChannelDiscoverResult;
+    if (buyOutcome.status === "fulfilled") {
+      buyResult = buyOutcome.value;
+    } else {
       buyResult = {
         comps: [],
         searchUrl: "",
@@ -405,7 +417,7 @@ export async function enrichListingSalesAppraisal(
       };
       pushUniqueWarning(
         warnings,
-        `Sales appraisal: for-sale comp discovery failed (${error instanceof Error ? error.message : "unknown error"}); using sold comps only.`,
+        `Sales appraisal: for-sale comp discovery failed (${buyOutcome.reason instanceof Error ? buyOutcome.reason.message : "unknown error"}); using sold comps only.`,
       );
     }
 
@@ -531,6 +543,30 @@ export async function enrichListingSalesAppraisal(
       }
     }
 
+    const compDerivedBand = { ...band };
+    const guideResolution = applyAgencyGuideToCompBand({
+      displayPrice: listingWithSignals.displayPrice,
+      compBand: compDerivedBand,
+      premiumTier: premiumResult.premium,
+    });
+    const { agencyGuide } = guideResolution;
+    const agencyGuideReview = guideResolution.review ?? undefined;
+
+    if (agencyGuide) {
+      band = guideResolution.band;
+      pushUniqueWarning(
+        warnings,
+        `Sales appraisal retained the agency's advertised guide (${formatSalePriceRange(agencyGuide.priceMin, agencyGuide.priceMax)}) as the appraisal range.`,
+      );
+    }
+
+    if (agencyGuideReview?.required) {
+      pushUniqueWarning(
+        warnings,
+        "Sales appraisal requires agent review because the agency guide materially differs from the comp-derived range.",
+      );
+    }
+
     const compSelectionBase = {
       ...listingWithSignals,
       salesComps: comps,
@@ -597,6 +633,15 @@ export async function enrichListingSalesAppraisal(
         discovery,
         premiumTier: premiumResult.premium,
         premiumReasons: premiumResult.reasons,
+        agencyGuide: agencyGuide ?? undefined,
+        compDerivedBand: agencyGuide
+          ? {
+              priceMin: compDerivedBand.priceMin,
+              priceMax: compDerivedBand.priceMax,
+              priceMidpoint: compDerivedBand.priceMidpoint,
+            }
+          : undefined,
+        agencyGuideReview,
         positioning: positioned.positioning
           ? {
               ...positioned.positioning,

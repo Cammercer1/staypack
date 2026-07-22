@@ -62,7 +62,15 @@ function deriveHeading(listing: Listing, parsed: ParsedListing) {
   return address || "Property appraisal overview";
 }
 
-function pricePositionLine(soldCompCount: number, forSaleCompCount: number) {
+function pricePositionLine(
+  soldCompCount: number,
+  forSaleCompCount: number,
+  agencyGuideApplied: boolean,
+) {
+  if (agencyGuideApplied) {
+    return `The estimated price range alongside retains the agency’s current marketed guide, reviewed against recent sold results and current competing listings.`;
+  }
+
   if (soldCompCount > 0) {
     return `The estimated price range alongside is drawn from comparable properties sold within the past 12 months and matched to this home's property type, size and location${forSaleCompCount > 0 ? ", with current for-sale listings providing additional market context" : ""}.`;
   }
@@ -108,7 +116,11 @@ export function deriveSalesAppraisalCopy({
       " ",
     );
 
-  const priceLine = pricePositionLine(soldCompCount, forSaleCompCount);
+  const priceLine = pricePositionLine(
+    soldCompCount,
+    forSaleCompCount,
+    Boolean(parsed.salesAppraisal?.agencyGuide),
+  );
   const marketLine =
     soldCompCount > 0
       ? `Recent sold results nearby demonstrate active buyer demand for comparable homes in the area.`
@@ -167,8 +179,9 @@ export function deriveSalesAppraisalCopy({
       "Confirm presentation, styling and campaign inclusions when setting the asking price.",
       "Allow for marketing costs, agent fees and settlement timing when planning the sale.",
     ],
-    methodology_note:
-      "Estimated sale price range from same-property-type REA comparables sold within the past 12 months, matched on beds, baths and parking. The search expands to nearby areas when local evidence is limited; current for-sale listings provide context only. Outliers trimmed; comparable evidence shown on page 2.",
+    methodology_note: parsed.salesAppraisal?.agencyGuide
+      ? "The agency’s current marketed guide is retained as the estimated sale price range and reviewed against same-property-type comparables sold within the past 12 months. Current for-sale listings provide additional context; comparable evidence is shown on page 2."
+      : "Estimated sale price range from same-property-type REA comparables sold within the past 12 months, matched on beds, baths and parking. The search expands to nearby areas when local evidence is limited; current for-sale listings provide context only. Outliers trimmed; comparable evidence shown on page 2.",
     disclaimer:
       agency.default_disclaimer ??
       "This appraisal is indicative only and does not constitute financial, legal or valuation advice. Vendors should make their own enquiries.",

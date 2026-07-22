@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { scrapeApifyReaRentSearchUrls } from "@/lib/apify/client";
+import {
+  APIFY_REA_DATASET_FIELDS,
+  scrapeApifyReaRentSearchUrls,
+} from "@/lib/apify/client";
 
 function mockSuccessfulRun() {
   const fetchMock = vi.fn()
@@ -67,6 +70,19 @@ describe("Apify REA search options", () => {
 
     const datasetUrl = String(fetchMock.mock.calls[2]![0]);
     expect(datasetUrl).toContain("limit=100");
+    const fields = new URL(datasetUrl).searchParams.get("fields");
+    expect(fields).toBe(APIFY_REA_DATASET_FIELDS);
+    expect(fields?.split(",")).toEqual(
+      expect.arrayContaining([
+        "listing",
+        "price",
+        "soldDate",
+        "landSize",
+        "images",
+        "agents",
+      ]),
+    );
+    expect(fields?.split(",")).not.toContain("withIdsResponse");
   });
 
   it("preserves the existing 50-record non-surrounding default", async () => {

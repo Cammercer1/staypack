@@ -157,6 +157,26 @@ export type ParsedListing = {
     };
     premiumTier?: boolean;
     premiumReasons?: string[];
+    /** Numeric price guide advertised by the agency on the subject listing. */
+    agencyGuide?: {
+      displayPrice: string;
+      priceMin: number;
+      priceMax: number;
+      priceMidpoint: number;
+    };
+    /** Automated comp result retained for evidence when the agency guide is authoritative. */
+    compDerivedBand?: {
+      priceMin: number;
+      priceMax: number;
+      priceMidpoint: number;
+    };
+    /** Explicit acknowledgement gate when agency and comp evidence materially disagree. */
+    agencyGuideReview?: {
+      required: boolean;
+      confirmed: boolean;
+      divergencePct: number;
+      reasons: string[];
+    };
     /** LLM-adjusted price band after reviewing comps and listing quality. */
     positioning?: SaleAppraisalPositioning;
   };

@@ -52,6 +52,7 @@ export function SalesAppraisalDataStep({
     [parsed],
   );
   const appraisal = parsed?.salesAppraisal;
+  const agencyGuideReview = appraisal?.agencyGuideReview;
   const jobProcessing =
     activeJob?.status === "pending" || activeJob?.status === "processing";
   const jobFailed = activeJob?.status === "failed";
@@ -69,6 +70,9 @@ export function SalesAppraisalDataStep({
   const [priceMid, setPriceMid] = useState<string>(
     () => String(appraisal?.priceMidpoint ?? ""),
   );
+  const [agentReviewConfirmed, setAgentReviewConfirmed] = useState(
+    () => agencyGuideReview?.confirmed ?? false,
+  );
   const [selectedIds, setSelectedIds] = useState<string[]>(() => {
     if (appraisal?.selectedCompListingIds?.length) {
       return appraisal.selectedCompListingIds;
@@ -84,12 +88,13 @@ export function SalesAppraisalDataStep({
     setPriceMin(String(appraisal?.priceMin ?? ""));
     setPriceMax(String(appraisal?.priceMax ?? ""));
     setPriceMid(String(appraisal?.priceMidpoint ?? ""));
+    setAgentReviewConfirmed(agencyGuideReview?.confirmed ?? false);
     if (appraisal?.selectedCompListingIds?.length) {
       setSelectedIds(appraisal.selectedCompListingIds);
     } else if (parsed && pool.length > 0) {
       setSelectedIds(defaultSelectedSaleCompListingIds(parsed));
     }
-  }, [listing.updated_at, appraisal, parsed, pool.length]);
+  }, [listing.updated_at, appraisal, agencyGuideReview, parsed, pool.length]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const compRows = useMemo(
@@ -125,7 +130,11 @@ export function SalesAppraisalDataStep({
   const compsReady = hasSalesAppraisalComps(parsed);
   const initialCompsProcessing = jobProcessing && !compsReady;
   const refreshingComps = jobProcessing && compsReady;
-  const canContinue = compsReady && selectedIds.length > 0;
+  const needsAgentReview = agencyGuideReview?.required === true;
+  const canContinue =
+    compsReady &&
+    selectedIds.length > 0 &&
+    (!needsAgentReview || agentReviewConfirmed);
 
   useEffect(() => {
     if (!jobProcessing || !activeJob?.id) {
@@ -267,6 +276,9 @@ export function SalesAppraisalDataStep({
             price_max: parsePrice(priceMax),
             price_midpoint: parsePrice(priceMid),
             selected_comp_listing_ids: selectedIds,
+            agent_review_confirmed: needsAgentReview
+              ? agentReviewConfirmed
+              : undefined,
           }),
         },
       );
@@ -402,6 +414,46 @@ export function SalesAppraisalDataStep({
               <p className="text-sm text-muted-foreground sm:col-span-3">
                 Guide range: <span className="font-medium text-foreground">{priceSummary}</span>
               </p>
+            ) : null}
+            {needsAgentReview ? (
+              <div className="rounded-xl border border-amber-300 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 sm:col-span-3">
+                <p className="font-medium">Agent review required</p>
+                <p className="mt-1 text-amber-900/80">
+                  The agency guide of{" "}
+                  {appraisal?.agencyGuide
+                    ? formatSalePriceRange(
+                        appraisal.agencyGuide.priceMin,
+                        appraisal.agencyGuide.priceMax,
+                      )
+                    : "the displayed range"}{" "}
+                  has been retained, but the automated comp range was{" "}
+                  {appraisal?.compDerivedBand
+                    ? formatSalePriceRange(
+                        appraisal.compDerivedBand.priceMin,
+                        appraisal.compDerivedBand.priceMax,
+                      )
+                    : "materially different"}
+                  . Review the evidence before continuing.
+                </p>
+                {agencyGuideReview.reasons.length > 0 ? (
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-900/80">
+                    {agencyGuideReview.reasons.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                <label className="mt-3 flex cursor-pointer items-start gap-2 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={agentReviewConfirmed}
+                    onChange={(event) =>
+                      setAgentReviewConfirmed(event.target.checked)
+                    }
+                    className="mt-0.5 size-4 accent-primary"
+                  />
+                  <span>I have reviewed the agency guide against the comparable evidence.</span>
+                </label>
+              </div>
             ) : null}
           </div>
 

@@ -8,6 +8,39 @@ const DEFAULT_REA_TIMEOUT_MS = 240_000;
 const DEFAULT_REA_MAX_REQUEST_RETRIES = 2;
 const DEFAULT_REA_MAX_CONCURRENCY = 10;
 
+// The actor duplicates the complete REA detail response under
+// `withIdsResponse`. All current parsers use the flattened fields below or
+// the canonical `listing` object, so do not download that duplicate envelope.
+export const APIFY_REA_DATASET_FIELDS = [
+  "source",
+  "country",
+  "listingId",
+  "title",
+  "propertyType",
+  "channel",
+  "status",
+  "price",
+  "address",
+  "suburb",
+  "postcode",
+  "state",
+  "bedrooms",
+  "bathrooms",
+  "carSpaces",
+  "landSize",
+  "floorArea",
+  "soldDate",
+  "dateSold",
+  "description",
+  "isRent",
+  "isBuy",
+  "url",
+  "images",
+  "agents",
+  "originalSearchUrl",
+  "listing",
+].join(",");
+
 export function getApifyApiKey() {
   return process.env.APIFY_API_KEY?.trim() ?? "";
 }
@@ -200,10 +233,18 @@ async function scrapeApifyReaUrls({
           throw new Error("Apify REA scrape completed without a dataset ID.");
         }
 
-        const datasetResponse = await fetch(
-          `https://${DEFAULT_API_HOST}/v2/datasets/${datasetId}/items?token=${encodeURIComponent(apiKey)}&clean=true&format=json&limit=${resultLimit}`,
-          { signal: controller.signal },
+        const datasetUrl = new URL(
+          `https://${DEFAULT_API_HOST}/v2/datasets/${datasetId}/items`,
         );
+        datasetUrl.searchParams.set("token", apiKey);
+        datasetUrl.searchParams.set("clean", "true");
+        datasetUrl.searchParams.set("format", "json");
+        datasetUrl.searchParams.set("limit", String(resultLimit));
+        datasetUrl.searchParams.set("fields", APIFY_REA_DATASET_FIELDS);
+
+        const datasetResponse = await fetch(datasetUrl, {
+          signal: controller.signal,
+        });
         const datasetText = await datasetResponse.text();
         if (!datasetResponse.ok) {
           throw new Error(

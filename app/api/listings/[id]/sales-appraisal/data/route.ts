@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireListingAccess } from "@/lib/auth/requireUser";
 import {
+  applySalesAppraisalAgentReviewConfirmation,
   applySalesAppraisalCompSelection,
   applySalesAppraisalPriceOverrides,
   MAX_SALES_APPRAISAL_FEATURED_COMPS,
@@ -17,6 +18,7 @@ const bodySchema = z.object({
     .array(z.string().min(1))
     .max(MAX_SALES_APPRAISAL_FEATURED_COMPS)
     .optional(),
+  agent_review_confirmed: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -54,6 +56,13 @@ export async function PATCH(
       nextParsed = applySalesAppraisalCompSelection(
         nextParsed,
         body.selected_comp_listing_ids,
+      );
+    }
+
+    if (body.agent_review_confirmed != null) {
+      nextParsed = applySalesAppraisalAgentReviewConfirmation(
+        nextParsed,
+        body.agent_review_confirmed,
       );
     }
 

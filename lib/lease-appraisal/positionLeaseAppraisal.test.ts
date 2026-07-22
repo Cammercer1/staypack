@@ -42,6 +42,21 @@ describe("deriveRentCompAwareBounds", () => {
     expect(bounds.floor).toBeLessThan(1500);
     expect(bounds.ceiling).toBeGreaterThan(1500);
   });
+
+  it("never produces a premium ceiling below its target or strongest comp", () => {
+    const bounds = deriveRentCompAwareBounds({
+      sameBedCount: 13,
+      sameBedMin: 550,
+      sameBedMedian: 600,
+      sameBedP75: 660,
+      sameBedMax: 1200,
+      premiumTier: true,
+      statisticalMid: 600,
+    });
+
+    expect(bounds.ceiling).toBeGreaterThanOrEqual(bounds.target!);
+    expect(bounds.ceiling).toBeGreaterThanOrEqual(1200);
+  });
 });
 
 describe("clampPositionedRentBand", () => {

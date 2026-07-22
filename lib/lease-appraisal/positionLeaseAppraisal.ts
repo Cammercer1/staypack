@@ -201,7 +201,7 @@ export function deriveRentCompAwareBounds({
       sameBedP75 != null
         ? roundWeeklyRent(sameBedP75 * 1.08)
         : hardCeiling;
-    const ceiling = Math.min(softCeiling, hardCeiling);
+    const statisticalCeiling = Math.min(softCeiling, hardCeiling);
     const floor = roundWeeklyRent(
       Math.max(
         sameBedMin != null ? sameBedMin * 0.95 : sameBedMedian * 0.9,
@@ -210,6 +210,11 @@ export function deriveRentCompAwareBounds({
     );
     const target = roundWeeklyRent(
       sameBedMedian + (sameBedMax - sameBedMedian) * (premiumTier ? 0.6 : 0.5),
+    );
+    const ceiling = Math.max(
+      statisticalCeiling,
+      target,
+      premiumTier ? sameBedMax : 0,
     );
 
     return { floor, ceiling, target };
