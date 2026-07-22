@@ -10,9 +10,13 @@ export type RentalComp = {
   listingUrl?: string;
 };
 
-export type RentalAppraisalSource = "rea_discover" | "apify_rea";
+export type RentalAppraisalSource =
+  /** @deprecated Historical persisted reports only. */
+  | "rea_discover"
+  | "apify_rea";
 
 export type SuburbRentFloorSource =
+  /** @deprecated Historical persisted reports only; no longer produced. */
   | "domain_bed_median"
   | "rea_bed_median"
   | "propradar_house_median";

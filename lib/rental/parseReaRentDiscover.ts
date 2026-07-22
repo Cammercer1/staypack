@@ -48,6 +48,7 @@ export function reaRecordToRentalComp(record: BrightDataReaRecord): RentalComp |
   };
 }
 
+/** @deprecated Appraisal discovery now uses Apify REA records only. */
 export function parseReaRentDiscoverRecords(
   records: BrightDataReaRecord[],
 ): RentalComp[] {

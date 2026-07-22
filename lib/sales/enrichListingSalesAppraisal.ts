@@ -4,10 +4,6 @@ import {
   scrapeApifyReaRentSearch,
   scrapeApifyReaRentSearchUrls,
 } from "@/lib/apify/client";
-import {
-  hasBrightDataReaConfig,
-  scrapeBrightDataReaRentDiscover,
-} from "@/lib/brightdata/client";
 import { detectPremiumRentSubject } from "@/lib/rental/detectPremiumRentSubject";
 import { parseListingPremiumSignals } from "@/lib/rental/parseListingPremiumSignals";
 import {
@@ -33,7 +29,6 @@ import {
 import { enrichSelectedSaleCompDetails } from "@/lib/sales/enrichSaleCompDetails";
 import { mergeSaleComps } from "@/lib/sales/mergeSaleComps";
 import { parseApifyReaSaleListings } from "@/lib/sales/parseApifyReaSaleListings";
-import { parseReaSaleDiscoverRecords } from "@/lib/sales/parseReaSaleDiscover";
 import {
   applyAgencyGuideToCompBand,
 } from "@/lib/sales/resolveAgencyGuidePriceBand";
@@ -55,7 +50,6 @@ export type EnrichSalesAppraisalOptions = {
   /** Override SERP URLs per channel (for tests). */
   soldSearchUrl?: string;
   buySearchUrl?: string;
-  limitPages?: number;
   /** Listing URL used to ensure the subject is never treated as its own comp. */
   subjectListingUrl?: string | null;
 };
@@ -64,7 +58,7 @@ const MIN_SOLD_COMPS_FOR_BAND = MIN_SALE_COMPS_FOR_BAND;
 const MAX_SALE_PRIMARY_BATCH_URLS = 3;
 
 function hasSaleDiscoverConfig() {
-  return hasApifyReaConfig() || hasBrightDataReaConfig();
+  return hasApifyReaConfig();
 }
 
 function pushUniqueWarning(warnings: string[], message: string) {
@@ -103,7 +97,7 @@ type SaleChannelDiscoverResult = {
   comps: SaleComp[];
   searchUrl: string;
   attemptLabel: string;
-  provider: "apify" | "brightdata";
+  provider: "apify";
   discovery: ComparableDiscoverySummary;
 };
 
@@ -152,30 +146,14 @@ function prepareSaleComparablePool({
 async function fetchSaleCompsForSearchUrl(
   searchUrl: string,
   channel: ReaSaleChannel,
-  options?: EnrichSalesAppraisalOptions,
-  skipApify = false,
-): Promise<{ comps: SaleComp[]; provider: "apify" | "brightdata" }> {
-  if (!skipApify && hasApifyReaConfig()) {
-    try {
-      const records = await scrapeApifyReaRentSearch({
-        searchUrl,
-        maxItems: getApifyReaMaxListings(),
-      });
-      return { comps: parseApifyReaSaleListings(records, channel), provider: "apify" };
-    } catch (error) {
-      if (!hasBrightDataReaConfig()) {
-        throw error;
-      }
-    }
-  }
-
-  const records = await scrapeBrightDataReaRentDiscover({
+): Promise<{ comps: SaleComp[]; provider: "apify" }> {
+  const records = await scrapeApifyReaRentSearch({
     searchUrl,
-    limitPages: options?.limitPages ?? 1,
+    maxItems: getApifyReaMaxListings(),
   });
   return {
-    comps: parseReaSaleDiscoverRecords(records, channel),
-    provider: "brightdata",
+    comps: parseApifyReaSaleListings(records, channel),
+    provider: "apify",
   };
 }
 
@@ -193,7 +171,6 @@ async function discoverSaleCompsForChannel(
     const { comps, provider } = await fetchSaleCompsForSearchUrl(
       overrideUrl,
       channel,
-      options,
     );
     const prepared = prepareSaleComparablePool({
       comps,
@@ -216,67 +193,13 @@ async function discoverSaleCompsForChannel(
     premiumSignals,
     channel,
   ).slice(0, MAX_SALE_DISCOVERY_ATTEMPTS_PER_CHANNEL);
-  let apifyBatchFailed = false;
-
-  if (hasApifyReaConfig()) {
-    const batches = [
-      attempts.slice(0, MAX_SALE_PRIMARY_BATCH_URLS),
-      attempts.slice(MAX_SALE_PRIMARY_BATCH_URLS),
-    ].filter((batch) => batch.length > 0);
-    let mergedComps: SaleComp[] = [];
-    let attemptedSearches = 0;
-    let prepared = prepareSaleComparablePool({
-      comps: [],
-      listing,
-      subjectListingUrl: options?.subjectListingUrl,
-      targets,
-      attemptCount: 0,
-    });
-
-    try {
-      for (const [batchIndex, batch] of batches.entries()) {
-        const records = await scrapeApifyReaRentSearchUrls({
-          searchUrls: batch.map((attempt) => attempt.searchUrl),
-          maxItems: getApifyReaMaxListings(),
-        });
-        mergedComps = mergeSaleComps(
-          mergedComps,
-          parseApifyReaSaleListings(records, channel),
-        );
-        attemptedSearches += batch.length;
-        prepared = prepareSaleComparablePool({
-          comps: mergedComps,
-          listing,
-          subjectListingUrl: options?.subjectListingUrl,
-          targets,
-          attemptCount: attemptedSearches,
-        });
-
-        if (prepared.discovery.targetMet || batchIndex === batches.length - 1) {
-          return {
-            comps: prepared.comps,
-            searchUrl: attempts[0]?.searchUrl ?? "",
-            attemptLabel: `${channel}-${batchIndex === 0 ? "batched-primary-search" : "batched-expanded-search"}`,
-            provider: "apify",
-            discovery: prepared.discovery,
-          };
-        }
-      }
-    } catch (error) {
-      if (!hasBrightDataReaConfig()) {
-        throw error;
-      }
-      apifyBatchFailed = true;
-    }
-  }
-
+  const batches = [
+    attempts.slice(0, MAX_SALE_PRIMARY_BATCH_URLS),
+    attempts.slice(MAX_SALE_PRIMARY_BATCH_URLS),
+  ].filter((batch) => batch.length > 0);
   let mergedComps: SaleComp[] = [];
-  let lastProvider: SaleChannelDiscoverResult["provider"] = hasApifyReaConfig()
-    ? "apify"
-    : "brightdata";
-  let lastSearchUrl = "";
-  let lastAttemptLabel = "merged";
-  let lastPrepared = prepareSaleComparablePool({
+  let attemptedSearches = 0;
+  let prepared = prepareSaleComparablePool({
     comps: [],
     listing,
     subjectListingUrl: options?.subjectListingUrl,
@@ -284,42 +207,41 @@ async function discoverSaleCompsForChannel(
     attemptCount: 0,
   });
 
-  for (const [index, attempt] of attempts.entries()) {
-    const { comps, provider } = await fetchSaleCompsForSearchUrl(
-      attempt.searchUrl,
-      channel,
-      options,
-      apifyBatchFailed,
+  for (const [batchIndex, batch] of batches.entries()) {
+    const records = await scrapeApifyReaRentSearchUrls({
+      searchUrls: batch.map((attempt) => attempt.searchUrl),
+      maxItems: getApifyReaMaxListings(),
+    });
+    mergedComps = mergeSaleComps(
+      mergedComps,
+      parseApifyReaSaleListings(records, channel),
     );
-    mergedComps = mergeSaleComps(mergedComps, comps);
-    lastPrepared = prepareSaleComparablePool({
+    attemptedSearches += batch.length;
+    prepared = prepareSaleComparablePool({
       comps: mergedComps,
       listing,
       subjectListingUrl: options?.subjectListingUrl,
       targets,
-      attemptCount: index + 1,
+      attemptCount: attemptedSearches,
     });
-    lastProvider = provider;
-    lastSearchUrl = attempt.searchUrl;
-    lastAttemptLabel = attempt.label;
 
-    if (lastPrepared.discovery.targetMet) {
+    if (prepared.discovery.targetMet || batchIndex === batches.length - 1) {
       return {
-        comps: lastPrepared.comps,
-        searchUrl: attempt.searchUrl,
-        attemptLabel: attempt.label,
-        provider,
-        discovery: lastPrepared.discovery,
+        comps: prepared.comps,
+        searchUrl: attempts[0]?.searchUrl ?? "",
+        attemptLabel: `${channel}-${batchIndex === 0 ? "batched-primary-search" : "batched-expanded-search"}`,
+        provider: "apify",
+        discovery: prepared.discovery,
       };
     }
   }
 
   return {
-    comps: lastPrepared.comps,
-    searchUrl: lastSearchUrl,
-    attemptLabel: lastAttemptLabel,
-    provider: lastProvider,
-    discovery: lastPrepared.discovery,
+    comps: prepared.comps,
+    searchUrl: attempts[0]?.searchUrl ?? "",
+    attemptLabel: "no-search-attempts",
+    provider: "apify",
+    discovery: prepared.discovery,
   };
 }
 
@@ -361,7 +283,7 @@ export async function enrichListingSalesAppraisal(
 
   if (!hasSaleDiscoverConfig()) {
     warnings.push(
-      "Sales appraisal skipped: Apify or Bright Data REA discovery is not configured.",
+      "Sales appraisal skipped: Apify REA discovery is not configured.",
     );
     return { ...listingWithSignals, warnings };
   }
@@ -614,7 +536,7 @@ export async function enrichListingSalesAppraisal(
 
     pushUniqueWarning(
       warnings,
-      `Sales appraisal from ${soldResult.provider === "apify" ? "Apify" : "Bright Data"} REA comps (${soldComps.length} sold, ${forSaleComps.length} for sale, midpoint ${formatSalePriceRange(band.priceMidpoint, band.priceMidpoint)}).`,
+      `Sales appraisal from Apify REA comps (${soldComps.length} sold, ${forSaleComps.length} for sale, midpoint ${formatSalePriceRange(band.priceMidpoint, band.priceMidpoint)}).`,
     );
 
     return {
@@ -624,7 +546,7 @@ export async function enrichListingSalesAppraisal(
         priceMax: band.priceMax,
         priceMidpoint: band.priceMidpoint,
         selectedCompListingIds,
-        source: soldResult.provider === "apify" ? "apify_rea" : "rea_discover",
+        source: "apify_rea",
         compCount: comps.length,
         soldCompCount: soldComps.length,
         forSaleCompCount: forSaleComps.length,

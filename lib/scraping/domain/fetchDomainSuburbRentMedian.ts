@@ -210,6 +210,7 @@ export function parseDomainSuburbRentMedians(
   return [...deduped.values()];
 }
 
+/** @deprecated Appraisals use Apify REA comparable evidence only. */
 export async function fetchDomainSuburbRentMedian(input: {
   suburb: string;
   state: string;

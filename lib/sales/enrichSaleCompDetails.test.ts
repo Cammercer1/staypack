@@ -32,7 +32,7 @@ describe("mergeSaleCompDetailRecord", () => {
     expect(
       mergeSaleCompDetailRecord(
         { ...soldComp, soldDate: "2025-01-01", landAreaSqm: 500 },
-        { listing_type: "sold" },
+        {},
       ),
     ).toMatchObject({
       soldDate: "2025-01-01",
@@ -44,7 +44,7 @@ describe("mergeSaleCompDetailRecord", () => {
     expect(
       mergeSaleCompDetailRecord(
         { ...soldComp, saleStatus: "for_sale" },
-        { sold_date: "2025-01-01" },
+        { soldDate: "2025-01-01" },
       ).soldDate,
     ).toBeUndefined();
   });

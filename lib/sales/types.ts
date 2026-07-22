@@ -22,7 +22,10 @@ export type SaleComp = {
   listingUrl?: string;
 };
 
-export type SalesAppraisalSource = "rea_discover" | "apify_rea";
+export type SalesAppraisalSource =
+  /** @deprecated Historical persisted reports only. */
+  | "rea_discover"
+  | "apify_rea";
 
 export type SalesAppraisalMeta = {
   priceMin?: number;

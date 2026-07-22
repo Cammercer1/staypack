@@ -109,7 +109,10 @@ export type ParsedListing = {
     weeklyMidpoint?: number;
     /** Up to 6 listing URLs (or synthetic ids) shown on page 2. */
     selectedCompListingIds?: string[];
-    source?: "rea_discover" | "apify_rea";
+    source?:
+      /** @deprecated Historical persisted reports only. */
+      | "rea_discover"
+      | "apify_rea";
     /** Eligible evidence pool size; distinct from the six featured report cards. */
     compCount?: number;
     featuredCompCount?: number;
@@ -118,7 +121,11 @@ export type ParsedListing = {
     premiumTier?: boolean;
     premiumReasons?: string[];
     rentFloorWeekly?: number;
-    rentFloorSource?: "domain_bed_median" | "rea_bed_median" | "propradar_house_median";
+    rentFloorSource?:
+      /** @deprecated Historical persisted reports only; no longer produced. */
+      | "domain_bed_median"
+      | "rea_bed_median"
+      | "propradar_house_median";
     /** LLM-adjusted rent band after reviewing comps and listing quality. */
     positioning?: LtrAppraisalPositioning;
   };
@@ -144,7 +151,10 @@ export type ParsedListing = {
     priceMidpoint?: number;
     /** Up to 6 listing URLs (or synthetic ids) shown on page 2. */
     selectedCompListingIds?: string[];
-    source?: "rea_discover" | "apify_rea";
+    source?:
+      /** @deprecated Historical persisted reports only. */
+      | "rea_discover"
+      | "apify_rea";
     /** Eligible sold + for-sale pool size; distinct from featured report cards. */
     compCount?: number;
     featuredCompCount?: number;

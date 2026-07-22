@@ -123,6 +123,7 @@ export function reaRecordToSaleComp(
   };
 }
 
+/** @deprecated Appraisal discovery now uses Apify REA records only. */
 export function parseReaSaleDiscoverRecords(
   records: BrightDataReaRecord[],
   channel: ReaSaleChannel,

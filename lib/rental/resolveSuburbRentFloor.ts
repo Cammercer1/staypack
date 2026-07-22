@@ -1,9 +1,7 @@
-import type { DomainSuburbRentMedian } from "@/lib/scraping/domain/fetchDomainSuburbRentMedian";
 import type { RentalComp } from "@/lib/rental/types";
 import type { LtrSuburbMarketJson } from "@/lib/types";
 
 export type SuburbRentFloorSource =
-  | "domain_bed_median"
   | "rea_bed_median"
   | "propradar_house_median";
 
@@ -53,7 +51,7 @@ export function computeReaBedroomRentPercentile(
 
 /**
  * PropRadar only publishes all-house / all-unit medians — scale house median slightly
- * for 4+ bed subjects when no Domain row is available.
+ * for 4+ bed subjects when bedroom-matched REA evidence is unavailable.
  */
 export function propradarHouseRentFloor(
   market: LtrSuburbMarketJson | null | undefined,
@@ -79,20 +77,12 @@ export function propradarHouseRentFloor(
 }
 
 export function resolveSuburbRentFloor(input: {
-  domainMedian: DomainSuburbRentMedian | null;
   reaBedMedian: number | null;
   reaBedP75?: number | null;
   suburbMarket: LtrSuburbMarketJson | null | undefined;
   bedrooms: number;
   premium: boolean;
 }): SuburbRentFloor | null {
-  if (input.domainMedian?.weeklyRent) {
-    return {
-      weeklyRent: input.domainMedian.weeklyRent,
-      source: "domain_bed_median",
-    };
-  }
-
   const reaFloor =
     input.premium && input.reaBedP75 != null
       ? input.reaBedP75

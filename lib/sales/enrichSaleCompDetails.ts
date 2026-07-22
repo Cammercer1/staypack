@@ -3,11 +3,6 @@ import {
   scrapeApifyReaListingUrls,
 } from "@/lib/apify/client";
 import type { ApifyReaListingRecord } from "@/lib/apify/types";
-import {
-  hasBrightDataReaConfig,
-  scrapeBrightDataReaListings,
-} from "@/lib/brightdata/client";
-import type { BrightDataReaRecord } from "@/lib/brightdata/types";
 import type { SaleComp } from "@/lib/sales/types";
 import { saleCompListingId } from "@/lib/sales-appraisal/saleCompIds";
 import {
@@ -16,7 +11,7 @@ import {
   resolveReaSoldDate,
 } from "@/lib/scraping/rea/parseReaPropertyFacts";
 
-type ReaDetailRecord = ApifyReaListingRecord | BrightDataReaRecord;
+type ReaDetailRecord = ApifyReaListingRecord;
 
 function parseCount(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -53,18 +48,12 @@ function listingNumber(value?: string) {
 }
 
 function recordUrl(record: ReaDetailRecord) {
-  return record.url ??
-    ("input" in record && record.input && typeof record.input.url === "string"
-      ? record.input.url
-      : undefined);
+  return record.url;
 }
 
 function recordListingNumber(record: ReaDetailRecord) {
   if ("listingId" in record && record.listingId) {
     return String(record.listingId);
-  }
-  if ("rea_property_id" in record && record.rea_property_id) {
-    return String(record.rea_property_id);
   }
   return listingNumber(recordUrl(record));
 }
@@ -112,27 +101,8 @@ export function mergeSaleCompDetailRecord(
 }
 
 async function fetchDetailRecords(urls: string[]): Promise<ReaDetailRecord[]> {
-  const records: ReaDetailRecord[] = [];
-  let lastError: unknown;
-
-  if (hasApifyReaConfig()) {
-    try {
-      records.push(...(await scrapeApifyReaListingUrls(urls)));
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  if (hasBrightDataReaConfig()) {
-    try {
-      records.push(...(await scrapeBrightDataReaListings(urls)));
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  if (records.length === 0 && lastError) throw lastError;
-  return records;
+  if (!hasApifyReaConfig()) return [];
+  return scrapeApifyReaListingUrls(urls);
 }
 
 /** Bounded detail-page pass for the featured sales comparables only. */

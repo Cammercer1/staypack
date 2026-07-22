@@ -12,7 +12,6 @@ import {
   type ComparableDiscoverySummary,
 } from "@/lib/comparables/discoveryPolicy";
 import type { RentAppraisalConfig } from "@/lib/delivery/rentAppraisalConfig";
-import { fetchDomainSuburbRentMedian } from "@/lib/scraping/domain/fetchDomainSuburbRentMedian";
 import { buildRentDiscoverAttempts } from "@/lib/rental/buildRentDiscoverAttempts";
 import { mergeRentalComps } from "@/lib/rental/mergeRentalComps";
 import { MIN_RENT_COMPS_FOR_BAND } from "@/lib/rental/rentCompThresholds";
@@ -392,14 +391,6 @@ export async function enrichListingRentalAppraisal(
     }
 
     const bedrooms = withSuburb.bedrooms!;
-    const domainMedian = await fetchDomainSuburbRentMedian({
-      suburb: withSuburb.suburb!,
-      state: withSuburb.state!,
-      postcode: withSuburb.postcode!,
-      bedrooms,
-      propertyType: withSuburb.propertyType,
-    }).catch(() => null);
-
     const reaBedMedian = computeReaBedroomRentMedian(estimationComps, bedrooms);
     const reaBedP75 = computeReaBedroomRentPercentile(
       estimationComps,
@@ -407,7 +398,6 @@ export async function enrichListingRentalAppraisal(
       0.75,
     );
     const rentFloor = resolveSuburbRentFloor({
-      domainMedian,
       reaBedMedian,
       reaBedP75,
       suburbMarket: withSuburb.ltrSuburbMarket,
@@ -423,10 +413,6 @@ export async function enrichListingRentalAppraisal(
           `Rental appraisal band raised to align with suburb benchmark ($${rentFloor.weeklyRent}/wk from ${rentFloor.source.replace(/_/g, " ")}).`,
         );
       }
-    } else if (domainMedian == null) {
-      warnings.push(
-        "Rental appraisal: Domain suburb rent median unavailable; band uses REA comps only.",
-      );
     }
 
     const statisticalBand = { ...band };
