@@ -1,3 +1,5 @@
+import type { ComparableDiscoverySummary } from "@/lib/comparables/discoveryPolicy";
+
 export type AgencyRole = "owner" | "admin" | "member";
 
 export type ReportStatus =
@@ -87,6 +89,8 @@ export type ParsedListing = {
   carSpaces?: number;
   description?: string;
   displayPrice?: string;
+  /** Sold date supplied by the listing source when importing a sold property. */
+  soldDate?: string;
   images: string[];
   agents: {
     name?: string;
@@ -97,15 +101,20 @@ export type ParsedListing = {
   }[];
   /** Land area parsed from listing copy (e.g. 1,025 m²). */
   landAreaSqm?: number;
+  /** Internal/floor/building area supplied by the listing source. */
+  floorAreaSqm?: number;
   rentalAppraisal?: {
     weeklyMin?: number;
     weeklyMax?: number;
     weeklyMidpoint?: number;
-    /** Up to 4 listing URLs (or synthetic ids) shown on page 2. */
+    /** Up to 6 listing URLs (or synthetic ids) shown on page 2. */
     selectedCompListingIds?: string[];
     source?: "rea_discover" | "apify_rea";
+    /** Eligible evidence pool size; distinct from the six featured report cards. */
     compCount?: number;
+    featuredCompCount?: number;
     searchUrl?: string;
+    discovery?: ComparableDiscoverySummary;
     premiumTier?: boolean;
     premiumReasons?: string[];
     rentFloorWeekly?: number;
@@ -120,6 +129,7 @@ export type ParsedListing = {
     weeklyRent: number;
     bedrooms?: number;
     bathrooms?: number;
+    carSpaces?: number;
     propertyType?: string;
     imageUrl?: string;
     listingUrl?: string;
@@ -135,10 +145,16 @@ export type ParsedListing = {
     /** Up to 6 listing URLs (or synthetic ids) shown on page 2. */
     selectedCompListingIds?: string[];
     source?: "rea_discover" | "apify_rea";
+    /** Eligible sold + for-sale pool size; distinct from featured report cards. */
     compCount?: number;
+    featuredCompCount?: number;
     soldCompCount?: number;
     forSaleCompCount?: number;
     searchUrl?: string;
+    discovery?: {
+      sold: ComparableDiscoverySummary;
+      forSale: ComparableDiscoverySummary;
+    };
     premiumTier?: boolean;
     premiumReasons?: string[];
     /** LLM-adjusted price band after reviewing comps and listing quality. */
@@ -151,9 +167,12 @@ export type ParsedListing = {
     price: number;
     saleStatus: "sold" | "for_sale";
     soldDate?: string;
+    landAreaSqm?: number;
+    floorAreaSqm?: number;
     priceDisplay?: string;
     bedrooms?: number;
     bathrooms?: number;
+    carSpaces?: number;
     propertyType?: string;
     imageUrl?: string;
     listingUrl?: string;
@@ -306,6 +325,8 @@ export type LtrRentalCompCard = {
   listing_url: string;
   bedrooms: number | null;
   bathrooms: number | null;
+  car_spaces?: number | null;
+  property_type?: string | null;
   weekly_rent: number | null;
   suburb: string | null;
 };
@@ -346,10 +367,14 @@ export type SaleCompCard = {
   listing_url: string;
   bedrooms: number | null;
   bathrooms: number | null;
+  car_spaces?: number | null;
+  property_type?: string | null;
   price: number | null;
   price_display: string | null;
   sale_status: "sold" | "for_sale";
   sold_date: string | null;
+  land_area_sqm?: number | null;
+  floor_area_sqm?: number | null;
   suburb: string | null;
 };
 
@@ -444,6 +469,8 @@ export type FinalReportJson = {
     hero_image_url: string;
     selected_image_urls: string[];
     display_price?: string | null;
+    land_area_sqm?: number | null;
+    floor_area_sqm?: number | null;
   };
   str: {
     annual_revenue: number | null;
@@ -509,6 +536,7 @@ export type FinalReportJson = {
 
 export type Agency = {
   id: string;
+  agency_group_id?: string | null;
   name: string;
   slug: string;
   slug_aliases: string[];

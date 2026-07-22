@@ -8,7 +8,7 @@ export function renderEmailSubject(
   template: string | null,
   address: string,
 ) {
-  const base = template ?? "STR report: {{address}}";
+  const base = template ?? "Short-term rental appraisal: {{address}}";
   return base.replace(/\{\{address\}\}/g, address || "Property");
 }
 
@@ -29,7 +29,7 @@ export async function sendStrDeliveryEmail({
     from: resolveDeliveryFromEmail(tenant.email_from),
     to: tenant.email_recipients,
     subject,
-    text: `Please find the short-term rental report for ${address} attached.`,
+    text: `Please find the short-term rental appraisal for ${address} attached.`,
     attachments: [
       {
         filename: pdfFilename,

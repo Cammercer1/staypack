@@ -6,6 +6,12 @@ import {
 } from "@/lib/sales/parseSalePrice";
 import type { SaleComp, SaleCompStatus } from "@/lib/sales/types";
 import { normalizeReaImageUrl } from "@/lib/scraping/rea/normalizeReaImageUrl";
+import {
+  resolveReaFloorAreaSqm,
+  resolveReaLandAreaSqm,
+  resolveReaSoldDate,
+} from "@/lib/scraping/rea/parseReaPropertyFacts";
+import { parseLandAreaSqm } from "@/lib/rental/parseListingPremiumSignals";
 
 function parseCount(value: string | number | undefined) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -68,17 +74,6 @@ function resolveSaleStatus(
   return channel === "sold" ? "sold" : "for_sale";
 }
 
-function resolveSoldDate(record: BrightDataReaRecord): string | undefined {
-  const raw = record as Record<string, unknown>;
-  for (const key of ["sold_date", "date_sold", "soldDate"]) {
-    const value = raw[key];
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
-  }
-  return undefined;
-}
-
 export function reaRecordToSaleComp(
   record: BrightDataReaRecord,
   channel: ReaSaleChannel,
@@ -111,11 +106,18 @@ export function reaRecordToSaleComp(
     suburb,
     price,
     saleStatus,
-    soldDate: saleStatus === "sold" ? resolveSoldDate(record) : undefined,
+    soldDate: saleStatus === "sold" ? resolveReaSoldDate(record) : undefined,
+    landAreaSqm:
+      resolveReaLandAreaSqm(record) ??
+      (record.description?.trim()
+        ? parseLandAreaSqm(record.description)
+        : undefined),
+    floorAreaSqm: resolveReaFloorAreaSqm(record),
     priceDisplay,
     bedrooms: parseCount(record.bedrooms),
     bathrooms: parseCount(record.bathrooms),
-    propertyType: record.property_type ?? record.house_type,
+    carSpaces: parseCount(record.parking),
+    propertyType: (record.property_type ?? record.house_type)?.trim() || undefined,
     imageUrl: rawImage ? normalizeReaImageUrl(rawImage) : undefined,
     listingUrl: record.url,
   };

@@ -67,6 +67,7 @@ export function apifyReaRecordToRentalComp(
     weeklyRent,
     bedrooms: record.bedrooms ?? undefined,
     bathrooms: record.bathrooms ?? undefined,
+    carSpaces: record.carSpaces ?? undefined,
     propertyType: record.propertyType ?? undefined,
     imageUrl: rawImage ? normalizeReaImageUrl(rawImage) : undefined,
     listingUrl: record.url,

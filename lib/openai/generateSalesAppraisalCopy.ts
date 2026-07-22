@@ -6,6 +6,7 @@ import {
 } from "@/lib/sales-appraisal/deriveSalesAppraisalCopy";
 import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
 import { SALES_APPRAISAL_COMPARABLE_DISCLAIMER } from "@/lib/sales-appraisal/comparableEvidenceCopy";
+import { reportableSaleLandArea } from "@/lib/sales/reportableSaleArea";
 import {
   PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
   PAGE_ONE_COPY_MAX_ATTEMPTS,
@@ -19,7 +20,7 @@ import type { Agency, Listing, ParsedListing, SaleCompCard } from "@/lib/types";
 
 const SYSTEM_PROMPT = `You write page-1 copy for an Australian sales appraisal aimed at property vendors.
 
-The page header already says "Sales appraisal" — never use that phrase as the heading.
+The page header already says "Property appraisal" — never use that phrase as the heading.
 
 Inputs include the REA listing description, recently sold comparable evidence, current for-sale price guides, and an estimated sale price range. Use them.
 
@@ -60,10 +61,17 @@ export async function generateSalesAppraisalCopy(
       listing_url: comp.listingUrl ?? "",
       bedrooms: comp.bedrooms ?? null,
       bathrooms: comp.bathrooms ?? null,
+      car_spaces: comp.carSpaces ?? null,
+      property_type: comp.propertyType ?? null,
       price: comp.price,
       price_display: comp.priceDisplay ?? null,
       sale_status: comp.saleStatus,
       sold_date: comp.soldDate ?? null,
+      land_area_sqm: reportableSaleLandArea(
+        comp.propertyType,
+        comp.landAreaSqm,
+      ),
+      floor_area_sqm: comp.floorAreaSqm ?? null,
       suburb: comp.suburb ?? null,
     })) ??
     [];
@@ -98,6 +106,8 @@ export async function generateSalesAppraisalCopy(
       listing_title: input.listing.listing_title ?? input.parsed.title,
       listing_description:
         input.listing.listing_description ?? input.parsed.description,
+      land_area_sqm: input.parsed.landAreaSqm ?? null,
+      floor_area_sqm: input.parsed.floorAreaSqm ?? null,
     },
     sale_appraisal: {
       price_min: input.priceMin,
@@ -111,8 +121,12 @@ export async function generateSalesAppraisalCopy(
       price: comp.price,
       status: comp.sale_status,
       sold_date: comp.sold_date,
+      land_area_sqm: comp.land_area_sqm,
+      floor_area_sqm: comp.floor_area_sqm,
       bedrooms: comp.bedrooms,
       bathrooms: comp.bathrooms,
+      car_spaces: comp.car_spaces,
+      property_type: comp.property_type,
     })),
     agency: {
       name: input.agency.name,

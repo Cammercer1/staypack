@@ -118,7 +118,7 @@ export async function upsertDeliveryTenant(
         email_recipients: input.email_recipients,
         email_from: input.email_from ?? null,
         email_subject_template:
-          input.email_subject_template ?? "STR report: {{address}}",
+          input.email_subject_template ?? "Short-term rental appraisal: {{address}}",
         str_template_pack_id: input.str_template_pack_id ?? null,
         deliverables: input.deliverables,
         billing_mode: input.billing_mode,

@@ -29,7 +29,7 @@ import {
   type ReportCopyFieldPath,
 } from "@/lib/reports/editable/reportCopyPaths";
 import { mergeSalesAppraisalPreviewFromListing } from "@/lib/sales-appraisal/mergeSalesAppraisalPreviewFromListing";
-import { mergeSalesAppraisalPreviewAgents } from "@/lib/sales-appraisal/mergeSalesAppraisalPreviewAgents";
+import { mergeAppraisalPreviewAgents } from "@/lib/reports/mergeAppraisalPreviewAgents";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { hasSalesAppraisalComps } from "@/lib/sales-appraisal/generateSalesAppraisalForListing";
 import { hasSalesAppraisalSelectedComps } from "@/lib/sales-appraisal/salesAppraisalData";
@@ -37,6 +37,7 @@ import type { SalesAppraisalCopy } from "@/lib/sales-appraisal/deriveSalesApprai
 import { isSalesAppraisalTemplateId } from "@/lib/sales-appraisal/salesAppraisalTemplates";
 import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
 import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
+import { defaultBlurbLengthForTemplateId } from "@/lib/copy/blurbVariants";
 import { cn } from "@/lib/utils";
 import type {
   Agency,
@@ -110,6 +111,9 @@ export const SalesAppraisalCopyEditor = forwardRef<
   const templateId = isSalesAppraisalTemplateId(report.template_id)
     ? report.template_id!
     : collateral.template_id;
+  const activeBlurbLength = templateId
+    ? defaultBlurbLengthForTemplateId(templateId, "sales_appraisal")
+    : "medium";
 
   const [copy, setCopy] = useState<SalesAppraisalCopy | null>(() =>
     copyFromReport(report),
@@ -189,7 +193,7 @@ export const SalesAppraisalCopyEditor = forwardRef<
         }
       : withListing;
     return resolveFinalReportForDisplay(
-      mergeSalesAppraisalPreviewAgents(withImages, listing, agencyAgents),
+      mergeAppraisalPreviewAgents(withImages, listing, agencyAgents),
     );
   }, [
     report.final_report_json,
@@ -242,11 +246,12 @@ export const SalesAppraisalCopyEditor = forwardRef<
         copyRef.current,
         "copy.blurb",
         flushedBlurb,
+        { activeBlurbLength },
       ) as SalesAppraisalCopy;
       copyRef.current = next;
       setCopy(next);
     }
-  }, []);
+  }, [activeBlurbLength]);
 
   useImperativeHandle(
     ref,
@@ -393,10 +398,12 @@ export const SalesAppraisalCopyEditor = forwardRef<
   const handleInlineSetField = useCallback(
     (path: ReportCopyFieldPath, value: string) => {
       commitCopy((current) =>
-        setReportCopyValueAtPath(current, path, value) as SalesAppraisalCopy,
+        setReportCopyValueAtPath(current, path, value, {
+          activeBlurbLength,
+        }) as SalesAppraisalCopy,
       );
     },
-    [commitCopy],
+    [activeBlurbLength, commitCopy],
   );
 
   const addressLine = [
@@ -421,8 +428,8 @@ export const SalesAppraisalCopyEditor = forwardRef<
   return (
     <AsyncLoadingOverlay
       active={generating}
-      title="Generating collateral"
-      description="Writing vendor-facing sales appraisal copy from your listing and sales comps. This usually takes 15–30 seconds."
+      title="Preparing appraisal"
+      description="Writing vendor-ready property appraisal copy from the property details and comparable sales. This usually takes 15–30 seconds."
     >
       <div
         className={cn(
@@ -439,12 +446,12 @@ export const SalesAppraisalCopyEditor = forwardRef<
                   aria-hidden
                 />
               ) : null}
-              {copy ? "Edit sales appraisal" : "Content generation"}
+              {copy ? "Edit property appraisal" : "Appraisal content"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {copy
                 ? "Hover photos on the preview and click Change photo to pick another image or floor plan. Click text to edit copy inline."
-                : "Generate vendor-facing copy from your listing and sales comps, then edit directly on the appraisal."}
+                : "Generate vendor-ready copy from the property details and comparable sales, then edit it directly on the appraisal."}
             </p>
             {addressLine ? (
               <p className="mt-1 truncate text-sm font-medium text-foreground">
@@ -494,7 +501,7 @@ export const SalesAppraisalCopyEditor = forwardRef<
               ) : copy ? (
                 "Regenerate copy"
               ) : (
-                "Generate collateral"
+                "Generate appraisal"
               )}
             </Button>
             {copy ? (
@@ -535,7 +542,7 @@ export const SalesAppraisalCopyEditor = forwardRef<
                 value={priceRangeLabel ?? "—"}
               />
               <CopyEditorContextMetric
-                label="Featured comps"
+                label="Selected comparables"
                 value={selectedCount > 0 ? String(selectedCount) : "—"}
               />
             </div>
@@ -669,8 +676,8 @@ export const SalesAppraisalCopyEditor = forwardRef<
         ) : (
           <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-dashed bg-muted/20 p-8 text-center text-sm text-muted-foreground">
             {compsReady
-              ? "Generate collateral to preview and edit your sales appraisal here."
-              : "Complete appraisal data, then generate collateral to preview and edit here."}
+              ? "Generate the appraisal to preview and edit it here."
+              : "Complete appraisal data, then generate the appraisal here."}
           </div>
         )}
       </div>

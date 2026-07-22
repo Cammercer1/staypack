@@ -17,7 +17,7 @@ export async function POST(
 
     if (collateral.type === "str_report") {
       return NextResponse.json(
-        { error: "Use the Short-Term Rental Report flow for this collateral type" },
+        { error: "Use the short-term rental appraisal flow for this marketing asset" },
         { status: 400 },
       );
     }
@@ -26,7 +26,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Use the Long-term rental appraisal editor to regenerate this report",
+            "Use the rental appraisal editor to regenerate this appraisal",
         },
         { status: 400 },
       );
@@ -35,7 +35,7 @@ export async function POST(
     if (collateral.type === "sales_appraisal") {
       return NextResponse.json(
         {
-          error: "Use the Sales appraisal editor to regenerate this report",
+          error: "Use the property appraisal editor to regenerate this appraisal",
         },
         { status: 400 },
       );

@@ -1,9 +1,10 @@
 import { saleCompListingId } from "@/lib/sales-appraisal/saleCompIds";
-import { resolveRentSubjectPropertyType } from "@/lib/rental/resolveRentSubjectPropertyType";
 import {
   filterSaleCompsForSubjectType,
   rankSaleCompsForSubject,
+  resolveSaleSubjectPropertyType,
 } from "@/lib/sales/rankSaleCompsForSubject";
+import { filterRecentSaleComps } from "@/lib/sales/saleCompFreshness";
 import type { SaleComp } from "@/lib/sales/types";
 import type { ParsedListing } from "@/lib/types";
 
@@ -51,8 +52,10 @@ export function defaultSelectedSaleCompListingIds(
 
 export function orderSalesAppraisalCompPool(parsed: ParsedListing): SaleComp[] {
   const pool = saleCompPool(parsed);
-  const subjectPropertyType = resolveRentSubjectPropertyType(parsed);
-  const eligible = filterSaleCompsForSubjectType(pool, subjectPropertyType);
+  const subjectPropertyType = resolveSaleSubjectPropertyType(parsed);
+  const eligible = filterRecentSaleComps(
+    filterSaleCompsForSubjectType(pool, subjectPropertyType),
+  );
   return rankSaleCompsForSubject(eligible, {
     suburb: parsed.suburb,
     bedrooms: parsed.bedrooms ?? undefined,
@@ -70,11 +73,12 @@ export function resolveSelectedSaleComps(parsed: ParsedListing): SaleComp[] {
   }
 
   const byId = buildSaleCompIdLookup(parsed);
+  const eligible = new Set(pool);
   const seen = new Set<SaleComp>();
   const ordered = selectedIds
     .map((id) => byId.get(id))
     .filter((comp): comp is NonNullable<typeof comp> => {
-      if (!comp || seen.has(comp)) {
+      if (!comp || !eligible.has(comp) || seen.has(comp)) {
         return false;
       }
       seen.add(comp);
@@ -124,7 +128,10 @@ export function applySalesAppraisalCompSelection(
     salesAppraisal: {
       ...parsed.salesAppraisal,
       selectedCompListingIds: unique,
-      compCount: unique.length || parsed.salesAppraisal?.compCount,
+      compCount:
+        orderSalesAppraisalCompPool(parsed).length ||
+        parsed.salesAppraisal?.compCount,
+      featuredCompCount: unique.length,
     },
   };
 }

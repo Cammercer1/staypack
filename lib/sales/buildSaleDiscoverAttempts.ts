@@ -6,6 +6,7 @@ import {
   type ReaSaleSearchInput,
 } from "@/lib/sales/buildReaSaleSearchUrl";
 import type { ParsedListing } from "@/lib/types";
+import { resolveSaleSubjectPropertyType } from "@/lib/sales/rankSaleCompsForSubject";
 
 export type SaleDiscoverAttempt = {
   label: string;
@@ -24,7 +25,17 @@ export function buildSaleDiscoverAttemptsForChannel(
   premiumSignals: ListingPremiumSignals,
   channel: ReaSaleChannel,
 ): SaleDiscoverAttempt[] {
-  return buildRentDiscoverAttempts(listing, premiumSignals).map((attempt) => ({
+  const saleListing: ParsedListing = {
+    ...listing,
+    // Rental inference treats strata-style street numbers as units. Sales must
+    // preserve an explicit provider type such as townhouse.
+    propertyType: resolveSaleSubjectPropertyType(listing),
+    address: undefined,
+    title: undefined,
+    description: undefined,
+  };
+
+  return buildRentDiscoverAttempts(saleListing, premiumSignals).map((attempt) => ({
     label: `${channel}-${attempt.label}`,
     channel,
     input: attempt.input,

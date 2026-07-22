@@ -55,6 +55,9 @@ export const HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID =
 /** Managed delivery — bespoke Belle Property Group STR layout */
 export const BELLE_PROPERTY_STR_TEMPLATE_ID = "belle-property-str";
 
+/** Bespoke OC Real Estate STR appraisal layout */
+export const OC_REAL_ESTATE_STR_TEMPLATE_ID = "oc-real-estate-str";
+
 /** Managed delivery — Belle Property Group lease appraisal */
 export const BELLE_PROPERTY_LEASE_APPRAISAL_TEMPLATE_ID =
   "belle-property-lease-appraisal";
@@ -68,6 +71,7 @@ export {
   REFINED_LEASE_APPRAISAL_TEMPLATE_ID,
   MINIMALIST_LEASE_APPRAISAL_TEMPLATE_ID,
   LANDMARK_LEASE_APPRAISAL_TEMPLATE_ID,
+  OC_REAL_ESTATE_LEASE_APPRAISAL_TEMPLATE_ID,
   DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID,
 } from "@/lib/reports/templates/lease-appraisal/ids";
 
@@ -80,6 +84,7 @@ export {
   REFINED_SALES_APPRAISAL_TEMPLATE_ID,
   MINIMALIST_SALES_APPRAISAL_TEMPLATE_ID,
   LANDMARK_SALES_APPRAISAL_TEMPLATE_ID,
+  OC_REAL_ESTATE_SALES_APPRAISAL_TEMPLATE_ID,
   DEFAULT_SALES_APPRAISAL_TEMPLATE_ID,
 } from "@/lib/reports/templates/sales-appraisal/ids";
 
@@ -95,6 +100,7 @@ export const REPORT_TEMPLATE_IDS = [
   HAVEN_PROPERTIES_STR_TEMPLATE_ID,
   HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID,
   BELLE_PROPERTY_STR_TEMPLATE_ID,
+  OC_REAL_ESTATE_STR_TEMPLATE_ID,
   BELLE_PROPERTY_LEASE_APPRAISAL_TEMPLATE_ID,
   "classic-lease-appraisal",
   "bold-lease-appraisal",
@@ -104,6 +110,7 @@ export const REPORT_TEMPLATE_IDS = [
   "refined-lease-appraisal",
   "minimalist-lease-appraisal",
   "landmark-lease-appraisal",
+  "oc-real-estate-lease-appraisal",
   "classic-sales-appraisal",
   "bold-sales-appraisal",
   "gallery-sales-appraisal",
@@ -112,6 +119,7 @@ export const REPORT_TEMPLATE_IDS = [
   "refined-sales-appraisal",
   "minimalist-sales-appraisal",
   "landmark-sales-appraisal",
+  "oc-real-estate-sales-appraisal",
 ] as const;
 
 export type ReportTemplateId = (typeof REPORT_TEMPLATE_IDS)[number];

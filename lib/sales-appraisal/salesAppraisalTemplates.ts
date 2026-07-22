@@ -19,7 +19,9 @@ export function resolveSalesAppraisalTemplateSelection(
   if (!templateId) {
     return DEFAULT_SALES_APPRAISAL_TEMPLATE_ID;
   }
-  return getSalesAppraisalTemplates().some((t) => t.id === templateId)
+  return getTemplatesForProduct("sales_appraisal").some(
+    (template) => template.kind === "report" && template.id === templateId,
+  )
     ? templateId
     : DEFAULT_SALES_APPRAISAL_TEMPLATE_ID;
 }

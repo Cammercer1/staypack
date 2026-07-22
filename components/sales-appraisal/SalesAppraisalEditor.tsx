@@ -15,6 +15,7 @@ type Props = {
   collateral: CollateralItem;
   agency: Agency;
   agencyAgents: AgentProfile[];
+  skipTemplateSelection?: boolean;
 };
 
 export function SalesAppraisalEditor({
@@ -23,6 +24,7 @@ export function SalesAppraisalEditor({
   collateral,
   agency,
   agencyAgents,
+  skipTemplateSelection = false,
 }: Props) {
   return (
     <SalesAppraisalWizard
@@ -31,6 +33,7 @@ export function SalesAppraisalEditor({
       initialCollateral={collateral}
       agency={agency}
       initialAgencyAgents={agencyAgents}
+      skipTemplateSelection={skipTemplateSelection}
     />
   );
 }

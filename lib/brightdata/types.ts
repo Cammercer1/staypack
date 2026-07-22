@@ -14,6 +14,11 @@ export type BrightDataReaRecord = {
   bedrooms?: string | number;
   bathrooms?: string | number;
   parking?: number;
+  land_size?: number | string | { value?: number | string; unit?: string };
+  land_area?: number | string | { value?: number | string; unit?: string };
+  floor_area?: number | string | { value?: number | string; unit?: string };
+  sold_date?: string;
+  date_sold?: string;
   street_address?: string;
   suburb?: string;
   fullSuburb?: string;

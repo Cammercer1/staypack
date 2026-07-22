@@ -100,6 +100,14 @@ export function SalesAppraisalDataStep({
       })),
     [pool],
   );
+  const discoveryGaps = [
+    appraisal?.discovery?.sold && !appraisal.discovery.sold.targetMet
+      ? `Sold: ${appraisal.discovery.sold.poolCount}/${appraisal.discovery.sold.targetCount} candidates, ${appraisal.discovery.sold.sameSuburbCount}/${appraisal.discovery.sold.targetSameSuburbCount} in ${listing.suburb ?? "the subject suburb"}`
+      : null,
+    appraisal?.discovery?.forSale && !appraisal.discovery.forSale.targetMet
+      ? `For sale: ${appraisal.discovery.forSale.poolCount}/${appraisal.discovery.forSale.targetCount} candidates, ${appraisal.discovery.forSale.sameSuburbCount}/${appraisal.discovery.forSale.targetSameSuburbCount} in ${listing.suburb ?? "the subject suburb"}`
+      : null,
+  ].filter((message): message is string => Boolean(message));
 
   const priceSummary = useMemo(() => {
     const min = Number(priceMin);
@@ -400,10 +408,23 @@ export function SalesAppraisalDataStep({
           <div className="surface-card space-y-4 p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-medium">Featured comparables</p>
-              <p className="text-sm text-muted-foreground">
-                {selectedIds.length} / {MAX_SALES_APPRAISAL_FEATURED_COMPS} selected
-              </p>
+              <div className="text-right text-sm text-muted-foreground">
+                <p>{compRows.length} candidates found</p>
+                <p>
+                  {selectedIds.length} / {MAX_SALES_APPRAISAL_FEATURED_COMPS} selected for the report
+                </p>
+              </div>
             </div>
+
+            {discoveryGaps.length > 0 ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+                <p className="font-medium">Comparable evidence is below target</p>
+                <p className="mt-1 text-amber-900/80">
+                  {discoveryGaps.join(" · ")}. Review the candidates carefully or
+                  refresh before using the guide range.
+                </p>
+              </div>
+            ) : null}
 
             {compRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -440,6 +461,14 @@ export function SalesAppraisalDataStep({
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <SaleStatusBadge comp={comp} />
+                            {comp.propertyType ? (
+                              <Badge
+                                variant="outline"
+                                className="capitalize text-muted-foreground"
+                              >
+                                {comp.propertyType}
+                              </Badge>
+                            ) : null}
                           </div>
                           <p className="mt-1 line-clamp-2 text-sm font-medium">
                             {comp.address}

@@ -27,8 +27,8 @@ type BrochureCollateralType = Extract<
 >;
 
 const BROCHURE_LABELS: Record<BrochureCollateralType, string> = {
-  sales_brochure: "Sales brochure",
-  rental_brochure: "Lease brochure",
+  sales_brochure: "Property brochure",
+  rental_brochure: "Rental brochure",
 };
 
 const steps = [

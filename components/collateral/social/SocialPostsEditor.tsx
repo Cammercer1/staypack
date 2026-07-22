@@ -316,7 +316,7 @@ export function SocialPostsEditor({ listing, agency, collateral: initialCollater
           </Link>
           <div className="min-w-0">
             <h1 className="truncate font-display text-xl font-semibold tracking-tight sm:text-2xl">
-              Social posts
+              Social media posts
             </h1>
             <p className="truncate text-sm text-muted-foreground">
               {listing.property_address ?? "Listing"}

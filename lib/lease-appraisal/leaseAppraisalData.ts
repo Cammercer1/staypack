@@ -1,8 +1,7 @@
 import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
 import { resolveRentSubjectPropertyType } from "@/lib/rental/resolveRentSubjectPropertyType";
 import {
-  filterRentalCompsForSubjectType,
-  rankRentalCompsForSubject,
+  buildRentalCompSelectionPool,
 } from "@/lib/rental/rankRentalCompsForSubject";
 import type { ParsedListing } from "@/lib/types";
 
@@ -47,13 +46,25 @@ export function defaultSelectedCompListingIds(
 export function orderLeaseAppraisalCompPool(parsed: ParsedListing) {
   const pool = parsed.rentalComps ?? [];
   const subjectPropertyType = resolveRentSubjectPropertyType(parsed);
-  const eligible = filterRentalCompsForSubjectType(pool, subjectPropertyType);
-  return rankRentalCompsForSubject(eligible, {
+  return buildRentalCompSelectionPool(pool, {
     suburb: parsed.suburb,
     bedrooms: parsed.bedrooms ?? undefined,
     bathrooms: parsed.bathrooms ?? undefined,
+    carSpaces: parsed.carSpaces ?? undefined,
     subjectPropertyType,
   });
+}
+
+export function fillLeaseAppraisalCompSelection(
+  parsed: ParsedListing,
+  preferredIds: string[] = [],
+): string[] {
+  return [
+    ...new Set([
+      ...preferredIds,
+      ...defaultSelectedCompListingIds(parsed),
+    ]),
+  ].slice(0, MAX_LEASE_APPRAISAL_FEATURED_COMPS);
 }
 
 export function resolveSelectedRentalComps(parsed: ParsedListing) {
@@ -119,7 +130,10 @@ export function applyLeaseAppraisalCompSelection(
     rentalAppraisal: {
       ...parsed.rentalAppraisal,
       selectedCompListingIds: unique,
-      compCount: unique.length || parsed.rentalAppraisal?.compCount,
+      compCount:
+        orderLeaseAppraisalCompPool(parsed).length ||
+        parsed.rentalAppraisal?.compCount,
+      featuredCompCount: unique.length,
     },
   };
 }

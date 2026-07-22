@@ -19,6 +19,11 @@ import {
 } from "@/lib/lease-appraisal/leaseAppraisalData";
 import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
+import {
+  rentalCompSelectionTier,
+} from "@/lib/rental/rankRentalCompsForSubject";
+import { resolveRentalCompPropertyType } from "@/lib/rental/resolveRentalCompPropertyType";
+import { resolveRentSubjectPropertyType } from "@/lib/rental/resolveRentSubjectPropertyType";
 import { cn } from "@/lib/utils";
 import type { LeaseAppraisalJob, Listing } from "@/lib/types";
 
@@ -51,6 +56,9 @@ export function LeaseAppraisalDataStep({
     [parsed],
   );
   const appraisal = parsed?.rentalAppraisal;
+  const subjectPropertyType = parsed
+    ? resolveRentSubjectPropertyType(parsed)
+    : listing.property_type ?? undefined;
   const jobProcessing =
     activeJob?.status === "pending" || activeJob?.status === "processing";
   const jobFailed = activeJob?.status === "failed";
@@ -96,9 +104,16 @@ export function LeaseAppraisalDataStep({
       pool.map((comp, index) => ({
         comp,
         id: rentalCompListingId(comp, index),
+        tier: rentalCompSelectionTier(comp, subjectPropertyType),
       })),
-    [pool],
+    [pool, subjectPropertyType],
   );
+  const exactCompRows = compRows.filter((row) => row.tier === "exact");
+  const fallbackCompRows = compRows.filter(
+    (row) => row.tier === "upper_band_unit_fallback",
+  );
+  const otherCompRows = compRows.filter((row) => row.tier === "other");
+  const discovery = appraisal?.discovery;
 
   const rentSummary = useMemo(() => {
     const min = Number(weeklyMin);
@@ -299,7 +314,7 @@ export function LeaseAppraisalDataStep({
           {compsReady
             ? refreshingComps
               ? "Comparable rentals are refreshing in the background. Current comps remain available while the appraisal updates."
-              : `Comps are sorted with ${listing.suburb ?? "your suburb"} first, then nearby areas. Review the rent band, pick up to four for page 2, and use Refresh to re-fetch from REA.`
+              : `Comps are sorted with ${listing.suburb ?? "your suburb"} first, then nearby areas. Review the rent band, pick up to ${MAX_LEASE_APPRAISAL_FEATURED_COMPS} for page 2, and use Refresh to re-fetch from REA.`
             : jobProcessing
               ? "Comparable rentals are being fetched in the background. This page will update when they are ready."
               : "Comparable rentals load when you start the appraisal. Adjust the weekly rent band if needed, then choose featured comps."}
@@ -399,58 +414,152 @@ export function LeaseAppraisalDataStep({
           <div className="surface-card space-y-4 p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-medium">Featured comparables</p>
-              <p className="text-sm text-muted-foreground">
-                {selectedIds.length} / {MAX_LEASE_APPRAISAL_FEATURED_COMPS} selected
-              </p>
+              <div className="text-right text-sm text-muted-foreground">
+                <p>{compRows.length} candidates found</p>
+                <p>
+                  {selectedIds.length} / {MAX_LEASE_APPRAISAL_FEATURED_COMPS} selected for the report
+                </p>
+              </div>
             </div>
+
+            {discovery && !discovery.targetMet ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+                <p className="font-medium">Comparable evidence is below target</p>
+                <p className="mt-1 text-amber-900/80">
+                  Found {discovery.poolCount}/{discovery.targetCount} candidates,
+                  including {discovery.sameSuburbCount}/
+                  {discovery.targetSameSuburbCount} in {listing.suburb ?? "the subject suburb"}.
+                  Review the candidates carefully or refresh before using the guide
+                  range.
+                </p>
+              </div>
+            ) : null}
+
+            {fallbackCompRows.length > 0 ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+                <p className="font-medium">
+                  {exactCompRows.length} exact {formatPropertyType(subjectPropertyType).toLowerCase()} {exactCompRows.length === 1 ? "match" : "matches"}
+                </p>
+                <p className="mt-1 text-amber-900/80">
+                  The rent estimate uses the exact matches. Upper-band units are
+                  available below only to fill the report&apos;s comparable grid and
+                  are clearly marked as secondary evidence.
+                </p>
+              </div>
+            ) : null}
 
             {compRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No comparables returned — try refreshing comps.
               </p>
             ) : (
-              <ul className="grid gap-3 sm:grid-cols-2">
-                {compRows.map(({ comp, id }) => {
-                  const selected = selectedIds.includes(id);
-                  return (
-                    <li key={id}>
-                      <button
-                        type="button"
-                        onClick={() => toggleComp(id)}
-                        className={cn(
-                          "flex w-full gap-3 rounded-xl border p-3 text-left transition-colors",
-                          selected
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/40",
-                        )}
-                      >
-                        <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md bg-muted">
-                          {comp.imageUrl ? (
-                            <Image
-                              src={comp.imageUrl}
-                              alt=""
-                              fill
-                              className="object-cover"
-                              sizes="96px"
-                              unoptimized
-                            />
-                          ) : null}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-sm font-medium">{comp.address}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {comp.bedrooms ?? "?"} bed · ${comp.weeklyRent}/wk
-                            {comp.suburb ? ` · ${comp.suburb}` : ""}
-                          </p>
-                        </div>
-                        {selected ? (
-                          <Check className="h-5 w-5 shrink-0 text-primary" />
-                        ) : null}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="space-y-6">
+                {[
+                  {
+                    key: "exact",
+                    title: "Best property-type matches",
+                    description: "These comparables drive the suggested rent range.",
+                    rows: exactCompRows,
+                  },
+                  {
+                    key: "fallback",
+                    title: "Upper-band unit alternatives",
+                    description:
+                      "Secondary options matched on bedrooms and rent level; they do not change the townhouse estimate.",
+                    rows: fallbackCompRows,
+                  },
+                  {
+                    key: "other",
+                    title: "Nearby alternatives",
+                    description:
+                      "Broader options are shown only when exact property-type evidence is limited.",
+                    rows: otherCompRows,
+                  },
+                ].map((group) =>
+                  group.rows.length > 0 ? (
+                    <section key={group.key} className="space-y-3">
+                      <div>
+                        <p className="text-sm font-medium">{group.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {group.description}
+                        </p>
+                      </div>
+                      <ul className="grid gap-3 sm:grid-cols-2">
+                        {group.rows.map(({ comp, id, tier }) => {
+                          const selected = selectedIds.includes(id);
+                          const propertyType = formatPropertyType(
+                            resolveRentalCompPropertyType(comp),
+                          );
+                          return (
+                            <li key={id}>
+                              <button
+                                type="button"
+                                aria-pressed={selected}
+                                onClick={() => toggleComp(id)}
+                                className={cn(
+                                  "flex w-full gap-3 rounded-xl border p-3 text-left transition-colors",
+                                  selected
+                                    ? "border-primary bg-primary/5 shadow-sm"
+                                    : "border-border hover:border-primary/40",
+                                )}
+                              >
+                                <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-lg bg-muted">
+                                  {comp.imageUrl ? (
+                                    <Image
+                                      src={comp.imageUrl}
+                                      alt=""
+                                      fill
+                                      className="object-cover"
+                                      sizes="112px"
+                                      unoptimized
+                                    />
+                                  ) : null}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <Badge variant="secondary" className="text-[10px]">
+                                      {propertyType}
+                                    </Badge>
+                                    {tier !== "exact" ? (
+                                      <Badge
+                                        variant="outline"
+                                        className="border-amber-300 bg-amber-50 text-[10px] text-amber-900"
+                                      >
+                                        {tier === "upper_band_unit_fallback"
+                                          ? "Secondary fallback"
+                                          : "Nearby fallback"}
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-[10px]">
+                                        Exact type
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="mt-1 line-clamp-2 text-sm font-medium">
+                                    {comp.address}
+                                  </p>
+                                  <p className="mt-1 text-sm font-semibold">
+                                    ${comp.weeklyRent}/wk
+                                  </p>
+                                  <p className="mt-0.5 text-xs text-muted-foreground">
+                                    {comp.bedrooms ?? "?"} bed · {comp.bathrooms ?? "?"} bath · {comp.carSpaces ?? "?"} car
+                                    {comp.suburb ? ` · ${comp.suburb}` : ""}
+                                  </p>
+                                </div>
+                                {selected ? (
+                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                    <Check className="h-4 w-4" />
+                                  </span>
+                                ) : null}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  ) : null,
+                )}
+              </div>
             )}
           </div>
         </>
@@ -473,4 +582,12 @@ export function LeaseAppraisalDataStep({
 function parseRent(value: string) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function formatPropertyType(value?: string) {
+  const normalized = value?.trim() || "Property";
+  return normalized
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }

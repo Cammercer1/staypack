@@ -29,7 +29,7 @@ export default async function DevHavenPropertiesPage({
         <div className="max-w-md space-y-4 text-center">
           <h1 className="text-xl font-semibold">Listing missing preview data</h1>
           <p className="text-sm text-muted-foreground">
-            This listing needs an STR report with an estimate and generated collateral (
+            This property needs a short-term rental appraisal with an estimate and generated copy (
             <code className="text-xs">final_report_json</code> or estimate + AI copy).
           </p>
           <p className="break-all font-mono text-xs text-muted-foreground">{listingId}</p>

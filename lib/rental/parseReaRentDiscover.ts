@@ -41,6 +41,7 @@ export function reaRecordToRentalComp(record: BrightDataReaRecord): RentalComp |
     weeklyRent: Number(weeklyRent),
     bedrooms: parseCount(record.bedrooms),
     bathrooms: parseCount(record.bathrooms),
+    carSpaces: parseCount(record.parking),
     propertyType: record.property_type ?? record.house_type,
     imageUrl: rawImage ? normalizeReaImageUrl(rawImage) : undefined,
     listingUrl: record.url,

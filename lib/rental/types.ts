@@ -4,6 +4,7 @@ export type RentalComp = {
   weeklyRent: number;
   bedrooms?: number;
   bathrooms?: number;
+  carSpaces?: number;
   propertyType?: string;
   imageUrl?: string;
   listingUrl?: string;

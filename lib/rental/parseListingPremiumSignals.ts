@@ -90,7 +90,7 @@ export function parseListingPremiumSignals(
   listing: ParsedListing,
 ): ListingPremiumSignals {
   const text = listingText(listing);
-  const landAreaSqm = parseLandAreaSqm(text);
+  const landAreaSqm = listing.landAreaSqm ?? parseLandAreaSqm(text);
   const luxuryKeywordHits = detectLuxuryKeywords(text);
   const luxuryScore = luxuryKeywordHits.length;
 

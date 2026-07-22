@@ -1,4 +1,5 @@
 import { ltrEnrichmentFromParsed } from "@/lib/lease-appraisal/ltrEnrichmentFromParsed";
+import { resolveLeaseAppraisalCopyDisclaimers } from "@/lib/lease-appraisal/leaseAppraisalDisclaimer";
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import type { FinalReportJson, Listing } from "@/lib/types";
 
@@ -7,38 +8,48 @@ export function mergeLeaseAppraisalPreviewFromListing(
   report: FinalReportJson,
   listing: Listing,
 ): FinalReportJson {
+  const resolvedReport: FinalReportJson = {
+    ...report,
+    copy: resolveLeaseAppraisalCopyDisclaimers(report.copy),
+  };
   const parsed = listing.scraped_listing_json;
   if (!parsed) {
-    return report;
+    return resolvedReport;
   }
 
   const ltrEnrichment = ltrEnrichmentFromParsed(parsed);
   if (!ltrEnrichment) {
-    return report;
+    return resolvedReport;
   }
 
-  const weeklyMin = parsed.rentalAppraisal?.weeklyMin ?? report.ltr?.weekly_min ?? null;
-  const weeklyMax = parsed.rentalAppraisal?.weeklyMax ?? report.ltr?.weekly_max ?? null;
+  const weeklyMin =
+    parsed.rentalAppraisal?.weeklyMin ?? resolvedReport.ltr?.weekly_min ?? null;
+  const weeklyMax =
+    parsed.rentalAppraisal?.weeklyMax ?? resolvedReport.ltr?.weekly_max ?? null;
   const weeklyMidpoint =
-    parsed.rentalAppraisal?.weeklyMidpoint ?? report.ltr?.weekly_midpoint ?? null;
+    parsed.rentalAppraisal?.weeklyMidpoint ??
+    resolvedReport.ltr?.weekly_midpoint ??
+    null;
   const annualMidpoint =
-    weeklyMidpoint != null ? weeklyMidpoint * 52 : report.ltr?.annual_midpoint ?? null;
+    weeklyMidpoint != null
+      ? weeklyMidpoint * 52
+      : resolvedReport.ltr?.annual_midpoint ?? null;
 
   const rentRangeLabel =
     weeklyMin != null && weeklyMax != null
       ? formatWeeklyRentRange(weeklyMin, weeklyMax)
       : weeklyMidpoint != null
         ? formatWeeklyRentRange(weeklyMidpoint, weeklyMidpoint)
-        : report.property.display_price;
+        : resolvedReport.property.display_price;
 
   return {
-    ...report,
+    ...resolvedReport,
     property: {
-      ...report.property,
-      display_price: rentRangeLabel || report.property.display_price,
+      ...resolvedReport.property,
+      display_price: rentRangeLabel || resolvedReport.property.display_price,
     },
     ltr: {
-      ...report.ltr,
+      ...resolvedReport.ltr,
       weekly_min: weeklyMin,
       weekly_max: weeklyMax,
       weekly_midpoint: weeklyMidpoint,

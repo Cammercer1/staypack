@@ -123,6 +123,8 @@ export function buildFinalReportJson({
       hero_image_url: strImages.hero_image_url ?? "",
       selected_image_urls: strImages.selected_image_urls,
       display_price: displayPrice,
+      land_area_sqm: scrapedListing?.landAreaSqm ?? null,
+      floor_area_sqm: scrapedListing?.floorAreaSqm ?? null,
     },
     str: {
       annual_revenue: estimate.annualRevenue,

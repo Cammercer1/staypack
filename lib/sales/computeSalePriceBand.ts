@@ -3,6 +3,7 @@ import {
   matchesSaleSubjectPropertyType,
 } from "@/lib/sales/rankSaleCompsForSubject";
 import type { SaleComp } from "@/lib/sales/types";
+import { filterRecentSaleComps } from "@/lib/sales/saleCompFreshness";
 
 export type SalePriceBandResult = {
   priceMin: number;
@@ -177,10 +178,10 @@ export function computeSalePriceBandFromComps(
   soldComps: SaleComp[],
   options?: SalePriceBandOptions,
 ): SalePriceBandResult | null {
-  let filtered = soldComps.filter((comp) => comp.price > 0);
+  let filtered = filterRecentSaleComps(soldComps).filter((comp) => comp.price > 0);
 
   if (options?.subjectPropertyType) {
-    filtered = applyFilterIfEnough(filtered, (comp) =>
+    filtered = filtered.filter((comp) =>
       matchesSaleSubjectPropertyType(comp, options.subjectPropertyType),
     );
   }

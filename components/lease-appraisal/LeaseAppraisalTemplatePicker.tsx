@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useAvailableTemplates } from "@/components/templates/useAvailableTemplates";
 import { cn } from "@/lib/utils";
 
@@ -11,8 +12,17 @@ type Props = {
 export function LeaseAppraisalTemplatePicker({ value, onChange }: Props) {
   const { data, loading } = useAvailableTemplates("lease");
   const templates = data?.templates ?? [];
-  const selected = templates.find((template) => template.id === value);
+  const resolvedValue = templates.some((template) => template.id === value)
+    ? value
+    : data?.default_template_id ?? value;
+  const selected = templates.find((template) => template.id === resolvedValue);
   const currentFamily = selected?.family ?? "classic";
+
+  useEffect(() => {
+    if (!loading && data && value !== resolvedValue) {
+      onChange(resolvedValue);
+    }
+  }, [data, loading, onChange, resolvedValue, value]);
 
   function handleChange(family: string) {
     const match = templates.find((template) => template.family === family);
@@ -23,6 +33,18 @@ export function LeaseAppraisalTemplatePicker({ value, onChange }: Props) {
 
   if (loading && templates.length === 0) {
     return <p className="text-sm text-muted-foreground">Loading templates…</p>;
+  }
+
+  if (templates.length === 1) {
+    const template = templates[0];
+    return (
+      <div className="rounded-xl border border-primary bg-primary/5 p-4">
+        <p className="font-medium">{template.label}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Your agency template is applied automatically.
+        </p>
+      </div>
+    );
   }
 
   return (

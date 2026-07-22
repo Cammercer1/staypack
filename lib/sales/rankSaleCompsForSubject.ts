@@ -1,17 +1,34 @@
 import { propertyTypeFamily } from "@/lib/rental/computeRentBand";
-import { MIN_RENT_COMPS_FOR_BAND } from "@/lib/rental/rentCompThresholds";
 import type { SaleComp } from "@/lib/sales/types";
+import type { ParsedListing } from "@/lib/types";
 
 /** Strata-style address e.g. 2/121 Alison Road, 401/2 Roscrea Avenue. */
 const UNIT_ADDRESS_PATTERN = /\d+\s*\/\s*\d+/;
 
 /** REA often labels apartments as duplex/semi-detached. Infer unit from address. */
 export function resolveSaleCompPropertyType(comp: SaleComp): string | undefined {
+  const declared = comp.propertyType?.trim();
+  if (declared) {
+    return declared;
+  }
   const address = comp.address?.trim() ?? "";
   if (UNIT_ADDRESS_PATTERN.test(address)) {
     return "Unit";
   }
-  return comp.propertyType?.trim() || undefined;
+  return undefined;
+}
+
+/** Prefer the provider's declared subject type; infer from address only when absent. */
+export function resolveSaleSubjectPropertyType(
+  listing: ParsedListing,
+): string | undefined {
+  const declared = listing.propertyType?.trim();
+  if (declared) {
+    return declared;
+  }
+  return UNIT_ADDRESS_PATTERN.test(listing.address?.trim() ?? "")
+    ? "Unit"
+    : undefined;
 }
 
 export function matchesSaleSubjectPropertyType(
@@ -106,7 +123,7 @@ function bathroomDistance(comp: SaleComp, bathrooms?: number) {
   return Math.abs(comp.bathrooms - bathrooms);
 }
 
-/** Keep only comps that match subject property type when enough exist. */
+/** Sales evidence never falls back to a different property-type family. */
 export function filterSaleCompsForSubjectType(
   comps: SaleComp[],
   subjectPropertyType?: string,
@@ -117,7 +134,7 @@ export function filterSaleCompsForSubjectType(
   const matched = comps.filter((comp) =>
     matchesSaleSubjectPropertyType(comp, subjectPropertyType),
   );
-  return matched.length >= MIN_RENT_COMPS_FOR_BAND ? matched : comps;
+  return matched;
 }
 
 export function rankSaleCompsForSubject(

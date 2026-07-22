@@ -59,7 +59,7 @@ export const SALES_BROCHURE_COPY_LIMITS = {
   bond_value: {
     max: 60,
     label: "Bond",
-    hint: "Bond amount shown on this lease brochure only.",
+    hint: "Bond amount shown on this rental brochure only.",
   },
   disclaimer: {
     max: 500,

@@ -401,8 +401,8 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
     return (
       <AsyncLoadingOverlay
         active={generating}
-        title="Generating collateral"
-        description="Writing buyer-facing collateral from your listing and STR numbers. This usually takes 10–20 seconds."
+        title="Preparing appraisal"
+        description="Writing buyer-ready short-term rental appraisal copy from the property details and revenue estimate. This usually takes 10–20 seconds."
       >
         <div
           className={cn(
@@ -419,12 +419,12 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
                     aria-hidden
                   />
                 ) : null}
-                {copy ? "Edit STR report" : "Content generation"}
+                {copy ? "Edit short-term rental appraisal" : "Appraisal content"}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {copy
                   ? "Hover photos on the preview and click Change photo to pick another image or floor plan. Click text to edit copy inline."
-                  : "Generate buyer-facing collateral from your listing and STR estimate, then edit directly on the report."}
+                  : "Generate buyer-ready copy from the property details and short-term rental estimate, then edit it directly on the appraisal."}
               </p>
               {addressLine ? (
                 <p className="mt-1 truncate text-sm font-medium text-foreground">
@@ -476,7 +476,7 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
                 ) : copy ? (
                   "Regenerate copy"
                 ) : (
-                  "Generate collateral"
+                    "Generate appraisal"
                 )}
               </Button>
               {copy ? (
@@ -677,8 +677,8 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
           ) : (
             <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-dashed bg-muted/20 p-8 text-center text-sm text-muted-foreground">
               {estimate
-                ? "Generate collateral to preview and edit your STR report here."
-                : "Run an STR estimate first, then generate collateral to preview and edit here."}
+                ? "Generate the appraisal to preview and edit it here."
+                : "Run the short-term rental estimate first, then generate the appraisal here."}
             </div>
           )}
         </div>

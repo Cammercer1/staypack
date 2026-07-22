@@ -59,12 +59,12 @@ function deriveHeading(listing: Listing, parsed: ParsedListing) {
     return `${beds}-bedroom ${type.toLowerCase()} · ${suburb}`;
   }
 
-  return address || "Sales appraisal overview";
+  return address || "Property appraisal overview";
 }
 
 function pricePositionLine(soldCompCount: number, forSaleCompCount: number) {
   if (soldCompCount > 0) {
-    return `The estimated price range alongside is drawn from recently sold comparable properties matched to this home's size and location${forSaleCompCount > 0 ? ", with current for-sale listings providing additional market context" : ""}.`;
+    return `The estimated price range alongside is drawn from comparable properties sold within the past 12 months and matched to this home's property type, size and location${forSaleCompCount > 0 ? ", with current for-sale listings providing additional market context" : ""}.`;
   }
 
   if (forSaleCompCount > 0) {
@@ -168,7 +168,7 @@ export function deriveSalesAppraisalCopy({
       "Allow for marketing costs, agent fees and settlement timing when planning the sale.",
     ],
     methodology_note:
-      "Estimated sale price range from recently sold REA comparables matched on beds, baths and parking, with current for-sale listings as context. Outliers trimmed; comparable evidence shown on page 2.",
+      "Estimated sale price range from same-property-type REA comparables sold within the past 12 months, matched on beds, baths and parking. The search expands to nearby areas when local evidence is limited; current for-sale listings provide context only. Outliers trimmed; comparable evidence shown on page 2.",
     disclaimer:
       agency.default_disclaimer ??
       "This appraisal is indicative only and does not constitute financial, legal or valuation advice. Vendors should make their own enquiries.",

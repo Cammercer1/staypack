@@ -43,7 +43,7 @@ export async function POST(
     const templateId = resolveReportTemplateId(agency, reportForBuild);
 
     try {
-      await assertTemplateGranted(agency.id, templateId);
+      await assertTemplateGranted(agency, templateId);
     } catch (grantError) {
       const denied = templateGrantErrorResponse(grantError);
       if (denied) {

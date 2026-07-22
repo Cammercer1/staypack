@@ -35,7 +35,7 @@ export async function POST(
         error:
           error instanceof Error
             ? error.message
-            : "Unable to create sales appraisal",
+            : "Unable to create property appraisal",
       },
       { status: 400 },
     );

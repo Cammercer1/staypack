@@ -198,6 +198,7 @@ export async function processDeliveryListing({
 
     if (wantsLease(tenant)) {
       const enriched = await enrichListingRentalAppraisal(parsed, {
+        subjectListingUrl: listingUrl,
         rentAppraisalConfig: {
           tier: rentAppraisalTierSetting(tenant) ?? "auto",
         },

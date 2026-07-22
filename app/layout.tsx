@@ -14,9 +14,13 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "StayPack",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://staypack.app"),
+  title: {
+    default: "StayPack | Branded property reports",
+    template: "%s | StayPack",
+  },
   description:
-    "Branded short-term rental potential reports for real estate agencies",
+    "Create polished, data-backed property reports and marketing collateral in your agency's branding.",
 };
 
 export default function RootLayout({

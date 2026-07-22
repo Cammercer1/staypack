@@ -6,7 +6,7 @@ export const HAVEN_BRAND = {
   heroSubheadline: "Short-term rental potential · Market-backed estimate",
   leaseAppraisalHeading: "What can you lease this for?",
   leaseAppraisalSubheadline:
-    "Long-term rental appraisal · Market-backed weekly rent range",
+    "Rental appraisal · Market-backed weekly rent range",
   logoOnDarkUrl:
     "https://images.zenu.com.au/w336ynmmwwefedna2gdto9mn4u6twg84.png",
   logoOnLightUrl:

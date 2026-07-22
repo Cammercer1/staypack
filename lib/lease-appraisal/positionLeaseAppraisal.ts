@@ -2,7 +2,10 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
+import { fillLeaseAppraisalCompSelection } from "@/lib/lease-appraisal/leaseAppraisalData";
 import { formatWeeklyRentRange, type RentBandResult } from "@/lib/rental/computeRentBand";
+import { filterRentalCompsForSubjectType } from "@/lib/rental/rankRentalCompsForSubject";
+import { resolveRentSubjectPropertyType } from "@/lib/rental/resolveRentSubjectPropertyType";
 import type {
   LtrAppraisalPositioning,
   LtrSuburbMarketJson,
@@ -383,7 +386,10 @@ export async function ensureLeaseAppraisalPositioning(
   parsed: ParsedListing,
 ): Promise<ParsedListing> {
   const appraisal = parsed.rentalAppraisal;
-  const comps = parsed.rentalComps ?? [];
+  const comps = filterRentalCompsForSubjectType(
+    parsed.rentalComps ?? [],
+    resolveRentSubjectPropertyType(parsed),
+  );
 
   if (
     appraisal?.positioning ||
@@ -412,9 +418,12 @@ export async function ensureLeaseAppraisalPositioning(
     return parsed;
   }
 
-  const selectedCompListingIds =
+  const selectedCompListingIds = fillLeaseAppraisalCompSelection(
+    parsed,
     positioned.selectedCompListingIds ??
-    parsed.rentalAppraisal?.selectedCompListingIds;
+      parsed.rentalAppraisal?.selectedCompListingIds ??
+      [],
+  );
 
   return {
     ...parsed,

@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { VariantProps } from "class-variance-authority";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
-import type { buttonVariants } from "@/components/ui/button";
 import type { CollateralItem } from "@/lib/types";
 
 type Props = {
@@ -33,8 +31,13 @@ export function CollateralPdfButton({
   downloadLabel = "Download asset",
   onUpdated,
 }: Props) {
-  const [pdfUrl, setPdfUrl] = useState(url);
+  const [generatedPdf, setGeneratedPdf] = useState<{
+    collateralId: string;
+    url: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
+  const pdfUrl =
+    generatedPdf?.collateralId === collateralId ? generatedPdf.url : url;
 
   const downloadUrl = useMemo(() => {
     if (!pdfUrl) return null;
@@ -42,10 +45,6 @@ export function CollateralPdfButton({
     if (cacheVersion) return cacheBustedPdfUrl(pdfUrl, cacheVersion);
     return pdfUrl;
   }, [pdfUrl, cacheVersion]);
-
-  useEffect(() => {
-    setPdfUrl(url);
-  }, [url]);
 
   const hasPdf = Boolean(downloadUrl);
   const isStale =
@@ -67,7 +66,7 @@ export function CollateralPdfButton({
       return;
     }
 
-    setPdfUrl(payload.pdf_url);
+    setGeneratedPdf({ collateralId, url: payload.pdf_url });
     if (payload.collateral) {
       onUpdated?.(payload.collateral as CollateralItem);
     }
@@ -92,11 +91,12 @@ export function CollateralPdfButton({
 
   if (downloadUrl) {
     return (
-      <Link href={downloadUrl} target="_blank">
-        <Button variant="outline" size={size}>
-          {downloadLabel}
-        </Button>
-      </Link>
+      <a
+        href={`/api/collateral/${collateralId}/download`}
+        className={buttonVariants({ variant: "outline", size })}
+      >
+        {downloadLabel}
+      </a>
     );
   }
 

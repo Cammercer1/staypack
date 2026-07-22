@@ -223,6 +223,11 @@ function parseBrightDataPayload<T>(raw: string): T[] {
 }
 
 export async function scrapeBrightDataReaListing(url: string) {
+  const records = await scrapeBrightDataReaListings([url]);
+  return records[0] ?? null;
+}
+
+export async function scrapeBrightDataReaListings(urls: string[]) {
   const datasetId = getBrightDataReaDatasetId();
   const timeoutMs = getReaScrapeTimeoutMs();
   let raw: string | null = null;
@@ -234,7 +239,7 @@ export async function scrapeBrightDataReaListing(url: string) {
       raw = await brightDataRequest(
         `/datasets/v3/scrape?dataset_id=${encodeURIComponent(datasetId)}&notify=false&include_errors=true`,
         {
-          input: [{ url }],
+          input: urls.map((url) => ({ url })),
         },
         { timeoutMs },
       );
@@ -248,19 +253,17 @@ export async function scrapeBrightDataReaListing(url: string) {
   }
 
   if (!raw) {
-    return null;
+    return [];
   }
 
   const records = parseBrightDataPayload<Record<string, unknown>>(raw);
-  const record = records.find(
+  return records.filter(
     (entry) =>
       !entry.error &&
       (typeof entry.url === "string" ||
         typeof entry.street_address === "string" ||
         typeof entry.description === "string"),
-  );
-
-  return (record ?? null) as import("@/lib/brightdata/types").BrightDataReaRecord | null;
+  ) as import("@/lib/brightdata/types").BrightDataReaRecord[];
 }
 
 export type ReaRentDiscoverInput = {

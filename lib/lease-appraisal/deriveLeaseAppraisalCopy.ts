@@ -9,6 +9,7 @@ import {
   deriveComparableEvidence,
   LEASE_APPRAISAL_COMPARABLE_DISCLAIMER,
 } from "@/lib/lease-appraisal/comparableEvidenceCopy";
+import { resolveLeaseAppraisalDisclaimer } from "@/lib/lease-appraisal/leaseAppraisalDisclaimer";
 import type { Agency, Listing, LtrRentalCompCard, LtrSuburbMarketJson, ParsedListing } from "@/lib/types";
 
 export type LeaseAppraisalCopy = {
@@ -227,9 +228,7 @@ export function deriveLeaseAppraisalCopy({
     ],
     methodology_note:
       "Weekly rent range from comparable REA lease listings matched on beds, baths and parking. Suburb metrics from PropRadar. Outliers trimmed; median and interquartile range shown on page 2.",
-    disclaimer:
-      agency.default_disclaimer ??
-      "This appraisal is indicative only and does not constitute financial, legal or valuation advice. Investors should make their own enquiries.",
+    disclaimer: resolveLeaseAppraisalDisclaimer(agency.default_disclaimer),
     comparable_evidence,
     comparable_disclaimer: LEASE_APPRAISAL_COMPARABLE_DISCLAIMER,
     cta: agency.default_cta || "Contact us to discuss leasing strategy for this asset.",

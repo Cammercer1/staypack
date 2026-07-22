@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SALES_APPRAISAL_LABEL } from "@/lib/listings/collateralTypes";
 import { collateralPhotoRequirementError } from "@/lib/listings/collateralPhotoRequirements";
 import { loadAgencyAgentProfiles } from "@/lib/reports/loadReportAgent";
+import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
 import type { CollateralItem, Report } from "@/lib/types";
 
 export default async function ListingSalesAppraisalPage({
@@ -34,6 +35,15 @@ export default async function ListingSalesAppraisalPage({
   if (listing.listing_purpose === "lease") {
     redirect(`/listings/${listingId}`);
   }
+
+  const availableTemplates = await resolveAvailableTemplates(
+    agency,
+    "sales_appraisal",
+  );
+  const soleTemplateId =
+    availableTemplates.templates.length === 1
+      ? availableTemplates.templates[0].id
+      : null;
 
   let { data: collateral } = await supabase
     .from("collateral_items")
@@ -75,7 +85,7 @@ export default async function ListingSalesAppraisalPage({
         agency_id: agency.id,
         listing_id: listing.id,
         status: "draft",
-        template_id: null,
+        template_id: soleTemplateId,
       })
       .select("*")
       .single();
@@ -85,6 +95,24 @@ export default async function ListingSalesAppraisalPage({
     }
 
     report = createdReport as Report;
+  }
+
+  if (
+    soleTemplateId &&
+    report.status !== "published" &&
+    report.template_id !== soleTemplateId
+  ) {
+    const { data: updatedReport, error: updateError } = await supabase
+      .from("reports")
+      .update({ template_id: soleTemplateId })
+      .eq("id", report.id)
+      .select("*")
+      .single();
+
+    if (updateError || !updatedReport) {
+      notFound();
+    }
+    report = updatedReport as Report;
   }
 
   if (!collateral) {
@@ -108,6 +136,24 @@ export default async function ListingSalesAppraisalPage({
     collateral = createdCollateral;
   }
 
+  if (
+    soleTemplateId &&
+    report.status !== "published" &&
+    collateral.template_id !== soleTemplateId
+  ) {
+    const { data: updatedCollateral, error: updateError } = await supabase
+      .from("collateral_items")
+      .update({ template_id: soleTemplateId })
+      .eq("id", collateral.id)
+      .select("*")
+      .single();
+
+    if (updateError || !updatedCollateral) {
+      notFound();
+    }
+    collateral = updatedCollateral;
+  }
+
   const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
 
   return (
@@ -126,8 +172,9 @@ export default async function ListingSalesAppraisalPage({
           {SALES_APPRAISAL_LABEL}
         </h1>
         <p className="text-muted-foreground">
-          Choose a template, review sold and for-sale comps and the price band,
-          generate and edit vendor content, then publish a PDF for{" "}
+          {soleTemplateId ? "Review" : "Choose a template, then review"} sold and
+          for-sale comps and the price band, generate and edit vendor content,
+          then publish a PDF for{" "}
           {listing.property_address ?? "this property"}.
         </p>
       </div>
@@ -138,6 +185,7 @@ export default async function ListingSalesAppraisalPage({
         collateral={collateral as CollateralItem}
         agency={agency}
         agencyAgents={agencyAgents}
+        skipTemplateSelection={Boolean(soleTemplateId)}
       />
     </div>
   );

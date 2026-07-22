@@ -9,8 +9,9 @@ import type { ParsedListing } from "@/lib/types";
 
 export async function enrichParsedListingForSalesAppraisal(
   parsed: ParsedListing,
+  options?: { subjectListingUrl?: string | null },
 ): Promise<{ parsed: ParsedListing; warnings: string[] }> {
-  let enrichedRaw = await enrichListingSalesAppraisal(parsed);
+  let enrichedRaw = await enrichListingSalesAppraisal(parsed, options);
   if (!hasSalesAppraisalSelectedComps(enrichedRaw)) {
     enrichedRaw = applySalesAppraisalCompSelection(
       enrichedRaw,

@@ -1,8 +1,8 @@
 import type { CollateralType, ListingPurpose } from "@/lib/types";
 
-export const STR_REPORT_LABEL = "Short-Term Rental Report";
-export const LEASE_APPRAISAL_LABEL = "Long-term rental appraisal";
-export const SALES_APPRAISAL_LABEL = "Sales appraisal";
+export const STR_REPORT_LABEL = "Short-term rental appraisal";
+export const LEASE_APPRAISAL_LABEL = "Rental appraisal";
+export const SALES_APPRAISAL_LABEL = "Property appraisal";
 
 export const COLLATERAL_TYPE_ORDER: CollateralType[] = [
   "sales_appraisal",
@@ -12,7 +12,6 @@ export const COLLATERAL_TYPE_ORDER: CollateralType[] = [
   "investor_snapshot",
   "str_report",
   "social_posts",
-  "agent_business_card",
 ];
 
 export function collateralOrderForPurpose(
@@ -34,38 +33,43 @@ export const COLLATERAL_TYPE_META: Record<
 > = {
   str_report: {
     label: STR_REPORT_LABEL,
-    description: "Short-term rental potential report for buyers.",
+    description:
+      "A professional short-term rental appraisal with estimated gross revenue, comparable market evidence and a clear performance outlook.",
   },
   sales_brochure: {
-    label: "Sales brochure",
-    description: "Print-ready brochure for open homes and property sales.",
+    label: "Property brochure",
+    description:
+      "A polished, print-ready property brochure for open homes, buyer follow-up and vendor presentations.",
   },
   rental_brochure: {
-    label: "Lease brochure",
-    description: "Branded brochure for properties for lease.",
+    label: "Rental brochure",
+    description:
+      "A polished, print-ready rental brochure for inspections and prospective tenant enquiries.",
   },
   lease_appraisal: {
     label: LEASE_APPRAISAL_LABEL,
     description:
-      "Investor-facing rental appraisal with REA rent comps, weekly rent range, and suburb context (for sale listings).",
+      "A landlord-ready rental appraisal with an estimated weekly rent range, comparable rentals and local market context.",
   },
   sales_appraisal: {
     label: SALES_APPRAISAL_LABEL,
     description:
-      "Vendor-facing sales appraisal with recently sold and for-sale REA comps and an estimated sale price range.",
+      "A vendor-ready property appraisal with an estimated sale price range and carefully selected comparable sales.",
   },
   social_posts: {
-    label: "Social posts",
-    description: "Ready-to-share graphics for Instagram, Facebook and LinkedIn.",
+    label: "Social media posts",
+    description:
+      "On-brand property marketing ready to publish across Instagram, Facebook and LinkedIn.",
   },
   investor_snapshot: {
-    label: "Investor snapshot",
-    description: "Suburb report and one-page investment summary for serious buyers.",
+    label: "Investment report",
+    description:
+      "A concise, buyer-ready investment report covering the property, suburb and key fundamentals.",
     comingSoon: true,
   },
   agent_business_card: {
     label: "Business card",
-    description: "Branded contact card linked to this listing.",
+    description: "A polished agent contact card with consistent agency branding.",
     comingSoon: true,
   },
 };

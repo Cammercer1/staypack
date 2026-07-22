@@ -19,7 +19,7 @@ export function collateralPurposeMismatchError(
   }
 
   if (purpose === "sale" && LEASE_ONLY.includes(collateralType)) {
-    return "Lease brochures are only available for lease listings";
+    return "Rental brochures are only available for rental listings";
   }
 
   return null;

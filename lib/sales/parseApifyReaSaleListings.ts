@@ -6,6 +6,12 @@ import {
 } from "@/lib/sales/parseSalePrice";
 import type { SaleComp, SaleCompStatus } from "@/lib/sales/types";
 import { normalizeReaImageUrl } from "@/lib/scraping/rea/normalizeReaImageUrl";
+import {
+  resolveReaFloorAreaSqm,
+  resolveReaLandAreaSqm,
+  resolveReaSoldDate,
+} from "@/lib/scraping/rea/parseReaPropertyFacts";
+import { parseLandAreaSqm } from "@/lib/rental/parseListingPremiumSignals";
 
 function resolveSalePrice(record: ApifyReaListingRecord): number | null {
   const structured = record.listing?.price;
@@ -40,17 +46,6 @@ function resolveSaleStatus(
   return channel === "sold" ? "sold" : "for_sale";
 }
 
-function resolveSoldDate(record: ApifyReaListingRecord): string | undefined {
-  const raw = record as Record<string, unknown>;
-  for (const key of ["soldDate", "dateSold", "sold_date"]) {
-    const value = raw[key];
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
-  }
-  return undefined;
-}
-
 export function apifyReaRecordToSaleComp(
   record: ApifyReaListingRecord,
   channel: ReaSaleChannel,
@@ -83,11 +78,18 @@ export function apifyReaRecordToSaleComp(
     suburb,
     price,
     saleStatus,
-    soldDate: saleStatus === "sold" ? resolveSoldDate(record) : undefined,
+    soldDate: saleStatus === "sold" ? resolveReaSoldDate(record) : undefined,
+    landAreaSqm:
+      resolveReaLandAreaSqm(record) ??
+      (record.description?.trim()
+        ? parseLandAreaSqm(record.description)
+        : undefined),
+    floorAreaSqm: resolveReaFloorAreaSqm(record),
     priceDisplay: record.price?.trim() || record.listing?.price?.display?.trim() || undefined,
     bedrooms: record.bedrooms ?? undefined,
     bathrooms: record.bathrooms ?? undefined,
-    propertyType: record.propertyType ?? undefined,
+    carSpaces: record.carSpaces ?? undefined,
+    propertyType: record.propertyType?.trim() || undefined,
     imageUrl: rawImage ? normalizeReaImageUrl(rawImage) : undefined,
     listingUrl: record.url,
   };

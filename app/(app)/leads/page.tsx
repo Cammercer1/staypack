@@ -24,7 +24,7 @@ export default async function LeadsPage() {
         eyebrow="Leads"
         highlight="Your"
         title="enquiry inbox."
-        description="Every enquiry from your landing pages in one place, grouped by person so you can see who is interested in which properties and follow up fast."
+        description="Every enquiry from your property pages in one place, grouped by person so you can see who is interested in which properties and follow up fast."
       />
       <LeadsInbox initialLeads={leads} />
     </div>

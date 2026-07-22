@@ -25,6 +25,12 @@ describe("normalizeReportTemplateId", () => {
       DEFAULT_REPORT_TEMPLATE_ID,
     );
   });
+
+  it("keeps the OC lease appraisal template id", () => {
+    expect(normalizeReportTemplateId("oc-real-estate-lease-appraisal")).toBe(
+      "oc-real-estate-lease-appraisal",
+    );
+  });
 });
 
 describe("isSelectableStrTemplateId", () => {
@@ -40,5 +46,8 @@ describe("isSelectableStrTemplateId", () => {
 
   it("rejects lease appraisal templates", () => {
     expect(isSelectableStrTemplateId("classic-lease-appraisal")).toBe(false);
+    expect(isSelectableStrTemplateId("oc-real-estate-lease-appraisal")).toBe(
+      false,
+    );
   });
 });

@@ -316,6 +316,8 @@ function compForPrompt(comp: SaleComp, index: number) {
     price: comp.price,
     status: comp.saleStatus,
     sold_date: comp.soldDate ?? null,
+    land_area_sqm: comp.landAreaSqm ?? null,
+    floor_area_sqm: comp.floorAreaSqm ?? null,
     price_display: comp.priceDisplay ?? null,
     bedrooms: comp.bedrooms ?? null,
     bathrooms: comp.bathrooms ?? null,

@@ -1,4 +1,5 @@
 import { syncBlurbFieldWithVariants } from "@/lib/copy/blurbVariantsQuality";
+import type { BlurbLength } from "@/lib/copy/blurbVariantConstants";
 import type { FinalReportJson } from "@/lib/types";
 
 export type ReportCopyFieldPath = `copy.${string}`;
@@ -61,6 +62,7 @@ export function setReportCopyValueAtPath(
   copy: ReportCopy,
   path: ReportCopyFieldPath,
   nextValue: string,
+  options?: { activeBlurbLength?: BlurbLength },
 ): ReportCopy {
   const parts = path.split(".");
   if (parts[0] !== "copy" || parts.length < 2) {
@@ -100,10 +102,16 @@ export function setReportCopyValueAtPath(
   }
 
   if (field === "blurb" || field === "sales_pack_blurb") {
-    const blurb_variants = syncBlurbFieldWithVariants(
+    const syncedVariants = syncBlurbFieldWithVariants(
       nextValue,
       copy.blurb_variants,
     );
+    const blurb_variants = options?.activeBlurbLength
+      ? {
+          ...syncedVariants,
+          [options.activeBlurbLength]: nextValue,
+        }
+      : syncedVariants;
     return {
       ...copy,
       [field]: nextValue,

@@ -106,7 +106,7 @@ export async function generateHeadlessStrReport({
   assertListingReadyForStr(listing);
 
   if (listing.listing_purpose === "lease") {
-    throw new Error("STR reports are only available for listings for sale");
+    throw new Error("Short-term rental appraisals are only available for properties for sale");
   }
 
   const packTemplateId =
@@ -300,7 +300,7 @@ export async function generateHeadlessStrReport({
   const qrDestinationUrl = resolveListingDestinationUrl(listing);
 
   if (!qrDestinationUrl) {
-    throw new Error("Listing landing page is not provisioned");
+    throw new Error("Property page is not provisioned");
   }
 
   const qrBuffer = await generateQrCodeBuffer(qrTrackingUrl);

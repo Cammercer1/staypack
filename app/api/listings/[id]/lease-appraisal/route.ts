@@ -35,7 +35,7 @@ export async function POST(
         error:
           error instanceof Error
             ? error.message
-            : "Unable to create lease appraisal",
+            : "Unable to create rental appraisal",
       },
       { status: 400 },
     );

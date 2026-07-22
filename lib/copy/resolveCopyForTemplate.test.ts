@@ -49,4 +49,14 @@ describe("resolveCopyForTemplate", () => {
       expect(resolved.blurb_blocks).toHaveLength(BLURB_PARAGRAPH_COUNTS.long);
     }
   });
+
+  it("uses short blurb for the OC sales appraisal layout", () => {
+    const resolved = resolveCopyForTemplate({
+      copy: { heading: "Test", blurb: "fallback", blurb_variants: variants },
+      templateId: "oc-real-estate-sales-appraisal",
+      collateral: "sales_appraisal",
+    });
+
+    expect(resolved.blurb_blocks).toHaveLength(BLURB_PARAGRAPH_COUNTS.short);
+  });
 });

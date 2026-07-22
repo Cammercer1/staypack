@@ -71,7 +71,7 @@ export async function PATCH(
       DEFAULT_REPORT_TEMPLATE_ID;
 
     try {
-      await assertTemplateGranted(agency.id, templateId);
+      await assertTemplateGranted(agency, templateId);
     } catch (grantError) {
       const denied = templateGrantErrorResponse(grantError);
       if (denied) {

@@ -62,7 +62,7 @@ export async function POST(
 
     const templateId = resolveCollateralTemplateId(agency, collateral);
     try {
-      await assertTemplateGranted(agency.id, templateId);
+      await assertTemplateGranted(agency, templateId);
     } catch (grantError) {
       const denied = templateGrantErrorResponse(grantError);
       if (denied) {

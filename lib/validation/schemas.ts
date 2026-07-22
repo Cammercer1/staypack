@@ -109,6 +109,9 @@ export const parsedListingSchema = z.object({
   carSpaces: z.coerce.number().nullable().optional(),
   description: z.string().nullable().optional(),
   displayPrice: z.string().nullable().optional(),
+  soldDate: z.string().nullable().optional(),
+  landAreaSqm: z.coerce.number().positive().nullable().optional(),
+  floorAreaSqm: z.coerce.number().positive().nullable().optional(),
   images: z.array(z.string()).default([]),
   agents: z
     .array(
@@ -329,6 +332,14 @@ export const loginSchema = z.object({
 });
 
 export const signupSchema = loginSchema.extend({
+  confirmPassword: z.string().min(6),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+export const setPasswordSchema = z.object({
+  password: z.string().min(6),
   confirmPassword: z.string().min(6),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",

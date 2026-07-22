@@ -22,6 +22,10 @@ export type ApifyReaListingRecord = {
   bedrooms?: number | null;
   bathrooms?: number | null;
   carSpaces?: number | null;
+  landSize?: number | string | { value?: number | string; unit?: string } | null;
+  floorArea?: number | string | { value?: number | string; unit?: string } | null;
+  soldDate?: string | null;
+  dateSold?: string | null;
   description?: string;
   isRent?: boolean;
   isBuy?: boolean;

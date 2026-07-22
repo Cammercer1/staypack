@@ -7,6 +7,7 @@ import {
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import { isDevelopment } from "@/lib/env";
 import { LEASE_APPRAISAL_COMPARABLE_DISCLAIMER } from "@/lib/lease-appraisal/comparableEvidenceCopy";
+import { resolveLeaseAppraisalComparableDisclaimer } from "@/lib/lease-appraisal/leaseAppraisalDisclaimer";
 import {
   PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
   PAGE_ONE_COPY_MAX_ATTEMPTS,
@@ -20,7 +21,7 @@ import type { Agency, Listing, LtrRentalCompCard, LtrSuburbMarketJson, ParsedLis
 
 const SYSTEM_PROMPT = `You write page-1 copy for an Australian long-term rental appraisal aimed at property investors.
 
-The page header already says "Long-term rental appraisal" — never use that phrase as the heading.
+The page header already says "Rental appraisal" — never use that phrase as the heading.
 
 Inputs include the REA listing description, rent comparable range, and suburb statistics. Use them.
 
@@ -174,10 +175,11 @@ export async function generateLeaseAppraisalCopy(
           buyer_checks: fallback.buyer_checks,
           methodology_note: fallback.methodology_note,
           comparable_evidence: fallback.comparable_evidence,
-          comparable_disclaimer:
-            input.agency.default_disclaimer?.trim() ||
-            fallback.comparable_disclaimer ||
-            LEASE_APPRAISAL_COMPARABLE_DISCLAIMER,
+          comparable_disclaimer: resolveLeaseAppraisalComparableDisclaimer(
+            input.agency.default_disclaimer ??
+              fallback.comparable_disclaimer ??
+              LEASE_APPRAISAL_COMPARABLE_DISCLAIMER,
+          ),
           disclaimer: fallback.disclaimer,
           cta: input.agency.default_cta || fallback.cta,
         };

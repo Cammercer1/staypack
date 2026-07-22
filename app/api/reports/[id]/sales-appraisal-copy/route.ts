@@ -5,6 +5,8 @@ import { rebuildSalesAppraisalFinalReport } from "@/lib/sales-appraisal/rebuildS
 import { hasSalesAppraisalComps } from "@/lib/sales-appraisal/generateSalesAppraisalForListing";
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSalesAppraisalReport";
+import { assertTemplateGranted } from "@/lib/templates/grants/assertTemplateGranted";
+import { templateGrantErrorResponse } from "@/lib/templates/grants/apiErrors";
 import type { ReportPropertyImageSelection } from "@/lib/reports/editable/reportImageSlots";
 
 const blurbVariantsSchema = z.object({
@@ -60,9 +62,19 @@ export async function PATCH(
       body.template_id ?? report.template_id ?? undefined;
     if (!templateId || !isSalesAppraisalTemplateId(templateId)) {
       return NextResponse.json(
-        { error: "Choose a sales appraisal template first" },
+        { error: "Choose a property appraisal template first" },
         { status: 400 },
       );
+    }
+
+    try {
+      await assertTemplateGranted(agency, templateId);
+    } catch (grantError) {
+      const denied = templateGrantErrorResponse(grantError);
+      if (denied) {
+        return denied;
+      }
+      throw grantError;
     }
 
     const agentProfile = await loadListingAgentProfile(supabase, listing);

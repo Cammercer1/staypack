@@ -36,11 +36,11 @@ export function HavenLeaseAppraisalPlayground({ baseReport }: Props) {
               Dev only
             </p>
             <h1 className="mt-1 font-display text-2xl tracking-tight">
-              havenly property · Lease appraisal
+              havenly property · Rental appraisal
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Investor-facing <strong>long-term rental appraisal</strong> (not tenant lease
-              brochure). Landmark-inspired layout in{" "}
+              Landlord-ready <strong>rental appraisal</strong> (not a tenant-facing
+              rental brochure). Landmark-inspired layout in{" "}
               <code className="text-xs">haven-properties/</code>. Data from REA discover
               pipeline; fixture: 1401/67 Ferny Ave (live REA scrape).
             </p>

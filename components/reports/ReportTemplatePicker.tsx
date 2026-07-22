@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useAvailableTemplates } from "@/components/templates/useAvailableTemplates";
 import { normalizeReportTemplateId } from "@/lib/reports/templates/ids";
 
@@ -24,6 +25,12 @@ export function ReportTemplatePicker({ value, onChange }: Props) {
     ? normalizedValue
     : data?.default_template_id ?? normalizedValue;
 
+  useEffect(() => {
+    if (!loading && data && value !== selectedValue) {
+      onChange(selectedValue);
+    }
+  }, [data, loading, onChange, selectedValue, value]);
+
   if (loading && options.length === 0) {
     return (
       <select
@@ -32,6 +39,15 @@ export function ReportTemplatePicker({ value, onChange }: Props) {
       >
         <option>Loading templates…</option>
       </select>
+    );
+  }
+
+  if (options.length === 1) {
+    return (
+      <div className="flex h-8 items-center gap-2 rounded-md border border-input bg-muted/30 px-2.5 text-sm">
+        <span className="font-medium">{options[0].label}</span>
+        <span className="text-xs text-muted-foreground">Agency template</span>
+      </div>
     );
   }
 

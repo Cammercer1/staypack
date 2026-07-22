@@ -1,5 +1,11 @@
 import type { BrightDataReaRecord } from "@/lib/brightdata/types";
 import { normalizeReaImageUrls } from "@/lib/scraping/rea/normalizeReaImageUrl";
+import {
+  resolveReaFloorAreaSqm,
+  resolveReaLandAreaSqm,
+  resolveReaSoldDate,
+} from "@/lib/scraping/rea/parseReaPropertyFacts";
+import { parseLandAreaSqm } from "@/lib/rental/parseListingPremiumSignals";
 import type { ParsedListing } from "@/lib/types";
 
 function parseCount(value: string | number | undefined) {
@@ -18,13 +24,17 @@ function detectPurpose(record: BrightDataReaRecord): ParsedListing["purpose"] {
   if (listingType === "rent" || listingType === "lease") {
     return "lease";
   }
-  if (listingType === "buy" || listingType === "sale") {
+  if (listingType === "buy" || listingType === "sale" || listingType === "sold") {
     return "sale";
   }
   if (record.rent_price != null) {
     return "lease";
   }
   return undefined;
+}
+
+function isSoldListing(record: BrightDataReaRecord) {
+  return record.listing_type?.trim().toLowerCase().includes("sold") === true;
 }
 
 function buildDisplayPrice(record: BrightDataReaRecord) {
@@ -97,6 +107,13 @@ export function parseBrightDataReaRecord(
     carSpaces: record.parking ?? undefined,
     description: record.description?.trim(),
     displayPrice: buildDisplayPrice(record),
+    soldDate: isSoldListing(record) ? resolveReaSoldDate(record) : undefined,
+    landAreaSqm:
+      resolveReaLandAreaSqm(record) ??
+      (record.description?.trim()
+        ? parseLandAreaSqm(record.description)
+        : undefined),
+    floorAreaSqm: resolveReaFloorAreaSqm(record),
     images,
     agents,
     confidence:

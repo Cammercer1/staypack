@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import {
@@ -273,10 +274,10 @@ function LandingPageCard({
           <Globe className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-medium">Listing landing page</p>
+          <p className="font-medium">Property page</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Public page with property summary and lead capture form. Report QR
-            codes link here.
+            A branded, shareable property page with enquiry capture and a
+            trackable QR code.
           </p>
         </div>
       </div>
@@ -291,8 +292,7 @@ function LandingPageCard({
               className="h-16 w-16 shrink-0 rounded-md border border-border/70 bg-white p-1"
             />
             <p className="text-xs text-muted-foreground">
-              Scans are tracked, then visitors are sent to your{" "}
-              {listing.custom_landing_url ? "custom" : "StayPacks"} listing page.
+              Ready to share at inspections, in print and across your marketing.
             </p>
           </div>
         ) : null}
@@ -592,54 +592,9 @@ function CollateralTab({
                 </p>
               ) : null}
 
-              {type === "agent_business_card" && item?.document_json ? (
-                <p className="mt-4 text-sm text-muted-foreground">
-                  Branded card with agent details and a QR code to the listing
-                  landing page.
-                </p>
-              ) : null}
-
-              {type === "social_posts" && item?.document_json ? (
-                <p className="mt-4 text-sm text-muted-foreground">
-                  Branded graphics for Instagram, Facebook and LinkedIn with your
-                  logo and property address.
-                </p>
-              ) : null}
-
-              {type === "sales_brochure" && item?.document_json ? (
-                <p className="mt-4 text-sm text-muted-foreground">
-                  Print-ready A4 brochure with property photos, copy and a QR code
-                  to your listing page.
-                </p>
-              ) : null}
-              {type === "rental_brochure" && item?.document_json ? (
-                <p className="mt-4 text-sm text-muted-foreground">
-                  Print-ready A4 lease brochure with property photos, copy and a QR
-                  code to your listing page.
-                </p>
-              ) : null}
-              {type === "lease_appraisal" && leaseAppraisalFinal ? (
-                <p className="mt-4 text-sm text-muted-foreground">
-                  Two-page investor appraisal with REA rent comparables and suburb
-                  market context — not a tenant lease brochure.
-                </p>
-              ) : null}
-              {type === "sales_appraisal" && salesAppraisalFinal ? (
-                <p className="mt-4 text-sm text-muted-foreground">
-                  Two-page vendor appraisal with recently sold and for-sale REA
-                  comparables and an estimated sale price range.
-                </p>
-              ) : null}
-              {(type === "sales_brochure" || type === "rental_brochure") &&
-              !item?.document_json ? (
-                <p className="mt-4 text-sm text-muted-foreground">
-                  {meta.description}
-                </p>
-              ) : null}
-
               {strReport?.final_estimate_json?.annualRevenue != null ? (
                 <p className="mt-4 text-sm text-muted-foreground">
-                  Estimated annual STR revenue:{" "}
+                  Estimated gross STR revenue:{" "}
                   <span className="font-medium text-foreground">
                     {formatCurrency(strReport.final_estimate_json.annualRevenue)}
                   </span>
@@ -658,7 +613,7 @@ function CollateralTab({
                   {leaseAppraisalFinal.ltr_enrichment?.comp_count ? (
                     <>
                       {" "}
-                      · {leaseAppraisalFinal.ltr_enrichment.comp_count} comps
+                      · {leaseAppraisalFinal.ltr_enrichment.comp_count} comparables
                     </>
                   ) : null}
                 </p>
@@ -676,7 +631,7 @@ function CollateralTab({
                   {salesAppraisalFinal.sales_enrichment?.comp_count ? (
                     <>
                       {" "}
-                      · {salesAppraisalFinal.sales_enrichment.comp_count} comps
+                      · {salesAppraisalFinal.sales_enrichment.comp_count} comparables
                     </>
                   ) : null}
                 </p>
@@ -833,12 +788,21 @@ function CollateralTab({
 
               {type === "str_report" ? (
                 <div className="mt-4 flex justify-end">
-                  <div className="flex items-center gap-1.5 opacity-40">
-                    <span className="text-[10px] text-muted-foreground">Powered by</span>
-                    <img src="/airbtics-logo.png" alt="Airbtics" className="h-3.5 w-auto" />
+                  <div className="flex items-center gap-1.5 opacity-50">
+                    <span className="text-[10px] text-muted-foreground">
+                      Powered by
+                    </span>
+                    <Image
+                      src="/airbtics-logo.png"
+                      alt="Airbtics"
+                      width={80}
+                      height={18}
+                      className="h-3.5 w-auto"
+                    />
                   </div>
                 </div>
               ) : null}
+
             </div>
           );
         })}
@@ -905,7 +869,7 @@ function LeadsTab({
       <div className="surface-card p-8 text-center">
         <p className="font-medium">No leads yet</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Enquiries from the public landing page will appear here.
+          Enquiries from the public property page will appear here.
         </p>
       </div>
     );

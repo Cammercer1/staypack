@@ -5,7 +5,9 @@ import { requireListingReportAccess } from "@/lib/auth/requireUser";
 import { ReportEditor } from "@/components/reports/ReportEditor";
 import { Button } from "@/components/ui/button";
 import { STR_REPORT_LABEL } from "@/lib/listings/collateralTypes";
-import type { Listing, Report } from "@/lib/types";
+import { refreshStrEnrichmentInFinalReport } from "@/lib/airbtics/enrich";
+import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
+import type { FinalReportJson, Listing, Report } from "@/lib/types";
 
 export default async function ListingReportEditorPage({
   params,
@@ -26,6 +28,28 @@ export default async function ListingReportEditorPage({
   } catch {
     notFound();
   }
+
+  const availableTemplates = await resolveAvailableTemplates(agency, "str");
+  const soleTemplateId =
+    availableTemplates.templates.length === 1
+      ? availableTemplates.templates[0].id
+      : null;
+  const cachedFinalReport = report.final_report_json as FinalReportJson | null;
+  const editorReport: Report = soleTemplateId
+    ? {
+        ...report,
+        template_id: soleTemplateId,
+        final_report_json: cachedFinalReport
+          ? {
+              ...refreshStrEnrichmentInFinalReport(
+                cachedFinalReport,
+                report.raw_airbtics_json,
+              ),
+              template_id: soleTemplateId,
+            }
+          : null,
+      }
+    : report;
 
   return (
     <div className="space-y-6">
@@ -50,7 +74,7 @@ export default async function ListingReportEditorPage({
 
       <ReportEditor
         initialListing={listing}
-        initialReport={report}
+        initialReport={editorReport}
         agency={agency}
       />
     </div>

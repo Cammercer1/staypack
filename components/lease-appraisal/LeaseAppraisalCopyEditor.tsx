@@ -29,6 +29,7 @@ import {
   type ReportCopyFieldPath,
 } from "@/lib/reports/editable/reportCopyPaths";
 import { mergeLeaseAppraisalPreviewFromListing } from "@/lib/lease-appraisal/mergeLeaseAppraisalPreviewFromListing";
+import { mergeAppraisalPreviewAgents } from "@/lib/reports/mergeAppraisalPreviewAgents";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { hasLeaseAppraisalComps } from "@/lib/lease-appraisal/generateLeaseAppraisalForListing";
 import { hasLeaseAppraisalSelectedComps } from "@/lib/lease-appraisal/leaseAppraisalData";
@@ -39,6 +40,7 @@ import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPri
 import { cn } from "@/lib/utils";
 import type {
   Agency,
+  AgentProfile,
   CollateralItem,
   FinalReportJson,
   Listing,
@@ -47,6 +49,7 @@ import type {
 
 type Props = {
   agency: Agency;
+  agencyAgents: AgentProfile[];
   listing: Listing;
   report: Report;
   collateral: CollateralItem;
@@ -93,6 +96,7 @@ export const LeaseAppraisalCopyEditor = forwardRef<
   Props
 >(function LeaseAppraisalCopyEditor(
   {
+    agencyAgents,
     listing,
     report,
     collateral,
@@ -184,8 +188,17 @@ export const LeaseAppraisalCopyEditor = forwardRef<
           },
         }
       : withListing;
-    return resolveFinalReportForDisplay(withImages);
-  }, [report.final_report_json, copy, templateId, listing, propertyImages]);
+    return resolveFinalReportForDisplay(
+      mergeAppraisalPreviewAgents(withImages, listing, agencyAgents),
+    );
+  }, [
+    report.final_report_json,
+    copy,
+    templateId,
+    listing,
+    propertyImages,
+    agencyAgents,
+  ]);
 
   const handleOpenImagePicker = useCallback((slot: ReportImageSlot) => {
     setImagePickerSlot(slot);
@@ -408,8 +421,8 @@ export const LeaseAppraisalCopyEditor = forwardRef<
   return (
     <AsyncLoadingOverlay
       active={generating}
-      title="Generating collateral"
-      description="Writing investor-facing lease appraisal copy from your listing and rent comps. This usually takes 15–30 seconds."
+      title="Preparing appraisal"
+      description="Writing landlord-ready rental appraisal copy from the property details and comparable rentals. This usually takes 15–30 seconds."
     >
       <div
         className={cn(
@@ -426,12 +439,12 @@ export const LeaseAppraisalCopyEditor = forwardRef<
                   aria-hidden
                 />
               ) : null}
-              {copy ? "Edit lease appraisal" : "Content generation"}
+              {copy ? "Edit rental appraisal" : "Appraisal content"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {copy
                 ? "Hover photos on the preview and click Change photo to pick another image or floor plan. Click text to edit copy inline."
-                : "Generate investor-facing copy from your listing and rent comps, then edit directly on the appraisal."}
+                : "Generate landlord-ready copy from the property details and comparable rentals, then edit it directly on the appraisal."}
             </p>
             {addressLine ? (
               <p className="mt-1 truncate text-sm font-medium text-foreground">
@@ -481,7 +494,7 @@ export const LeaseAppraisalCopyEditor = forwardRef<
               ) : copy ? (
                 "Regenerate copy"
               ) : (
-                "Generate collateral"
+                "Generate appraisal"
               )}
             </Button>
             {copy ? (
@@ -522,7 +535,7 @@ export const LeaseAppraisalCopyEditor = forwardRef<
                 value={rentRangeLabel ?? "—"}
               />
               <CopyEditorContextMetric
-                label="Featured comps"
+                label="Selected comparables"
                 value={selectedCount > 0 ? String(selectedCount) : "—"}
               />
             </div>
@@ -656,8 +669,8 @@ export const LeaseAppraisalCopyEditor = forwardRef<
         ) : (
           <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-dashed bg-muted/20 p-8 text-center text-sm text-muted-foreground">
             {compsReady
-              ? "Generate collateral to preview and edit your lease appraisal here."
-              : "Complete appraisal data, then generate collateral to preview and edit here."}
+              ? "Generate the appraisal to preview and edit it here."
+              : "Complete appraisal data, then generate the appraisal here."}
           </div>
         )}
       </div>

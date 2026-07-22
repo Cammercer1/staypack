@@ -122,6 +122,7 @@ export async function generateOutreachBundle(
   if (deliverables.includes("lease_appraisal")) {
     try {
       let enriched = await enrichListingRentalAppraisal(parsed, {
+        subjectListingUrl: request.listing_url,
         rentAppraisalConfig: {
           tier: rentAppraisalTierSetting(tenant) ?? "auto",
         },
@@ -257,7 +258,7 @@ export async function generateOutreachBundle(
       errors.push({
         type: "sales_brochure",
         message:
-          error instanceof Error ? error.message : "Sales brochure generation failed",
+          error instanceof Error ? error.message : "Property brochure generation failed",
       });
     }
   }

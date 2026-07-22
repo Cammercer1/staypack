@@ -10,6 +10,9 @@ import { HavenPropertiesStrTemplate } from "@/lib/reports/templates/haven-proper
 import { HavenPropertiesLeaseAppraisalTemplate } from "@/lib/reports/templates/haven-properties/HavenPropertiesLeaseAppraisalTemplate";
 import { BellePropertyStrTemplate } from "@/lib/reports/templates/belle-property/BellePropertyStrTemplate";
 import { BellePropertyLeaseAppraisalTemplate } from "@/lib/reports/templates/belle-property/BellePropertyLeaseAppraisalTemplate";
+import { OcRealEstateSalesAppraisalTemplate } from "@/lib/reports/templates/oc-real-estate/OcRealEstateSalesAppraisalTemplate";
+import { OcRealEstateLeaseAppraisalTemplate } from "@/lib/reports/templates/oc-real-estate/OcRealEstateLeaseAppraisalTemplate";
+import { OcRealEstateStrTemplate } from "@/lib/reports/templates/oc-real-estate/OcRealEstateStrTemplate";
 import {
   BoldLeaseAppraisalTemplate,
   ClassicLeaseAppraisalTemplate,
@@ -44,6 +47,7 @@ import {
   HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID,
   BELLE_PROPERTY_STR_TEMPLATE_ID,
   BELLE_PROPERTY_LEASE_APPRAISAL_TEMPLATE_ID,
+  OC_REAL_ESTATE_STR_TEMPLATE_ID,
   CLASSIC_LEASE_APPRAISAL_TEMPLATE_ID,
   BOLD_LEASE_APPRAISAL_TEMPLATE_ID,
   GALLERY_LEASE_APPRAISAL_TEMPLATE_ID,
@@ -52,6 +56,7 @@ import {
   REFINED_LEASE_APPRAISAL_TEMPLATE_ID,
   MINIMALIST_LEASE_APPRAISAL_TEMPLATE_ID,
   LANDMARK_LEASE_APPRAISAL_TEMPLATE_ID,
+  OC_REAL_ESTATE_LEASE_APPRAISAL_TEMPLATE_ID,
   CLASSIC_SALES_APPRAISAL_TEMPLATE_ID,
   BOLD_SALES_APPRAISAL_TEMPLATE_ID,
   GALLERY_SALES_APPRAISAL_TEMPLATE_ID,
@@ -60,6 +65,7 @@ import {
   REFINED_SALES_APPRAISAL_TEMPLATE_ID,
   MINIMALIST_SALES_APPRAISAL_TEMPLATE_ID,
   LANDMARK_SALES_APPRAISAL_TEMPLATE_ID,
+  OC_REAL_ESTATE_SALES_APPRAISAL_TEMPLATE_ID,
   isValidReportTemplateId,
   normalizeReportTemplateId,
   REPORT_TEMPLATE_IDS,
@@ -265,6 +271,16 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
     Component: BellePropertyStrTemplate,
   },
   {
+    id: OC_REAL_ESTATE_STR_TEMPLATE_ID,
+    family: "oc-real-estate",
+    tier: "detailed",
+    label: "OC Real Estate",
+    description: "Bespoke OC short-term rental appraisal with six market comparables.",
+    pages: 2,
+    sourcePath: "lib/reports/templates/oc-real-estate",
+    Component: OcRealEstateStrTemplate,
+  },
+  {
     id: BELLE_PROPERTY_LEASE_APPRAISAL_TEMPLATE_ID,
     family: "belle-property",
     tier: "detailed",
@@ -273,6 +289,16 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
     pages: 2,
     sourcePath: "lib/reports/templates/belle-property",
     Component: BellePropertyLeaseAppraisalTemplate,
+  },
+  {
+    id: OC_REAL_ESTATE_LEASE_APPRAISAL_TEMPLATE_ID,
+    family: "oc-real-estate",
+    tier: "detailed",
+    label: "OC Real Estate",
+    description: "Bespoke OC rental appraisal with six comparable rentals.",
+    pages: 2,
+    sourcePath: "lib/reports/templates/oc-real-estate",
+    Component: OcRealEstateLeaseAppraisalTemplate,
   },
   {
     id: CLASSIC_SALES_APPRAISAL_TEMPLATE_ID,
@@ -353,6 +379,16 @@ export const REPORT_TEMPLATES: ReportTemplateDefinition[] = [
     pages: 2,
     sourcePath: "lib/reports/templates/landmark",
     Component: LandmarkSalesAppraisalTemplate,
+  },
+  {
+    id: OC_REAL_ESTATE_SALES_APPRAISAL_TEMPLATE_ID,
+    family: "oc-real-estate",
+    tier: "detailed",
+    label: "OC Real Estate",
+    description: "Bespoke OC property appraisal with branded comparable sales.",
+    pages: 2,
+    sourcePath: "lib/reports/templates/oc-real-estate",
+    Component: OcRealEstateSalesAppraisalTemplate,
   },
 ];
 

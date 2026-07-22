@@ -2,6 +2,7 @@ import {
   getApifyReaMaxListings,
   hasApifyReaConfig,
   scrapeApifyReaRentSearch,
+  scrapeApifyReaRentSearchUrls,
 } from "@/lib/apify/client";
 import {
   hasBrightDataReaConfig,
@@ -10,11 +11,15 @@ import {
 import { detectPremiumRentSubject } from "@/lib/rental/detectPremiumRentSubject";
 import { parseListingPremiumSignals } from "@/lib/rental/parseListingPremiumSignals";
 import {
-  MIN_RENT_COMPS_FOR_BAND,
-  MIN_SAME_SUBURB_COMPS_FOR_DISCOVER,
-  TARGET_RENT_COMPS_FOR_BAND,
-} from "@/lib/rental/rentCompThresholds";
-import { resolveRentSubjectPropertyType } from "@/lib/rental/resolveRentSubjectPropertyType";
+  FOR_SALE_COMPARABLE_POOL_TARGETS,
+  MAX_SALE_DISCOVERY_ATTEMPTS_PER_CHANNEL,
+  SOLD_COMPARABLE_POOL_TARGETS,
+  capComparablePool,
+  excludeSubjectComparables,
+  summarizeComparablePool,
+  type ComparableDiscoverySummary,
+  type ComparablePoolTargets,
+} from "@/lib/comparables/discoveryPolicy";
 import {
   buildSaleDiscoverAttemptsForChannel,
   type SaleDiscoverAttempt,
@@ -25,6 +30,7 @@ import {
   formatSalePriceRange,
   MIN_SALE_COMPS_FOR_BAND,
 } from "@/lib/sales/computeSalePriceBand";
+import { enrichSelectedSaleCompDetails } from "@/lib/sales/enrichSaleCompDetails";
 import { mergeSaleComps } from "@/lib/sales/mergeSaleComps";
 import { parseApifyReaSaleListings } from "@/lib/sales/parseApifyReaSaleListings";
 import { parseReaSaleDiscoverRecords } from "@/lib/sales/parseReaSaleDiscover";
@@ -33,11 +39,11 @@ import {
   saleSubjectFromParsedListing,
 } from "@/lib/sales/positionSalesAppraisal";
 import {
-  countSameSuburbSaleComps,
   filterSaleCompsForSubjectType,
-  matchesSaleSubjectPropertyType,
   rankSaleCompsForSubject,
+  resolveSaleSubjectPropertyType,
 } from "@/lib/sales/rankSaleCompsForSubject";
+import { filterRecentSaleComps } from "@/lib/sales/saleCompFreshness";
 import type { SaleComp } from "@/lib/sales/types";
 import { defaultSelectedSaleCompListingIds } from "@/lib/sales-appraisal/salesAppraisalData";
 import type { ParsedListing } from "@/lib/types";
@@ -47,9 +53,12 @@ export type EnrichSalesAppraisalOptions = {
   soldSearchUrl?: string;
   buySearchUrl?: string;
   limitPages?: number;
+  /** Listing URL used to ensure the subject is never treated as its own comp. */
+  subjectListingUrl?: string | null;
 };
 
 const MIN_SOLD_COMPS_FOR_BAND = MIN_SALE_COMPS_FOR_BAND;
+const MAX_SALE_PRIMARY_BATCH_URLS = 3;
 
 function hasSaleDiscoverConfig() {
   return hasApifyReaConfig() || hasBrightDataReaConfig();
@@ -75,8 +84,10 @@ function orderSaleCompsForListing(
   comps: SaleComp[],
   listing: ParsedListing,
 ): SaleComp[] {
-  const subjectPropertyType = resolveRentSubjectPropertyType(listing);
-  const eligible = filterSaleCompsForSubjectType(comps, subjectPropertyType);
+  const subjectPropertyType = resolveSaleSubjectPropertyType(listing);
+  const eligible = filterRecentSaleComps(
+    filterSaleCompsForSubjectType(comps, subjectPropertyType),
+  );
   return rankSaleCompsForSubject(eligible, {
     suburb: listing.suburb,
     bedrooms: listing.bedrooms ?? undefined,
@@ -85,41 +96,63 @@ function orderSaleCompsForListing(
   });
 }
 
-function countTypeMatchedComps(comps: SaleComp[], subjectPropertyType?: string) {
-  if (!subjectPropertyType?.trim()) {
-    return comps.length;
-  }
-  return comps.filter((comp) =>
-    matchesSaleSubjectPropertyType(comp, subjectPropertyType),
-  ).length;
-}
-
-function countSameSuburbTypeMatchedComps(
-  comps: SaleComp[],
-  suburb: string | undefined,
-  subjectPropertyType?: string,
-) {
-  const pool = subjectPropertyType?.trim()
-    ? comps.filter((comp) =>
-        matchesSaleSubjectPropertyType(comp, subjectPropertyType),
-      )
-    : comps;
-  return countSameSuburbSaleComps(pool, suburb);
-}
-
 type SaleChannelDiscoverResult = {
   comps: SaleComp[];
   searchUrl: string;
   attemptLabel: string;
   provider: "apify" | "brightdata";
+  discovery: ComparableDiscoverySummary;
 };
+
+function targetsForSaleChannel(channel: ReaSaleChannel): ComparablePoolTargets {
+  return channel === "sold"
+    ? SOLD_COMPARABLE_POOL_TARGETS
+    : FOR_SALE_COMPARABLE_POOL_TARGETS;
+}
+
+function prepareSaleComparablePool({
+  comps,
+  listing,
+  subjectListingUrl,
+  targets,
+  attemptCount,
+}: {
+  comps: SaleComp[];
+  listing: ParsedListing;
+  subjectListingUrl?: string | null;
+  targets: ComparablePoolTargets;
+  attemptCount: number;
+}) {
+  const withoutSubject = excludeSubjectComparables(comps, {
+    address: listing.address,
+    suburb: listing.suburb,
+    listingUrl: subjectListingUrl,
+  });
+  const ordered = orderSaleCompsForListing(
+    withoutSubject.comparables,
+    listing,
+  );
+  const discovery = summarizeComparablePool({
+    comparables: ordered,
+    subjectSuburb: listing.suburb,
+    targets,
+    attemptCount,
+    subjectExcludedCount: withoutSubject.excludedCount,
+  });
+
+  return {
+    comps: capComparablePool(ordered),
+    discovery,
+  };
+}
 
 async function fetchSaleCompsForSearchUrl(
   searchUrl: string,
   channel: ReaSaleChannel,
   options?: EnrichSalesAppraisalOptions,
+  skipApify = false,
 ): Promise<{ comps: SaleComp[]; provider: "apify" | "brightdata" }> {
-  if (hasApifyReaConfig()) {
+  if (!skipApify && hasApifyReaConfig()) {
     try {
       const records = await scrapeApifyReaRentSearch({
         searchUrl,
@@ -149,6 +182,7 @@ async function discoverSaleCompsForChannel(
   channel: ReaSaleChannel,
   options?: EnrichSalesAppraisalOptions,
 ): Promise<SaleChannelDiscoverResult> {
+  const targets = targetsForSaleChannel(channel);
   const overrideUrl =
     channel === "sold" ? options?.soldSearchUrl : options?.buySearchUrl;
 
@@ -158,20 +192,80 @@ async function discoverSaleCompsForChannel(
       channel,
       options,
     );
-    return {
+    const prepared = prepareSaleComparablePool({
       comps,
+      listing,
+      subjectListingUrl: options?.subjectListingUrl,
+      targets,
+      attemptCount: 1,
+    });
+    return {
+      comps: prepared.comps,
       searchUrl: overrideUrl,
       attemptLabel: "override",
       provider,
+      discovery: prepared.discovery,
     };
   }
 
-  const subjectPropertyType = resolveRentSubjectPropertyType(listing);
   const attempts: SaleDiscoverAttempt[] = buildSaleDiscoverAttemptsForChannel(
     listing,
     premiumSignals,
     channel,
-  );
+  ).slice(0, MAX_SALE_DISCOVERY_ATTEMPTS_PER_CHANNEL);
+  let apifyBatchFailed = false;
+
+  if (hasApifyReaConfig()) {
+    const batches = [
+      attempts.slice(0, MAX_SALE_PRIMARY_BATCH_URLS),
+      attempts.slice(MAX_SALE_PRIMARY_BATCH_URLS),
+    ].filter((batch) => batch.length > 0);
+    let mergedComps: SaleComp[] = [];
+    let attemptedSearches = 0;
+    let prepared = prepareSaleComparablePool({
+      comps: [],
+      listing,
+      subjectListingUrl: options?.subjectListingUrl,
+      targets,
+      attemptCount: 0,
+    });
+
+    try {
+      for (const [batchIndex, batch] of batches.entries()) {
+        const records = await scrapeApifyReaRentSearchUrls({
+          searchUrls: batch.map((attempt) => attempt.searchUrl),
+          maxItems: getApifyReaMaxListings(),
+        });
+        mergedComps = mergeSaleComps(
+          mergedComps,
+          parseApifyReaSaleListings(records, channel),
+        );
+        attemptedSearches += batch.length;
+        prepared = prepareSaleComparablePool({
+          comps: mergedComps,
+          listing,
+          subjectListingUrl: options?.subjectListingUrl,
+          targets,
+          attemptCount: attemptedSearches,
+        });
+
+        if (prepared.discovery.targetMet || batchIndex === batches.length - 1) {
+          return {
+            comps: prepared.comps,
+            searchUrl: attempts[0]?.searchUrl ?? "",
+            attemptLabel: `${channel}-${batchIndex === 0 ? "batched-primary-search" : "batched-expanded-search"}`,
+            provider: "apify",
+            discovery: prepared.discovery,
+          };
+        }
+      }
+    } catch (error) {
+      if (!hasBrightDataReaConfig()) {
+        throw error;
+      }
+      apifyBatchFailed = true;
+    }
+  }
 
   let mergedComps: SaleComp[] = [];
   let lastProvider: SaleChannelDiscoverResult["provider"] = hasApifyReaConfig()
@@ -179,56 +273,50 @@ async function discoverSaleCompsForChannel(
     : "brightdata";
   let lastSearchUrl = "";
   let lastAttemptLabel = "merged";
+  let lastPrepared = prepareSaleComparablePool({
+    comps: [],
+    listing,
+    subjectListingUrl: options?.subjectListingUrl,
+    targets,
+    attemptCount: 0,
+  });
 
-  for (const attempt of attempts) {
+  for (const [index, attempt] of attempts.entries()) {
     const { comps, provider } = await fetchSaleCompsForSearchUrl(
       attempt.searchUrl,
       channel,
       options,
+      apifyBatchFailed,
     );
     mergedComps = mergeSaleComps(mergedComps, comps);
+    lastPrepared = prepareSaleComparablePool({
+      comps: mergedComps,
+      listing,
+      subjectListingUrl: options?.subjectListingUrl,
+      targets,
+      attemptCount: index + 1,
+    });
     lastProvider = provider;
     lastSearchUrl = attempt.searchUrl;
     lastAttemptLabel = attempt.label;
 
-    const typeMatched = countTypeMatchedComps(mergedComps, subjectPropertyType);
-    const enoughTotal = subjectPropertyType?.trim()
-      ? typeMatched >= TARGET_RENT_COMPS_FOR_BAND
-      : mergedComps.length >= TARGET_RENT_COMPS_FOR_BAND;
-    const enoughLocal =
-      countSameSuburbTypeMatchedComps(
-        mergedComps,
-        listing.suburb,
-        subjectPropertyType,
-      ) >= MIN_SAME_SUBURB_COMPS_FOR_DISCOVER;
-
-    if (enoughTotal && enoughLocal) {
+    if (lastPrepared.discovery.targetMet) {
       return {
-        comps: mergedComps,
+        comps: lastPrepared.comps,
         searchUrl: attempt.searchUrl,
         attemptLabel: attempt.label,
         provider,
-      };
-    }
-
-    if (
-      attempt.label.includes("adjacent-postcodes") &&
-      mergedComps.length >= MIN_RENT_COMPS_FOR_BAND
-    ) {
-      return {
-        comps: mergedComps,
-        searchUrl: attempt.searchUrl,
-        attemptLabel: attempt.label,
-        provider,
+        discovery: lastPrepared.discovery,
       };
     }
   }
 
   return {
-    comps: mergedComps,
+    comps: lastPrepared.comps,
     searchUrl: lastSearchUrl,
     attemptLabel: lastAttemptLabel,
     provider: lastProvider,
+    discovery: lastPrepared.discovery,
   };
 }
 
@@ -241,6 +329,7 @@ const GRANULAR_SALE_DISCOVER_SUFFIXES = new Set([
   "primary-bed-bath-suburb",
   "primary-bed-suburb",
   "primary-bed-adjacent-postcodes",
+  "batched-primary-search",
 ]);
 
 function isGranularSaleAttemptLabel(label: string) {
@@ -282,7 +371,7 @@ export async function enrichListingSalesAppraisal(
   }
 
   try {
-    const subjectPropertyType = resolveRentSubjectPropertyType(listingWithSignals);
+    const subjectPropertyType = resolveSaleSubjectPropertyType(listingWithSignals);
 
     // Sold comps first (they drive the price band), then buy comps for context.
     const soldResult = await discoverSaleCompsForChannel(
@@ -306,6 +395,13 @@ export async function enrichListingSalesAppraisal(
         searchUrl: "",
         attemptLabel: "failed",
         provider: soldResult.provider,
+        discovery: summarizeComparablePool({
+          comparables: [],
+          subjectSuburb: listingWithSignals.suburb,
+          targets: FOR_SALE_COMPARABLE_POOL_TARGETS,
+          attemptCount: 0,
+          subjectExcludedCount: 0,
+        }),
       };
       pushUniqueWarning(
         warnings,
@@ -314,11 +410,34 @@ export async function enrichListingSalesAppraisal(
     }
 
     const merged = mergeSaleComps(soldResult.comps, buyResult.comps);
-    const comps = orderSaleCompsForListing(merged, listingWithSignals);
+    const comps = capComparablePool(
+      orderSaleCompsForListing(merged, listingWithSignals),
+    );
     const soldComps = comps.filter((comp) => comp.saleStatus === "sold");
     const forSaleComps = comps.filter((comp) => comp.saleStatus === "for_sale");
+    const discovery = {
+      sold: soldResult.discovery,
+      forSale: buyResult.discovery,
+    };
+
+    if (!soldResult.discovery.targetMet) {
+      pushUniqueWarning(
+        warnings,
+        `Sales appraisal candidate sold pool below target (${soldResult.discovery.poolCount}/${soldResult.discovery.targetCount} total, ${soldResult.discovery.sameSuburbCount}/${soldResult.discovery.targetSameSuburbCount} in ${listingWithSignals.suburb}).`,
+      );
+    }
+    if (!buyResult.discovery.targetMet) {
+      pushUniqueWarning(
+        warnings,
+        `Sales appraisal candidate for-sale pool below target (${buyResult.discovery.poolCount}/${buyResult.discovery.targetCount} total, ${buyResult.discovery.sameSuburbCount}/${buyResult.discovery.targetSameSuburbCount} in ${listingWithSignals.suburb}).`,
+      );
+    }
 
     if (comps.length < MIN_SALE_COMPS_FOR_BAND) {
+      const selectedCompListingIds = defaultSelectedSaleCompListingIds({
+        ...listingWithSignals,
+        salesComps: comps,
+      });
       pushUniqueWarning(
         warnings,
         `Sales appraisal: only ${comps.length} sale listings returned from REA (need at least ${MIN_SALE_COMPS_FOR_BAND}).`,
@@ -328,10 +447,13 @@ export async function enrichListingSalesAppraisal(
         salesComps: comps,
         salesAppraisal: {
           ...listingWithSignals.salesAppraisal,
-          selectedCompListingIds: defaultSelectedSaleCompListingIds({
-            ...listingWithSignals,
-            salesComps: comps,
-          }),
+          compCount: comps.length,
+          soldCompCount: soldComps.length,
+          forSaleCompCount: forSaleComps.length,
+          featuredCompCount: selectedCompListingIds.length,
+          searchUrl: soldResult.searchUrl,
+          discovery,
+          selectedCompListingIds,
         },
         warnings,
       };
@@ -360,6 +482,10 @@ export async function enrichListingSalesAppraisal(
     }
 
     if (!band) {
+      const selectedCompListingIds = defaultSelectedSaleCompListingIds({
+        ...listingWithSignals,
+        salesComps: comps,
+      });
       pushUniqueWarning(
         warnings,
         "Sales appraisal: could not compute a sale price band from sold REA listings.",
@@ -372,11 +498,10 @@ export async function enrichListingSalesAppraisal(
           compCount: comps.length,
           soldCompCount: soldComps.length,
           forSaleCompCount: forSaleComps.length,
+          featuredCompCount: selectedCompListingIds.length,
           searchUrl: soldResult.searchUrl,
-          selectedCompListingIds: defaultSelectedSaleCompListingIds({
-            ...listingWithSignals,
-            salesComps: comps,
-          }),
+          discovery,
+          selectedCompListingIds,
         },
         warnings,
       };
@@ -413,6 +538,18 @@ export async function enrichListingSalesAppraisal(
     const selectedCompListingIds =
       positioned.selectedCompListingIds ??
       defaultSelectedSaleCompListingIds(compSelectionBase);
+    let detailedComps = comps;
+    try {
+      detailedComps = await enrichSelectedSaleCompDetails(
+        comps,
+        selectedCompListingIds,
+      );
+    } catch (error) {
+      pushUniqueWarning(
+        warnings,
+        `Sales appraisal comparable detail enrichment failed (${error instanceof Error ? error.message : "unknown error"}); using search-result fields.`,
+      );
+    }
 
     if (!isGranularSaleAttemptLabel(soldResult.attemptLabel)) {
       pushUniqueWarning(
@@ -455,7 +592,9 @@ export async function enrichListingSalesAppraisal(
         compCount: comps.length,
         soldCompCount: soldComps.length,
         forSaleCompCount: forSaleComps.length,
+        featuredCompCount: selectedCompListingIds.length,
         searchUrl: soldResult.searchUrl,
+        discovery,
         premiumTier: premiumResult.premium,
         premiumReasons: premiumResult.reasons,
         positioning: positioned.positioning
@@ -465,7 +604,7 @@ export async function enrichListingSalesAppraisal(
             }
           : undefined,
       },
-      salesComps: comps,
+      salesComps: detailedComps,
       warnings,
     };
   } catch (error) {

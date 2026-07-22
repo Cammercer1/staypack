@@ -63,7 +63,7 @@ function HavenStrStatStrip({ report }: { report: FinalReportJson }) {
           className="text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-white/80"
           style={{ fontFamily: headingFont }}
         >
-          Short-Term Rental Report
+          Short-term rental appraisal
         </p>
       ) : null}
     </div>

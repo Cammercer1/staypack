@@ -5,8 +5,8 @@ import {
 } from "@/lib/reports/resolveReportAgents";
 import type { AgentProfile, FinalReportJson, Listing } from "@/lib/types";
 
-/** Keep wizard previews in sync with the listing agents and their saved profiles. */
-export function mergeSalesAppraisalPreviewAgents(
+/** Keep appraisal previews in sync with the listing agents and their saved profiles. */
+export function mergeAppraisalPreviewAgents(
   report: FinalReportJson,
   listing: Listing,
   agencyAgents: AgentProfile[],

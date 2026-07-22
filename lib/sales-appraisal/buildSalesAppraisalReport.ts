@@ -1,4 +1,5 @@
 import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
+import { reportableSaleLandArea } from "@/lib/sales/reportableSaleArea";
 import { salesEnrichmentFromParsed } from "@/lib/sales-appraisal/salesEnrichmentFromParsed";
 import { DEFAULT_SALES_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/templates/sales-appraisal/ids";
 import { calculateAccommodates } from "@/lib/reports/formatters";
@@ -73,6 +74,7 @@ export function buildSalesAppraisalReport({
   const priceMin = parsed.salesAppraisal?.priceMin ?? null;
   const priceMax = parsed.salesAppraisal?.priceMax ?? null;
   const priceMidpoint = parsed.salesAppraisal?.priceMidpoint ?? null;
+  const propertyType = listing.property_type ?? parsed.propertyType ?? "";
 
   const priceRangeLabel =
     priceMin != null && priceMax != null
@@ -130,7 +132,7 @@ export function buildSalesAppraisalReport({
       state: listing.state ?? parsed.state ?? "",
       postcode: listing.postcode ?? parsed.postcode ?? "",
       summary: listing.listing_title ?? address,
-      property_type: listing.property_type ?? parsed.propertyType ?? "",
+      property_type: propertyType,
       bedrooms: listing.bedrooms ?? parsed.bedrooms ?? 0,
       bathrooms: listing.bathrooms ?? parsed.bathrooms ?? 0,
       car_spaces: listing.car_spaces ?? parsed.carSpaces ?? 0,
@@ -149,6 +151,8 @@ export function buildSalesAppraisalReport({
           ? propertyImages.selected_image_urls
           : selectedFromListing,
       display_price: listing.display_price ?? priceRangeLabel,
+      land_area_sqm: reportableSaleLandArea(propertyType, parsed.landAreaSqm),
+      floor_area_sqm: parsed.floorAreaSqm ?? null,
     },
     str: {
       annual_revenue: null,

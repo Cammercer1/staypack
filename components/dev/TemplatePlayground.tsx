@@ -59,9 +59,9 @@ type BrandedProps = BaseProps & {
 type Props = FixtureProps | BrandedProps;
 
 const COLLATERAL_OPTIONS: { id: ReportPageVariant; label: string; short: string }[] = [
-  { id: "str", label: "STR report", short: "STR" },
+  { id: "str", label: "Short-term rental appraisal", short: "STR" },
   { id: "lease", label: "Lease appraisal", short: "Lease" },
-  { id: "sale", label: "Sales brochure", short: "Sale" },
+  { id: "sale", label: "Property brochure", short: "Sale" },
 ];
 
 function isBrandedMode(props: Props): props is BrandedProps {
@@ -396,7 +396,7 @@ export function TemplatePlayground(props: Props) {
               <p className="text-[0.65rem] text-muted-foreground">
                 {collateral === "lease"
                   ? "Lease appraisals are always 2 pages (comps on page 2)."
-                  : "STR reports are always 2 pages (market evidence on page 2)."}
+                  : "Short-term rental appraisals are always 2 pages (market evidence on page 2)."}
               </p>
             ) : null}
           </div>

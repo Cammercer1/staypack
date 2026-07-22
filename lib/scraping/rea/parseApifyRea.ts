@@ -1,5 +1,11 @@
 import type { ApifyReaListingRecord } from "@/lib/apify/types";
 import { normalizeReaImageUrls } from "@/lib/scraping/rea/normalizeReaImageUrl";
+import {
+  resolveReaFloorAreaSqm,
+  resolveReaLandAreaSqm,
+  resolveReaSoldDate,
+} from "@/lib/scraping/rea/parseReaPropertyFacts";
+import { parseLandAreaSqm } from "@/lib/rental/parseListingPremiumSignals";
 import type { ParsedListing } from "@/lib/types";
 
 function parseCount(value: number | null | undefined) {
@@ -14,12 +20,15 @@ function detectPurpose(record: ApifyReaListingRecord): ParsedListing["purpose"] 
   if (channel === "rent" || channel === "lease") {
     return "lease";
   }
+  if (channel === "buy" || channel === "sale" || channel === "sold") {
+    return "sale";
+  }
 
   const status = record.status?.trim().toLowerCase();
   if (status === "rent" || status === "lease") {
     return "lease";
   }
-  if (status === "buy" || status === "sale") {
+  if (status === "buy" || status === "sale" || status === "sold") {
     return "sale";
   }
 
@@ -31,6 +40,13 @@ function detectPurpose(record: ApifyReaListingRecord): ParsedListing["purpose"] 
   }
 
   return undefined;
+}
+
+function isSoldListing(record: ApifyReaListingRecord) {
+  return (
+    record.channel?.trim().toLowerCase() === "sold" ||
+    record.status?.trim().toLowerCase().includes("sold") === true
+  );
 }
 
 function buildAddress(record: ApifyReaListingRecord) {
@@ -160,6 +176,11 @@ export function parseApifyReaRecord(record: ApifyReaListingRecord): ParsedListin
     carSpaces: parseCount(record.carSpaces),
     description,
     displayPrice: buildDisplayPrice(record),
+    soldDate: isSoldListing(record) ? resolveReaSoldDate(record) : undefined,
+    landAreaSqm:
+      resolveReaLandAreaSqm(record) ??
+      (description ? parseLandAreaSqm(description) : undefined),
+    floorAreaSqm: resolveReaFloorAreaSqm(record),
     images,
     agents,
     confidence:

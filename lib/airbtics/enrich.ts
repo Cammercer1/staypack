@@ -138,7 +138,11 @@ function selectFeaturedComps(
   };
 
   if (sameBedRanked.length >= 3) {
-    return pickFrom(sameBedRanked);
+    const mixed = [
+      ...sameBedRanked,
+      ...ranked.filter((comp) => compBedrooms(comp) !== subjectBedrooms),
+    ];
+    return pickFrom(mixed).slice(0, limit);
   }
 
   if (sameBedRanked.length > 0) {

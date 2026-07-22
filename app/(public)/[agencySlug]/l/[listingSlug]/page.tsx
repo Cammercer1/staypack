@@ -43,7 +43,7 @@ export default async function PublicListingLandingPage({
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
         <p className="text-muted-foreground">
-          Configure Supabase service role credentials to view listing landing pages.
+          Configure Supabase service role credentials to view property pages.
         </p>
       </div>
     );

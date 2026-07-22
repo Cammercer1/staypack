@@ -8,8 +8,12 @@ const UNIT_ADDRESS_PATTERN = /\d+\s*\/\s*\d+/;
  */
 export function resolveRentalCompPropertyType(comp: RentalComp): string | undefined {
   const address = comp.address?.trim() ?? "";
+  const declared = comp.propertyType?.trim();
+  if (declared && /townhouse|town house|row house|terrace/i.test(declared)) {
+    return declared;
+  }
   if (UNIT_ADDRESS_PATTERN.test(address)) {
     return "Unit";
   }
-  return comp.propertyType?.trim() || undefined;
+  return declared || undefined;
 }

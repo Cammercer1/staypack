@@ -8,10 +8,15 @@ export type SaleComp = {
   saleStatus: SaleCompStatus;
   /** ISO-ish sold date string when available (sold comps only). */
   soldDate?: string;
+  /** Land/lot area normalized to square metres. */
+  landAreaSqm?: number;
+  /** Internal/floor/building area normalized to square metres. */
+  floorAreaSqm?: number;
   /** Raw display price from REA (e.g. "$1,850,000", "Auction guide $950k"). */
   priceDisplay?: string;
   bedrooms?: number;
   bathrooms?: number;
+  carSpaces?: number;
   propertyType?: string;
   imageUrl?: string;
   listingUrl?: string;

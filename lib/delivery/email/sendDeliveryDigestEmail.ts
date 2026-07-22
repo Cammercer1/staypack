@@ -21,7 +21,7 @@ function reportLinksHtml(item: DeliveryProcessedListing) {
 
   if (item.reports.str) {
     parts.push(
-      `<li><strong>STR report</strong> — <a href="${item.reports.str.publicUrl}">View online</a> · <a href="${item.reports.str.pdfUrl}">Download PDF</a></li>`,
+      `<li><strong>Short-term rental appraisal</strong> — <a href="${item.reports.str.publicUrl}">View online</a> · <a href="${item.reports.str.pdfUrl}">Download PDF</a></li>`,
     );
   }
 
@@ -38,7 +38,7 @@ function reportLinksText(item: DeliveryProcessedListing) {
   const lines: string[] = [];
 
   if (item.reports.str) {
-    lines.push(`STR report: ${item.reports.str.publicUrl}`);
+    lines.push(`Short-term rental appraisal: ${item.reports.str.publicUrl}`);
     lines.push(`STR PDF: ${item.reports.str.pdfUrl}`);
   }
 

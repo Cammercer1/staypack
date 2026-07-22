@@ -89,7 +89,7 @@ export async function PATCH(
 
     if (body.template_id) {
       try {
-        await assertTemplateGranted(agency.id, body.template_id);
+        await assertTemplateGranted(agency, body.template_id);
       } catch (grantError) {
         const denied = templateGrantErrorResponse(grantError);
         if (denied) {

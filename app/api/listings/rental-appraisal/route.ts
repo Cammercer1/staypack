@@ -58,7 +58,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const enriched = await enrichListingRentalAppraisal(scraped);
+    const enriched = await enrichListingRentalAppraisal(scraped, {
+      subjectListingUrl: listing.listing_url,
+    });
     const displayPrice = resolveRentalDisplayPrice(enriched);
 
     const { data: updated, error } = await supabase

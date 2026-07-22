@@ -24,6 +24,9 @@ Return JSON only with this shape:
   "carSpaces": number | null,
   "description": string | null,
   "displayPrice": string | null,
+  "soldDate": string | null,
+  "landAreaSqm": number | null,
+  "floorAreaSqm": number | null,
   "images": string[],
   "agents": [{ "name": string | null, "email": string | null, "phone": string | null, "photo_url": string | null }],
   "confidence": "low" | "medium" | "high",
@@ -41,6 +44,8 @@ Rules:
 - For agents, use full phone numbers from tel: links or structured data. Never return masked numbers containing asterisks (e.g. "0497***").
 - Keep description concise but faithful (max ~1200 chars).
 - displayPrice must be a concise human-readable price (e.g. "$2,300,000 – $2,500,000" or "Offers over $1,200,000"), not portal labels like "Price Range".
+- soldDate is only for a sold listing and must come from an explicit sold/date-sold field or statement on the page.
+- landAreaSqm is the land or allotment area converted to square metres. floorAreaSqm is the internal, floor, or building area converted to square metres. Keep them separate and leave either null when unclear.
 - If unsure, leave fields null and add a warning.
 - confidence is high when address + at least one image + bed/bath are present, medium when address or major fields present, otherwise low.`;
 
@@ -64,6 +69,9 @@ function normalizeAiListing(raw: ParsedListingInput): ParsedListing {
     carSpaces: raw.carSpaces ?? undefined,
     description: raw.description ?? undefined,
     displayPrice: normalizeDisplayPrice(raw.displayPrice),
+    soldDate: raw.soldDate ?? undefined,
+    landAreaSqm: raw.landAreaSqm ?? undefined,
+    floorAreaSqm: raw.floorAreaSqm ?? undefined,
     images: [...new Set(raw.images.filter(Boolean))],
     agents: raw.agents
       .filter((agent) => agent.name || agent.email || agent.phone)

@@ -161,7 +161,7 @@ export function BrandAdvancedSettingsModal({
             Advanced brand settings
           </DialogTitle>
           <DialogDescription>
-            Fine-tune buttons, corners, and links on landing pages and buyer-facing
+            Fine-tune buttons, corners, and links on property pages and buyer-facing
             collateral. Changes apply across your account immediately.
           </DialogDescription>
         </DialogHeader>

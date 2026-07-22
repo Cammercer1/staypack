@@ -42,7 +42,7 @@ export function BelleLeaseAppraisalPlayground({
               Dev only
             </p>
             <h1 className="mt-1 font-display text-2xl tracking-tight">
-              Belle Property Group lease appraisal
+              Belle Property Group rental appraisal
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Bold-derived page 1 with shared lease comps page 2.

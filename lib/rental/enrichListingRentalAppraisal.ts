@@ -2,24 +2,23 @@ import {
   getApifyReaMaxListings,
   hasApifyReaConfig,
   scrapeApifyReaRentSearch,
+  scrapeApifyReaRentSearchUrls,
 } from "@/lib/apify/client";
 import {
-  hasBrightDataReaConfig,
-  scrapeBrightDataReaRentDiscover,
-} from "@/lib/brightdata/client";
+  RENT_COMPARABLE_POOL_TARGETS,
+  capComparablePool,
+  excludeSubjectComparables,
+  summarizeComparablePool,
+  type ComparableDiscoverySummary,
+} from "@/lib/comparables/discoveryPolicy";
 import type { RentAppraisalConfig } from "@/lib/delivery/rentAppraisalConfig";
 import { fetchDomainSuburbRentMedian } from "@/lib/scraping/domain/fetchDomainSuburbRentMedian";
 import { buildRentDiscoverAttempts } from "@/lib/rental/buildRentDiscoverAttempts";
 import { mergeRentalComps } from "@/lib/rental/mergeRentalComps";
+import { MIN_RENT_COMPS_FOR_BAND } from "@/lib/rental/rentCompThresholds";
 import {
-  MIN_RENT_COMPS_FOR_BAND,
-  MIN_SAME_SUBURB_COMPS_FOR_DISCOVER,
-  TARGET_RENT_COMPS_FOR_BAND,
-} from "@/lib/rental/rentCompThresholds";
-import {
-  countSameSuburbComps,
+  buildRentalCompSelectionPool,
   filterRentalCompsForSubjectType,
-  rankRentalCompsForSubject,
 } from "@/lib/rental/rankRentalCompsForSubject";
 import { applyRentBandSuburbFloor } from "@/lib/rental/applyRentBandSuburbFloor";
 import {
@@ -32,14 +31,15 @@ import { detectPremiumRentSubject } from "@/lib/rental/detectPremiumRentSubject"
 import { enrichLtrSuburbMarket } from "@/lib/propradar/enrichLtrSuburbMarket";
 import { parseListingPremiumSignals } from "@/lib/rental/parseListingPremiumSignals";
 import { parseApifyReaListings } from "@/lib/rental/parseApifyReaListings";
-import { parseReaRentDiscoverRecords } from "@/lib/rental/parseReaRentDiscover";
 import {
   computeReaBedroomRentMedian,
   computeReaBedroomRentPercentile,
   resolveSuburbRentFloor,
 } from "@/lib/rental/resolveSuburbRentFloor";
 import { resolveRentSubjectPropertyType } from "@/lib/rental/resolveRentSubjectPropertyType";
-import { defaultSelectedCompListingIds } from "@/lib/lease-appraisal/leaseAppraisalData";
+import {
+  fillLeaseAppraisalCompSelection,
+} from "@/lib/lease-appraisal/leaseAppraisalData";
 import {
   positionLeaseAppraisal,
   subjectFromParsedListing,
@@ -52,11 +52,11 @@ function orderRentalCompsForListing(
   listing: ParsedListing,
 ): RentalComp[] {
   const subjectPropertyType = resolveRentSubjectPropertyType(listing);
-  const eligible = filterRentalCompsForSubjectType(comps, subjectPropertyType);
-  return rankRentalCompsForSubject(eligible, {
+  return buildRentalCompSelectionPool(comps, {
     suburb: listing.suburb,
     bedrooms: listing.bedrooms ?? undefined,
     bathrooms: listing.bathrooms ?? undefined,
+    carSpaces: listing.carSpaces ?? undefined,
     subjectPropertyType,
   });
 }
@@ -64,13 +64,14 @@ function orderRentalCompsForListing(
 export type EnrichRentalAppraisalOptions = {
   /** Override SERP URL (for tests). */
   searchUrl?: string;
-  limitPages?: number;
   /** Delivery tenant rent_appraisal config (tier override). */
   rentAppraisalConfig?: RentAppraisalConfig | null;
+  /** Listing URL used to ensure the subject is never treated as its own comp. */
+  subjectListingUrl?: string | null;
 };
 
 function hasRentDiscoverConfig() {
-  return hasApifyReaConfig() || hasBrightDataReaConfig();
+  return hasApifyReaConfig();
 }
 
 function pushUniqueWarning(warnings: string[], message: string) {
@@ -93,28 +94,8 @@ type RentDiscoverResult = {
   comps: RentalComp[];
   searchUrl: string;
   attemptLabel: string;
-  provider: "apify" | "brightdata";
+  discovery: ComparableDiscoverySummary;
 };
-
-function countTypeMatchedComps(comps: RentalComp[], subjectPropertyType?: string) {
-  if (!subjectPropertyType?.trim()) {
-    return comps.length;
-  }
-  return comps.filter((comp) =>
-    matchesSubjectPropertyType(comp, subjectPropertyType),
-  ).length;
-}
-
-function countSameSuburbTypeMatchedComps(
-  comps: RentalComp[],
-  suburb: string | undefined,
-  subjectPropertyType?: string,
-) {
-  const pool = subjectPropertyType?.trim()
-    ? comps.filter((comp) => matchesSubjectPropertyType(comp, subjectPropertyType))
-    : comps;
-  return countSameSuburbComps(pool, suburb);
-}
 
 const GRANULAR_RENT_DISCOVER_LABELS = new Set([
   "primary-type-bed-bath-park-suburb",
@@ -125,31 +106,60 @@ const GRANULAR_RENT_DISCOVER_LABELS = new Set([
   "primary-bed-bath-suburb",
   "primary-bed-suburb",
   "primary-bed-adjacent-postcodes",
+  "batched-primary-search",
 ]);
+
+const MAX_PRIMARY_RENT_SEARCH_URLS = 6;
+const MAX_EXPANDED_RENT_SEARCH_URLS = 8;
+
+function prepareRentalComparablePool({
+  comps,
+  listing,
+  subjectListingUrl,
+  attemptCount,
+}: {
+  comps: RentalComp[];
+  listing: ParsedListing;
+  subjectListingUrl?: string | null;
+  attemptCount: number;
+}) {
+  const withoutSubject = excludeSubjectComparables(comps, {
+    address: listing.address,
+    suburb: listing.suburb,
+    listingUrl: subjectListingUrl,
+  });
+  const ordered = orderRentalCompsForListing(
+    withoutSubject.comparables,
+    listing,
+  );
+  const subjectPropertyType = resolveRentSubjectPropertyType(listing);
+  const evidenceComps = subjectPropertyType
+    ? withoutSubject.comparables.filter((comp) =>
+        matchesSubjectPropertyType(comp, subjectPropertyType),
+      )
+    : withoutSubject.comparables;
+  const discovery = summarizeComparablePool({
+    comparables: evidenceComps,
+    subjectSuburb: listing.suburb,
+    targets: RENT_COMPARABLE_POOL_TARGETS,
+    attemptCount,
+    subjectExcludedCount: withoutSubject.excludedCount,
+  });
+
+  return {
+    comps: capComparablePool(ordered),
+    discovery,
+  };
+}
 
 async function fetchRentCompsForSearchUrl(
   searchUrl: string,
-  options?: EnrichRentalAppraisalOptions,
-): Promise<{ comps: RentalComp[]; provider: "apify" | "brightdata" }> {
-  if (hasApifyReaConfig()) {
-    try {
-      const records = await scrapeApifyReaRentSearch({
-        searchUrl,
-        maxItems: getApifyReaMaxListings(),
-      });
-      return { comps: parseApifyReaListings(records), provider: "apify" };
-    } catch (error) {
-      if (!hasBrightDataReaConfig()) {
-        throw error;
-      }
-    }
-  }
-
-  const records = await scrapeBrightDataReaRentDiscover({
+): Promise<RentalComp[]> {
+  const records = await scrapeApifyReaRentSearch({
     searchUrl,
-    limitPages: options?.limitPages ?? 1,
+    maxItems: getApifyReaMaxListings(),
   });
-  return { comps: parseReaRentDiscoverRecords(records), provider: "brightdata" };
+  return parseApifyReaListings(records);
 }
 
 async function discoverRentalComps(
@@ -158,76 +168,94 @@ async function discoverRentalComps(
   options?: EnrichRentalAppraisalOptions,
 ): Promise<RentDiscoverResult> {
   if (options?.searchUrl) {
-    const { comps, provider } = await fetchRentCompsForSearchUrl(
-      options.searchUrl,
-      options,
-    );
-    return {
+    const comps = await fetchRentCompsForSearchUrl(options.searchUrl);
+    const prepared = prepareRentalComparablePool({
       comps,
+      listing,
+      subjectListingUrl: options.subjectListingUrl,
+      attemptCount: 1,
+    });
+    return {
+      comps: prepared.comps,
       searchUrl: options.searchUrl,
       attemptLabel: "override",
-      provider,
+      discovery: prepared.discovery,
     };
   }
 
-  const subjectPropertyType = resolveRentSubjectPropertyType(listing);
   const attempts = buildRentDiscoverAttempts(listing, premiumSignals);
-
-  let mergedComps: RentalComp[] = [];
-  let lastProvider: RentDiscoverResult["provider"] = hasApifyReaConfig()
-    ? "apify"
-    : "brightdata";
-  let lastSearchUrl = "";
-  let lastAttemptLabel = "merged";
-
-  for (const attempt of attempts) {
-    const { comps, provider } = await fetchRentCompsForSearchUrl(
-      attempt.searchUrl,
-      options,
-    );
-    mergedComps = mergeRentalComps(mergedComps, comps);
-    lastProvider = provider;
-    lastSearchUrl = attempt.searchUrl;
-    lastAttemptLabel = attempt.label;
-
-    const typeMatched = countTypeMatchedComps(mergedComps, subjectPropertyType);
-    const enoughTotal = subjectPropertyType?.trim()
-      ? typeMatched >= TARGET_RENT_COMPS_FOR_BAND
-      : mergedComps.length >= TARGET_RENT_COMPS_FOR_BAND;
-    const enoughLocal =
-      countSameSuburbTypeMatchedComps(
-        mergedComps,
-        listing.suburb,
-        subjectPropertyType,
-      ) >= MIN_SAME_SUBURB_COMPS_FOR_DISCOVER;
-
-    if (enoughTotal && enoughLocal) {
-      return {
-        comps: mergedComps,
-        searchUrl: attempt.searchUrl,
-        attemptLabel: attempt.label,
-        provider,
-      };
-    }
-
-    if (
-      attempt.label.includes("adjacent-postcodes") &&
-      mergedComps.length >= MIN_RENT_COMPS_FOR_BAND
-    ) {
-      return {
-        comps: mergedComps,
-        searchUrl: attempt.searchUrl,
-        attemptLabel: attempt.label,
-        provider,
-      };
-    }
+  if (attempts.length === 0) {
+    const prepared = prepareRentalComparablePool({
+      comps: [],
+      listing,
+      subjectListingUrl: options?.subjectListingUrl,
+      attemptCount: 0,
+    });
+    return {
+      comps: [],
+      searchUrl: "",
+      attemptLabel: "no-search-attempts",
+      discovery: prepared.discovery,
+    };
   }
 
-  return {
+  const primaryAttempts = attempts
+    .filter((attempt) => attempt.label.startsWith("primary-"))
+    .slice(0, MAX_PRIMARY_RENT_SEARCH_URLS);
+  const expandedAttempts = attempts
+    .filter((attempt) => !attempt.label.startsWith("primary-"))
+    .slice(0, MAX_EXPANDED_RENT_SEARCH_URLS);
+  const firstBatch = primaryAttempts.length > 0
+    ? primaryAttempts
+    : attempts.slice(0, MAX_PRIMARY_RENT_SEARCH_URLS);
+
+  const primaryRecords = await scrapeApifyReaRentSearchUrls({
+    searchUrls: firstBatch.map((attempt) => attempt.searchUrl),
+    maxItems: getApifyReaMaxListings(),
+  });
+  let mergedComps = mergeRentalComps(
+    [],
+    parseApifyReaListings(primaryRecords),
+  );
+  let prepared = prepareRentalComparablePool({
     comps: mergedComps,
-    searchUrl: lastSearchUrl,
-    attemptLabel: lastAttemptLabel,
-    provider: lastProvider,
+    listing,
+    subjectListingUrl: options?.subjectListingUrl,
+    attemptCount: firstBatch.length,
+  });
+
+  if (prepared.discovery.targetMet || expandedAttempts.length === 0) {
+    return {
+      comps: prepared.comps,
+      searchUrl: firstBatch[0]?.searchUrl ?? "",
+      attemptLabel:
+        firstBatch.length > 1
+          ? "batched-primary-search"
+          : (firstBatch[0]?.label ?? "no-search-attempts"),
+      discovery: prepared.discovery,
+    };
+  }
+
+  const expandedRecords = await scrapeApifyReaRentSearchUrls({
+    searchUrls: expandedAttempts.map((attempt) => attempt.searchUrl),
+    maxItems: getApifyReaMaxListings(),
+  });
+  mergedComps = mergeRentalComps(
+    mergedComps,
+    parseApifyReaListings(expandedRecords),
+  );
+  prepared = prepareRentalComparablePool({
+    comps: mergedComps,
+    listing,
+    subjectListingUrl: options?.subjectListingUrl,
+    attemptCount: firstBatch.length + expandedAttempts.length,
+  });
+
+  return {
+    comps: prepared.comps,
+    searchUrl: firstBatch[0]?.searchUrl ?? "",
+    attemptLabel: "batched-expanded-search",
+    discovery: prepared.discovery,
   };
 }
 
@@ -244,7 +272,7 @@ export async function enrichListingRentalAppraisal(
 
   if (!hasRentDiscoverConfig()) {
     warnings.push(
-      "Rental appraisal skipped: Apify or Bright Data REA rent discovery is not configured.",
+      "Rental appraisal skipped: Apify REA rent discovery is not configured.",
     );
     return finishRentalAppraisalEnrichment({ ...listingWithSignals, warnings });
   }
@@ -261,12 +289,25 @@ export async function enrichListingRentalAppraisal(
 
     const subjectPropertyType = resolveRentSubjectPropertyType(withSuburb);
 
-    const { comps: discoveredComps, searchUrl, attemptLabel, provider } =
+    const { comps: discoveredComps, searchUrl, attemptLabel, discovery } =
       await discoverRentalComps(withSuburb, premiumSignals, options);
 
-    const comps = orderRentalCompsForListing(discoveredComps, withSuburb);
+    const comps = capComparablePool(
+      orderRentalCompsForListing(discoveredComps, withSuburb),
+    );
+
+    if (!discovery.targetMet) {
+      pushUniqueWarning(
+        warnings,
+        `Rental appraisal candidate pool below target (${discovery.poolCount}/${discovery.targetCount} total, ${discovery.sameSuburbCount}/${discovery.targetSameSuburbCount} in ${withSuburb.suburb}).`,
+      );
+    }
 
     if (comps.length < MIN_RENT_COMPS_FOR_BAND) {
+      const selectedCompListingIds = fillLeaseAppraisalCompSelection({
+        ...withSuburb,
+        rentalComps: comps,
+      });
       pushUniqueWarning(
         warnings,
         `Rental appraisal: only ${comps.length} rent listings returned from REA (need at least ${MIN_RENT_COMPS_FOR_BAND}).`,
@@ -276,10 +317,11 @@ export async function enrichListingRentalAppraisal(
         rentalComps: comps,
         rentalAppraisal: {
           ...withSuburb.rentalAppraisal,
-          selectedCompListingIds: defaultSelectedCompListingIds({
-            ...withSuburb,
-            rentalComps: comps,
-          }),
+          compCount: comps.length,
+          featuredCompCount: selectedCompListingIds.length,
+          searchUrl,
+          discovery,
+          selectedCompListingIds,
         },
         warnings,
       });
@@ -314,13 +356,30 @@ export async function enrichListingRentalAppraisal(
       maxFeaturedComps: 6,
     };
 
-    let band = computeRentBandFromComps(comps, rentBandOptions);
+    const estimationComps = filterRentalCompsForSubjectType(
+      comps,
+      subjectPropertyType,
+    );
+
+    let band = computeRentBandFromComps(estimationComps, rentBandOptions);
 
     if (!band) {
       warnings.push("Rental appraisal: could not compute a rent band from REA listings.");
+      const selectedCompListingIds = fillLeaseAppraisalCompSelection({
+        ...withSuburb,
+        rentalComps: comps,
+      });
       return finishRentalAppraisalEnrichment({
         ...withSuburb,
         rentalComps: comps,
+        rentalAppraisal: {
+          ...withSuburb.rentalAppraisal,
+          compCount: comps.length,
+          featuredCompCount: selectedCompListingIds.length,
+          searchUrl,
+          discovery,
+          selectedCompListingIds,
+        },
         warnings,
       });
     }
@@ -334,8 +393,12 @@ export async function enrichListingRentalAppraisal(
       propertyType: withSuburb.propertyType,
     }).catch(() => null);
 
-    const reaBedMedian = computeReaBedroomRentMedian(comps, bedrooms);
-    const reaBedP75 = computeReaBedroomRentPercentile(comps, bedrooms, 0.75);
+    const reaBedMedian = computeReaBedroomRentMedian(estimationComps, bedrooms);
+    const reaBedP75 = computeReaBedroomRentPercentile(
+      estimationComps,
+      bedrooms,
+      0.75,
+    );
     const rentFloor = resolveSuburbRentFloor({
       domainMedian,
       reaBedMedian,
@@ -363,7 +426,7 @@ export async function enrichListingRentalAppraisal(
     const positioned = await positionLeaseAppraisal({
       subject: subjectFromParsedListing(withSuburb, premiumResult.premium),
       band,
-      comps,
+      comps: estimationComps,
       suburbMarket: withSuburb.ltrSuburbMarket,
     });
 
@@ -385,9 +448,10 @@ export async function enrichListingRentalAppraisal(
       ...withSuburb,
       rentalComps: comps,
     };
-    const selectedCompListingIds =
-      positioned.selectedCompListingIds ??
-      defaultSelectedCompListingIds(compSelectionBase);
+    const selectedCompListingIds = fillLeaseAppraisalCompSelection(
+      compSelectionBase,
+      positioned.selectedCompListingIds ?? [],
+    );
 
     const displayPrice = formatWeeklyRentRange(band.weeklyMin, band.weeklyMax);
 
@@ -432,7 +496,7 @@ export async function enrichListingRentalAppraisal(
 
     pushUniqueWarning(
       warnings,
-      `Rental appraisal from ${provider === "apify" ? "Apify" : "Bright Data"} REA rent comps (n=${band.compCount}, median $${band.weeklyMidpoint}/wk).`,
+      `Rental appraisal from Apify REA rent comps (n=${band.compCount}, median $${band.weeklyMidpoint}/wk).`,
     );
 
     const enriched = await finishRentalAppraisalEnrichment({
@@ -444,9 +508,11 @@ export async function enrichListingRentalAppraisal(
         weeklyMax: band.weeklyMax,
         weeklyMidpoint: band.weeklyMidpoint,
         selectedCompListingIds,
-        source: provider === "apify" ? "apify_rea" : "rea_discover",
+        source: "apify_rea",
         compCount: comps.length,
+        featuredCompCount: selectedCompListingIds.length,
         searchUrl,
+        discovery,
         premiumTier: premiumResult.premium,
         premiumReasons: premiumResult.reasons,
         rentFloorWeekly: rentFloor?.weeklyRent,

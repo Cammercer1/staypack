@@ -16,10 +16,15 @@ import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
 import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
 import { mergeSalesAppraisalPreviewFromListing } from "@/lib/sales-appraisal/mergeSalesAppraisalPreviewFromListing";
-import { mergeSalesAppraisalPreviewAgents } from "@/lib/sales-appraisal/mergeSalesAppraisalPreviewAgents";
+import { mergeAppraisalPreviewAgents } from "@/lib/reports/mergeAppraisalPreviewAgents";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { hasSalesAppraisalComps } from "@/lib/sales-appraisal/generateSalesAppraisalForListing";
 import { hasSalesAppraisalSelectedComps } from "@/lib/sales-appraisal/salesAppraisalData";
+import {
+  getInitialSalesAppraisalWizardStep,
+  SALES_APPRAISAL_WIZARD_STEPS,
+  type SalesAppraisalWizardStep,
+} from "@/lib/sales-appraisal/salesAppraisalWizardFlow";
 import { SALES_APPRAISAL_LABEL } from "@/lib/listings/collateralTypes";
 import type {
   Agency,
@@ -33,19 +38,13 @@ import type {
 
 const PREVIEW_SYNC_MIN_MS = 400;
 
-const steps = [
-  { id: "template", label: "Choose template" },
-  { id: "data", label: "Appraisal data" },
-  { id: "copy", label: "Content generation" },
-  { id: "preview", label: "Preview & publish" },
-];
-
 type Props = {
   initialListing: Listing;
   initialReport: Report;
   initialCollateral: CollateralItem;
   agency: Agency;
   initialAgencyAgents: AgentProfile[];
+  skipTemplateSelection?: boolean;
 };
 
 export function SalesAppraisalWizard({
@@ -54,13 +53,25 @@ export function SalesAppraisalWizard({
   initialCollateral,
   agency,
   initialAgencyAgents,
+  skipTemplateSelection = false,
 }: Props) {
   const [listing, setListing] = useState(initialListing);
   const [report, setReport] = useState(initialReport);
   const [collateral, setCollateral] = useState(initialCollateral);
   const agencyAgents = initialAgencyAgents;
   const [step, setStep] = useState(() =>
-    getInitialStep(initialListing, initialReport, initialCollateral),
+    getInitialSalesAppraisalWizardStep({
+      hasFinalReport: Boolean(initialReport.final_report_json),
+      hasTemplate: Boolean(
+        initialReport.template_id || initialCollateral.template_id,
+      ),
+      hasComps: hasSalesAppraisalComps(initialListing.scraped_listing_json),
+      hasSelectedComps: hasSalesAppraisalSelectedComps(
+        initialListing.scraped_listing_json,
+      ),
+      isPublished: initialReport.status === "published",
+      skipTemplateSelection,
+    }),
   );
   const [loading, setLoading] = useState(false);
   const [publishStage, setPublishStage] = useState<
@@ -155,12 +166,17 @@ export function SalesAppraisalWizard({
     }
     const withListing = mergeSalesAppraisalPreviewFromListing(cached, listing);
     return resolveFinalReportForDisplay(
-      mergeSalesAppraisalPreviewAgents(withListing, listing, agencyAgents),
+      mergeAppraisalPreviewAgents(withListing, listing, agencyAgents),
     );
   }, [previewDraftReport, report.final_report_json, listing, agencyAgents]);
 
   function handleStepChange(next: string) {
-    if (next === "preview") {
+    if (!SALES_APPRAISAL_WIZARD_STEPS.some((item) => item.id === next)) {
+      return;
+    }
+    const nextStep = next as SalesAppraisalWizardStep;
+
+    if (nextStep === "preview") {
       if (step === "preview") {
         return;
       }
@@ -188,7 +204,7 @@ export function SalesAppraisalWizard({
       previewSyncTimeoutRef.current = null;
     }
     setPreviewSyncing(false);
-    setStep(next);
+    setStep(nextStep);
   }
 
   async function publishReport() {
@@ -239,11 +255,17 @@ export function SalesAppraisalWizard({
   }
 
   const hasTemplate = Boolean(report.template_id || collateral.template_id);
+  const steps = skipTemplateSelection
+    ? SALES_APPRAISAL_WIZARD_STEPS.filter((item) => item.id !== "template")
+    : SALES_APPRAISAL_WIZARD_STEPS;
 
   return (
     <div className="space-y-6">
       <Tabs value={step} onValueChange={handleStepChange}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList
+          className="grid w-full"
+          style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+        >
           {steps.map((item) => (
             <TabsTrigger key={item.id} value={item.id}>
               {item.label}
@@ -251,18 +273,20 @@ export function SalesAppraisalWizard({
           ))}
         </TabsList>
 
-        <TabsContent value="template">
-          <SalesAppraisalTemplateStep
-            agency={agency}
-            listing={listing}
-            report={report}
-            collateral={collateral}
-            agencyAgents={agencyAgents}
-            onReportChange={setReport}
-            onCollateralChange={setCollateral}
-            onContinue={() => setStep("data")}
-          />
-        </TabsContent>
+        {!skipTemplateSelection ? (
+          <TabsContent value="template">
+            <SalesAppraisalTemplateStep
+              agency={agency}
+              listing={listing}
+              report={report}
+              collateral={collateral}
+              agencyAgents={agencyAgents}
+              onReportChange={setReport}
+              onCollateralChange={setCollateral}
+              onContinue={() => setStep("data")}
+            />
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="data">
           {hasTemplate ? (
@@ -275,7 +299,16 @@ export function SalesAppraisalWizard({
               onContinue={() => setStep("copy")}
             />
           ) : (
-            <StepGate message="Choose a template first." onBack={() => setStep("template")} />
+            <StepGate
+              message={
+                skipTemplateSelection
+                  ? "Your account template is unavailable."
+                  : "Choose a template first."
+              }
+              onBack={
+                skipTemplateSelection ? undefined : () => setStep("template")
+              }
+            />
           )}
         </TabsContent>
 
@@ -294,7 +327,16 @@ export function SalesAppraisalWizard({
               onContinueToPreview={() => handleStepChange("preview")}
             />
           ) : (
-            <StepGate message="Choose a template first." onBack={() => setStep("template")} />
+            <StepGate
+              message={
+                skipTemplateSelection
+                  ? "Your account template is unavailable."
+                  : "Choose a template first."
+              }
+              onBack={
+                skipTemplateSelection ? undefined : () => setStep("template")
+              }
+            />
           )}
         </TabsContent>
 
@@ -392,35 +434,16 @@ function StepGate({
   onBack,
 }: {
   message: string;
-  onBack: () => void;
+  onBack?: () => void;
 }) {
   return (
     <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
       <p>{message}</p>
-      <Button className="mt-4" variant="outline" onClick={onBack}>
-        Go back
-      </Button>
+      {onBack ? (
+        <Button className="mt-4" variant="outline" onClick={onBack}>
+          Go back
+        </Button>
+      ) : null}
     </div>
   );
-}
-
-function getInitialStep(
-  listing: Listing,
-  report: Report,
-  collateral: CollateralItem,
-) {
-  if (report.status === "published" || report.final_report_json) {
-    return "preview";
-  }
-
-  if (!report.template_id && !collateral.template_id) {
-    return "template";
-  }
-
-  const parsed = listing.scraped_listing_json;
-  if (!hasSalesAppraisalComps(parsed) || !hasSalesAppraisalSelectedComps(parsed)) {
-    return "data";
-  }
-
-  return "copy";
 }

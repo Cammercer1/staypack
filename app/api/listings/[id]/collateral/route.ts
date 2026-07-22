@@ -46,7 +46,7 @@ export async function POST(
 
     if (body.type === "str_report") {
       return NextResponse.json(
-        { error: "Use the Short-Term Rental Report flow to create this report" },
+        { error: "Use the short-term rental appraisal flow to create this appraisal" },
         { status: 400 },
       );
     }
@@ -55,7 +55,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Use the Long-term rental appraisal flow to create this report",
+            "Use the rental appraisal flow to create this appraisal",
         },
         { status: 400 },
       );
@@ -64,7 +64,7 @@ export async function POST(
     if (body.type === "sales_appraisal") {
       return NextResponse.json(
         {
-          error: "Use the Sales appraisal flow to create this report",
+          error: "Use the property appraisal flow to create this appraisal",
         },
         { status: 400 },
       );

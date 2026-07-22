@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { LEASE_APPRAISAL_LABEL } from "@/lib/listings/collateralTypes";
 import { collateralPhotoRequirementError } from "@/lib/listings/collateralPhotoRequirements";
 import { DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID } from "@/lib/lease-appraisal/leaseAppraisalTemplates";
+import { loadAgencyAgentProfiles } from "@/lib/reports/loadReportAgent";
+import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
 import type { CollateralItem, Report } from "@/lib/types";
 
 /** Drafts auto-assigned Classic before template step existed — reopen on Choose template. */
@@ -77,6 +79,12 @@ export default async function ListingLeaseAppraisalPage({
     redirect(`/listings/${listingId}`);
   }
 
+  const availableTemplates = await resolveAvailableTemplates(agency, "lease");
+  const soleTemplateId =
+    availableTemplates.templates.length === 1
+      ? availableTemplates.templates[0].id
+      : null;
+
   let { data: collateral } = await supabase
     .from("collateral_items")
     .select("*")
@@ -117,7 +125,7 @@ export default async function ListingLeaseAppraisalPage({
         agency_id: agency.id,
         listing_id: listing.id,
         status: "draft",
-        template_id: null,
+        template_id: soleTemplateId,
       })
       .select("*")
       .single();
@@ -150,11 +158,51 @@ export default async function ListingLeaseAppraisalPage({
     collateral = createdCollateral;
   }
 
-  ({ report, collateral } = await clearLegacyAutoTemplate(
-    supabase,
-    report,
-    collateral as CollateralItem | null,
-  ));
+  if (
+    soleTemplateId &&
+    report.status !== "published" &&
+    report.template_id !== soleTemplateId
+  ) {
+    const { data: updatedReport, error: updateError } = await supabase
+      .from("reports")
+      .update({ template_id: soleTemplateId })
+      .eq("id", report.id)
+      .select("*")
+      .single();
+
+    if (updateError || !updatedReport) {
+      notFound();
+    }
+    report = updatedReport as Report;
+  }
+
+  if (
+    soleTemplateId &&
+    report.status !== "published" &&
+    collateral.template_id !== soleTemplateId
+  ) {
+    const { data: updatedCollateral, error: updateError } = await supabase
+      .from("collateral_items")
+      .update({ template_id: soleTemplateId })
+      .eq("id", collateral.id)
+      .select("*")
+      .single();
+
+    if (updateError || !updatedCollateral) {
+      notFound();
+    }
+    collateral = updatedCollateral;
+  }
+
+  if (!soleTemplateId) {
+    ({ report, collateral } = await clearLegacyAutoTemplate(
+      supabase,
+      report,
+      collateral as CollateralItem | null,
+    ));
+  }
+
+  const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
 
   return (
     <div className="space-y-6">
@@ -172,7 +220,8 @@ export default async function ListingLeaseAppraisalPage({
           {LEASE_APPRAISAL_LABEL}
         </h1>
         <p className="text-muted-foreground">
-          Choose a template, set rent comps and weekly range, generate and edit
+          {soleTemplateId ? "Review" : "Choose a template, then review"} rent
+          comps and the weekly range, generate and edit
           investor content, then publish a PDF for{" "}
           {listing.property_address ?? "this property"}.
         </p>
@@ -183,6 +232,8 @@ export default async function ListingLeaseAppraisalPage({
         report={report}
         collateral={collateral as CollateralItem}
         agency={agency}
+        agencyAgents={agencyAgents}
+        skipTemplateSelection={Boolean(soleTemplateId)}
       />
     </div>
   );

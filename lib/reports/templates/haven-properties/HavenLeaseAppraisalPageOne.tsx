@@ -28,7 +28,7 @@ const headingFont = "var(--report-heading-font, inherit)";
 const bodyFont = "var(--report-body-font, inherit)";
 
 /** Shown in the teal bar only — body uses `copy.heading` from the listing / AI. */
-export const LEASE_APPRAISAL_BANNER_LABEL = "Long-term rental appraisal";
+export const LEASE_APPRAISAL_BANNER_LABEL = "Rental appraisal";
 
 function isDuplicateLeaseBannerHeading(heading: string) {
   const normalized = heading.trim().toLowerCase();

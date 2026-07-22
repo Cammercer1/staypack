@@ -16,7 +16,8 @@ import type { ReportTemplateDefinition } from "@/lib/reports/templates/types";
 function isAccountTemplateId(templateId: string): boolean {
   return (
     templateId.startsWith("haven-properties") ||
-    templateId.startsWith("belle-property")
+    templateId.startsWith("belle-property") ||
+    templateId.startsWith("oc-real-estate")
   );
 }
 

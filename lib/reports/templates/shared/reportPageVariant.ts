@@ -53,22 +53,22 @@ export function revenueSectionTitle(variant: ReportPageVariant) {
 }
 
 export function reportTypeBannerLabel(variant: ReportPageVariant) {
-  if (variant === "lease") return "Long-term rental appraisal";
-  if (variant === "sales_appraisal") return "Sales appraisal";
+  if (variant === "lease") return "Rental appraisal";
+  if (variant === "sales_appraisal") return "Property appraisal";
   if (variant === "sale") return "For sale";
-  return "Short-Term Rental Report";
+  return "Short-term rental appraisal";
 }
 
 export function pageOneHeaderTagline(variant: ReportPageVariant) {
-  if (variant === "lease") return "Long-term rental potential";
-  if (variant === "sales_appraisal") return "Sales appraisal";
+  if (variant === "lease") return "Rental appraisal";
+  if (variant === "sales_appraisal") return "Property appraisal";
   if (variant === "sale") return "Property for sale";
-  return "Short-Term Rental Potential";
+  return "Short-term rental appraisal";
 }
 
 export function landmarkBannerTitle(variant: ReportPageVariant) {
-  if (variant === "lease") return "Lease appraisal";
-  if (variant === "sales_appraisal") return "Sales appraisal";
+  if (variant === "lease") return "Rental appraisal";
+  if (variant === "sales_appraisal") return "Property appraisal";
   if (variant === "sale") return "Property brochure";
-  return "STR Revenue Report";
+  return "Short-term rental appraisal";
 }

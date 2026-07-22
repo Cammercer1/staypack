@@ -39,7 +39,7 @@ export async function generateCollateralDocument({
 }: GenerateInput): Promise<CollateralDocumentJson> {
   if (collateral.type === "social_posts") {
     if (!listing) {
-      throw new Error("Social posts require a listing");
+      throw new Error("Social media posts require a property");
     }
 
     return buildSocialPostsDocument({
@@ -75,7 +75,7 @@ export async function generateCollateralDocument({
       });
     case "sales_brochure": {
       if (!qr) {
-        throw new Error("Sales brochures require a listing");
+        throw new Error("Property brochures require a property");
       }
 
       const existingCopy =
@@ -98,7 +98,7 @@ export async function generateCollateralDocument({
     }
     case "rental_brochure": {
       if (!qr) {
-        throw new Error("Lease brochures require a listing");
+        throw new Error("Rental brochures require a property");
       }
 
       const existingCopy =

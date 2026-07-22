@@ -34,13 +34,13 @@ export async function POST(
     const templateId = body.template_id ?? report.template_id ?? undefined;
     if (!templateId || !isLeaseAppraisalTemplateId(templateId)) {
       return NextResponse.json(
-        { error: "Choose a lease appraisal template before generating content" },
+        { error: "Choose a rental appraisal template before generating content" },
         { status: 400 },
       );
     }
 
     try {
-      await assertTemplateGranted(agency.id, templateId);
+      await assertTemplateGranted(agency, templateId);
     } catch (grantError) {
       const denied = templateGrantErrorResponse(grantError);
       if (denied) {

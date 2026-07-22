@@ -72,6 +72,7 @@ export async function generateHeadlessLeaseAppraisal({
     parsed.rentalAppraisal?.weeklyMin != null
       ? parsed
       : await enrichListingRentalAppraisal(parsed, {
+          subjectListingUrl: listingUrl,
           rentAppraisalConfig: {
             tier: rentAppraisalTierSetting(tenant) ?? "auto",
           },

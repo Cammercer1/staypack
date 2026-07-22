@@ -176,7 +176,7 @@ async function enrichFromAgencySite(
 
   const checkpoint = isBotCheckpointHtml(html);
   const ruleParsed = parseListing(html, url);
-  let parserName = ruleParsed.parserName;
+  const parserName = ruleParsed.parserName;
   let merged = ruleParsed.listing;
 
   if (checkpoint && /security checkpoint/i.test(merged.title ?? "")) {
@@ -260,6 +260,8 @@ export type ExtractListingResult = {
 export type ExtractListingOptions = {
   /** REA rent discover + median band (slow; 2–3 min). */
   enrichRentalAppraisal?: boolean;
+  /** Source URL used to exclude the subject from rental comparables. */
+  subjectListingUrl?: string;
 };
 
 async function applyExtractOptions(
@@ -270,7 +272,9 @@ async function applyExtractOptions(
     return result;
   }
 
-  const listing = await enrichListingRentalAppraisal(result.listing);
+  const listing = await enrichListingRentalAppraisal(result.listing, {
+    subjectListingUrl: options.subjectListingUrl,
+  });
   return {
     ...result,
     listing,
@@ -354,8 +358,12 @@ async function spfnAddressSeed(url: string, warnings: string[]) {
 
 export async function extractListingFromUrl(
   url: string,
-  options?: ExtractListingOptions,
+  inputOptions?: ExtractListingOptions,
 ): Promise<ExtractListingResult> {
+  const options: ExtractListingOptions = {
+    ...inputOptions,
+    subjectListingUrl: url,
+  };
   const warnings: string[] = [];
   const urlAddressHint = isSpfnListingUrl(url)
     ? await spfnAddressSeed(url, warnings)
@@ -475,7 +483,7 @@ export async function extractListingFromUrl(
   }
 
   const checkpoint = isBotCheckpointHtml(html);
-  let ruleParsed = parseListing(html, url);
+  const ruleParsed = parseListing(html, url);
   parserName = ruleParsed.parserName;
   listing = mergeParsedListings(listing, ruleParsed.listing);
 

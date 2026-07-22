@@ -104,7 +104,7 @@ export function SalesAppraisalTemplateStep({
         <div className="min-w-0">
           <h2 className="text-lg font-semibold">Choose template</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Pick the sales appraisal layout. Preview uses your agency brand
+            Pick the property appraisal layout. Preview uses your agency brand
             {assignedAgent ? ` and ${assignedAgent.name}` : ""}, listing photos,
             and placeholder copy until you fetch comps and generate content.
           </p>

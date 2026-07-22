@@ -8,7 +8,7 @@ export const BELLE_BRAND = {
   heroSubheadline: "Short-term rental potential · Market-backed estimate",
   leaseAppraisalHeading: "What can you lease this for?",
   leaseAppraisalSubheadline:
-    "Long-term rental appraisal · Market-backed weekly rent range",
+    "Rental appraisal · Market-backed weekly rent range",
   logoOnDarkUrl:
     "https://propvue.azureedge.net/belle/public/img/belle-logo.svg",
   logoOnLightUrl:

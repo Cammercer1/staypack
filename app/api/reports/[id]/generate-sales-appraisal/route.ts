@@ -26,7 +26,7 @@ export async function POST(
 
     if (listing.listing_purpose === "lease") {
       return NextResponse.json(
-        { error: "Sales appraisals are only available for listings for sale" },
+        { error: "Property appraisals are only available for properties for sale" },
         { status: 400 },
       );
     }
@@ -34,13 +34,13 @@ export async function POST(
     const templateId = body.template_id ?? report.template_id ?? undefined;
     if (!templateId || !isSalesAppraisalTemplateId(templateId)) {
       return NextResponse.json(
-        { error: "Choose a sales appraisal template before generating content" },
+        { error: "Choose a property appraisal template before generating content" },
         { status: 400 },
       );
     }
 
     try {
-      await assertTemplateGranted(agency.id, templateId);
+      await assertTemplateGranted(agency, templateId);
     } catch (grantError) {
       const denied = templateGrantErrorResponse(grantError);
       if (denied) {
@@ -74,7 +74,7 @@ export async function POST(
         error:
           error instanceof Error
             ? error.message
-            : "Sales appraisal generation failed",
+            : "Property appraisal generation failed",
       },
       { status: 400 },
     );

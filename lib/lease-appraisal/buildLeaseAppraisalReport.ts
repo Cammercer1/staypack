@@ -4,7 +4,7 @@ import { HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/temp
 import { calculateAccommodates } from "@/lib/reports/formatters";
 import {
   primaryReportAgent,
-  resolveAgencyAccountReportAgents,
+  resolveReportAgents,
   type ReportAgent,
 } from "@/lib/reports/resolveReportAgents";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
@@ -16,6 +16,7 @@ import {
   deriveLeaseAppraisalCopy,
   type LeaseAppraisalCopy,
 } from "@/lib/lease-appraisal/deriveLeaseAppraisalCopy";
+import { resolveLeaseAppraisalCopyDisclaimers } from "@/lib/lease-appraisal/leaseAppraisalDisclaimer";
 import type { ReportPropertyImageSelection } from "@/lib/reports/editable/reportImageSlots";
 import type {
   Agency,
@@ -55,7 +56,8 @@ export function buildLeaseAppraisalReport({
 }: BuildLeaseAppraisalReportInput): FinalReportJson {
   const agents =
     resolvedAgents ??
-    resolveAgencyAccountReportAgents({
+    resolveReportAgents({
+      scraped: parsed,
       agentProfile,
       agencyAgents,
     });
@@ -83,20 +85,21 @@ export function buildLeaseAppraisalReport({
 
   const address = listing.property_address ?? parsed.address ?? "";
   const compCount = ltrEnrichment?.comp_count ?? 0;
-  const copy =
+  const copy = resolveLeaseAppraisalCopyDisclaimers(
     copyOverride ??
-    deriveLeaseAppraisalCopy({
-      agency,
-      listing,
-      parsed,
-      compCount,
-      rentRangeLabel,
-      weeklyMin,
-      weeklyMax,
-      weeklyMid: weeklyMidpoint,
-      suburbMarket: ltrEnrichment?.suburb_market ?? parsed.ltrSuburbMarket,
-      featuredComps: ltrEnrichment?.comps ?? [],
-    });
+      deriveLeaseAppraisalCopy({
+        agency,
+        listing,
+        parsed,
+        compCount,
+        rentRangeLabel,
+        weeklyMin,
+        weeklyMax,
+        weeklyMid: weeklyMidpoint,
+        suburbMarket: ltrEnrichment?.suburb_market ?? parsed.ltrSuburbMarket,
+        featuredComps: ltrEnrichment?.comps ?? [],
+      }),
+  );
 
   return {
     version: "lease_appraisal_v1",

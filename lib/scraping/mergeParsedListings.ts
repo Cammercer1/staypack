@@ -16,10 +16,17 @@ export function mergeParsedListings(base: ParsedListing, next: ParsedListing): P
     carSpaces: next.carSpaces ?? base.carSpaces,
     description: next.description ?? base.description,
     displayPrice: normalizeDisplayPrice(next.displayPrice ?? base.displayPrice),
+    soldDate: next.soldDate ?? base.soldDate,
+    landAreaSqm: next.landAreaSqm ?? base.landAreaSqm,
+    floorAreaSqm: next.floorAreaSqm ?? base.floorAreaSqm,
     images: [...new Set([...next.images, ...base.images])],
     agents: mergeListingAgents(base.agents, next.agents),
     rentalAppraisal: next.rentalAppraisal ?? base.rentalAppraisal,
     rentalComps: next.rentalComps?.length ? next.rentalComps : base.rentalComps,
+    salesAppraisal: next.salesAppraisal ?? base.salesAppraisal,
+    salesComps: next.salesComps?.length ? next.salesComps : base.salesComps,
+    salesAppraisalEnrichment:
+      next.salesAppraisalEnrichment ?? base.salesAppraisalEnrichment,
     outgoings: next.outgoings ?? base.outgoings,
     confidence:
       next.confidence === "high" || base.confidence === "high"

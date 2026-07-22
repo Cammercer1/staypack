@@ -52,7 +52,7 @@ export async function POST(
 
     if (!qrDestinationUrl) {
       return NextResponse.json(
-        { error: "Listing landing page is not provisioned" },
+        { error: "Property page is not provisioned" },
         { status: 400 },
       );
     }

@@ -1,5 +1,6 @@
 import { getTemplateCatalogEntry } from "@/lib/templates/catalog";
-import { isTemplateGranted } from "@/lib/templates/grants/repository";
+import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
+import type { Agency } from "@/lib/types";
 
 export class TemplateNotGrantedError extends Error {
   code = "template_not_granted" as const;
@@ -11,7 +12,7 @@ export class TemplateNotGrantedError extends Error {
 }
 
 export async function assertTemplateGranted(
-  agencyId: string,
+  agency: Agency,
   templateId: string,
 ): Promise<void> {
   const entry = getTemplateCatalogEntry(templateId);
@@ -19,12 +20,8 @@ export async function assertTemplateGranted(
     throw new TemplateNotGrantedError(templateId);
   }
 
-  if (entry.scope === "platform") {
-    return;
-  }
-
-  const granted = await isTemplateGranted(agencyId, templateId);
-  if (!granted) {
+  const available = await resolveAvailableTemplates(agency, entry.product);
+  if (!available.templates.some((template) => template.id === templateId)) {
     throw new TemplateNotGrantedError(templateId);
   }
 }

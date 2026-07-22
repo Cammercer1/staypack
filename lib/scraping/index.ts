@@ -18,6 +18,9 @@ function mergeListings(base: ParsedListing, next: ParsedListing): ParsedListing 
     carSpaces: base.carSpaces ?? next.carSpaces,
     description: base.description ?? next.description,
     displayPrice: normalizeDisplayPrice(base.displayPrice ?? next.displayPrice),
+    soldDate: base.soldDate ?? next.soldDate,
+    landAreaSqm: base.landAreaSqm ?? next.landAreaSqm,
+    floorAreaSqm: base.floorAreaSqm ?? next.floorAreaSqm,
     images:
       next.images.length > base.images.length
         ? next.images
@@ -27,6 +30,10 @@ function mergeListings(base: ParsedListing, next: ParsedListing): ParsedListing 
     agents: mergeListingAgents(base.agents, next.agents),
     rentalAppraisal: base.rentalAppraisal ?? next.rentalAppraisal,
     rentalComps: base.rentalComps?.length ? base.rentalComps : next.rentalComps,
+    salesAppraisal: base.salesAppraisal ?? next.salesAppraisal,
+    salesComps: base.salesComps?.length ? base.salesComps : next.salesComps,
+    salesAppraisalEnrichment:
+      base.salesAppraisalEnrichment ?? next.salesAppraisalEnrichment,
     outgoings: base.outgoings ?? next.outgoings,
     confidence:
       base.confidence === "high" || next.confidence === "high"

@@ -46,7 +46,7 @@ const updateLeaseAppraisalCollateralSchema = z
       .optional()
       .refine(
         (value) => value == null || isLeaseAppraisalTemplateId(value),
-        { message: "Select a valid lease appraisal template" },
+        { message: "Select a valid rental appraisal template" },
       ),
   })
   .refine((data) => data.template_id !== undefined, {
@@ -61,7 +61,7 @@ const updateSalesAppraisalCollateralSchema = z
       .optional()
       .refine(
         (value) => value == null || isSalesAppraisalTemplateId(value),
-        { message: "Select a valid sales appraisal template" },
+        { message: "Select a valid property appraisal template" },
       ),
   })
   .refine((data) => data.template_id !== undefined, {
@@ -121,7 +121,7 @@ async function patchLeaseAppraisal(
 
   if (body.template_id) {
     try {
-      await assertTemplateGranted(agency.id, body.template_id);
+      await assertTemplateGranted(agency, body.template_id);
     } catch (grantError) {
       const denied = templateGrantErrorResponse(grantError);
       if (denied) {
@@ -155,7 +155,7 @@ async function patchSalesAppraisal(
 
   if (body.template_id) {
     try {
-      await assertTemplateGranted(agency.id, body.template_id);
+      await assertTemplateGranted(agency, body.template_id);
     } catch (grantError) {
       const denied = templateGrantErrorResponse(grantError);
       if (denied) {
@@ -335,7 +335,7 @@ async function patchBrochure(
 
   if (body.template_id) {
     try {
-      await assertTemplateGranted(agency.id, body.template_id);
+      await assertTemplateGranted(agency, body.template_id);
     } catch (grantError) {
       const denied = templateGrantErrorResponse(grantError);
       if (denied) {

@@ -63,7 +63,7 @@ export function SalesBrochurePlayground({
               Dev only
             </p>
             <h1 className="mt-1 font-display text-2xl tracking-tight">
-              Sales brochure templates
+              Property brochure templates
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Build and compare 5 layout families × 1-page and 2-page variants. Edit

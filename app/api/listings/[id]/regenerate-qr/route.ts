@@ -30,7 +30,7 @@ export async function POST(
 
   if (!listing.public_slug) {
     return NextResponse.json(
-      { error: "Listing has no public slug yet — publish the landing page first" },
+      { error: "This property has no public slug yet — publish the property page first" },
       { status: 400 },
     );
   }

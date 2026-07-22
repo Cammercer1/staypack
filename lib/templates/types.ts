@@ -12,6 +12,8 @@ export type TemplateProduct =
 
 export type TemplateScope = "platform" | "account";
 
+export type TemplateCatalogMode = "platform_plus_grants" | "grants_only";
+
 export type TemplateBrandMode = "agency" | "fixed" | "agency_with_overrides";
 
 /** Shared metadata for report and brochure templates in the catalog. */

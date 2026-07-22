@@ -197,7 +197,7 @@ export function LeadsInbox({
         </div>
         <p className="font-medium">No leads yet</p>
         <p className="max-w-sm text-sm text-muted-foreground">
-          Enquiries from your landing pages will appear here automatically. This
+          Enquiries from your property pages will appear here automatically. This
           page stays up to date on its own.
         </p>
       </div>

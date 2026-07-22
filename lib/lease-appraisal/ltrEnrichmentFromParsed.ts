@@ -1,9 +1,14 @@
 import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
-import { resolveSelectedRentalComps } from "@/lib/lease-appraisal/leaseAppraisalData";
+import {
+  orderLeaseAppraisalCompPool,
+  resolveSelectedRentalComps,
+} from "@/lib/lease-appraisal/leaseAppraisalData";
+import { resolveRentalCompPropertyType } from "@/lib/rental/resolveRentalCompPropertyType";
 import type { LtrEnrichmentJson, LtrRentalCompCard, ParsedListing } from "@/lib/types";
 
 export function ltrEnrichmentFromParsed(listing: ParsedListing): LtrEnrichmentJson | null {
   const appraisal = listing.rentalAppraisal;
+  const compPool = orderLeaseAppraisalCompPool(listing);
   const comps = resolveSelectedRentalComps(listing);
 
   const suburbMarket = listing.ltrSuburbMarket ?? null;
@@ -19,12 +24,14 @@ export function ltrEnrichmentFromParsed(listing: ParsedListing): LtrEnrichmentJs
     listing_url: comp.listingUrl ?? "",
     bedrooms: comp.bedrooms ?? null,
     bathrooms: comp.bathrooms ?? null,
+    car_spaces: comp.carSpaces ?? null,
+    property_type: resolveRentalCompPropertyType(comp) ?? null,
     weekly_rent: comp.weeklyRent,
     suburb: comp.suburb ?? null,
   }));
 
   return {
-    comp_count: appraisal?.compCount ?? mappedComps.length,
+    comp_count: Math.max(appraisal?.compCount ?? 0, compPool.length),
     weekly_range: {
       p25: appraisal?.weeklyMin ?? null,
       p50: appraisal?.weeklyMidpoint ?? null,

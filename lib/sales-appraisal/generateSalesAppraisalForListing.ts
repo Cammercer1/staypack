@@ -27,7 +27,7 @@ export { DEFAULT_SALES_APPRAISAL_TEMPLATE_ID as SALES_APPRAISAL_TEMPLATE_ID } fr
 function assertSaleListing(listing: Listing) {
   if (listing.listing_purpose === "lease") {
     throw new Error(
-      "Sales appraisals are only available for listings marked for sale",
+      "Property appraisals are only available for listings marked for sale",
     );
   }
 }
@@ -130,6 +130,7 @@ export async function enrichListingForSalesAppraisal({
 
   const { parsed, warnings } = await enrichParsedListingForSalesAppraisal(
     listing.scraped_listing_json!,
+    { subjectListingUrl: listing.listing_url },
   );
   const previousStatus = salesAppraisalEnrichmentStatus(
     listing.scraped_listing_json,

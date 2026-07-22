@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeSalesAppraisalPreviewAgents } from "@/lib/sales-appraisal/mergeSalesAppraisalPreviewAgents";
+import { mergeAppraisalPreviewAgents } from "@/lib/reports/mergeAppraisalPreviewAgents";
 import type { AgentProfile, FinalReportJson, Listing } from "@/lib/types";
 
 const placeholder = {
@@ -29,7 +29,7 @@ function agent(
   };
 }
 
-describe("mergeSalesAppraisalPreviewAgents", () => {
+describe("mergeAppraisalPreviewAgents", () => {
   it("replaces cached placeholders with the listing's matched agency agents", () => {
     const report = {
       agent: placeholder,
@@ -42,7 +42,7 @@ describe("mergeSalesAppraisalPreviewAgents", () => {
       },
     } as unknown as Listing;
 
-    const merged = mergeSalesAppraisalPreviewAgents(report, listing, [
+    const merged = mergeAppraisalPreviewAgents(report, listing, [
       agent("unrelated", "Unrelated Agent"),
       agent("donna", "Donna Burke"),
       agent("james", "James Giltinan"),
@@ -66,7 +66,7 @@ describe("mergeSalesAppraisalPreviewAgents", () => {
       scraped_listing_json: { agents: [] },
     } as unknown as Listing;
 
-    const merged = mergeSalesAppraisalPreviewAgents(report, listing, [
+    const merged = mergeAppraisalPreviewAgents(report, listing, [
       agent("other", "Other Agent", true),
       agent("assigned", "Assigned Agent"),
     ]);
@@ -83,7 +83,7 @@ describe("mergeSalesAppraisalPreviewAgents", () => {
     } as FinalReportJson;
 
     expect(
-      mergeSalesAppraisalPreviewAgents(
+      mergeAppraisalPreviewAgents(
         report,
         { agent_profile_id: null } as Listing,
         [],

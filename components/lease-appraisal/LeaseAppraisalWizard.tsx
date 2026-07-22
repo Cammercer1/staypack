@@ -16,6 +16,7 @@ import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
 import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
 import { mergeLeaseAppraisalPreviewFromListing } from "@/lib/lease-appraisal/mergeLeaseAppraisalPreviewFromListing";
+import { mergeAppraisalPreviewAgents } from "@/lib/reports/mergeAppraisalPreviewAgents";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { hasLeaseAppraisalComps } from "@/lib/lease-appraisal/generateLeaseAppraisalForListing";
 import { hasLeaseAppraisalSelectedComps } from "@/lib/lease-appraisal/leaseAppraisalData";
@@ -44,6 +45,8 @@ type Props = {
   initialReport: Report;
   initialCollateral: CollateralItem;
   agency: Agency;
+  initialAgencyAgents: AgentProfile[];
+  skipTemplateSelection?: boolean;
 };
 
 export function LeaseAppraisalWizard({
@@ -51,13 +54,20 @@ export function LeaseAppraisalWizard({
   initialReport,
   initialCollateral,
   agency,
+  initialAgencyAgents,
+  skipTemplateSelection = false,
 }: Props) {
   const [listing, setListing] = useState(initialListing);
   const [report, setReport] = useState(initialReport);
   const [collateral, setCollateral] = useState(initialCollateral);
-  const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
+  const agencyAgents = initialAgencyAgents;
   const [step, setStep] = useState(() =>
-    getInitialStep(initialListing, initialReport, initialCollateral),
+    getInitialStep(
+      initialListing,
+      initialReport,
+      initialCollateral,
+      skipTemplateSelection,
+    ),
   );
   const [loading, setLoading] = useState(false);
   const [publishStage, setPublishStage] = useState<
@@ -90,13 +100,6 @@ export function LeaseAppraisalWizard({
       setPreviewDraftReport(cached);
     }
   }, [report.final_report_json]);
-
-  useEffect(() => {
-    fetch("/api/agents")
-      .then((response) => response.json())
-      .then((payload) => setAgencyAgents(payload.agents ?? []))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     compsPrefetchStartedRef.current = false;
@@ -157,10 +160,11 @@ export function LeaseAppraisalWizard({
     if (!cached) {
       return null;
     }
+    const withListing = mergeLeaseAppraisalPreviewFromListing(cached, listing);
     return resolveFinalReportForDisplay(
-      mergeLeaseAppraisalPreviewFromListing(cached, listing),
+      mergeAppraisalPreviewAgents(withListing, listing, agencyAgents),
     );
-  }, [previewDraftReport, report.final_report_json, listing]);
+  }, [previewDraftReport, report.final_report_json, listing, agencyAgents]);
 
   function handleStepChange(next: string) {
     if (next === "preview") {
@@ -242,30 +246,40 @@ export function LeaseAppraisalWizard({
   }
 
   const hasTemplate = Boolean(report.template_id || collateral.template_id);
+  const visibleSteps = skipTemplateSelection
+    ? steps.filter((item) => item.id !== "template")
+    : steps;
 
   return (
     <div className="space-y-6">
       <Tabs value={step} onValueChange={handleStepChange}>
-        <TabsList className="grid w-full grid-cols-4">
-          {steps.map((item) => (
+        <TabsList
+          className="grid w-full"
+          style={{
+            gridTemplateColumns: `repeat(${visibleSteps.length}, minmax(0, 1fr))`,
+          }}
+        >
+          {visibleSteps.map((item) => (
             <TabsTrigger key={item.id} value={item.id}>
               {item.label}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        <TabsContent value="template">
-          <LeaseAppraisalTemplateStep
-            agency={agency}
-            listing={listing}
-            report={report}
-            collateral={collateral}
-            agencyAgents={agencyAgents}
-            onReportChange={setReport}
-            onCollateralChange={setCollateral}
-            onContinue={() => setStep("data")}
-          />
-        </TabsContent>
+        {!skipTemplateSelection ? (
+          <TabsContent value="template">
+            <LeaseAppraisalTemplateStep
+              agency={agency}
+              listing={listing}
+              report={report}
+              collateral={collateral}
+              agencyAgents={agencyAgents}
+              onReportChange={setReport}
+              onCollateralChange={setCollateral}
+              onContinue={() => setStep("data")}
+            />
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="data">
           {hasTemplate ? (
@@ -278,7 +292,16 @@ export function LeaseAppraisalWizard({
               onContinue={() => setStep("copy")}
             />
           ) : (
-            <StepGate message="Choose a template first." onBack={() => setStep("template")} />
+            <StepGate
+              message={
+                skipTemplateSelection
+                  ? "Your account template is unavailable."
+                  : "Choose a template first."
+              }
+              onBack={
+                skipTemplateSelection ? undefined : () => setStep("template")
+              }
+            />
           )}
         </TabsContent>
 
@@ -287,6 +310,7 @@ export function LeaseAppraisalWizard({
             <LeaseAppraisalCopyEditor
               ref={copyEditorRef}
               agency={agency}
+              agencyAgents={agencyAgents}
               listing={listing}
               report={report}
               collateral={collateral}
@@ -296,7 +320,16 @@ export function LeaseAppraisalWizard({
               onContinueToPreview={() => handleStepChange("preview")}
             />
           ) : (
-            <StepGate message="Choose a template first." onBack={() => setStep("template")} />
+            <StepGate
+              message={
+                skipTemplateSelection
+                  ? "Your account template is unavailable."
+                  : "Choose a template first."
+              }
+              onBack={
+                skipTemplateSelection ? undefined : () => setStep("template")
+              }
+            />
           )}
         </TabsContent>
 
@@ -394,14 +427,16 @@ function StepGate({
   onBack,
 }: {
   message: string;
-  onBack: () => void;
+  onBack?: () => void;
 }) {
   return (
     <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
       <p>{message}</p>
-      <Button className="mt-4" variant="outline" onClick={onBack}>
-        Go back
-      </Button>
+      {onBack ? (
+        <Button className="mt-4" variant="outline" onClick={onBack}>
+          Go back
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -410,8 +445,17 @@ function getInitialStep(
   listing: Listing,
   report: Report,
   collateral: CollateralItem,
+  skipTemplateSelection: boolean,
 ) {
-  if (report.status === "published" || report.final_report_json) {
+  if (report.status === "published") {
+    return "preview";
+  }
+
+  if (skipTemplateSelection) {
+    return "data";
+  }
+
+  if (report.final_report_json) {
     return "preview";
   }
 

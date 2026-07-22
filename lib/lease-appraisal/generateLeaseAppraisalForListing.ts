@@ -29,7 +29,7 @@ export { DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID as LEASE_APPRAISAL_TEMPLATE_ID } fr
 function assertSaleListing(listing: Listing) {
   if (listing.listing_purpose === "lease") {
     throw new Error(
-      "Long-term rental appraisals are only available for listings marked for sale",
+      "Rental appraisals are only available for listings marked for sale",
     );
   }
 }
@@ -145,6 +145,7 @@ export async function enrichListingForLeaseAppraisal({
 
   const { parsed, warnings } = await enrichParsedListingForLeaseAppraisal(
     listing.scraped_listing_json!,
+    { subjectListingUrl: listing.listing_url },
   );
   const previousStatus = leaseAppraisalEnrichmentStatus(
     listing.scraped_listing_json,

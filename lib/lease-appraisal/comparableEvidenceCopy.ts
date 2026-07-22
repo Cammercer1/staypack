@@ -1,3 +1,4 @@
+import { propertyTypeFamily } from "@/lib/rental/computeRentBand";
 import type { LtrRentalCompCard } from "@/lib/types";
 
 export const LEASE_APPRAISAL_COMPARABLE_DISCLAIMER =
@@ -32,19 +33,20 @@ function subjectFeaturePhrase(description: string, bathrooms: number, carSpaces:
   if (/\bnorth[- ]?facing\b/.test(desc) || desc.includes("north facing")) {
     features.push("north-facing aspect");
   }
-  if (/\bview|skyline|ocean\b/.test(desc)) {
+  if (/\b(view|views|skyline|ocean)\b/.test(desc)) {
     features.push("views");
   }
-  if (/\b(level|floor|high)\b/.test(desc) && /\b\d{1,2}(st|nd|rd|th)?\b/.test(desc)) {
-    features.push("elevated position");
-  } else if (desc.includes("level") || desc.includes("floor")) {
+  if (/\b(level|floor)\s+\d{1,2}\b|\btop floor\b|\bupper level\b|\bhigh-rise\b/.test(desc)) {
     features.push("elevated position");
   }
   if (bathrooms >= 2) {
     features.push("two bathrooms");
   }
   if (carSpaces >= 1) {
-    features.push("secure car space");
+    const secureParking =
+      /\bsecure\b.{0,30}\b(car|parking|garage|carport)\b/.test(desc) ||
+      /\b(car|parking|garage|carport)\b.{0,30}\bsecure\b/.test(desc);
+    features.push(secureParking ? "secure parking" : "off-street parking");
   }
 
   if (!features.length) {
@@ -64,7 +66,7 @@ export type DeriveComparableEvidenceInput = {
   compCount: number;
   weeklyMin: number | null;
   weeklyMax: number | null;
-  featuredComps?: Pick<LtrRentalCompCard, "weekly_rent">[];
+  featuredComps?: Pick<LtrRentalCompCard, "weekly_rent" | "property_type">[];
 };
 
 export function deriveComparableEvidence({
@@ -79,9 +81,22 @@ export function deriveComparableEvidence({
   weeklyMax,
   featuredComps = [],
 }: DeriveComparableEvidenceInput): string {
-  const rents = featuredComps
+  const subjectFamily = propertyTypeFamily(propertyType);
+  const exactFeaturedComps = featuredComps.filter(
+    (comp) =>
+      subjectFamily === "other" ||
+      propertyTypeFamily(comp.property_type ?? undefined) === subjectFamily,
+  );
+  const rangeComps =
+    exactFeaturedComps.length > 0 ? exactFeaturedComps : featuredComps;
+  const rents = rangeComps
     .map((comp) => comp.weekly_rent)
     .filter((rent): rent is number => rent != null && rent > 0);
+  const fallbackUnitCount = featuredComps.filter(
+    (comp) =>
+      subjectFamily === "townhouse" &&
+      propertyTypeFamily(comp.property_type ?? undefined) === "unit",
+  ).length;
 
   const compMin = rents.length > 0 ? Math.min(...rents) : weeklyMin;
   const compMax = rents.length > 0 ? Math.max(...rents) : weeklyMax;
@@ -99,7 +114,12 @@ export function deriveComparableEvidence({
       ? `we reviewed ${compCount} similar ${typePhrase} available for lease near ${suburb}`
       : `we reviewed similar ${typePhrase} available for lease near ${suburb}`;
 
-  const para1 = `To support the appraisal range, ${reviewLead}. The strongest comparable properties are currently advertised ${compRangePhrase}, with pricing influenced by views, building quality, parking, amenities and proximity to the beach, light rail and central ${suburb}.`;
+  const fallbackContext =
+    fallbackUnitCount > 0
+      ? ` ${fallbackUnitCount} upper-band ${fallbackUnitCount === 1 ? "unit listing is" : "unit listings are"} shown as secondary context only and were not used to set the townhouse rent range.`
+      : "";
+
+  const para1 = `To support the appraisal range, ${reviewLead}.${fallbackContext} The strongest exact-type comparable properties are currently advertised ${compRangePhrase}, with pricing influenced by condition, layout, parking, local amenities and transport access.`;
 
   const features = subjectFeaturePhrase(description, bathrooms, carSpaces);
   const featuresLead = features

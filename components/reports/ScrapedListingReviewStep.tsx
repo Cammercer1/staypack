@@ -250,7 +250,7 @@ export function ScrapedListingReviewStep({
           ))}
         </div>
         <p className="text-xs text-muted-foreground">
-          Lease listings skip the short-term rental report.
+          Rental listings skip the short-term rental appraisal.
         </p>
       </div>
 

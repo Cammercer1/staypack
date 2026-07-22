@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { VariantProps } from "class-variance-authority";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
-import type { buttonVariants } from "@/components/ui/button";
 import type { Report } from "@/lib/types";
 
 type Props = {
@@ -35,8 +33,12 @@ export function DownloadPdfButton({
   downloadLabel = "Download PDF",
   onGenerated,
 }: Props) {
-  const [pdfUrl, setPdfUrl] = useState(url);
+  const [generatedPdf, setGeneratedPdf] = useState<{
+    reportId: string;
+    url: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
+  const pdfUrl = generatedPdf?.reportId === reportId ? generatedPdf.url : url;
 
   const downloadUrl = useMemo(() => {
     if (!pdfUrl) {
@@ -54,10 +56,6 @@ export function DownloadPdfButton({
     return pdfUrl;
   }, [pdfUrl, cacheVersion]);
 
-  useEffect(() => {
-    setPdfUrl(url);
-  }, [url]);
-
   async function generatePdf() {
     setLoading(true);
 
@@ -74,7 +72,7 @@ export function DownloadPdfButton({
       return;
     }
 
-    setPdfUrl(payload.pdf_url);
+    setGeneratedPdf({ reportId, url: payload.pdf_url });
     onGenerated?.({ pdf_url: payload.pdf_url, report: payload.report });
     toast.success("PDF ready");
     setLoading(false);
@@ -83,11 +81,12 @@ export function DownloadPdfButton({
   if (downloadUrl) {
     return (
       <div className="flex flex-wrap gap-2">
-        <Link href={downloadUrl} target="_blank">
-          <Button variant="outline" size={size}>
-            {downloadLabel}
-          </Button>
-        </Link>
+        <a
+          href={`/api/reports/${reportId}/download`}
+          className={buttonVariants({ variant: "outline", size })}
+        >
+          {downloadLabel}
+        </a>
         {canGenerate ? (
           <Button
             variant="outline"

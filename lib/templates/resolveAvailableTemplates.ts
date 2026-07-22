@@ -1,10 +1,15 @@
 import { DEFAULT_COLLATERAL_TEMPLATE_IDS } from "@/lib/collateral/templates/ids";
 import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
 import { getTemplatesForProduct } from "@/lib/templates/catalog";
-import type { TemplateCatalogEntry } from "@/lib/templates/types";
-import { listGrantsForAgency } from "@/lib/templates/grants/repository";
+import {
+  loadTemplateAccessForAgency,
+  type TemplateAccessConfiguration,
+  type TemplateGrant,
+} from "@/lib/templates/grants/repository";
 import type {
   AvailableTemplatesResult,
+  TemplateCatalogMode,
+  TemplateCatalogEntry,
   TemplateProduct,
 } from "@/lib/templates/types";
 import type { Agency } from "@/lib/types";
@@ -49,7 +54,12 @@ function platformDefaultForProduct(product: TemplateProduct): string {
 function filterByGrants(
   templates: TemplateCatalogEntry[],
   grantedIds: Set<string>,
+  catalogMode: TemplateCatalogMode,
 ): TemplateCatalogEntry[] {
+  if (catalogMode === "grants_only") {
+    return templates.filter((entry) => grantedIds.has(entry.id));
+  }
+
   return templates.filter(
     (entry) => entry.scope === "platform" || grantedIds.has(entry.id),
   );
@@ -67,6 +77,13 @@ function pickDefaultId(
     }
   }
   return available[0]?.id ?? platformDefaultForProduct(product);
+}
+
+export class TemplateAccessConfigurationError extends Error {
+  constructor(product: TemplateProduct) {
+    super(`No ${product} templates are available for this account`);
+    this.name = "TemplateAccessConfigurationError";
+  }
 }
 
 function moveTemplateToFront(
@@ -90,19 +107,47 @@ export async function resolveAvailableTemplates(
   agency: Agency,
   product: TemplateProduct,
 ): Promise<AvailableTemplatesResult> {
+  const access = await loadTemplateAccessForAgency(
+    agency.id,
+    agency.agency_group_id ?? null,
+    product,
+  );
+  return resolveAvailableTemplatesFromAccess(agency, product, access);
+}
+
+export function resolveAvailableTemplatesFromAccess(
+  agency: Agency,
+  product: TemplateProduct,
+  access: TemplateAccessConfiguration,
+): AvailableTemplatesResult {
   const allForProduct = getTemplatesForProduct(product);
-  const grants = await listGrantsForAgency(agency.id);
+  const catalogMode =
+    access.agencyCatalogMode ??
+    access.groupCatalogMode ??
+    "platform_plus_grants";
+  const grants = [...access.groupGrants, ...access.agencyGrants];
   const grantedIds = new Set(
     grants.filter((g) => g.product === product).map((g) => g.template_id),
   );
-  const templates = filterByGrants(allForProduct, grantedIds);
+  const templates = filterByGrants(allForProduct, grantedIds, catalogMode);
 
-  const grantDefault =
-    grants.find((g) => g.product === product && g.is_default)?.template_id ??
-    null;
+  if (templates.length === 0) {
+    throw new TemplateAccessConfigurationError(product);
+  }
+
+  const agencyGrantDefault = access.agencyGrants.find(
+    (g) => g.product === product && g.is_default,
+  )?.template_id;
+  const groupGrantDefault = access.groupGrants.find(
+    (g) => g.product === product && g.is_default,
+  )?.template_id;
   const defaultTemplateId = pickDefaultId(
     templates,
-    [grantDefault, agencyDefaultForProduct(agency, product)],
+    [
+      agencyGrantDefault,
+      groupGrantDefault,
+      agencyDefaultForProduct(agency, product),
+    ],
     product,
   );
 
@@ -113,29 +158,16 @@ export async function resolveAvailableTemplates(
   };
 }
 
-/** Sync helper for UI when grants are already loaded (e.g. from API response). */
+/** Backwards-compatible sync helper for callers with office grants only. */
 export function resolveAvailableTemplatesFromGrants(
   agency: Agency,
   product: TemplateProduct,
-  grants: { template_id: string; product: string; is_default: boolean }[],
+  grants: TemplateGrant[],
 ): AvailableTemplatesResult {
-  const allForProduct = getTemplatesForProduct(product);
-  const grantedIds = new Set(
-    grants.filter((g) => g.product === product).map((g) => g.template_id),
-  );
-  const templates = filterByGrants(allForProduct, grantedIds);
-  const grantDefault =
-    grants.find((g) => g.product === product && g.is_default)?.template_id ??
-    null;
-  const defaultTemplateId = pickDefaultId(
-    templates,
-    [grantDefault, agencyDefaultForProduct(agency, product)],
-    product,
-  );
-
-  return {
-    product,
-    defaultTemplateId,
-    templates: moveTemplateToFront(templates, defaultTemplateId),
-  };
+  return resolveAvailableTemplatesFromAccess(agency, product, {
+    agencyGrants: grants,
+    groupGrants: [],
+    agencyCatalogMode: null,
+    groupCatalogMode: null,
+  });
 }

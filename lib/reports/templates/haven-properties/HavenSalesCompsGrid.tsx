@@ -1,8 +1,9 @@
-import { BedDouble, Bath } from "lucide-react";
+import { BedDouble, Bath, Ruler } from "lucide-react";
 import type { SaleCompCard } from "@/lib/types";
 import { MAX_SALES_APPRAISAL_FEATURED_COMPS } from "@/lib/sales-appraisal/salesAppraisalData";
 import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
 import { formatNumber } from "@/lib/reports/formatters";
+import { reportableSaleArea } from "@/lib/sales/reportableSaleArea";
 
 export const HAVEN_SALES_FEATURED_COMP_COUNT = MAX_SALES_APPRAISAL_FEATURED_COMPS;
 export const HAVEN_SALES_COMP_IMAGE_ASPECT = "aspect-[5/2]";
@@ -38,6 +39,17 @@ function compPriceLabel(comp: SaleCompCard) {
     return formatSalePriceRange(comp.price, comp.price);
   }
   return comp.price_display?.trim() || "Price undisclosed";
+}
+
+function compAreaLabel(comp: SaleCompCard) {
+  const area = reportableSaleArea({
+    propertyType: comp.property_type,
+    landAreaSqm: comp.land_area_sqm,
+    floorAreaSqm: comp.floor_area_sqm,
+  });
+  return area
+    ? `${formatNumber(area.value)} m² ${area.kind}`
+    : null;
 }
 
 function SaleStatusLabel({
@@ -119,7 +131,9 @@ export function HavenSalesCompsGrid({
       <div
         className={`grid grid-cols-2 ${denseSix ? "gap-2" : compact ? "gap-3" : "gap-5"}`}
       >
-        {featured.map((comp) => (
+        {featured.map((comp) => {
+          const areaLabel = compAreaLabel(comp);
+          return (
           <article key={comp.listing_id || comp.name} className="min-w-0">
             {comp.thumbnail_url ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -163,10 +177,17 @@ export function HavenSalesCompsGrid({
                     {formatNumber(comp.bathrooms)}
                   </span>
                 ) : null}
+                {areaLabel ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Ruler className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                    {areaLabel}
+                  </span>
+                ) : null}
               </div>
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

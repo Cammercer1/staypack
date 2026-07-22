@@ -37,4 +37,32 @@ describe("buildStrEnrichment", () => {
     expect(enrichment?.comps).toHaveLength(1);
     expect(enrichment?.comps[0].listing_id).toBe("entire-home");
   });
+
+  it("keeps same-bedroom evidence first and fills all six featured comp slots", () => {
+    const comps = Array.from({ length: 8 }, (_, index) => ({
+      listingID: `comp-${index + 1}`,
+      name: `Comparable ${index + 1}`,
+      room_type: "entire_home",
+      bedrooms: index < 3 ? 2 : 3,
+      annual_revenue_ltm: 70_000 - index * 2_000,
+      similarity_score: 1 - index * 0.05,
+    }));
+
+    const enrichment = buildStrEnrichment({
+      report_type: "all",
+      bedrooms: 2,
+      kpis: {
+        "25": { ltm_revenue: 35_000 },
+        "50": { ltm_revenue: 50_000 },
+        "75": { ltm_revenue: 65_000 },
+        "90": { ltm_revenue: 75_000 },
+      },
+      comps,
+    });
+
+    expect(enrichment?.comps).toHaveLength(6);
+    expect(enrichment?.comps.slice(0, 3).map((comp) => comp.bedrooms)).toEqual([
+      2, 2, 2,
+    ]);
+  });
 });

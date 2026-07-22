@@ -32,7 +32,7 @@ export async function provisionCollateralQr({
   const qrDestinationUrl = resolveListingDestinationUrl(provisionedListing);
 
   if (!qrDestinationUrl) {
-    throw new Error("Listing landing page is not provisioned");
+    throw new Error("Property page is not provisioned");
   }
 
   const admin = createAdminClient();
