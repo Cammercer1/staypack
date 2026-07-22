@@ -111,6 +111,7 @@ const GRANULAR_RENT_DISCOVER_LABELS = new Set([
 
 const MAX_PRIMARY_RENT_SEARCH_URLS = 6;
 const MAX_EXPANDED_RENT_SEARCH_URLS = 8;
+const MAX_RENT_DATASET_ITEMS = 100;
 
 function prepareRentalComparablePool({
   comps,
@@ -158,6 +159,8 @@ async function fetchRentCompsForSearchUrl(
   const records = await scrapeApifyReaRentSearch({
     searchUrl,
     maxItems: getApifyReaMaxListings(),
+    includeSurroundingSuburbs: true,
+    datasetItemLimit: MAX_RENT_DATASET_ITEMS,
   });
   return parseApifyReaListings(records);
 }
@@ -212,6 +215,8 @@ async function discoverRentalComps(
   const primaryRecords = await scrapeApifyReaRentSearchUrls({
     searchUrls: firstBatch.map((attempt) => attempt.searchUrl),
     maxItems: getApifyReaMaxListings(),
+    includeSurroundingSuburbs: true,
+    datasetItemLimit: MAX_RENT_DATASET_ITEMS,
   });
   let mergedComps = mergeRentalComps(
     [],
@@ -239,6 +244,8 @@ async function discoverRentalComps(
   const expandedRecords = await scrapeApifyReaRentSearchUrls({
     searchUrls: expandedAttempts.map((attempt) => attempt.searchUrl),
     maxItems: getApifyReaMaxListings(),
+    includeSurroundingSuburbs: true,
+    datasetItemLimit: MAX_RENT_DATASET_ITEMS,
   });
   mergedComps = mergeRentalComps(
     mergedComps,

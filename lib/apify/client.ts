@@ -3,6 +3,7 @@ import type { ApifyReaListingRecord } from "@/lib/apify/types";
 const DEFAULT_API_HOST = "api.apify.com";
 const DEFAULT_REA_ACTOR_ID = "qBUaDtdr6kYSBZE8J";
 const DEFAULT_REA_MAX_LISTINGS = 50;
+const DEFAULT_REA_MAX_DATASET_ITEMS = 100;
 const DEFAULT_REA_TIMEOUT_MS = 240_000;
 const DEFAULT_REA_MAX_REQUEST_RETRIES = 2;
 const DEFAULT_REA_MAX_CONCURRENCY = 10;
@@ -55,26 +56,38 @@ export async function scrapeApifyReaListingUrls(
 export async function scrapeApifyReaRentSearch({
   searchUrl,
   maxItems,
+  includeSurroundingSuburbs,
+  datasetItemLimit,
 }: {
   searchUrl: string;
   maxItems?: number;
+  includeSurroundingSuburbs?: boolean;
+  datasetItemLimit?: number;
 }): Promise<ApifyReaListingRecord[]> {
   return scrapeApifyReaRentSearchUrls({
     searchUrls: [searchUrl],
     maxItems,
+    includeSurroundingSuburbs,
+    datasetItemLimit,
   });
 }
 
 export async function scrapeApifyReaRentSearchUrls({
   searchUrls,
   maxItems,
+  includeSurroundingSuburbs = false,
+  datasetItemLimit,
 }: {
   searchUrls: string[];
   maxItems?: number;
+  includeSurroundingSuburbs?: boolean;
+  datasetItemLimit?: number;
 }): Promise<ApifyReaListingRecord[]> {
   return scrapeApifyReaUrls({
     startUrls: searchUrls,
     maxItems,
+    includeSurroundingSuburbs,
+    datasetItemLimit,
   });
 }
 
@@ -82,10 +95,14 @@ async function scrapeApifyReaUrls({
   startUrls,
   maxItems,
   includeDetails = false,
+  includeSurroundingSuburbs = false,
+  datasetItemLimit,
 }: {
   startUrls: string[];
   maxItems?: number;
   includeDetails?: boolean;
+  includeSurroundingSuburbs?: boolean;
+  datasetItemLimit?: number;
 }): Promise<ApifyReaListingRecord[]> {
   const apiKey = getApifyApiKey();
   if (!apiKey) {
@@ -95,7 +112,25 @@ async function scrapeApifyReaUrls({
   const actorId = getApifyReaActorId();
   const timeoutMs = getApifyReaTimeoutMs();
   const timeoutSec = Math.max(1, Math.ceil(timeoutMs / 1000));
-  const limit = Math.min(maxItems ?? getApifyReaMaxListings(), DEFAULT_REA_MAX_LISTINGS);
+  const requestedItemsPerUrl = Math.min(
+    maxItems ?? getApifyReaMaxListings(),
+    DEFAULT_REA_MAX_LISTINGS,
+  );
+  const resultLimit = datasetItemLimit == null
+    ? requestedItemsPerUrl
+    : Math.min(
+        Math.max(1, Math.round(datasetItemLimit)),
+        DEFAULT_REA_MAX_DATASET_ITEMS,
+      );
+  const maxItemsPerUrl = datasetItemLimit == null
+    ? requestedItemsPerUrl
+    : Math.max(
+        1,
+        Math.min(
+          requestedItemsPerUrl,
+          Math.floor(resultLimit / Math.max(1, startUrls.length)),
+        ),
+      );
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs + 15_000);
@@ -110,9 +145,9 @@ async function scrapeApifyReaUrls({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           startUrls,
-          maxItems: limit,
+          maxItems: maxItemsPerUrl,
           flattenOutput: true,
-          includeSurroundingSuburbs: false,
+          includeSurroundingSuburbs,
           minConcurrency: 1,
           maxConcurrency: DEFAULT_REA_MAX_CONCURRENCY,
           maxRequestRetries: DEFAULT_REA_MAX_REQUEST_RETRIES,
@@ -166,7 +201,7 @@ async function scrapeApifyReaUrls({
         }
 
         const datasetResponse = await fetch(
-          `https://${DEFAULT_API_HOST}/v2/datasets/${datasetId}/items?token=${encodeURIComponent(apiKey)}&clean=true&format=json&limit=${limit}`,
+          `https://${DEFAULT_API_HOST}/v2/datasets/${datasetId}/items?token=${encodeURIComponent(apiKey)}&clean=true&format=json&limit=${resultLimit}`,
           { signal: controller.signal },
         );
         const datasetText = await datasetResponse.text();
