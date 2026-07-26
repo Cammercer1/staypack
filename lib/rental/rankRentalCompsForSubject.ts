@@ -11,6 +11,7 @@ export type RankRentalCompsInput = {
   bedrooms?: number;
   bathrooms?: number;
   carSpaces?: number;
+  targetWeeklyRent?: number;
   subjectPropertyType?: string;
 };
 
@@ -21,6 +22,10 @@ export type RentalCompSelectionTier =
 
 function normalizeSuburb(value?: string) {
   return value?.trim().toLowerCase() ?? "";
+}
+
+function relativeDifference(actual: number, target: number) {
+  return target > 0 ? Math.abs(actual - target) / target : Number.POSITIVE_INFINITY;
 }
 
 export function rentalCompSubjectScore(
@@ -62,11 +67,28 @@ export function rentalCompSubjectScore(
   if (input.carSpaces != null && comp.carSpaces != null) {
     const diff = Math.abs(comp.carSpaces - input.carSpaces);
     if (diff === 0) {
-      score += 4;
+      score += 10;
     } else if (diff === 1) {
-      score += 1;
+      score -= 2;
     } else {
-      score -= 3;
+      score -= 8;
+    }
+  }
+
+  if (
+    input.targetWeeklyRent != null &&
+    input.targetWeeklyRent > 0 &&
+    comp.weeklyRent > 0
+  ) {
+    const diff = relativeDifference(comp.weeklyRent, input.targetWeeklyRent);
+    if (diff <= 0.05) {
+      score += 40;
+    } else if (diff <= 0.1) {
+      score += 30;
+    } else if (diff <= 0.2) {
+      score += 15;
+    } else if (diff > 0.35) {
+      score -= 35;
     }
   }
 
@@ -101,9 +123,20 @@ export function rankRentalCompsForSubject(
   comps: RentalComp[],
   input: RankRentalCompsInput,
 ): RentalComp[] {
-  return [...comps].sort(
-    (a, b) => rentalCompSubjectScore(b, input) - rentalCompSubjectScore(a, input),
-  );
+  return [...comps].sort((a, b) => {
+    const scoreDiff =
+      rentalCompSubjectScore(b, input) - rentalCompSubjectScore(a, input);
+    if (scoreDiff !== 0) {
+      return scoreDiff;
+    }
+    if (input.targetWeeklyRent != null && input.targetWeeklyRent > 0) {
+      return (
+        Math.abs(a.weeklyRent - input.targetWeeklyRent) -
+        Math.abs(b.weeklyRent - input.targetWeeklyRent)
+      );
+    }
+    return 0;
+  });
 }
 
 function percentile(sorted: number[], proportion: number) {

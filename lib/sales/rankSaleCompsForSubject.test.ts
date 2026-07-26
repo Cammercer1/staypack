@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterSaleCompsForSubjectType,
+  rankSaleCompsForSubject,
   resolveSaleCompPropertyType,
   resolveSaleSubjectPropertyType,
 } from "@/lib/sales/rankSaleCompsForSubject";
@@ -44,5 +45,33 @@ describe("sales comparable property types", () => {
     expect(
       filterSaleCompsForSubjectType([comp("Apartment"), comp("Unit")], "Townhouse"),
     ).toEqual([]);
+  });
+
+  it("prefers prices near a trusted subject anchor instead of alphabetical ties", () => {
+    const near = {
+      ...comp("Apartment"),
+      address: "21/57 Belmore Road",
+      price: 890_000,
+      bedrooms: 2,
+      bathrooms: 2,
+      carSpaces: 1,
+    };
+    const premium = {
+      ...near,
+      address: "104/9-15 Bishops Avenue",
+      price: 1_900_000,
+    };
+
+    expect(
+      rankSaleCompsForSubject([premium, near], {
+        suburb: "Randwick",
+        bedrooms: 2,
+        bathrooms: 2,
+        carSpaces: 0,
+        subjectAddress: "4/12-14 Belmore Road",
+        targetPrice: 930_000,
+        subjectPropertyType: "Apartment",
+      })[0],
+    ).toBe(near);
   });
 });

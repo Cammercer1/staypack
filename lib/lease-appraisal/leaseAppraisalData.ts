@@ -51,6 +51,11 @@ export function orderLeaseAppraisalCompPool(parsed: ParsedListing) {
     bedrooms: parsed.bedrooms ?? undefined,
     bathrooms: parsed.bathrooms ?? undefined,
     carSpaces: parsed.carSpaces ?? undefined,
+    targetWeeklyRent:
+      parsed.domainAvm?.rentalEstimate?.confidence === "high" ||
+      parsed.domainAvm?.rentalEstimate?.confidence === "medium"
+        ? parsed.domainAvm.rentalEstimate.weeklyRent
+        : undefined,
     subjectPropertyType,
   });
 }

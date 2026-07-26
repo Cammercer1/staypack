@@ -40,10 +40,17 @@ import { resolveRentSubjectPropertyType } from "@/lib/rental/resolveRentSubjectP
 import {
   fillLeaseAppraisalCompSelection,
 } from "@/lib/lease-appraisal/leaseAppraisalData";
+import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
 import {
   positionLeaseAppraisal,
   subjectFromParsedListing,
 } from "@/lib/lease-appraisal/positionLeaseAppraisal";
+import { enrichListingWithDomainAvm } from "@/lib/domain-avm/client";
+import {
+  anchorRentBandToDomainAvm,
+  filterRentalCompsAroundDomainAvm,
+  isTrustedDomainConfidence,
+} from "@/lib/domain-avm/appraisalEvidence";
 import type { ParsedListing } from "@/lib/types";
 import type { RentalComp } from "@/lib/rental/types";
 
@@ -57,6 +64,12 @@ function orderRentalCompsForListing(
     bedrooms: listing.bedrooms ?? undefined,
     bathrooms: listing.bathrooms ?? undefined,
     carSpaces: listing.carSpaces ?? undefined,
+    targetWeeklyRent:
+      isTrustedDomainConfidence(
+        listing.domainAvm?.rentalEstimate?.confidence,
+      )
+        ? listing.domainAvm?.rentalEstimate?.weeklyRent
+        : undefined,
     subjectPropertyType,
   });
 }
@@ -282,7 +295,7 @@ export async function enrichListingRentalAppraisal(
 ): Promise<ParsedListing> {
   const warnings = [...listing.warnings];
   const premiumSignals = parseListingPremiumSignals(listing);
-  const listingWithSignals: ParsedListing = {
+  let listingWithSignals: ParsedListing = {
     ...listing,
     landAreaSqm: premiumSignals.landAreaSqm ?? listing.landAreaSqm,
   };
@@ -302,6 +315,20 @@ export async function enrichListingRentalAppraisal(
   }
 
   try {
+    const domainResult = await enrichListingWithDomainAvm(listingWithSignals);
+    listingWithSignals = domainResult.listing;
+    if (domainResult.status === "failed") {
+      pushUniqueWarning(
+        warnings,
+        `Domain AVM unavailable (${domainResult.error}); continuing with REA comparables.`,
+      );
+    } else if (domainResult.status === "unavailable") {
+      pushUniqueWarning(
+        warnings,
+        "Domain AVM did not return an exact-address match; continuing with REA comparables.",
+      );
+    }
+
     const { listing: withSuburb } = await enrichLtrSuburbMarket(listingWithSignals);
 
     const subjectPropertyType = resolveRentSubjectPropertyType(withSuburb);
@@ -372,6 +399,12 @@ export async function enrichListingRentalAppraisal(
       preferSuburb: withSuburb.suburb,
       subjectBedrooms: withSuburb.bedrooms ?? undefined,
       subjectBathrooms: withSuburb.bathrooms ?? undefined,
+      subjectCarSpaces: withSuburb.carSpaces ?? undefined,
+      targetWeeklyRent: isTrustedDomainConfidence(
+        withSuburb.domainAvm?.rentalEstimate?.confidence,
+      )
+        ? withSuburb.domainAvm?.rentalEstimate?.weeklyRent
+        : undefined,
       tier: tierOverride,
       tierSetting,
       premiumSignals,
@@ -379,9 +412,9 @@ export async function enrichListingRentalAppraisal(
       maxFeaturedComps: 6,
     };
 
-    const estimationComps = filterRentalCompsForSubjectType(
-      comps,
-      subjectPropertyType,
+    const estimationComps = filterRentalCompsAroundDomainAvm(
+      filterRentalCompsForSubjectType(comps, subjectPropertyType),
+      withSuburb.domainAvm,
     );
 
     let band = computeRentBandFromComps(estimationComps, rentBandOptions);
@@ -422,12 +455,16 @@ export async function enrichListingRentalAppraisal(
       premium: premiumResult.premium,
     });
 
-    if (rentFloor) {
+    const trustedDomainRent = isTrustedDomainConfidence(
+      withSuburb.domainAvm?.rentalEstimate?.confidence,
+    );
+    const appliedRentFloor = trustedDomainRent ? undefined : rentFloor;
+    if (appliedRentFloor) {
       const beforeMin = band.weeklyMin;
-      band = applyRentBandSuburbFloor(band, rentFloor);
+      band = applyRentBandSuburbFloor(band, appliedRentFloor);
       if (band.weeklyMin > beforeMin) {
         warnings.push(
-          `Rental appraisal band raised to align with suburb benchmark ($${rentFloor.weeklyRent}/wk from ${rentFloor.source.replace(/_/g, " ")}).`,
+          `Rental appraisal band raised to align with suburb benchmark ($${appliedRentFloor.weeklyRent}/wk from ${appliedRentFloor.source.replace(/_/g, " ")}).`,
         );
       }
     }
@@ -454,13 +491,35 @@ export async function enrichListingRentalAppraisal(
       }
     }
 
+    const domainRent = withSuburb.domainAvm?.rentalEstimate;
+    if (domainRent) {
+      if (isTrustedDomainConfidence(domainRent.confidence)) {
+        band = anchorRentBandToDomainAvm(band, withSuburb.domainAvm);
+        pushUniqueWarning(
+          warnings,
+          `Rental appraisal anchored to the exact-address Domain estimate (${domainRent.confidence} confidence, $${domainRent.weeklyRent}/wk).`,
+        );
+      } else {
+        pushUniqueWarning(
+          warnings,
+          "Domain rental estimate was Low confidence and was retained as advisory evidence only.",
+        );
+      }
+    }
+
     const compSelectionBase = {
       ...withSuburb,
       rentalComps: comps,
     };
+    const bandFeaturedIds = band.featuredComps.map((comp) =>
+      rentalCompListingId(comp, Math.max(0, comps.indexOf(comp))),
+    );
     const selectedCompListingIds = fillLeaseAppraisalCompSelection(
       compSelectionBase,
-      positioned.selectedCompListingIds ?? [],
+      [
+        ...bandFeaturedIds,
+        ...(positioned.selectedCompListingIds ?? []),
+      ],
     );
 
     const displayPrice = formatWeeklyRentRange(band.weeklyMin, band.weeklyMax);
@@ -506,7 +565,7 @@ export async function enrichListingRentalAppraisal(
 
     pushUniqueWarning(
       warnings,
-      `Rental appraisal from ${provider === "rapidapi" ? "RapidAPI" : "Apify"} REA rent comps (n=${band.compCount}, median $${band.weeklyMidpoint}/wk).`,
+      `Rental appraisal from ${trustedDomainRent ? "Domain AVM evidence plus " : ""}${provider === "rapidapi" ? "RapidAPI" : "Apify"} REA rent comps (n=${band.compCount}, median $${band.weeklyMidpoint}/wk).`,
     );
 
     const enriched = await finishRentalAppraisalEnrichment({
@@ -525,8 +584,8 @@ export async function enrichListingRentalAppraisal(
         discovery,
         premiumTier: premiumResult.premium,
         premiumReasons: premiumResult.reasons,
-        rentFloorWeekly: rentFloor?.weeklyRent,
-        rentFloorSource: rentFloor?.source,
+        rentFloorWeekly: appliedRentFloor?.weeklyRent,
+        rentFloorSource: appliedRentFloor?.source,
         positioning: positioned.positioning
           ? {
               ...positioned.positioning,

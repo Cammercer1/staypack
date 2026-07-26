@@ -20,6 +20,7 @@ export type SaleComp = {
   propertyType?: string;
   imageUrl?: string;
   listingUrl?: string;
+  provider?: "rea" | "domain_avm";
 };
 
 export type SalesAppraisalSource =

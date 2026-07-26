@@ -60,6 +60,14 @@ export function orderSalesAppraisalCompPool(parsed: ParsedListing): SaleComp[] {
     suburb: parsed.suburb,
     bedrooms: parsed.bedrooms ?? undefined,
     bathrooms: parsed.bathrooms ?? undefined,
+    carSpaces: parsed.carSpaces ?? undefined,
+    floorAreaSqm: parsed.floorAreaSqm ?? parsed.domainAvm?.floorAreaSqm,
+    subjectAddress: parsed.address,
+    targetPrice:
+      parsed.domainAvm?.valuation?.confidence === "high" ||
+      parsed.domainAvm?.valuation?.confidence === "medium"
+        ? parsed.domainAvm.valuation.midPrice
+        : undefined,
     subjectPropertyType,
   });
 }

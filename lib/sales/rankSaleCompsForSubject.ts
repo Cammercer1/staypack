@@ -1,5 +1,6 @@
 import { propertyTypeFamily } from "@/lib/rental/computeRentBand";
 import type { SaleComp } from "@/lib/sales/types";
+import { parseStreetAddress } from "@/lib/scraping/domain/addressMatch";
 import type { ParsedListing } from "@/lib/types";
 
 /** Strata-style address e.g. 2/121 Alison Road, 401/2 Roscrea Avenue. */
@@ -53,11 +54,30 @@ export type RankSaleCompsInput = {
   suburb?: string;
   bedrooms?: number;
   bathrooms?: number;
+  carSpaces?: number;
+  floorAreaSqm?: number;
+  subjectAddress?: string;
+  targetPrice?: number;
   subjectPropertyType?: string;
 };
 
 function normalizeSuburb(value?: string) {
   return value?.trim().toLowerCase() ?? "";
+}
+
+function relativeDifference(actual: number, target: number) {
+  return target > 0 ? Math.abs(actual - target) / target : Number.POSITIVE_INFINITY;
+}
+
+function sameStreet(compAddress: string, subjectAddress?: string) {
+  if (!subjectAddress?.trim()) return false;
+  const subject = parseStreetAddress({ address: subjectAddress });
+  const comp = parseStreetAddress({ address: compAddress });
+  return Boolean(
+    subject.streetName &&
+      comp.streetName &&
+      subject.streetName === comp.streetName,
+  );
 }
 
 export function saleCompSubjectScore(
@@ -93,6 +113,45 @@ export function saleCompSubjectScore(
       score += 2;
     } else {
       score -= 4;
+    }
+  }
+
+  if (input.carSpaces != null && comp.carSpaces != null) {
+    const diff = Math.abs(comp.carSpaces - input.carSpaces);
+    if (diff === 0) {
+      score += 10;
+    } else if (diff === 1) {
+      score -= 2;
+    } else {
+      score -= 8;
+    }
+  }
+
+  if (input.floorAreaSqm != null && comp.floorAreaSqm != null) {
+    const diff = relativeDifference(comp.floorAreaSqm, input.floorAreaSqm);
+    if (diff <= 0.15) {
+      score += 12;
+    } else if (diff <= 0.3) {
+      score += 5;
+    } else if (diff > 0.5) {
+      score -= 8;
+    }
+  }
+
+  if (sameStreet(comp.address, input.subjectAddress)) {
+    score += 30;
+  }
+
+  if (input.targetPrice != null && input.targetPrice > 0 && comp.price > 0) {
+    const diff = relativeDifference(comp.price, input.targetPrice);
+    if (diff <= 0.05) {
+      score += 40;
+    } else if (diff <= 0.1) {
+      score += 30;
+    } else if (diff <= 0.2) {
+      score += 15;
+    } else if (diff > 0.35) {
+      score -= 35;
     }
   }
 
@@ -156,6 +215,15 @@ export function rankSaleCompsForSubject(
       bathroomDistance(a, input.bathrooms) - bathroomDistance(b, input.bathrooms);
     if (bathDiff !== 0) {
       return bathDiff;
+    }
+
+    if (input.targetPrice != null && input.targetPrice > 0) {
+      const priceDiff =
+        Math.abs(a.price - input.targetPrice) -
+        Math.abs(b.price - input.targetPrice);
+      if (priceDiff !== 0) {
+        return priceDiff;
+      }
     }
 
     return (a.address ?? "").localeCompare(b.address ?? "");

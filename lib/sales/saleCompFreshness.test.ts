@@ -27,6 +27,27 @@ describe("sale comp freshness", () => {
     expect(isRecentSoldComp(sold("2025-07-20"), referenceDate)).toBe(false);
   });
 
+  it("allows exact-address Domain AVM evidence up to 18 months", () => {
+    expect(
+      isRecentSoldComp(
+        {
+          ...sold("2025-02-01"),
+          provider: "domain_avm",
+        },
+        referenceDate,
+      ),
+    ).toBe(true);
+    expect(
+      isRecentSoldComp(
+        {
+          ...sold("2025-01-20"),
+          provider: "domain_avm",
+        },
+        referenceDate,
+      ),
+    ).toBe(false);
+  });
+
   it("rejects sold records without a verifiable date", () => {
     expect(isRecentSoldComp(sold(), referenceDate)).toBe(false);
     expect(isRecentSoldComp(sold("not-a-date"), referenceDate)).toBe(false);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRentalCompSelectionPool,
+  rankRentalCompsForSubject,
   rentalCompSelectionTier,
 } from "@/lib/rental/rankRentalCompsForSubject";
 import { resolveRentalCompPropertyType } from "@/lib/rental/resolveRentalCompPropertyType";
@@ -107,5 +108,24 @@ describe("buildRentalCompSelectionPool", () => {
 
     expect(pool).toEqual([house]);
     expect(units.every((unit) => !pool.includes(unit))).toBe(true);
+  });
+
+  it("prefers rental evidence near a trusted address estimate", () => {
+    const near = comp("4/20 Belmore Road", "Apartment", 900, "Randwick");
+    near.bathrooms = 2;
+    near.carSpaces = 0;
+    const premium = comp("9 Young Street", "Apartment", 1_385, "Randwick");
+    premium.bathrooms = 2;
+
+    expect(
+      rankRentalCompsForSubject([premium, near], {
+        suburb: "Randwick",
+        bedrooms: 2,
+        bathrooms: 2,
+        carSpaces: 0,
+        targetWeeklyRent: 885,
+        subjectPropertyType: "Apartment",
+      })[0],
+    ).toBe(near);
   });
 });

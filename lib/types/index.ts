@@ -1,4 +1,5 @@
 import type { ComparableDiscoverySummary } from "@/lib/comparables/discoveryPolicy";
+import type { DomainAvm } from "@/lib/domain-avm/types";
 
 export type AgencyRole = "owner" | "admin" | "member";
 
@@ -103,6 +104,8 @@ export type ParsedListing = {
   landAreaSqm?: number;
   /** Internal/floor/building area supplied by the listing source. */
   floorAreaSqm?: number;
+  /** Exact-address Domain property profile and AVM evidence. */
+  domainAvm?: DomainAvm;
   rentalAppraisal?: {
     weeklyMin?: number;
     weeklyMax?: number;
@@ -141,6 +144,7 @@ export type ParsedListing = {
     propertyType?: string;
     imageUrl?: string;
     listingUrl?: string;
+    provider?: "rea" | "domain_avm";
   }[];
   /** PropRadar suburb medians / demographics for lease appraisal. */
   ltrSuburbMarket?: LtrSuburbMarketJson;

@@ -19,6 +19,7 @@ export function mergeParsedListings(base: ParsedListing, next: ParsedListing): P
     soldDate: next.soldDate ?? base.soldDate,
     landAreaSqm: next.landAreaSqm ?? base.landAreaSqm,
     floorAreaSqm: next.floorAreaSqm ?? base.floorAreaSqm,
+    domainAvm: next.domainAvm ?? base.domainAvm,
     images: [...new Set([...next.images, ...base.images])],
     agents: mergeListingAgents(base.agents, next.agents),
     rentalAppraisal: next.rentalAppraisal ?? base.rentalAppraisal,

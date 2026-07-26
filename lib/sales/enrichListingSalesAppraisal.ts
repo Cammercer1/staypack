@@ -46,6 +46,13 @@ import {
 import { filterRecentSaleComps } from "@/lib/sales/saleCompFreshness";
 import type { SaleComp } from "@/lib/sales/types";
 import { defaultSelectedSaleCompListingIds } from "@/lib/sales-appraisal/salesAppraisalData";
+import { enrichListingWithDomainAvm } from "@/lib/domain-avm/client";
+import {
+  anchorSaleBandToDomainAvm,
+  domainAvmSaleComps,
+  filterSaleCompsAroundDomainAvm,
+  isTrustedDomainConfidence,
+} from "@/lib/domain-avm/appraisalEvidence";
 import type { ParsedListing } from "@/lib/types";
 
 export type EnrichSalesAppraisalOptions = {
@@ -91,6 +98,13 @@ function orderSaleCompsForListing(
     suburb: listing.suburb,
     bedrooms: listing.bedrooms ?? undefined,
     bathrooms: listing.bathrooms ?? undefined,
+    carSpaces: listing.carSpaces ?? undefined,
+    floorAreaSqm: listing.floorAreaSqm ?? listing.domainAvm?.floorAreaSqm,
+    subjectAddress: listing.address,
+    targetPrice:
+      isTrustedDomainConfidence(listing.domainAvm?.valuation?.confidence)
+        ? listing.domainAvm?.valuation?.midPrice
+        : undefined,
     subjectPropertyType,
   });
 }
@@ -280,7 +294,7 @@ export async function enrichListingSalesAppraisal(
 ): Promise<ParsedListing> {
   const warnings = [...listing.warnings];
   const premiumSignals = parseListingPremiumSignals(listing);
-  const listingWithSignals: ParsedListing = {
+  let listingWithSignals: ParsedListing = {
     ...listing,
     landAreaSqm: premiumSignals.landAreaSqm ?? listing.landAreaSqm,
   };
@@ -300,6 +314,20 @@ export async function enrichListingSalesAppraisal(
   }
 
   try {
+    const domainResult = await enrichListingWithDomainAvm(listingWithSignals);
+    listingWithSignals = domainResult.listing;
+    if (domainResult.status === "failed") {
+      pushUniqueWarning(
+        warnings,
+        `Domain AVM unavailable (${domainResult.error}); continuing with REA comparables.`,
+      );
+    } else if (domainResult.status === "unavailable") {
+      pushUniqueWarning(
+        warnings,
+        "Domain AVM did not return an exact-address match; continuing with REA comparables.",
+      );
+    }
+
     const subjectPropertyType = resolveSaleSubjectPropertyType(listingWithSignals);
 
     // These channels are independent. Discover them together, then preserve
@@ -347,7 +375,14 @@ export async function enrichListingSalesAppraisal(
       );
     }
 
-    const merged = mergeSaleComps(soldResult.comps, buyResult.comps);
+    const domainComps = domainAvmSaleComps(
+      listingWithSignals.domainAvm,
+      listingWithSignals,
+    );
+    const merged = mergeSaleComps(
+      domainComps,
+      mergeSaleComps(soldResult.comps, buyResult.comps),
+    );
     const comps = capComparablePool(
       orderSaleCompsForListing(merged, listingWithSignals),
     );
@@ -405,7 +440,11 @@ export async function enrichListingSalesAppraisal(
       signals: premiumSignals,
     });
 
-    let band = computeSalePriceBandFromComps(soldComps, {
+    const appraisalSoldComps = filterSaleCompsAroundDomainAvm(
+      soldComps,
+      listingWithSignals.domainAvm,
+    );
+    let band = computeSalePriceBandFromComps(appraisalSoldComps, {
       subjectPropertyType,
       preferSuburb: listingWithSignals.suburb,
       subjectBedrooms: listingWithSignals.bedrooms ?? undefined,
@@ -452,7 +491,10 @@ export async function enrichListingSalesAppraisal(
         premiumResult.premium,
       ),
       band,
-      comps,
+      comps: filterSaleCompsAroundDomainAvm(
+        comps,
+        listingWithSignals.domainAvm,
+      ),
     });
 
     if (positioned.positioning) {
@@ -465,6 +507,25 @@ export async function enrichListingSalesAppraisal(
         pushUniqueWarning(
           warnings,
           "Sales appraisal LLM band adjusted to stay within comp-derived bounds.",
+        );
+      }
+    }
+
+    const domainValuation = listingWithSignals.domainAvm?.valuation;
+    if (domainValuation) {
+      if (isTrustedDomainConfidence(domainValuation.confidence)) {
+        band = anchorSaleBandToDomainAvm(
+          band,
+          listingWithSignals.domainAvm,
+        );
+        pushUniqueWarning(
+          warnings,
+          `Sales appraisal anchored to the exact-address Domain AVM (${domainValuation.confidence} confidence, midpoint ${formatSalePriceRange(domainValuation.midPrice, domainValuation.midPrice)}).`,
+        );
+      } else {
+        pushUniqueWarning(
+          warnings,
+          "Domain sale AVM was Low confidence and was retained as advisory evidence only.",
         );
       }
     }
@@ -540,7 +601,7 @@ export async function enrichListingSalesAppraisal(
 
     pushUniqueWarning(
       warnings,
-      `Sales appraisal from ${soldResult.provider === "rapidapi" ? "RapidAPI" : "Apify"} REA comps (${soldComps.length} sold, ${forSaleComps.length} for sale, midpoint ${formatSalePriceRange(band.priceMidpoint, band.priceMidpoint)}).`,
+      `Sales appraisal from ${domainComps.length > 0 ? `Domain AVM evidence plus ` : ""}${soldResult.provider === "rapidapi" ? "RapidAPI" : "Apify"} REA comps (${soldComps.length} sold, ${forSaleComps.length} for sale, midpoint ${formatSalePriceRange(band.priceMidpoint, band.priceMidpoint)}).`,
     );
 
     return {

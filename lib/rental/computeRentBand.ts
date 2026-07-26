@@ -25,6 +25,8 @@ export type RentBandOptions = {
   subjectBedrooms?: number;
   subjectBathrooms?: number;
   subjectCarSpaces?: number;
+  /** Trusted exact-address weekly estimate used to rank featured evidence. */
+  targetWeeklyRent?: number;
   /** Force standard or premium comp selection; default is inferred from signals. */
   tier?: RentBandTier;
   tierSetting?: RentAppraisalTierSetting;
@@ -257,6 +259,36 @@ function subjectSimilarityScore(comp: RentalComp, options?: RentBandOptions) {
       score += 3;
     } else {
       score -= 6;
+    }
+  }
+
+  if (options.subjectCarSpaces != null && comp.carSpaces != null) {
+    const diff = Math.abs(comp.carSpaces - options.subjectCarSpaces);
+    if (diff === 0) {
+      score += 10;
+    } else if (diff === 1) {
+      score -= 2;
+    } else {
+      score -= 8;
+    }
+  }
+
+  if (
+    options.targetWeeklyRent != null &&
+    options.targetWeeklyRent > 0 &&
+    comp.weeklyRent > 0
+  ) {
+    const relativeDiff =
+      Math.abs(comp.weeklyRent - options.targetWeeklyRent) /
+      options.targetWeeklyRent;
+    if (relativeDiff <= 0.05) {
+      score += 40;
+    } else if (relativeDiff <= 0.1) {
+      score += 30;
+    } else if (relativeDiff <= 0.2) {
+      score += 15;
+    } else if (relativeDiff > 0.35) {
+      score -= 35;
     }
   }
 

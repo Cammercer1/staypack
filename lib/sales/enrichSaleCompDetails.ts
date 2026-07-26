@@ -72,6 +72,15 @@ function recordAddress(record: ReaDetailRecord) {
   );
 }
 
+function isReaListingUrl(value: string | undefined): value is string {
+  if (!value) return false;
+  try {
+    return /(^|\.)realestate\.com\.au$/i.test(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+}
+
 function recordsForComp(records: ReaDetailRecord[], comp: SaleComp) {
   const compNumber = listingNumber(comp.listingUrl);
   const address = normalizeAddress(comp.address);
@@ -118,7 +127,7 @@ export async function enrichSelectedSaleCompDetails(
     ...new Set(
       selected
         .map((comp) => comp.listingUrl?.trim())
-        .filter((url): url is string => Boolean(url)),
+        .filter(isReaListingUrl),
     ),
   ];
 

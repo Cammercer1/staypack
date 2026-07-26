@@ -92,7 +92,9 @@ export function parseStreetAddress(input: AddressMatchInput): ParsedStreetAddres
     };
   }
 
-  const unitMatch = streetPart.match(/^(\d+\s*\/\s*\d+|\d+[a-z]?)\s+(.+)$/i);
+  const unitMatch = streetPart.match(
+    /^(\d+\s*\/\s*\d+(?:\s*-\s*\d+)?|\d+[a-z]?)\s+(.+)$/i,
+  );
   if (!unitMatch) {
     return {
       streetNumber: null,
