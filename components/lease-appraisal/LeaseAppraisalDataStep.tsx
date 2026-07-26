@@ -27,7 +27,7 @@ import { resolveRentSubjectPropertyType } from "@/lib/rental/resolveRentSubjectP
 import { cn } from "@/lib/utils";
 import type { LeaseAppraisalJob, Listing } from "@/lib/types";
 
-const POLL_INTERVAL_MS = 10000;
+const POLL_INTERVAL_MS = 2000;
 
 type Props = {
   listing: Listing;

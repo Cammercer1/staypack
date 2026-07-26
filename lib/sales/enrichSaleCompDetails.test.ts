@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { mergeSaleCompDetailRecord } from "@/lib/sales/enrichSaleCompDetails";
+import {
+  mergeSaleCompDetailRecord,
+  saleCompNeedsDetail,
+} from "@/lib/sales/enrichSaleCompDetails";
 import type { SaleComp } from "@/lib/sales/types";
 
 const soldComp: SaleComp = {
@@ -47,5 +50,32 @@ describe("mergeSaleCompDetailRecord", () => {
         { soldDate: "2025-01-01" },
       ).soldDate,
     ).toBeUndefined();
+  });
+
+  it("skips detail requests when search results already contain report facts", () => {
+    expect(
+      saleCompNeedsDetail({
+        ...soldComp,
+        soldDate: "2026-06-18",
+        landAreaSqm: 970,
+        carSpaces: 6,
+        propertyType: "House",
+        listingUrl:
+          "https://www.realestate.com.au/property-house-sa-morphett+vale-123456789",
+      }),
+    ).toBe(false);
+  });
+
+  it("requests details when a reportable area is missing", () => {
+    expect(
+      saleCompNeedsDetail({
+        ...soldComp,
+        soldDate: "2026-06-18",
+        carSpaces: 6,
+        propertyType: "House",
+        listingUrl:
+          "https://www.realestate.com.au/property-house-sa-morphett+vale-123456789",
+      }),
+    ).toBe(true);
   });
 });

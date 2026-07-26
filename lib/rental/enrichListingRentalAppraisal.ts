@@ -44,6 +44,7 @@ import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
 import {
   positionLeaseAppraisal,
   subjectFromParsedListing,
+  type PositionLeaseAppraisalResult,
 } from "@/lib/lease-appraisal/positionLeaseAppraisal";
 import { enrichListingWithDomainAvm } from "@/lib/domain-avm/client";
 import {
@@ -183,6 +184,7 @@ async function discoverRentalComps(
   listing: ParsedListing,
   premiumSignals: ReturnType<typeof parseListingPremiumSignals>,
   options?: EnrichRentalAppraisalOptions,
+  domainListingPromise?: Promise<ParsedListing>,
 ): Promise<RentDiscoverResult> {
   if (options?.searchUrl) {
     const { comps, provider } = await fetchRentCompsForSearchUrl(options.searchUrl);
@@ -260,6 +262,25 @@ async function discoverRentalComps(
     };
   }
 
+  if (domainListingPromise) {
+    const domainListing = await domainListingPromise;
+    if (
+      domainListing.domainAvm?.rentalEstimate?.confidence === "high" &&
+      prepared.comps.length >= MIN_RENT_COMPS_FOR_BAND
+    ) {
+      return {
+        comps: prepared.comps,
+        searchUrl: firstBatch[0]?.searchUrl ?? "",
+        attemptLabel:
+          firstBatch.length > 1
+            ? "batched-primary-search"
+            : (firstBatch[0]?.label ?? "no-search-attempts"),
+        discovery: prepared.discovery,
+        provider: primaryProvider,
+      };
+    }
+  }
+
   const {
     records: expandedRecords,
     provider: expandedProvider,
@@ -315,7 +336,22 @@ export async function enrichListingRentalAppraisal(
   }
 
   try {
-    const domainResult = await enrichListingWithDomainAvm(listingWithSignals);
+    const domainResultPromise = enrichListingWithDomainAvm(listingWithSignals);
+    const domainListingPromise = domainResultPromise.then(
+      (result) => result.listing,
+    );
+    const suburbResultPromise = enrichLtrSuburbMarket(listingWithSignals);
+    const discoveryPromise = discoverRentalComps(
+      listingWithSignals,
+      premiumSignals,
+      options,
+      domainListingPromise,
+    );
+    const [domainResult, suburbResult, discoveryResult] = await Promise.all([
+      domainResultPromise,
+      suburbResultPromise,
+      discoveryPromise,
+    ]);
     listingWithSignals = domainResult.listing;
     if (domainResult.status === "failed") {
       pushUniqueWarning(
@@ -329,7 +365,10 @@ export async function enrichListingRentalAppraisal(
       );
     }
 
-    const { listing: withSuburb } = await enrichLtrSuburbMarket(listingWithSignals);
+    const withSuburb: ParsedListing = {
+      ...suburbResult.listing,
+      domainAvm: listingWithSignals.domainAvm,
+    };
 
     const subjectPropertyType = resolveRentSubjectPropertyType(withSuburb);
 
@@ -339,8 +378,7 @@ export async function enrichListingRentalAppraisal(
       attemptLabel,
       discovery,
       provider,
-    } =
-      await discoverRentalComps(withSuburb, premiumSignals, options);
+    } = discoveryResult;
 
     const comps = capComparablePool(
       orderRentalCompsForListing(discoveredComps, withSuburb),
@@ -470,12 +508,20 @@ export async function enrichListingRentalAppraisal(
     }
 
     const statisticalBand = { ...band };
-    const positioned = await positionLeaseAppraisal({
-      subject: subjectFromParsedListing(withSuburb, premiumResult.premium),
-      band,
-      comps: estimationComps,
-      suburbMarket: withSuburb.ltrSuburbMarket,
-    });
+    const skipPositioning =
+      withSuburb.domainAvm?.rentalEstimate?.confidence === "high";
+    const positioned: PositionLeaseAppraisalResult = skipPositioning
+      ? {
+          band,
+          positioning: null,
+          selectedCompListingIds: null,
+        }
+      : await positionLeaseAppraisal({
+          subject: subjectFromParsedListing(withSuburb, premiumResult.premium),
+          band,
+          comps: estimationComps,
+          suburbMarket: withSuburb.ltrSuburbMarket,
+        });
 
     if (positioned.positioning) {
       band = positioned.band;

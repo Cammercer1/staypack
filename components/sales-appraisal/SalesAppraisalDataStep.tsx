@@ -23,7 +23,7 @@ import type { SaleComp } from "@/lib/sales/types";
 import { cn } from "@/lib/utils";
 import type { Listing, SalesAppraisalJob } from "@/lib/types";
 
-const POLL_INTERVAL_MS = 10000;
+const POLL_INTERVAL_MS = 2000;
 
 type Props = {
   listing: Listing;

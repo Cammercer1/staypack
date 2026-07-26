@@ -37,6 +37,7 @@ import {
 import {
   positionSalesAppraisal,
   saleSubjectFromParsedListing,
+  type PositionSalesAppraisalResult,
 } from "@/lib/sales/positionSalesAppraisal";
 import {
   filterSaleCompsForSubjectType,
@@ -178,6 +179,7 @@ async function discoverSaleCompsForChannel(
   premiumSignals: ReturnType<typeof parseListingPremiumSignals>,
   channel: ReaSaleChannel,
   options?: EnrichSalesAppraisalOptions,
+  domainListingPromise?: Promise<ParsedListing>,
 ): Promise<SaleChannelDiscoverResult> {
   const targets = targetsForSaleChannel(channel);
   const overrideUrl =
@@ -242,6 +244,48 @@ async function discoverSaleCompsForChannel(
       targets,
       attemptCount: attemptedSearches,
     });
+
+    if (
+      batchIndex === 0 &&
+      !prepared.discovery.targetMet &&
+      domainListingPromise
+    ) {
+      const domainListing = await domainListingPromise;
+      const hasHighConfidenceDomainValuation =
+        domainListing.domainAvm?.valuation?.confidence === "high";
+      if (hasHighConfidenceDomainValuation) {
+        const domainComps =
+          channel === "sold"
+            ? domainAvmSaleComps(domainListing.domainAvm, domainListing)
+            : [];
+        const trustedPrepared = prepareSaleComparablePool({
+          comps: mergeSaleComps(domainComps, mergedComps),
+          listing: domainListing,
+          subjectListingUrl: options?.subjectListingUrl,
+          targets,
+          attemptCount: attemptedSearches,
+        });
+        const enoughPrimaryEvidence =
+          channel === "sold"
+            ? trustedPrepared.comps.length >= 6
+            : prepared.comps.length > 0;
+        if (enoughPrimaryEvidence) {
+          return {
+            comps:
+              channel === "sold"
+                ? trustedPrepared.comps
+                : prepared.comps,
+            searchUrl: attempts[0]?.searchUrl ?? "",
+            attemptLabel: `${channel}-batched-primary-search`,
+            provider,
+            discovery:
+              channel === "sold"
+                ? trustedPrepared.discovery
+                : prepared.discovery,
+          };
+        }
+      }
+    }
 
     if (prepared.discovery.targetMet || batchIndex === batches.length - 1) {
       return {
@@ -314,7 +358,30 @@ export async function enrichListingSalesAppraisal(
   }
 
   try {
-    const domainResult = await enrichListingWithDomainAvm(listingWithSignals);
+    const domainResultPromise = enrichListingWithDomainAvm(listingWithSignals);
+    const domainListingPromise = domainResultPromise.then(
+      (result) => result.listing,
+    );
+    const channelOutcomesPromise = Promise.allSettled([
+      discoverSaleCompsForChannel(
+        listingWithSignals,
+        premiumSignals,
+        "sold",
+        options,
+        domainListingPromise,
+      ),
+      discoverSaleCompsForChannel(
+        listingWithSignals,
+        premiumSignals,
+        "buy",
+        options,
+        domainListingPromise,
+      ),
+    ]);
+    const [domainResult, [soldOutcome, buyOutcome]] = await Promise.all([
+      domainResultPromise,
+      channelOutcomesPromise,
+    ]);
     listingWithSignals = domainResult.listing;
     if (domainResult.status === "failed") {
       pushUniqueWarning(
@@ -329,23 +396,6 @@ export async function enrichListingSalesAppraisal(
     }
 
     const subjectPropertyType = resolveSaleSubjectPropertyType(listingWithSignals);
-
-    // These channels are independent. Discover them together, then preserve
-    // the existing sold-required / for-sale-optional error handling below.
-    const [soldOutcome, buyOutcome] = await Promise.allSettled([
-      discoverSaleCompsForChannel(
-        listingWithSignals,
-        premiumSignals,
-        "sold",
-        options,
-      ),
-      discoverSaleCompsForChannel(
-        listingWithSignals,
-        premiumSignals,
-        "buy",
-        options,
-      ),
-    ]);
 
     if (soldOutcome.status === "rejected") {
       throw soldOutcome.reason;
@@ -485,17 +535,25 @@ export async function enrichListingSalesAppraisal(
     }
 
     const statisticalBand = { ...band };
-    const positioned = await positionSalesAppraisal({
-      subject: saleSubjectFromParsedListing(
-        listingWithSignals,
-        premiumResult.premium,
-      ),
-      band,
-      comps: filterSaleCompsAroundDomainAvm(
-        comps,
-        listingWithSignals.domainAvm,
-      ),
-    });
+    const skipPositioning =
+      listingWithSignals.domainAvm?.valuation?.confidence === "high";
+    const positioned: PositionSalesAppraisalResult = skipPositioning
+      ? {
+          band,
+          positioning: null,
+          selectedCompListingIds: null,
+        }
+      : await positionSalesAppraisal({
+          subject: saleSubjectFromParsedListing(
+            listingWithSignals,
+            premiumResult.premium,
+          ),
+          band,
+          comps: filterSaleCompsAroundDomainAvm(
+            comps,
+            listingWithSignals.domainAvm,
+          ),
+        });
 
     if (positioned.positioning) {
       band = positioned.band;

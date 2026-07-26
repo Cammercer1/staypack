@@ -5,6 +5,7 @@ import {
 import type { ApifyReaListingRecord } from "@/lib/apify/types";
 import type { SaleComp } from "@/lib/sales/types";
 import { saleCompListingId } from "@/lib/sales-appraisal/saleCompIds";
+import { reportableSaleArea } from "@/lib/sales/reportableSaleArea";
 import {
   resolveReaFloorAreaSqm,
   resolveReaLandAreaSqm,
@@ -81,6 +82,13 @@ function isReaListingUrl(value: string | undefined): value is string {
   }
 }
 
+export function saleCompNeedsDetail(comp: SaleComp) {
+  if (!isReaListingUrl(comp.listingUrl)) return false;
+  if (!comp.propertyType?.trim() || comp.carSpaces == null) return true;
+  if (comp.saleStatus === "sold" && !comp.soldDate?.trim()) return true;
+  return reportableSaleArea(comp) == null;
+}
+
 function recordsForComp(records: ReaDetailRecord[], comp: SaleComp) {
   const compNumber = listingNumber(comp.listingUrl);
   const address = normalizeAddress(comp.address);
@@ -126,6 +134,7 @@ export async function enrichSelectedSaleCompDetails(
   const urls = [
     ...new Set(
       selected
+        .filter(saleCompNeedsDetail)
         .map((comp) => comp.listingUrl?.trim())
         .filter(isReaListingUrl),
     ),
