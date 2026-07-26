@@ -130,6 +130,7 @@ export async function scrapeApifyReaRentSearchUrls({
 
   return loadComparableSearchThroughCache({
     request: {
+      provider: "apify_rea",
       actorId: getApifyReaActorId(),
       startUrls: searchUrls,
       maxItems: normalizedMaxItems,

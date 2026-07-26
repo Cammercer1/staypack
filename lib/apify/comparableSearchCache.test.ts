@@ -40,6 +40,10 @@ describe("Apify comparable search cache", () => {
 
     expect(buildComparableSearchCacheKey({
       ...request,
+      provider: "rapidapi_rea",
+    })).not.toBe(base);
+    expect(buildComparableSearchCacheKey({
+      ...request,
       includeSurroundingSuburbs: false,
     })).not.toBe(base);
     expect(buildComparableSearchCacheKey({

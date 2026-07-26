@@ -19,7 +19,11 @@ import {
   parseAddressFromListingUrl,
 } from "@/lib/scraping/parseAddressFromUrl";
 import { isReaListingUrl } from "@/lib/scraping/rea/findReaListingUrl";
-import { tryReaImport, hasReaImportConfig } from "@/lib/scraping/reaEnrichment";
+import {
+  tryReaImport,
+  hasReaImportConfig,
+  type ReaImportProvider,
+} from "@/lib/scraping/reaEnrichment";
 import {
   isSpfnListingUrl,
   parseSpfnDetailHtml,
@@ -29,10 +33,24 @@ import { emptyListing } from "@/lib/scraping/parsers/utils";
 export type DeliveryExtractMethod =
   | "static_fetch"
   | "browserless_rendered"
+  | "rapidapi_rea"
+  | "apify_rea"
   | "brightdata_rea"
   | "brightdata_unlocker";
 
 export type DeliveryExtractSource = "agency" | "rea" | "domain" | "mixed";
+
+function deliveryReaMethod(provider?: ReaImportProvider): DeliveryExtractMethod {
+  if (provider === "rapidapi") return "rapidapi_rea";
+  if (provider === "apify") return "apify_rea";
+  return "brightdata_rea";
+}
+
+function deliveryReaParser(provider?: ReaImportProvider) {
+  if (provider === "rapidapi") return "rea_rapidapi";
+  if (provider === "apify") return "rea_apify";
+  return "rea_brightdata";
+}
 
 export type ExtractListingForDeliveryResult =
   | {
@@ -215,11 +233,13 @@ async function enrichFromRea(
   );
 
   warnings.push(
-    reaImport.provider === "apify"
-      ? "Enriched from realestate.com.au (Apify)."
-      : "Enriched from realestate.com.au (Bright Data).",
+    reaImport.provider === "rapidapi"
+      ? "Enriched from realestate.com.au (RapidAPI)."
+      : reaImport.provider === "apify"
+        ? "Enriched from realestate.com.au (Apify)."
+        : "Enriched from realestate.com.au (Bright Data).",
   );
-  return { listing: merged, used: true };
+  return { listing: merged, used: true, provider: reaImport.provider };
 }
 
 async function enrichFromDomainPrimary(
@@ -349,7 +369,7 @@ async function extractDirectDomainUrl(url: string): Promise<ExtractListingForDel
 
 async function extractDirectReaUrl(url: string): Promise<ExtractListingForDeliveryResult> {
   const warnings: string[] = [];
-  // URL is already a REA listing page — scrape it directly (Apify), no Google discovery.
+  // URL is already a REA listing page — use the configured detail provider directly.
   const reaImport = await tryReaImport(url, null);
   warnings.push(...reaImport.warnings);
 
@@ -377,8 +397,8 @@ async function extractDirectReaUrl(url: string): Promise<ExtractListingForDelive
   return successResult({
     listing,
     warnings,
-    method: "brightdata_rea",
-    parserName: reaImport.provider === "apify" ? "rea_apify" : "rea_brightdata",
+    method: deliveryReaMethod(reaImport.provider),
+    parserName: deliveryReaParser(reaImport.provider),
     source: "rea",
   });
 }
@@ -392,7 +412,7 @@ async function extractViaAgencyWaterfall(url: string): Promise<ExtractListingFor
   listing = agencySnapshot.listing;
   let method: DeliveryExtractMethod = agencySnapshot.method;
   let parserName = agencySnapshot.parserName;
-  let source: DeliveryExtractSource = agencySnapshot.scraped ? "agency" : "mixed";
+  const source: DeliveryExtractSource = agencySnapshot.scraped ? "agency" : "mixed";
 
   let readiness = assessDeliveryListingReadiness(listing);
   if (readiness.strReady) {
@@ -408,8 +428,8 @@ async function extractViaAgencyWaterfall(url: string): Promise<ExtractListingFor
   listing = rea.listing;
   usedRea = rea.used;
   if (rea.used) {
-    method = "brightdata_rea";
-    parserName = "rea_brightdata";
+    method = deliveryReaMethod(rea.provider);
+    parserName = deliveryReaParser(rea.provider);
   }
 
   readiness = assessDeliveryListingReadiness(listing);

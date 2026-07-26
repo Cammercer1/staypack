@@ -9,7 +9,7 @@ export function isInternalSalesAppraisalWarning(message: string): boolean {
     return true;
   }
 
-  if (/Apify|Bright\s*Data/i.test(trimmed)) {
+  if (/RapidAPI|Apify|Bright\s*Data/i.test(trimmed)) {
     return true;
   }
 

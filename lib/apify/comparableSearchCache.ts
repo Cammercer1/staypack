@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { ApifyReaListingRecord } from "@/lib/apify/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const CACHE_KEY_VERSION = 1;
+const CACHE_KEY_VERSION = 2;
 const CACHE_RETENTION_MONTHS = 12;
 const DEFAULT_RENT_TTL_HOURS = 72;
 const DEFAULT_BUY_TTL_HOURS = 168;
@@ -10,6 +10,7 @@ const DEFAULT_SOLD_TTL_HOURS = 720;
 const FALSE_ENV_VALUES = new Set(["0", "false", "no", "off"]);
 
 export type ApifyComparableSearchRequest = {
+  provider?: "apify_rea" | "rapidapi_rea";
   actorId: string;
   startUrls: string[];
   maxItems: number;
@@ -56,20 +57,32 @@ function searchChannel(url: string): "rent" | "buy" | "sold" | "unknown" {
 export function comparableSearchCacheTtlMs(startUrls: string[]) {
   const hoursByChannel = {
     rent: positiveNumberFromEnv(
-      "APIFY_REA_RENT_CACHE_TTL_HOURS",
-      DEFAULT_RENT_TTL_HOURS,
+      "REA_RENT_CACHE_TTL_HOURS",
+      positiveNumberFromEnv(
+        "APIFY_REA_RENT_CACHE_TTL_HOURS",
+        DEFAULT_RENT_TTL_HOURS,
+      ),
     ),
     buy: positiveNumberFromEnv(
-      "APIFY_REA_BUY_CACHE_TTL_HOURS",
-      DEFAULT_BUY_TTL_HOURS,
+      "REA_BUY_CACHE_TTL_HOURS",
+      positiveNumberFromEnv(
+        "APIFY_REA_BUY_CACHE_TTL_HOURS",
+        DEFAULT_BUY_TTL_HOURS,
+      ),
     ),
     sold: positiveNumberFromEnv(
-      "APIFY_REA_SOLD_CACHE_TTL_HOURS",
-      DEFAULT_SOLD_TTL_HOURS,
+      "REA_SOLD_CACHE_TTL_HOURS",
+      positiveNumberFromEnv(
+        "APIFY_REA_SOLD_CACHE_TTL_HOURS",
+        DEFAULT_SOLD_TTL_HOURS,
+      ),
     ),
     unknown: positiveNumberFromEnv(
-      "APIFY_REA_RENT_CACHE_TTL_HOURS",
-      DEFAULT_RENT_TTL_HOURS,
+      "REA_RENT_CACHE_TTL_HOURS",
+      positiveNumberFromEnv(
+        "APIFY_REA_RENT_CACHE_TTL_HOURS",
+        DEFAULT_RENT_TTL_HOURS,
+      ),
     ),
   } as const;
 
@@ -84,6 +97,7 @@ export function buildComparableSearchCacheKey(
 ) {
   const canonicalRequest = JSON.stringify({
     version: CACHE_KEY_VERSION,
+    provider: request.provider ?? "apify_rea",
     actorId: request.actorId,
     startUrls: request.startUrls.map((url) => url.trim()),
     maxItems: request.maxItems,
@@ -92,11 +106,14 @@ export function buildComparableSearchCacheKey(
     datasetFields: request.datasetFields,
   });
   const digest = createHash("sha256").update(canonicalRequest).digest("hex");
-  return `apify-rea:${CACHE_KEY_VERSION}:${digest}`;
+  return `${request.provider ?? "apify_rea"}:${CACHE_KEY_VERSION}:${digest}`;
 }
 
 export function hasComparableSearchCacheConfig() {
-  const enabled = process.env.APIFY_REA_COMPARABLE_CACHE_ENABLED
+  const enabled = (
+    process.env.REA_COMPARABLE_CACHE_ENABLED ??
+    process.env.APIFY_REA_COMPARABLE_CACHE_ENABLED
+  )
     ?.trim()
     .toLowerCase();
   if (enabled && FALSE_ENV_VALUES.has(enabled)) {
@@ -156,7 +173,7 @@ function databaseComparableSearchCacheStore(): ComparableSearchCacheStore | null
       const { error } = await admin.from("comparable_search_cache").upsert(
         {
           cache_key: cacheKey,
-          provider: "apify_rea",
+          provider: request.provider ?? "apify_rea",
           actor_id: request.actorId,
           request_json: request,
           records_json: records,
@@ -203,7 +220,7 @@ export async function loadComparableSearchThroughCache({
     if (cached) return cached;
   } catch (error) {
     console.warn(
-      `Unable to read comparable search cache; continuing with Apify: ${error instanceof Error ? error.message : "unknown error"}`,
+      `Unable to read comparable search cache; continuing with ${request.provider ?? "apify_rea"}: ${error instanceof Error ? error.message : "unknown error"}`,
     );
   }
 
@@ -217,7 +234,7 @@ export async function loadComparableSearchThroughCache({
         await store.set(cacheKey, request, records);
       } catch (error) {
         console.warn(
-          `Unable to write comparable search cache; returning Apify results: ${error instanceof Error ? error.message : "unknown error"}`,
+          `Unable to write comparable search cache; returning ${request.provider ?? "apify_rea"} results: ${error instanceof Error ? error.message : "unknown error"}`,
         );
       }
     }

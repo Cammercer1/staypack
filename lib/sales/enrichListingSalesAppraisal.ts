@@ -1,9 +1,11 @@
 import {
-  getApifyReaMaxListings,
-  hasApifyReaConfig,
-  scrapeApifyReaRentSearch,
-  scrapeApifyReaRentSearchUrls,
-} from "@/lib/apify/client";
+  getReaMaxListings,
+  getPrimaryReaDataProvider,
+  hasReaDataProviderConfig,
+  scrapeReaSearch,
+  scrapeReaSearchUrls,
+  type ReaDataProvider,
+} from "@/lib/rea/client";
 import { detectPremiumRentSubject } from "@/lib/rental/detectPremiumRentSubject";
 import { parseListingPremiumSignals } from "@/lib/rental/parseListingPremiumSignals";
 import {
@@ -58,7 +60,7 @@ const MIN_SOLD_COMPS_FOR_BAND = MIN_SALE_COMPS_FOR_BAND;
 const MAX_SALE_PRIMARY_BATCH_URLS = 3;
 
 function hasSaleDiscoverConfig() {
-  return hasApifyReaConfig();
+  return hasReaDataProviderConfig();
 }
 
 function pushUniqueWarning(warnings: string[], message: string) {
@@ -97,7 +99,7 @@ type SaleChannelDiscoverResult = {
   comps: SaleComp[];
   searchUrl: string;
   attemptLabel: string;
-  provider: "apify";
+  provider: ReaDataProvider;
   discovery: ComparableDiscoverySummary;
 };
 
@@ -146,14 +148,14 @@ function prepareSaleComparablePool({
 async function fetchSaleCompsForSearchUrl(
   searchUrl: string,
   channel: ReaSaleChannel,
-): Promise<{ comps: SaleComp[]; provider: "apify" }> {
-  const records = await scrapeApifyReaRentSearch({
+): Promise<{ comps: SaleComp[]; provider: ReaDataProvider }> {
+  const { records, provider } = await scrapeReaSearch({
     searchUrl,
-    maxItems: getApifyReaMaxListings(),
+    maxItems: getReaMaxListings(),
   });
   return {
     comps: parseApifyReaSaleListings(records, channel),
-    provider: "apify",
+    provider,
   };
 }
 
@@ -206,12 +208,14 @@ async function discoverSaleCompsForChannel(
     targets,
     attemptCount: 0,
   });
+  let lastProvider: ReaDataProvider | undefined;
 
   for (const [batchIndex, batch] of batches.entries()) {
-    const records = await scrapeApifyReaRentSearchUrls({
+    const { records, provider } = await scrapeReaSearchUrls({
       searchUrls: batch.map((attempt) => attempt.searchUrl),
-      maxItems: getApifyReaMaxListings(),
+      maxItems: getReaMaxListings(),
     });
+    lastProvider = provider;
     mergedComps = mergeSaleComps(
       mergedComps,
       parseApifyReaSaleListings(records, channel),
@@ -230,7 +234,7 @@ async function discoverSaleCompsForChannel(
         comps: prepared.comps,
         searchUrl: attempts[0]?.searchUrl ?? "",
         attemptLabel: `${channel}-${batchIndex === 0 ? "batched-primary-search" : "batched-expanded-search"}`,
-        provider: "apify",
+        provider,
         discovery: prepared.discovery,
       };
     }
@@ -240,7 +244,7 @@ async function discoverSaleCompsForChannel(
     comps: prepared.comps,
     searchUrl: attempts[0]?.searchUrl ?? "",
     attemptLabel: "no-search-attempts",
-    provider: "apify",
+    provider: lastProvider ?? getPrimaryReaDataProvider() ?? "rapidapi",
     discovery: prepared.discovery,
   };
 }
@@ -283,7 +287,7 @@ export async function enrichListingSalesAppraisal(
 
   if (!hasSaleDiscoverConfig()) {
     warnings.push(
-      "Sales appraisal skipped: Apify REA discovery is not configured.",
+      "Sales appraisal skipped: no REA comparable-search provider is configured.",
     );
     return { ...listingWithSignals, warnings };
   }
@@ -536,7 +540,7 @@ export async function enrichListingSalesAppraisal(
 
     pushUniqueWarning(
       warnings,
-      `Sales appraisal from Apify REA comps (${soldComps.length} sold, ${forSaleComps.length} for sale, midpoint ${formatSalePriceRange(band.priceMidpoint, band.priceMidpoint)}).`,
+      `Sales appraisal from ${soldResult.provider === "rapidapi" ? "RapidAPI" : "Apify"} REA comps (${soldComps.length} sold, ${forSaleComps.length} for sale, midpoint ${formatSalePriceRange(band.priceMidpoint, band.priceMidpoint)}).`,
     );
 
     return {
@@ -546,7 +550,10 @@ export async function enrichListingSalesAppraisal(
         priceMax: band.priceMax,
         priceMidpoint: band.priceMidpoint,
         selectedCompListingIds,
-        source: "apify_rea",
+        source:
+          soldResult.provider === "rapidapi"
+            ? "rapidapi_rea"
+            : "apify_rea",
         compCount: comps.length,
         soldCompCount: soldComps.length,
         forSaleCompCount: forSaleComps.length,

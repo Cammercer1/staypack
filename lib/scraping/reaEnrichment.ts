@@ -7,6 +7,11 @@ import {
   hasApifyReaConfig,
   scrapeApifyReaListingUrl,
 } from "@/lib/apify/client";
+import {
+  hasRapidApiReaConfig,
+  scrapeRapidApiReaListingUrl,
+} from "@/lib/rapidapi/client";
+import { getReaProviderOrder } from "@/lib/rea/client";
 import type { ParsedListing } from "@/lib/types";
 import { mergeParsedListings } from "@/lib/scraping/index";
 import { MIN_DELIVERY_DESCRIPTION_CHARS } from "@/lib/scraping/listingCompleteness";
@@ -23,7 +28,7 @@ import {
 import { parseBrightDataReaRecord } from "@/lib/scraping/rea/parseBrightDataRea";
 import { emptyListing } from "@/lib/scraping/parsers/utils";
 
-export type ReaImportProvider = "apify" | "brightdata";
+export type ReaImportProvider = "rapidapi" | "apify" | "brightdata";
 
 export type ReaImportResult = {
   used: boolean;
@@ -34,7 +39,11 @@ export type ReaImportResult = {
 };
 
 export function hasReaImportConfig() {
-  return hasApifyReaConfig() || hasBrightDataReaConfig();
+  return (
+    hasRapidApiReaConfig() ||
+    hasApifyReaConfig() ||
+    hasBrightDataReaConfig()
+  );
 }
 
 export function hasSearchableReaAddress(listing: Partial<ParsedListing>) {
@@ -199,6 +208,24 @@ const APIFY_SCRAPER: ReaCandidateScraper = {
   thinDataMessage: "Apify REA scrape returned thin data; trying next discovered URL.",
 };
 
+const RAPIDAPI_SCRAPER: ReaCandidateScraper = {
+  provider: "rapidapi",
+  scrape: async (reaUrl) => {
+    const record = await scrapeRapidApiReaListingUrl(reaUrl);
+    return record ? parseApifyReaRecord(record) : null;
+  },
+  emptyRecordMessage: (reaUrl) =>
+    `RapidAPI returned no REA listing data for ${reaUrl}.`,
+  unusableMessage: (reaUrl) =>
+    `RapidAPI REA lookup for ${reaUrl} did not return a usable address.`,
+  failedMessage: (reaUrl, error) =>
+    error instanceof Error
+      ? `RapidAPI REA lookup failed for ${reaUrl}: ${error.message}`
+      : `RapidAPI REA lookup failed for ${reaUrl}.`,
+  thinDataMessage:
+    "RapidAPI REA lookup returned thin data; trying next discovered URL.",
+};
+
 const BRIGHTDATA_SCRAPER: ReaCandidateScraper = {
   provider: "brightdata",
   scrape: async (reaUrl) => {
@@ -264,13 +291,23 @@ async function tryReaProviderImport(
 
   const scraped = await scrapeBestReaListingFromCandidates(reaUrls, warnings, scraper);
   if (!scraped) {
-    const providerLabel = scraper.provider === "apify" ? "Apify" : "Bright Data";
+    const providerLabel =
+      scraper.provider === "rapidapi"
+        ? "RapidAPI"
+        : scraper.provider === "apify"
+          ? "Apify"
+          : "Bright Data";
     warnings.push(`${providerLabel} REA scrape did not return usable listing data.`);
     return { used: false, listing: emptyListing(), warnings };
   }
 
   const merged = mergeReaImportListing(scraped.parsed, addressHint);
-  const providerLabel = scraper.provider === "apify" ? "Apify" : "Bright Data";
+  const providerLabel =
+    scraper.provider === "rapidapi"
+      ? "RapidAPI"
+      : scraper.provider === "apify"
+        ? "Apify"
+        : "Bright Data";
 
   warnings.push(
     `Imported from realestate.com.au via ${providerLabel}: ${scraped.reaUrl}`,
@@ -283,6 +320,17 @@ async function tryReaProviderImport(
     warnings,
     provider: scraper.provider,
   };
+}
+
+export async function tryReaRapidApiImport(
+  sourceUrl: string,
+  addressHint?: Partial<ParsedListing> | null,
+): Promise<ReaImportResult> {
+  if (!hasRapidApiReaConfig()) {
+    return { used: false, listing: emptyListing(), warnings: [] };
+  }
+
+  return tryReaProviderImport(sourceUrl, addressHint, RAPIDAPI_SCRAPER);
 }
 
 export async function tryReaApifyImport(
@@ -311,19 +359,31 @@ export async function tryReaImport(
   sourceUrl: string,
   addressHint?: Partial<ParsedListing> | null,
 ): Promise<ReaImportResult> {
-  const apifyResult = await tryReaApifyImport(sourceUrl, addressHint);
-  if (apifyResult.used) {
-    return apifyResult;
+  const providerWarnings: string[] = [];
+  for (const provider of getReaProviderOrder()) {
+    const result = provider === "rapidapi"
+      ? await tryReaRapidApiImport(sourceUrl, addressHint)
+      : await tryReaApifyImport(sourceUrl, addressHint);
+    providerWarnings.push(...result.warnings);
+    if (result.used) {
+      return { ...result, warnings: providerWarnings };
+    }
   }
 
   const brightDataResult = await tryReaBrightDataImport(sourceUrl, addressHint);
   if (brightDataResult.used) {
-    return brightDataResult;
+    return {
+      ...brightDataResult,
+      warnings: [...providerWarnings, ...brightDataResult.warnings],
+    };
   }
 
   return {
     used: false,
     listing: emptyListing(),
-    warnings: [...apifyResult.warnings, ...brightDataResult.warnings],
+    warnings: [
+      ...providerWarnings,
+      ...brightDataResult.warnings,
+    ],
   };
 }

@@ -4,8 +4,8 @@
 
 This pipeline powers **investor-facing lease appraisals** (“what can I lease this for?”), not tenant **lease brochures** in collateral.
 
-1. **Property details** — REA listing URL via Apify (`tryReaApifyImport`, preferred) or Bright Data dataset fallback (`tryReaImport` in `extractListingFromUrl`).
-2. **Rent band + comps** — REA rent SERP via Apify (`memo23/realestate-au-listings`, preferred) or Bright Data `discover_new` fallback (`enrichListingRentalAppraisal`).
+1. **Property details** — REA listing URL via RapidAPI `/details/byurl`, with Apify and Bright Data fallbacks (`tryReaImport` in `extractListingFromUrl`).
+2. **Rent band + comps** — REA rent SERP via RapidAPI `/search/byurl`, with Apify fallback (`enrichListingRentalAppraisal`).
 3. **Suburb context** — PropRadar `GET /v1/suburbs/{state}/{suburb}?postcode=` (`enrichLtrSuburbMarket`): vacancy, population, renters %, gross yield for house vs unit segment.
 3. **Report PDF** — `buildLeaseAppraisalReport` → `haven-properties-lease-appraisal` template (Landmark-inspired layout under `lib/reports/templates/haven-properties/`). Managed delivery: `generateHeadlessLeaseAppraisal`.
 
@@ -23,7 +23,14 @@ BRIGHTDATA_REA_SCRAPE_TIMEOUT_MS=60000
 # Rent discover SERP crawl (default 180s) — Bright Data fallback
 BRIGHTDATA_REA_DISCOVER_TIMEOUT_MS=180000
 
-# Apify — REA rent comps (preferred when set)
+# RapidAPI — primary REA detail + comparable search
+REA_PRIMARY_PROVIDER=rapidapi
+RAPIDAPI_REA_KEY=
+RAPIDAPI_REA_HOST=realestate-com-au4.p.rapidapi.com
+RAPIDAPI_REA_MAX_LISTINGS=50
+RAPIDAPI_REA_MAX_CONCURRENCY=4
+
+# Apify — automatic fallback
 APIFY_API_KEY=
 APIFY_REA_ACTOR_ID=qBUaDtdr6kYSBZE8J
 APIFY_REA_MAX_LISTINGS=50
@@ -93,7 +100,7 @@ Example (3 bed house, Randwick):
 ## Rent band logic
 
 - Build REA rent SERP from suburb, state, postcode, beds (surrounding suburbs included by REA).
-- Apify actor returns up to `APIFY_REA_MAX_LISTINGS` (default 50) per search; free Apify tier caps at 5/run.
+- RapidAPI returns up to `RAPIDAPI_REA_MAX_LISTINGS` (default 50) per search; existing Supabase caching is shared across providers.
 - Parse listings with `channel: rent` and weekly price; filter by property-type family in band math.
 - Drop outer 10% outliers; **median** = midpoint; **p25/p75** = min/max band.
 - Pick 6 featured comps (default selection ranked for subject; page 2 is a 2×3 grid).
@@ -102,9 +109,12 @@ Example (3 bed house, Randwick):
 
 | File | Role |
 |------|------|
-| `lib/apify/client.ts` | Apify REA actor (listing import + rent search) |
-| `lib/scraping/rea/parseApifyRea.ts` | Apify record → `ParsedListing` |
-| `lib/rental/parseApifyReaListings.ts` | Apify record → rent comp |
+| `lib/rapidapi/client.ts` | RapidAPI REA detail + search client |
+| `lib/rapidapi/normalizeRea.ts` | RapidAPI payload → normalized REA record |
+| `lib/rea/client.ts` | RapidAPI-first provider selection + Apify fallback |
+| `lib/apify/client.ts` | Apify REA fallback actor |
+| `lib/scraping/rea/parseApifyRea.ts` | Normalized REA record → `ParsedListing` |
+| `lib/rental/parseApifyReaListings.ts` | Normalized REA record → rent comp |
 | `lib/brightdata/client.ts` | `scrapeBrightDataReaRentDiscover` (fallback) |
 | `lib/rental/buildReaRentSearchUrl.ts` | SERP URL builder |
 | `lib/rental/parseReaRentDiscover.ts` | Record → comp |

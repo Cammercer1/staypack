@@ -112,7 +112,8 @@ export type ParsedListing = {
     source?:
       /** @deprecated Historical persisted reports only. */
       | "rea_discover"
-      | "apify_rea";
+      | "apify_rea"
+      | "rapidapi_rea";
     /** Eligible evidence pool size; distinct from the six featured report cards. */
     compCount?: number;
     featuredCompCount?: number;
@@ -154,7 +155,8 @@ export type ParsedListing = {
     source?:
       /** @deprecated Historical persisted reports only. */
       | "rea_discover"
-      | "apify_rea";
+      | "apify_rea"
+      | "rapidapi_rea";
     /** Eligible sold + for-sale pool size; distinct from featured report cards. */
     compCount?: number;
     featuredCompCount?: number;

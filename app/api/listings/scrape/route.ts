@@ -14,7 +14,7 @@ import { buildScrapedListingFields } from "@/lib/listings/buildScrapedListingFie
 import { expandListingDescriptionAfterScrape } from "@/lib/listings/expandListingDescriptionAfterScrape";
 import type { Listing, ParsedListing } from "@/lib/types";
 
-// Apify REA listing scrape can take up to APIFY_REA_TIMEOUT_MS (default 120s).
+// Provider fallbacks can still reach the slower Apify REA timeout.
 export const maxDuration = 120;
 
 async function applyExpandedListingDescription({

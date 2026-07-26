@@ -1,7 +1,7 @@
 import {
-  hasApifyReaConfig,
-  scrapeApifyReaListingUrls,
-} from "@/lib/apify/client";
+  hasReaDataProviderConfig,
+  scrapeReaListingUrls,
+} from "@/lib/rea/client";
 import type { ApifyReaListingRecord } from "@/lib/apify/types";
 import type { SaleComp } from "@/lib/sales/types";
 import { saleCompListingId } from "@/lib/sales-appraisal/saleCompIds";
@@ -101,8 +101,8 @@ export function mergeSaleCompDetailRecord(
 }
 
 async function fetchDetailRecords(urls: string[]): Promise<ReaDetailRecord[]> {
-  if (!hasApifyReaConfig()) return [];
-  return scrapeApifyReaListingUrls(urls);
+  if (!hasReaDataProviderConfig()) return [];
+  return (await scrapeReaListingUrls(urls)).records;
 }
 
 /** Bounded detail-page pass for the featured sales comparables only. */

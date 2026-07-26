@@ -40,6 +40,7 @@ function shouldSkipAiEnrichment(
     parserName === "domain_fallback" ||
     parserName === "domain_primary" ||
     parserName === "domain_url" ||
+    parserName === "rea_rapidapi" ||
     parserName === "rea_brightdata" ||
     parserName === "rea_apify"
   ) {
@@ -213,10 +214,12 @@ async function enrichFromAgencySite(
 }
 
 function reaImportMethod(provider: ReaImportProvider): ExtractListingResult["method"] {
+  if (provider === "rapidapi") return "rapidapi_rea";
   return provider === "apify" ? "apify_rea" : "brightdata_rea";
 }
 
 function reaImportParserName(provider: ReaImportProvider) {
+  if (provider === "rapidapi") return "rea_rapidapi";
   return provider === "apify" ? "rea_apify" : "rea_brightdata";
 }
 
@@ -250,6 +253,7 @@ export type ExtractListingResult = {
   method:
     | "static_fetch"
     | "browserless_rendered"
+    | "rapidapi_rea"
     | "apify_rea"
     | "brightdata_rea"
     | "brightdata_unlocker";

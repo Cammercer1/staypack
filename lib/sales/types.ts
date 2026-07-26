@@ -25,7 +25,8 @@ export type SaleComp = {
 export type SalesAppraisalSource =
   /** @deprecated Historical persisted reports only. */
   | "rea_discover"
-  | "apify_rea";
+  | "apify_rea"
+  | "rapidapi_rea";
 
 export type SalesAppraisalMeta = {
   priceMin?: number;

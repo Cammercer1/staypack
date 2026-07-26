@@ -193,7 +193,7 @@ export function parseApifyReaRecord(record: ApifyReaListingRecord): ParsedListin
   };
 
   if (!address) {
-    listing.warnings.push("Apify REA record did not include a street address.");
+    listing.warnings.push("REA provider record did not include a street address.");
   }
 
   return listing;

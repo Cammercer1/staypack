@@ -1,9 +1,10 @@
 import {
-  getApifyReaMaxListings,
-  hasApifyReaConfig,
-  scrapeApifyReaRentSearch,
-  scrapeApifyReaRentSearchUrls,
-} from "@/lib/apify/client";
+  getReaMaxListings,
+  hasReaDataProviderConfig,
+  scrapeReaSearch,
+  scrapeReaSearchUrls,
+  type ReaDataProvider,
+} from "@/lib/rea/client";
 import {
   RENT_COMPARABLE_POOL_TARGETS,
   capComparablePool,
@@ -70,7 +71,7 @@ export type EnrichRentalAppraisalOptions = {
 };
 
 function hasRentDiscoverConfig() {
-  return hasApifyReaConfig();
+  return hasReaDataProviderConfig();
 }
 
 function pushUniqueWarning(warnings: string[], message: string) {
@@ -94,6 +95,7 @@ type RentDiscoverResult = {
   searchUrl: string;
   attemptLabel: string;
   discovery: ComparableDiscoverySummary;
+  provider?: ReaDataProvider;
 };
 
 const GRANULAR_RENT_DISCOVER_LABELS = new Set([
@@ -154,14 +156,14 @@ function prepareRentalComparablePool({
 
 async function fetchRentCompsForSearchUrl(
   searchUrl: string,
-): Promise<RentalComp[]> {
-  const records = await scrapeApifyReaRentSearch({
+): Promise<{ comps: RentalComp[]; provider: ReaDataProvider }> {
+  const { records, provider } = await scrapeReaSearch({
     searchUrl,
-    maxItems: getApifyReaMaxListings(),
+    maxItems: getReaMaxListings(),
     includeSurroundingSuburbs: true,
     datasetItemLimit: MAX_RENT_DATASET_ITEMS,
   });
-  return parseApifyReaListings(records);
+  return { comps: parseApifyReaListings(records), provider };
 }
 
 async function discoverRentalComps(
@@ -170,7 +172,7 @@ async function discoverRentalComps(
   options?: EnrichRentalAppraisalOptions,
 ): Promise<RentDiscoverResult> {
   if (options?.searchUrl) {
-    const comps = await fetchRentCompsForSearchUrl(options.searchUrl);
+    const { comps, provider } = await fetchRentCompsForSearchUrl(options.searchUrl);
     const prepared = prepareRentalComparablePool({
       comps,
       listing,
@@ -182,6 +184,7 @@ async function discoverRentalComps(
       searchUrl: options.searchUrl,
       attemptLabel: "override",
       discovery: prepared.discovery,
+      provider,
     };
   }
 
@@ -211,9 +214,12 @@ async function discoverRentalComps(
     ? primaryAttempts
     : attempts.slice(0, MAX_PRIMARY_RENT_SEARCH_URLS);
 
-  const primaryRecords = await scrapeApifyReaRentSearchUrls({
+  const {
+    records: primaryRecords,
+    provider: primaryProvider,
+  } = await scrapeReaSearchUrls({
     searchUrls: firstBatch.map((attempt) => attempt.searchUrl),
-    maxItems: getApifyReaMaxListings(),
+    maxItems: getReaMaxListings(),
     includeSurroundingSuburbs: true,
     datasetItemLimit: MAX_RENT_DATASET_ITEMS,
   });
@@ -237,12 +243,16 @@ async function discoverRentalComps(
           ? "batched-primary-search"
           : (firstBatch[0]?.label ?? "no-search-attempts"),
       discovery: prepared.discovery,
+      provider: primaryProvider,
     };
   }
 
-  const expandedRecords = await scrapeApifyReaRentSearchUrls({
+  const {
+    records: expandedRecords,
+    provider: expandedProvider,
+  } = await scrapeReaSearchUrls({
     searchUrls: expandedAttempts.map((attempt) => attempt.searchUrl),
-    maxItems: getApifyReaMaxListings(),
+    maxItems: getReaMaxListings(),
     includeSurroundingSuburbs: true,
     datasetItemLimit: MAX_RENT_DATASET_ITEMS,
   });
@@ -262,6 +272,7 @@ async function discoverRentalComps(
     searchUrl: firstBatch[0]?.searchUrl ?? "",
     attemptLabel: "batched-expanded-search",
     discovery: prepared.discovery,
+    provider: expandedProvider,
   };
 }
 
@@ -278,7 +289,7 @@ export async function enrichListingRentalAppraisal(
 
   if (!hasRentDiscoverConfig()) {
     warnings.push(
-      "Rental appraisal skipped: Apify REA rent discovery is not configured.",
+      "Rental appraisal skipped: no REA comparable-search provider is configured.",
     );
     return finishRentalAppraisalEnrichment({ ...listingWithSignals, warnings });
   }
@@ -295,7 +306,13 @@ export async function enrichListingRentalAppraisal(
 
     const subjectPropertyType = resolveRentSubjectPropertyType(withSuburb);
 
-    const { comps: discoveredComps, searchUrl, attemptLabel, discovery } =
+    const {
+      comps: discoveredComps,
+      searchUrl,
+      attemptLabel,
+      discovery,
+      provider,
+    } =
       await discoverRentalComps(withSuburb, premiumSignals, options);
 
     const comps = capComparablePool(
@@ -489,7 +506,7 @@ export async function enrichListingRentalAppraisal(
 
     pushUniqueWarning(
       warnings,
-      `Rental appraisal from Apify REA rent comps (n=${band.compCount}, median $${band.weeklyMidpoint}/wk).`,
+      `Rental appraisal from ${provider === "rapidapi" ? "RapidAPI" : "Apify"} REA rent comps (n=${band.compCount}, median $${band.weeklyMidpoint}/wk).`,
     );
 
     const enriched = await finishRentalAppraisalEnrichment({
@@ -501,7 +518,7 @@ export async function enrichListingRentalAppraisal(
         weeklyMax: band.weeklyMax,
         weeklyMidpoint: band.weeklyMidpoint,
         selectedCompListingIds,
-        source: "apify_rea",
+        source: provider === "rapidapi" ? "rapidapi_rea" : "apify_rea",
         compCount: comps.length,
         featuredCompCount: selectedCompListingIds.length,
         searchUrl,
