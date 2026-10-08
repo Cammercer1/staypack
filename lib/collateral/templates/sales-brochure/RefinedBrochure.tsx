@@ -7,13 +7,13 @@ import {
   RefinedSpread,
 } from "@/lib/collateral/templates/sales-brochure/refined/RefinedLayout";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
-import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
+import { getBrochurePageData } from "@/lib/collateral/templates/sales-brochure/shared/getBrochurePageData";
 
 /** Refined · 2 pages — page 1 property overview; page 2 photo mosaic + agent. */
 export function RefinedBrochure({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isBrochureDocument(document)) return null;
 
-  const { report, brand, pageTwoImages } = useBrochurePage(document);
+  const { report, brand, pageTwoImages } = getBrochurePageData(document);
   const pageTwo = pageTwoImages.filter(Boolean);
   const fmt = getCollateralPageFormat(pageFormat);
 

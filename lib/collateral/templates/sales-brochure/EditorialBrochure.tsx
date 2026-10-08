@@ -4,7 +4,7 @@ import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { EditorialPageOneSpread } from "@/lib/collateral/templates/sales-brochure/EditorialBrochureOnePage";
 import { BrochureGalleryPage } from "@/lib/collateral/templates/sales-brochure/shared/BrochureGalleryPage";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
-import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
+import { getBrochurePageData } from "@/lib/collateral/templates/sales-brochure/shared/getBrochurePageData";
 
 /**
  * Editorial · 2 pages — page 1 mirrors the single-page spread; page 2 is the
@@ -13,7 +13,7 @@ import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/share
 export function EditorialBrochure({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isBrochureDocument(document)) return null;
 
-  const { report, brand, pageOneGallery } = useBrochurePage(document);
+  const { report, brand, pageOneGallery } = getBrochurePageData(document);
   const hero = pageOneGallery.hero_image_url;
   const fmt = getCollateralPageFormat(pageFormat);
 

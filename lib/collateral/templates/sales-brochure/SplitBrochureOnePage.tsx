@@ -3,13 +3,13 @@ import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
 import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { SplitSpreadLayout } from "@/lib/collateral/templates/sales-brochure/split/SplitLayout";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
-import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
+import { getBrochurePageData } from "@/lib/collateral/templates/sales-brochure/shared/getBrochurePageData";
 
 /** Split · 1 page — content left, photo grid right (open-home brochure). */
 export function SplitBrochureOnePage({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isBrochureDocument(document)) return null;
 
-  const { report, brand } = useBrochurePage(document);
+  const { report, brand } = getBrochurePageData(document);
   const fmt = getCollateralPageFormat(pageFormat);
 
   return (

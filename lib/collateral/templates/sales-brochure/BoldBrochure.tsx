@@ -11,7 +11,7 @@ import {
 import { getBrochureGalleryPhotos } from "@/lib/collateral/templates/sales-brochure/shared/BrochureGalleryPage";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
 import { BrochurePhotoCollage } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePhotoCollage";
-import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
+import { getBrochurePageData } from "@/lib/collateral/templates/sales-brochure/shared/getBrochurePageData";
 
 const headingFont = "var(--report-heading-font, var(--collateral-heading-font, inherit))";
 const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))";
@@ -23,7 +23,7 @@ const bodyFont = "var(--report-body-font, var(--collateral-body-font, inherit))"
 export function BoldBrochure({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isBrochureDocument(document)) return null;
 
-  const { report, brand } = useBrochurePage(document);
+  const { report, brand } = getBrochurePageData(document);
   const fmt = getCollateralPageFormat(pageFormat);
   const band = resolveBrochureBrandBand(document.agency);
   const onLightBand = isLightColour(band.background);

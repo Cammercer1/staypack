@@ -7,13 +7,13 @@ import {
 } from "@/lib/collateral/templates/sales-brochure/gallery/GalleryLayout";
 import { RefinedPageTwoGallery } from "@/lib/collateral/templates/sales-brochure/refined/RefinedLayout";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
-import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
+import { getBrochurePageData } from "@/lib/collateral/templates/sales-brochure/shared/getBrochurePageData";
 
 /** Gallery · 2 pages — Ray White–style page 1; photo mosaic + agent page 2. */
 export function GalleryBrochure({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isBrochureDocument(document)) return null;
 
-  const { report, brand, pageTwoImages } = useBrochurePage(document);
+  const { report, brand, pageTwoImages } = getBrochurePageData(document);
   const pageTwo = pageTwoImages.filter(Boolean);
   const fmt = getCollateralPageFormat(pageFormat);
 

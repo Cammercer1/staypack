@@ -3,7 +3,7 @@
 import {
   forwardRef,
   useCallback,
-  useEffect,
+  useLayoutEffect,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -95,8 +95,16 @@ export const GeneratedBrochureCopyEditor = forwardRef<
   const blurbFlushRef = useRef<(() => BrochureBlurbBlock[] | null) | null>(null);
   const [propertyImages, setPropertyImages] = useState<
     BrochureDocumentJson["property"] | null
-  >(null);
+  >(() => {
+    const document = collateral.document_json;
+    return document && isBrochureDocument(document) ? document.property : null;
+  });
   const propertyImagesRef = useRef(propertyImages);
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(() =>
+    initialCopy && propertyImages ? brochureEditorSnapshot(initialCopy, propertyImages) : null,
+  );
 
   const commitCopy = useCallback(
     (updater: (current: SalesBrochureCopyJson) => SalesBrochureCopyJson) => {
@@ -127,23 +135,24 @@ export const GeneratedBrochureCopyEditor = forwardRef<
   }, []);
   const [generating, setGenerating] = useState(false);
 
-  useEffect(() => {
+  const [previousDocument, setPreviousDocument] = useState(collateral.document_json);
+  if (previousDocument !== collateral.document_json) {
+    setPreviousDocument(collateral.document_json);
     const document = collateral.document_json;
     if (document && isBrochureDocument(document)) {
       const nextCopy = coerceSalesBrochureCopyForEditor(document.copy);
-      copyRef.current = nextCopy;
       setCopy(nextCopy);
       setPropertyImages(document.property);
-      propertyImagesRef.current = document.property;
-      setLastSavedSnapshot(
-        brochureEditorSnapshot(nextCopy, document.property),
-      );
+      setLastSavedSnapshot(brochureEditorSnapshot(nextCopy, document.property));
       setSaveFailed(false);
     }
-  }, [collateral.document_json]);
-  const [saving, setSaving] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
-  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(null);
+  }
+
+  // Imperative preview/save handlers read the last committed editor state.
+  useLayoutEffect(() => {
+    copyRef.current = copy;
+    propertyImagesRef.current = propertyImages;
+  }, [copy, propertyImages]);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [imagePickerSlot, setImagePickerSlot] = useState<BrochureImageSlot | null>(
     null,

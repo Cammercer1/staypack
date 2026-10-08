@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -48,7 +48,9 @@ export function LeadsInbox({
     new Set(initialLeads.map((lead) => lead.id)),
   );
   const updatingRef = useRef(updatingIds);
-  updatingRef.current = updatingIds;
+  useLayoutEffect(() => {
+    updatingRef.current = updatingIds;
+  }, [updatingIds]);
 
   const refetch = useCallback(async (signal?: AbortSignal) => {
     // Skip while a status change is mid-flight to avoid clobbering optimistic state.

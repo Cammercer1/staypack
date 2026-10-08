@@ -1,0 +1,20 @@
+FROM node:24-bookworm-slim
+
+# Git is available for editors attached through Dev Containers.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+RUN mkdir -p node_modules .next /home/node/.npm \
+    && chown -R node:node /workspace /home/node/.npm \
+    && git config --system --add safe.directory /workspace
+
+COPY --chmod=755 scripts/container-entrypoint.sh /usr/local/bin/staypack-dev
+
+ENV NEXT_TELEMETRY_DISABLED=1
+USER node
+EXPOSE 3000
+
+ENTRYPOINT ["staypack-dev"]
+CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--webpack"]

@@ -18,7 +18,7 @@ import {
   EditorialSpecSidebar,
 } from "@/lib/collateral/templates/sales-brochure/editorial/EditorialChrome";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
-import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
+import { getBrochurePageData } from "@/lib/collateral/templates/sales-brochure/shared/getBrochurePageData";
 
 /**
  * Editorial page-1 spread — overlay hero + drop-cap narrative column + hairline
@@ -97,7 +97,7 @@ export function EditorialPageOneSpread({
 export function EditorialBrochureOnePage({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isBrochureDocument(document)) return null;
 
-  const { report, brand, pageOneGallery } = useBrochurePage(document);
+  const { report, brand, pageOneGallery } = getBrochurePageData(document);
   const hero = pageOneGallery.hero_image_url;
   const fmt = getCollateralPageFormat(pageFormat);
 

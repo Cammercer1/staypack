@@ -4,13 +4,13 @@ import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { SplitSpreadLayout } from "@/lib/collateral/templates/sales-brochure/split/SplitLayout";
 import { BrochureGalleryPage } from "@/lib/collateral/templates/sales-brochure/shared/BrochureGalleryPage";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
-import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
+import { getBrochurePageData } from "@/lib/collateral/templates/sales-brochure/shared/getBrochurePageData";
 
 /** Split · 2 pages — page 1 open-home split; page 2 standardised gallery + optional note + contact/QR. */
 export function SplitBrochure({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isBrochureDocument(document)) return null;
 
-  const { report, brand } = useBrochurePage(document);
+  const { report, brand } = getBrochurePageData(document);
   const fmt = getCollateralPageFormat(pageFormat);
 
   return (

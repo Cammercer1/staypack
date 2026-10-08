@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -66,23 +66,25 @@ export function UnknownAgentsAfterScrapeModal({
   agents,
   onComplete,
 }: Props) {
-  const [drafts, setDrafts] = useState<Record<string, AgentDraft>>({});
+  const [drafts, setDrafts] = useState<Record<string, AgentDraft>>(() =>
+    Object.fromEntries(agents.map((agent) => [agent.name, toDraft(agent)])),
+  );
   const [savedNames, setSavedNames] = useState<Set<string>>(new Set());
   const [skippedNames, setSkippedNames] = useState<Set<string>>(new Set());
   const [attemptedNames, setAttemptedNames] = useState<Set<string>>(new Set());
   const [savingName, setSavingName] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) {
-      return;
+  const [previous, setPrevious] = useState({ open, agents });
+  if (previous.open !== open || previous.agents !== agents) {
+    setPrevious({ open, agents });
+    if (open) {
+      setDrafts(Object.fromEntries(agents.map((agent) => [agent.name, toDraft(agent)])));
+      setSavedNames(new Set());
+      setSkippedNames(new Set());
+      setAttemptedNames(new Set());
+      setSavingName(null);
     }
-
-    setDrafts(Object.fromEntries(agents.map((agent) => [agent.name, toDraft(agent)])));
-    setSavedNames(new Set());
-    setSkippedNames(new Set());
-    setAttemptedNames(new Set());
-    setSavingName(null);
-  }, [open, agents]);
+  }
 
   function updateDraft(name: string, patch: Partial<AgentDraft>) {
     setDrafts((current) => ({

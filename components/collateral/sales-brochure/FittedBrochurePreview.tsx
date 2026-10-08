@@ -84,9 +84,12 @@ export function FittedBrochurePreview({
   );
   const fitToPanel = maxHeight !== "none";
 
-  useEffect(() => {
+  const paginationKey = `${document.template_id}:${pageCount}`;
+  const [previousPaginationKey, setPreviousPaginationKey] = useState(paginationKey);
+  if (previousPaginationKey !== paginationKey) {
+    setPreviousPaginationKey(paginationKey);
     setCurrentPage(0);
-  }, [document.template_id, pageCount]);
+  }
 
   useEffect(() => {
     if (useDocumentBrand) {

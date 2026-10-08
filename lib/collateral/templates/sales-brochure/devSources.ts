@@ -72,7 +72,7 @@ export const SALES_BROCHURE_DEV_SOURCES: Record<string, string[]> = {
 export const SALES_BROCHURE_SHARED_SOURCES = [
   "lib/collateral/templates/sales-brochure/shared/BrochurePageShell.tsx",
   "lib/collateral/templates/sales-brochure/shared/BrochureBrandedAgentBlock.tsx",
-  "lib/collateral/templates/sales-brochure/shared/useBrochurePage.ts",
+  "lib/collateral/templates/sales-brochure/shared/getBrochurePageData.ts",
   "lib/collateral/sales-brochure/previewBrand.ts",
   "lib/collateral/sales-brochure/playgroundFixture.ts",
   "lib/collateral/templates/sales-brochure/registry.ts",

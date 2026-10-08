@@ -1,0 +1,88 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { createLintRegressionFixtures, installRegressionMocks, type RegressionFixtures } from "./lintRegressionFixtures";
+import { DashboardAnalytics } from "@/components/dashboard/DashboardAnalytics";
+import { LeadsInbox } from "@/components/leads/LeadsInbox";
+import { ListingImageGallery } from "@/components/listings/ListingImageGallery";
+import { ListingAgentsStrip } from "@/components/listings/ListingAgentsStrip";
+import { LandingTemplatePreviewModal } from "@/components/listings/LandingTemplatePreviewModal";
+import { UnknownAgentsAfterScrapeModal } from "@/components/reports/UnknownAgentsAfterScrapeModal";
+import { ListingScrapeProgress } from "@/components/reports/ListingScrapeProgress";
+import { BrandAdvancedSettingsModal } from "@/components/settings/BrandAdvancedSettingsModal";
+import { FontPicker } from "@/components/settings/FontPicker";
+import { GeneratedBrochureCopyEditor } from "@/components/collateral/sales-brochure/GeneratedBrochureCopyEditor";
+import { SalesBrochureWizard } from "@/components/collateral/sales-brochure/SalesBrochureWizard";
+import { FittedBrochurePreview } from "@/components/collateral/sales-brochure/FittedBrochurePreview";
+import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
+import { SocialPostLayerPanel } from "@/components/collateral/social/SocialPostLayerPanel";
+import { buildSocialPostsDocument } from "@/lib/collateral/buildSocialPostsDocument";
+import { salesBrochureToReportShape } from "@/lib/collateral/sales-brochure/toReportShape";
+import { SALES_BROCHURE_TEMPLATES } from "@/lib/collateral/templates/sales-brochure/registry";
+import { REPORT_TEMPLATES } from "@/lib/reports/templates/registry";
+import { Button } from "@/components/ui/button";
+import type { AgencyInput } from "@/lib/validation/schemas";
+
+const cases = ["brochure", "editor", "wizard", "report", "gallery", "landing", "agents", "unknown-agents", "branding", "analytics", "leads", "progress", "social"] as const;
+
+export function LintRegressionPlayground() {
+  const [fixtures] = useState(createLintRegressionFixtures);
+  const [started, setStarted] = useState(false);
+  const [selected, setSelected] = useState<string>("brochure");
+  const [requests, setRequests] = useState<string[]>([]);
+  const restore = useRef<(() => void) | null>(null);
+  useEffect(() => () => restore.current?.(), []);
+
+  function start() {
+    restore.current = installRegressionMocks(fixtures, (label) => setRequests((items) => [...items, label]));
+    setStarted(true);
+  }
+
+  return <main className="mx-auto max-w-7xl space-y-5 p-6">
+    <header className="space-y-3 rounded-xl border bg-amber-50 p-4 text-slate-900">
+      <h1 className="text-2xl font-semibold">StayPack mock regression preview</h1>
+      <p>Synthetic listing and agency. Saves stay in this browser tab and reset on reload.</p>
+      {!started ? <Button onClick={start}>Start mock test session</Button> : <label>Test screen <select aria-label="Test screen" value={selected} onChange={(e) => setSelected(e.target.value)} className="ml-3 rounded border p-2">{cases.map((name) => <option key={name}>{name}</option>)}</select></label>}
+    </header>
+    {started && <RegressionCase key={selected} name={selected} fixtures={fixtures} />}
+    <details><summary>Mock API activity ({requests.length})</summary><pre data-testid="mock-requests">{requests.join("\n")}</pre></details>
+  </main>;
+}
+
+function RegressionCase({ name, fixtures }: { name: string; fixtures: RegressionFixtures }) {
+  const [listing, setListing] = useState(fixtures.listing);
+  const [collateral, setCollateral] = useState(fixtures.collateral);
+  const [agency, setAgency] = useState(fixtures.agency);
+  const [templateId, setTemplateId] = useState(fixtures.document.template_id);
+  const [reportTemplate, setReportTemplate] = useState(REPORT_TEMPLATES[0].id);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(false);
+  const [completion, setCompletion] = useState("");
+  const [social, setSocial] = useState(() => buildSocialPostsDocument({ agency, listing, collateral: { ...collateral, type: "social_posts", template_id: null }, agentProfile: fixtures.agent }));
+  const form = useForm<AgencyInput>({ defaultValues: { name: agency.name, slug: agency.slug, website_url: agency.website_url ?? "", email: agency.email ?? "", primary_colour: agency.primary_colour, text_colour: agency.text_colour, heading_font_family: agency.heading_font_family, body_font_family: agency.body_font_family } });
+  const document = { ...fixtures.document, template_id: templateId };
+  const report = { ...salesBrochureToReportShape(fixtures.document), template_id: reportTemplate };
+
+  if (name === "brochure") return <section data-testid="brochure">
+    <label>Brochure template <select aria-label="Brochure template" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>{SALES_BROCHURE_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.label} ({t.pages} pages)</option>)}</select></label>
+    <FittedBrochurePreview document={document} useDocumentBrand />
+  </section>;
+  if (name === "editor") return <GeneratedBrochureCopyEditor agency={agency} listing={listing} collateral={collateral} agencyAgents={[fixtures.agent]} onCollateralChange={setCollateral} onContinueToPreview={() => setCompletion("Preview ready")} />;
+  if (name === "wizard") return <SalesBrochureWizard agency={agency} initialListing={listing} initialCollateral={collateral} />;
+  if (name === "report") return <section data-testid="report">
+    <label>Report template <select aria-label="Report template" value={reportTemplate} onChange={(e) => setReportTemplate(e.target.value)}>{REPORT_TEMPLATES.slice(0, 2).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select></label>
+    <FittedReportPreview report={report} editable={{ setField: (_path, value) => setCompletion(value), openImagePicker: () => {} }} />
+    <output data-testid="edited-report">{completion}</output>
+  </section>;
+  if (name === "gallery") return <ListingImageGallery images={fixtures.document.property.selected_image_urls} address={listing.property_address ?? "Mock property"} />;
+  if (name === "landing") return <LandingTemplatePreviewModal listingId={listing.id} agencySlug="dev/lint-regression" listingSlug="mock" savedTemplate={listing.landing_template} />;
+  if (name === "agents") return <ListingAgentsStrip listing={listing} onUpdated={setListing} />;
+  if (name === "unknown-agents") return <section><Button onClick={() => setOpen(true)}>Review scraped agents</Button><UnknownAgentsAfterScrapeModal open={open} agents={[{ name: "Mock New Agent", phone: "0400000001" }]} onComplete={(result) => { setCompletion(JSON.stringify(result)); setOpen(false); }} /><output data-testid="completion">{completion}</output></section>;
+  if (name === "branding") return <section><Button onClick={() => setOpen(true)}>Advanced settings</Button><BrandAdvancedSettingsModal open={open} onOpenChange={setOpen} agency={agency} form={form} onSaved={setAgency} /><FontPicker form={form} agencyId={agency.id} /></section>;
+  if (name === "analytics") return <DashboardAnalytics activeListings={3} />;
+  if (name === "leads") return <LeadsInbox initialLeads={[fixtures.lead]} />;
+  if (name === "progress") return <section><Button onClick={() => { setActive(true); window.setTimeout(() => setActive(false), 1500); }}>Run mock import</Button><ListingScrapeProgress active={active}><p>Mock listing form</p></ListingScrapeProgress></section>;
+  if (name === "social") return <SocialPostLayerPanel document={social} listing={listing} backgroundOptions={fixtures.document.property.selected_image_urls} onChange={setSocial} />;
+  return null;
+}

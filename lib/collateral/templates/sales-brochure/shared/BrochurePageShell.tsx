@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { ReportBrandColours } from "@/lib/reports/brandColours";
-import { BROCHURE_PAGE_STYLE } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
+import { BROCHURE_PAGE_STYLE } from "@/lib/collateral/templates/sales-brochure/shared/getBrochurePageData";
 
 export function BrochurePageShell({
   brand,

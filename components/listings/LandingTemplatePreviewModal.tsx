@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, LayoutTemplate, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -49,19 +49,20 @@ export function LandingTemplatePreviewModal({
   const [saving, setSaving] = useState(false);
   const [iframeLoading, setIframeLoading] = useState(true);
 
-  // Pick up server-refreshed values (e.g. after router.refresh()).
-  useEffect(() => {
+  // Pick up refreshed props before rendering the saved-template indicator.
+  const [previousSavedTemplate, setPreviousSavedTemplate] = useState(savedTemplate);
+  if (previousSavedTemplate !== savedTemplate) {
+    setPreviousSavedTemplate(savedTemplate);
     setSavedTemplateId(resolveLandingTemplate(savedTemplate));
-  }, [savedTemplate]);
+  }
 
-  // Each time the modal opens, start from whatever is actually saved.
-  useEffect(() => {
-    if (open) {
+  function handleOpenChange(nextOpen: boolean) {
+    if (nextOpen) {
       setActiveTemplateId(savedTemplateId);
       setIframeLoading(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+    setOpen(nextOpen);
+  }
 
   const previewSrc = `/${agencySlug}/l/${listingSlug}?preview=1&embed=1&template=${activeTemplateId}`;
 
@@ -98,11 +99,11 @@ export function LandingTemplatePreviewModal({
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" onClick={() => handleOpenChange(true)}>
         <LayoutTemplate className="h-4 w-4" />
         Preview templates
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
           showCloseButton

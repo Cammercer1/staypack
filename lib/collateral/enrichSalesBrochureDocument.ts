@@ -74,7 +74,7 @@ export async function resolveSalesBrochurePrintDocument({
     template_id?: string | null;
   };
 }): Promise<CollateralDocumentJson> {
-  let document = mergeAgencyBrandIntoCollateralDocument(agency, collateral.document_json);
+  const document = mergeAgencyBrandIntoCollateralDocument(agency, collateral.document_json);
 
   if (!collateral.listing_id || !isBrochureDocument(document)) {
     return document;

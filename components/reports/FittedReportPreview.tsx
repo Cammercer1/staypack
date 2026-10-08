@@ -51,9 +51,12 @@ export function FittedReportPreview({
   const [currentPage, setCurrentPage] = useState(0);
   const fitToPanel = maxHeight !== "none";
 
-  useLayoutEffect(() => {
+  const paginationKey = `${report.template_id}:${pageCount}`;
+  const [previousPaginationKey, setPreviousPaginationKey] = useState(paginationKey);
+  if (previousPaginationKey !== paginationKey) {
+    setPreviousPaginationKey(paginationKey);
     setCurrentPage(0);
-  }, [report.template_id, pageCount]);
+  }
 
   useLayoutEffect(() => {
     const container = containerRef.current;

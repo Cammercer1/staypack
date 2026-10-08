@@ -462,7 +462,7 @@ export function InlineBlurbEditor({
     });
   }
 
-  let firstParagraph = true;
+  const firstParagraphIndex = blocks.findIndex((block) => block.type === "paragraph");
 
   if (blocks.length === 0) {
     return (
@@ -506,10 +506,7 @@ export function InlineBlurbEditor({
       <div className="flex flex-col gap-0.5 py-0.5">
         {blocks.map((block, index) => {
           const useDropCap =
-            editorialDropCap && block.type === "paragraph" && firstParagraph;
-          if (block.type === "paragraph") {
-            firstParagraph = false;
-          }
+            editorialDropCap && index === firstParagraphIndex;
 
           return (
             <Fragment key={`blurb-${index}-${block.type}`}>

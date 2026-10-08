@@ -93,13 +93,12 @@ function ListingAgentEditDialog({
   onClose: () => void;
   onSave: (agent: ListingAgentDraft) => void;
 }) {
-  const [draft, setDraft] = useState<ListingAgentDraft>(EMPTY_LISTING_AGENT);
-
-  useEffect(() => {
-    if (open && agent) {
-      setDraft(agent);
-    }
-  }, [open, agent]);
+  const [draft, setDraft] = useState<ListingAgentDraft>(agent ?? EMPTY_LISTING_AGENT);
+  const [previous, setPrevious] = useState({ open, agent });
+  if (previous.open !== open || previous.agent !== agent) {
+    setPrevious({ open, agent });
+    if (open && agent) setDraft(agent);
+  }
 
   function updateField(field: keyof ListingAgentDraft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -194,9 +193,12 @@ export function ListingAgentsStrip({ listing, onUpdated }: Props) {
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const listingRevision = `${listing.id}:${listing.updated_at}`;
+  const [previousListingRevision, setPreviousListingRevision] = useState(listingRevision);
+  if (previousListingRevision !== listingRevision) {
+    setPreviousListingRevision(listingRevision);
     setAgents(initialListingAgents(listing.scraped_listing_json?.agents));
-  }, [listing.id, listing.updated_at]);
+  }
 
   useEffect(() => {
     fetch("/api/agents")

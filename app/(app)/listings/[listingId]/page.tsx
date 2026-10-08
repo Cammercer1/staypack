@@ -33,6 +33,8 @@ export default async function ListingDetailPage({
     supabase,
   );
 
+  // This async server page queries a rolling window for the current request.
+  // eslint-disable-next-line react-hooks/purity -- The query intentionally uses the request-time clock.
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const [

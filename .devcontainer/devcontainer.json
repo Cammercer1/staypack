@@ -1,0 +1,22 @@
+{
+  "name": "StayPacks",
+  "dockerComposeFile": "../compose.yaml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "node",
+  "overrideCommand": false,
+  "shutdownAction": "stopCompose",
+  "initializeCommand": [
+    "sh",
+    "-c",
+    "test -f .env.local || cp .env.example .env.local"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss"
+      ]
+    }
+  }
+}

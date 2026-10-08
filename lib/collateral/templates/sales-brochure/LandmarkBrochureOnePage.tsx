@@ -3,13 +3,13 @@ import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
 import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { LandmarkSpread } from "@/lib/collateral/templates/sales-brochure/landmark/LandmarkLayout";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
-import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
+import { getBrochurePageData } from "@/lib/collateral/templates/sales-brochure/shared/getBrochurePageData";
 
 /** Landmark · 1 page — hero, branded stats banner, copy left + price/agents right. */
 export function LandmarkBrochureOnePage({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isBrochureDocument(document)) return null;
 
-  const { report, brand } = useBrochurePage(document);
+  const { report, brand } = getBrochurePageData(document);
   const fmt = getCollateralPageFormat(pageFormat);
 
   return (

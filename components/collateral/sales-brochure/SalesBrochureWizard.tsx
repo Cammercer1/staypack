@@ -53,13 +53,9 @@ export function SalesBrochureWizard({
   agency,
   collateralType = "sales_brochure",
 }: Props) {
-  const [listing, setListing] = useState(initialListing);
+  const listing = initialListing;
   const [collateral, setCollateral] = useState(initialCollateral);
   const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
-
-  useEffect(() => {
-    setListing(initialListing);
-  }, [initialListing]);
 
   useEffect(() => {
     fetch("/api/agents")
@@ -93,12 +89,14 @@ export function SalesBrochureWizard({
       return raw && isBrochureDocument(raw) ? raw : null;
     });
 
-  useEffect(() => {
+  const [previousDocument, setPreviousDocument] = useState(collateral.document_json);
+  if (previousDocument !== collateral.document_json) {
+    setPreviousDocument(collateral.document_json);
     const raw = collateral.document_json;
     if (raw && isBrochureDocument(raw)) {
       setPreviewDraftDocument(raw);
     }
-  }, [collateral.document_json]);
+  }
 
   useEffect(() => {
     return () => {

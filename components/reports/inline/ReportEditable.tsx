@@ -151,19 +151,21 @@ export function ReportEditable({
     onFieldFocus?.(null);
   }
 
-  return createElement(Component, {
-    ref,
-    className: cn(
-      className,
-      "outline-none transition-[box-shadow] focus-visible:ring-2 focus-visible:ring-primary/40 hover:ring-1 hover:ring-primary/25 rounded-sm",
-    ),
-    style,
-    contentEditable: true,
-    suppressContentEditableWarning: true,
-    spellCheck: true,
-    onInput: handleInput,
-    onPaste: handlePaste,
-    onFocus: handleFocus,
-    onBlur: handleBlur,
-  });
+  return (
+    <Component
+      ref={ref}
+      className={cn(
+        className,
+        "outline-none transition-[box-shadow] focus-visible:ring-2 focus-visible:ring-primary/40 hover:ring-1 hover:ring-primary/25 rounded-sm",
+      )}
+      style={style}
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck
+      onInput={handleInput}
+      onPaste={handlePaste}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+    />
+  );
 }

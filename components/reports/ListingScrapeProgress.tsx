@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,21 +20,19 @@ type Props = {
   children: ReactNode;
 };
 
+const subscribeToHydration = () => () => {};
+
 export function ListingScrapeProgress({ active, className, children }: Props) {
   const [stepIndex, setStepIndex] = useState(0);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!active) {
-      setStepIndex(0);
-      return;
-    }
-
+  const mounted = useSyncExternalStore(subscribeToHydration, () => true, () => false);
+  const [previousActive, setPreviousActive] = useState(active);
+  if (previousActive !== active) {
+    setPreviousActive(active);
     setStepIndex(0);
+  }
+
+  useEffect(() => {
+    if (!active) return;
 
     const timeouts: ReturnType<typeof setTimeout>[] = [];
     let elapsed = 0;

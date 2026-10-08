@@ -10,7 +10,10 @@ Branded short-term rental potential reports for real estate agencies. Next.js Ap
 
 ## Commands
 
-- `npm install` — install dependencies (Node >= 20.9)
+- `npm ci` — install locked dependencies (Node 24 LTS)
+- `npm run container:up` — build/start the Docker development environment at http://localhost:3000
+- `npm run container:down` — stop the Docker development environment
+- With the container running, use `docker compose exec app <command>` for checks so they use Linux dependencies and Node 24.
 - `npm run dev` — local dev server at http://localhost:3000
 - `npm run build` — production build (runs env verification first)
 - `npm run lint` — ESLint

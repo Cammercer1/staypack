@@ -234,7 +234,6 @@ export function SocialPostLayerPanel({
   useEffect(() => {
     if (!pickerOpen) return;
 
-    setAgentsLoading(true);
     fetch("/api/agents")
       .then((response) => response.json())
       .then((payload) => {
@@ -877,7 +876,7 @@ export function SocialPostLayerPanel({
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => setPickerOpen(true)}
+              onClick={() => { setAgentsLoading(true); setPickerOpen(true); }}
             >
               <Users className="h-4 w-4" />
               Load from team
@@ -1051,7 +1050,7 @@ export function SocialPostLayerPanel({
             variant="outline"
             size="sm"
             className="w-full"
-            onClick={() => setPickerOpen(true)}
+            onClick={() => { setAgentsLoading(true); setPickerOpen(true); }}
           >
             <Users className="h-4 w-4" />
             Load from team

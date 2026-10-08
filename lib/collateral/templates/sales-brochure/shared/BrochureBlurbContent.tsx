@@ -74,7 +74,9 @@ export function BrochureBlurbContent({
     return null;
   }
 
-  let firstParagraphDone = false;
+  const firstParagraphIndex = visible.findIndex(
+    (block) => block.type === "paragraph" && Boolean(block.text.trim()),
+  );
 
   return (
     <div className={cn("space-y-3", blurbClassName)}>
@@ -104,8 +106,7 @@ export function BrochureBlurbContent({
           );
         }
 
-        const useDropCap = editorialDropCap && !firstParagraphDone;
-        firstParagraphDone = true;
+        const useDropCap = editorialDropCap && index === firstParagraphIndex;
 
         return (
           <p

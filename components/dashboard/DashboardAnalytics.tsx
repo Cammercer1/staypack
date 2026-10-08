@@ -76,7 +76,7 @@ export function DashboardAnalytics({ activeListings }: { activeListings: number 
   const [loading, setLoading] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
 
-  const fetchStats = useCallback(async (p: Preset, c: typeof custom) => {
+  const fetchStats = useCallback((p: Preset, c: typeof custom) => {
     const range = presetToRange(p, c);
     // Don't fetch custom if dates aren't both set
     if (p === "custom" && (!c.from || !c.to)) return;
@@ -85,29 +85,41 @@ export function DashboardAnalytics({ activeListings }: { activeListings: number 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/analytics/overview?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`,
-        { signal: ctrl.signal },
-      );
-      if (!res.ok) return;
-      const data = (await res.json()) as Stats;
-      setStats(data);
-    } catch {
-      // aborted or network error — ignore
-    } finally {
-      setLoading(false);
-    }
+    return fetch(
+      `/api/analytics/overview?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`,
+      { signal: ctrl.signal },
+    )
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = (await res.json()) as Stats;
+        if (!ctrl.signal.aborted) setStats(data);
+      })
+      .catch(() => {
+        // Keep the last successful stats on cancellation or network failure.
+      })
+      .finally(() => {
+        if (!ctrl.signal.aborted) setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
-    fetchStats(preset, custom);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset]);
+    void fetchStats("30d", { from: "", to: "" });
+    return () => abortRef.current?.abort();
+  }, [fetchStats]);
+
+  function handlePresetChange(next: Preset) {
+    setPreset(next);
+    if (next !== "custom" || (custom.from && custom.to)) {
+      setLoading(true);
+      void fetchStats(next, custom);
+    }
+  }
 
   function handleCustomApply() {
-    if (custom.from && custom.to) fetchStats("custom", custom);
+    if (custom.from && custom.to) {
+      setLoading(true);
+      void fetchStats("custom", custom);
+    }
   }
 
   const conversion =
@@ -131,7 +143,7 @@ export function DashboardAnalytics({ activeListings }: { activeListings: number 
         {/* Time-frame selector */}
         <select
           value={preset}
-          onChange={(e) => setPreset(e.target.value as Preset)}
+          onChange={(e) => handlePresetChange(e.target.value as Preset)}
           className="rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
         >
           {PRESETS.map(({ key, label }) => (

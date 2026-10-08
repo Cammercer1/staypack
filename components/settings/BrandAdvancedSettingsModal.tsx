@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -87,7 +87,9 @@ export function BrandAdvancedSettingsModal({
   form,
   onSaved,
 }: Props) {
-  const [draft, setDraft] = useState<AgencyBrandAdvanced>(DEFAULT_BRAND_ADVANCED);
+  const [draft, setDraft] = useState<AgencyBrandAdvanced>(() =>
+    parseAgencyBrandAdvanced(form.getValues("brand_advanced_json") ?? agency.brand_advanced_json),
+  );
   const [saving, setSaving] = useState(false);
 
   const previewAgency = useMemo(
@@ -104,14 +106,15 @@ export function BrandAdvancedSettingsModal({
     [previewAgency],
   );
 
-  useEffect(() => {
-    if (!open) return;
-
-    const current = parseAgencyBrandAdvanced(
-      form.getValues("brand_advanced_json") ?? agency.brand_advanced_json,
-    );
-    setDraft(current);
-  }, [agency.brand_advanced_json, form, open]);
+  const [previous, setPrevious] = useState({ open, brand: agency.brand_advanced_json, form });
+  if (previous.open !== open || previous.brand !== agency.brand_advanced_json || previous.form !== form) {
+    setPrevious({ open, brand: agency.brand_advanced_json, form });
+    if (open) {
+      setDraft(parseAgencyBrandAdvanced(
+        form.getValues("brand_advanced_json") ?? agency.brand_advanced_json,
+      ));
+    }
+  }
 
   function updateDraft(patch: Partial<AgencyBrandAdvanced>) {
     setDraft((current) => ({ ...current, ...patch }));

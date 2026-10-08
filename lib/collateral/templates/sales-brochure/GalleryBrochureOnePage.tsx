@@ -3,13 +3,13 @@ import type { CollateralTemplateProps } from "@/lib/collateral/templates/types";
 import { isBrochureDocument } from "@/lib/collateral/templates/types";
 import { GalleryPageOneSpread } from "@/lib/collateral/templates/sales-brochure/gallery/GalleryLayout";
 import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/shared/BrochurePageShell";
-import { useBrochurePage } from "@/lib/collateral/templates/sales-brochure/shared/useBrochurePage";
+import { getBrochurePageData } from "@/lib/collateral/templates/sales-brochure/shared/getBrochurePageData";
 
 /** Gallery · 1 page — hero + three photos, address bar, details, website & QR. */
 export function GalleryBrochureOnePage({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
   if (!isBrochureDocument(document)) return null;
 
-  const { report, brand } = useBrochurePage(document);
+  const { report, brand } = getBrochurePageData(document);
   const fmt = getCollateralPageFormat(pageFormat);
 
   return (

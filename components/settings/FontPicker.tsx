@@ -48,11 +48,7 @@ function FontField({
 
   useEffect(() => {
     const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setResults([]);
-      setOpen(false);
-      return;
-    }
+    if (trimmed.length < 2) return;
 
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {
@@ -69,15 +65,16 @@ function FontField({
         if (!response.ok) {
           throw new Error(payload.error ?? "Unable to search fonts");
         }
+        if (controller.signal.aborted) return;
         setResults(payload.fonts ?? []);
         setOpen(true);
       } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
+        if (!controller.signal.aborted && !(error instanceof DOMException && error.name === "AbortError")) {
           setResults([]);
           setOpen(false);
         }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }, 200);
 
@@ -86,6 +83,15 @@ function FontField({
       window.clearTimeout(timeout);
     };
   }, [query]);
+
+  function updateQuery(next: string) {
+    setQuery(next);
+    if (next.trim().length < 2) {
+      setResults([]);
+      setOpen(false);
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="space-y-3 rounded-xl border border-border/70 bg-background/80 p-4">
@@ -103,7 +109,7 @@ function FontField({
         <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => updateQuery(event.target.value)}
           onFocus={() => {
             if (results.length > 0) setOpen(true);
           }}
@@ -128,7 +134,7 @@ function FontField({
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => {
                     onQuickPick(font.family);
-                    setQuery("");
+                    updateQuery("");
                     setOpen(false);
                   }}
                 >

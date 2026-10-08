@@ -52,7 +52,7 @@ export function ListingImageGallery({ images, address }: Props) {
   if (images.length === 0) return null;
 
   // Mobile-only floating button (col3 bar handles desktop)
-  const MobileShowAllButton = () => (
+  const mobileShowAllButton = (
     <button
       onClick={() => setModalOpen(true)}
       className="absolute bottom-3 right-3 flex items-center justify-between gap-6 bg-black/70 px-4 py-2.5 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/85"
@@ -92,7 +92,7 @@ export function ListingImageGallery({ images, address }: Props) {
           alt={address}
           className="aspect-[4/3] w-full object-cover"
         />
-        <MobileShowAllButton />
+        {mobileShowAllButton}
       </div>
 
       {/* ── Desktop gallery ───────────────────────────────── */}
