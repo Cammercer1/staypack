@@ -1,3 +1,4 @@
+import { LEGACY_PROPERTY_PAGE_TOOLS } from "@/lib/listings/legacyPropertyPages";
 import { Bath, BedDouble, Car } from "lucide-react";
 import { marked } from "marked";
 import { ListingLeadForm } from "@/components/listings/ListingLeadForm";
@@ -198,11 +199,11 @@ export function ClassicLandingTemplate({
               </div>
             ))}
 
-            <ListingLeadForm
+            {LEGACY_PROPERTY_PAGE_TOOLS ? <ListingLeadForm
               agencySlug={agencySlug}
               listingSlug={listingSlug}
               brandAdvanced={brandAdvanced}
-            />
+            /> : <div className="space-y-2 text-sm"><p>Contact the agent directly for more information.</p>{a.phone ? <a className="block" href={`tel:${a.phone}`}>{a.phone}</a> : null}{a.email ? <a className="block" href={`mailto:${a.email}`}>{a.email}</a> : null}</div>}
           </div>
         </div>
       </main>

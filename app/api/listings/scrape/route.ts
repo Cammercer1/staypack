@@ -7,7 +7,6 @@ import {
 import { scrapeListingSchema } from "@/lib/validation/schemas";
 import { extractListingFromUrl } from "@/lib/scraping/extractListing";
 import {
-  ensureListingLandingProvisioned,
   generateListingSlug,
 } from "@/lib/listings/provisionLandingPage";
 import { buildScrapedListingFields } from "@/lib/listings/buildScrapedListingFields";
@@ -198,11 +197,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         ...payload,
-        listing: await ensureListingLandingProvisioned(
-          payload.listing as Listing,
-          agency,
-          supabase,
-        ),
+        listing: payload.listing,
       });
     }
 
@@ -254,11 +249,7 @@ export async function POST(request: Request) {
     const agencyAgents = await loadAgencyAgents(supabase, agency.id);
     const unknown_agents = findUnknownScrapedAgents(listing.agents, agencyAgents);
 
-    const landingListing = await ensureListingLandingProvisioned(
-      listingWithDescription,
-      agency,
-      supabase,
-    );
+    const landingListing = listingWithDescription;
 
     return NextResponse.json({
       scrape_job_id: scrapeJob.id,

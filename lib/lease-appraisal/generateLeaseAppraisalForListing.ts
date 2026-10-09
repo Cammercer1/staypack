@@ -1,3 +1,5 @@
+import { saveAppraisalResults } from "@/lib/appraisals/saveAppraisalResults";
+import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { buildLeaseAppraisalReport } from "@/lib/lease-appraisal/buildLeaseAppraisalReport";
@@ -27,13 +29,6 @@ function assertSaleListing(listing: Listing) {
   }
 }
 
-function assertScrapedListing(listing: Listing) {
-  if (!listing.scraped_listing_json) {
-    throw new Error(
-      "Import the listing URL first so we can run rental comps and suburb context",
-    );
-  }
-}
 
 export function resolveAgentProfile(
   listing: Listing,
@@ -70,7 +65,6 @@ export async function createLeaseAppraisalDraft({
   userId?: string;
 }): Promise<{ report: Report; listing: Listing }> {
   assertSaleListing(listing);
-  assertScrapedListing(listing);
 
   const { data: existingCollateral } = await supabase
     .from("collateral_items")
@@ -143,26 +137,12 @@ export async function generateLeaseAppraisalReportContent({
 
   let listing = initialListing;
 
-  const scrapedListing = listing.scraped_listing_json;
-  if (!scrapedListing) {
-    throw new Error("Import the listing URL before generating the appraisal");
-  }
+  const appraisalInput = resolveAppraisalInput(listing);
 
-  const parsed = await ensureLeaseAppraisalPositioning(scrapedListing);
+  const parsed = await ensureLeaseAppraisalPositioning(appraisalInput);
 
-  if (parsed !== listing.scraped_listing_json) {
-    const { data: updatedListing, error: listingError } = await supabase
-      .from("listings")
-      .update({ scraped_listing_json: parsed })
-      .eq("id", listing.id)
-      .select("*")
-      .single();
-
-    if (listingError || !updatedListing) {
-      throw new Error(listingError?.message ?? "Failed to save lease positioning");
-    }
-
-    listing = updatedListing as Listing;
+  if (parsed !== appraisalInput) {
+    listing = await saveAppraisalResults({ supabase, listing, kind: "lease", parsed });
   }
 
   if (!hasLeaseAppraisalComps(parsed)) {

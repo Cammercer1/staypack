@@ -1,3 +1,4 @@
+import { publishedDocumentSnapshot } from "@/lib/documents/documentLink";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
@@ -34,6 +35,8 @@ export default async function DraftCollateralPrintPage({
   if (!collateral?.document_json) {
     notFound();
   }
+  collateral.document_json = publishedDocumentSnapshot(collateral.document_json);
+
 
   const { data: agency } = await admin
     .from("agencies")

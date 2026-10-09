@@ -1,3 +1,4 @@
+import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { buildSalesAppraisalReport } from "@/lib/sales-appraisal/buildSalesAppraisalReport";
@@ -25,13 +26,6 @@ function assertSaleListing(listing: Listing) {
   }
 }
 
-function assertScrapedListing(listing: Listing) {
-  if (!listing.scraped_listing_json) {
-    throw new Error(
-      "Import the listing URL first so we can find sold and for-sale comparables",
-    );
-  }
-}
 
 export function hasSalesAppraisalComps(parsed: ParsedListing | null | undefined) {
   const appraisal = parsed?.salesAppraisal;
@@ -55,7 +49,6 @@ export async function createSalesAppraisalDraft({
   userId?: string;
 }): Promise<{ report: Report; listing: Listing }> {
   assertSaleListing(listing);
-  assertScrapedListing(listing);
 
   const { data: existingCollateral } = await supabase
     .from("collateral_items")
@@ -128,10 +121,7 @@ export async function generateSalesAppraisalReportContent({
 
   const listing = initialListing;
 
-  const parsed = listing.scraped_listing_json;
-  if (!parsed) {
-    throw new Error("Import the listing URL before generating the appraisal");
-  }
+  const parsed = resolveAppraisalInput(listing);
 
   if (!hasSalesAppraisalComps(parsed)) {
     throw new Error("Fetch sale comps before generating appraisal content");

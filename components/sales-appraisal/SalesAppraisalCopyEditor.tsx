@@ -1,5 +1,7 @@
 "use client";
 
+import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
+
 import {
   forwardRef,
   useCallback,
@@ -146,7 +148,7 @@ export const SalesAppraisalCopyEditor = forwardRef<
   }, [report.final_report_json, report.updated_at]);
 
   const displayPrice = useMemo(() => resolveReportDisplayPrice(listing), [listing]);
-  const parsed = listing.scraped_listing_json;
+  const parsed = useMemo(() => resolveAppraisalInput(listing), [listing]);
   const appraisal = parsed?.salesAppraisal;
 
   const priceRangeLabel = useMemo(() => {

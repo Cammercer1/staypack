@@ -1,3 +1,4 @@
+import { DocumentQr } from "@/components/documents/DocumentQr";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import { resolveBrochureBrandBand } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureBrandBand";
 import type { FinalReportJson } from "@/lib/types";
@@ -313,12 +314,15 @@ export function RefinedFooterImage({ document }: { document: BrochureDocumentJso
   if (!footer) return null;
 
   return (
+    <div className="relative h-[88mm] shrink-0">
     <BrochureSlotImage
       url={footer}
       slot={{ kind: "page_one", index: 2 }}
-      className="h-[88mm] shrink-0"
+      className="h-full"
       imageWrapperClassName="min-h-0 h-full flex-1"
     />
+    <div className="absolute bottom-3 right-3"><DocumentQr document={document} /></div>
+    </div>
   );
 }
 

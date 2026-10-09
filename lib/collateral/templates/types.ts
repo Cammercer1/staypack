@@ -68,7 +68,7 @@ export type SocialPostFeaturesLayer = {
   scale: number;
 };
 
-export type BusinessCardDocumentJson = {
+export type BusinessCardDocumentJson = import("@/lib/documents/documentLink").DocumentLinkFields & {
   version: "business_card_v1";
   type: "agent_business_card";
   template_id: string;
@@ -310,7 +310,7 @@ export type BrochurePropertySlice = {
 /** @deprecated Use BrochurePropertySlice */
 export type SalesBrochurePropertySlice = BrochurePropertySlice;
 
-type BrochureDocumentBase = {
+type BrochureDocumentBase = import("@/lib/documents/documentLink").DocumentLinkFields & {
   template_id: string;
   generated_at: string;
   /** Last time copy/images were saved in the editor. */

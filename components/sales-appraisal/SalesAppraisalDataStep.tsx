@@ -1,5 +1,7 @@
 "use client";
 
+import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Check, Loader2 } from "lucide-react";
@@ -46,7 +48,7 @@ export function SalesAppraisalDataStep({
   onJobChange,
   onContinue,
 }: Props) {
-  const parsed = listing.scraped_listing_json;
+  const parsed = useMemo(() => resolveAppraisalInput(listing), [listing]);
   const pool = useMemo(
     () => (parsed ? orderSalesAppraisalCompPool(parsed) : []),
     [parsed],
@@ -127,7 +129,10 @@ export function SalesAppraisalDataStep({
     return null;
   }, [priceMin, priceMax, priceMid]);
 
+  const inputError = appraisalInputError(listing);
+  const staleEvidence = hasStaleAppraisal(listing, "sales");
   const compsReady = hasSalesAppraisalComps(parsed);
+  const noCompsFound = activeJob?.status === "completed" && !compsReady && !staleEvidence && !inputError;
   const initialCompsProcessing = jobProcessing && !compsReady;
   const refreshingComps = jobProcessing && compsReady;
   const needsAgentReview = agencyGuideReview?.required === true;
@@ -172,7 +177,11 @@ export function SalesAppraisalDataStep({
             if (jobCompletionToastRef.current !== nextJob.id) {
               jobCompletionToastRef.current = nextJob.id;
               if (nextJob.status === "completed") {
-                toast.success("Sales comps updated");
+                if (nextListing && hasSalesAppraisalComps(resolveAppraisalInput(nextListing))) {
+                  toast.success("Sales comps updated");
+                } else {
+                  toast.info("Search completed without suitable comparables");
+                }
               } else {
                 toast.error(
                   nextJob.error_message ??
@@ -339,14 +348,14 @@ export function SalesAppraisalDataStep({
           ) : jobFailed ? (
             <Badge variant="destructive">Failed</Badge>
           ) : (
-            <Badge variant="outline">Required</Badge>
+            <Badge variant="outline">{noCompsFound ? "No matches" : "Required"}</Badge>
           )}
         </div>
 
         <Button
           variant="outline"
           onClick={() => void fetchComps()}
-          disabled={loading || refreshingComps}
+          disabled={loading || refreshingComps || Boolean(inputError)}
         >
           {compsPrefetching || fetching || jobProcessing ? (
             <>
@@ -374,8 +383,14 @@ export function SalesAppraisalDataStep({
             {activeJob?.error_message ??
               "Sales comps failed to update. Refresh comps to try again."}
           </p>
+        ) : noCompsFound ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            No suitable comparable sales were found. Check the property details, then try fetching comparables again.
+          </p>
         ) : null}
       </div>
+
+      {inputError ? <p role="alert" className="text-sm text-destructive">{inputError}</p> : staleEvidence ? <p role="status" className="text-sm text-muted-foreground">Property details changed. Fetch comparables again to update the appraisal.</p> : null}
 
       {compsReady ? (
         <>

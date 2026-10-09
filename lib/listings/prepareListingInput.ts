@@ -1,3 +1,4 @@
+import { appraisalInputFingerprint, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
 import { geocodeReportAddress, hasGeocodableAddress } from "@/lib/geocoding";
 import {
   normalizeListingImageMetaInput,
@@ -24,7 +25,7 @@ export async function prepareListingInput(body: UpdateListingInput) {
   const prepared = { ...body };
 
   if (prepared.listing_agents !== undefined) {
-    const currentScraped = parsedListingSchema.parse({
+    const currentScraped = prepared.scraped_listing_json ?? parsedListingSchema.parse({
       images: [],
       agents: [],
       confidence: "low",
@@ -117,27 +118,17 @@ const ADDRESS_FIELDS = [
 
 export async function prepareListingPatch(
   body: UpdateListingInput,
-  existing: Pick<
-    Listing,
-    | (typeof ADDRESS_FIELDS)[number]
-    | "latitude"
-    | "longitude"
-    | "scraped_listing_json"
-    | "uploaded_image_urls"
-    | "listing_image_meta"
-  >,
+  existing: Listing,
 ) {
   const prepared = { ...body };
 
   if (prepared.listing_agents !== undefined) {
-    const currentScraped = parsedListingSchema.parse(
-      existing.scraped_listing_json ?? {
+    const currentScraped = existing.scraped_listing_json ?? parsedListingSchema.parse({
         images: [],
         agents: [],
         confidence: "low",
         warnings: [],
-      },
-    );
+      });
     const listingAgents = prepared.listing_agents
       .map((agent) => ({
         name: agent.name.trim(),
@@ -153,6 +144,26 @@ export async function prepareListingPatch(
       agents: listingAgents,
     };
     delete prepared.listing_agents;
+  }
+
+  // Undefined optional values are omitted by the database client, not saved as clears.
+  const savedFields = Object.fromEntries(
+    Object.entries(prepared).filter(([, value]) => value !== undefined),
+  );
+  const fingerprint = appraisalInputFingerprint(existing);
+  if (fingerprint !== appraisalInputFingerprint({ ...existing, ...savedFields } as Listing) && existing.scraped_listing_json) {
+    const stored = prepared.scraped_listing_json ?? existing.scraped_listing_json;
+    const storedWithInputs = {
+      ...stored,
+      appraisalInputFingerprints: {
+        // Legacy evidence already known to be stale must not be certified against
+        // the current edited fields. Only a new search can make it current again.
+        ...(existing.scraped_listing_json.rentalAppraisal ? { lease: hasStaleAppraisal(existing, "lease") ? "legacy-stale" : fingerprint } : {}),
+        ...(existing.scraped_listing_json.salesAppraisal ? { sales: hasStaleAppraisal(existing, "sales") ? "legacy-stale" : fingerprint } : {}),
+        ...existing.scraped_listing_json.appraisalInputFingerprints,
+      },
+    };
+    prepared.scraped_listing_json = storedWithInputs;
   }
 
   const nextListing = {

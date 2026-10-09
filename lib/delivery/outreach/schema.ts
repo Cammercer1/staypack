@@ -1,3 +1,4 @@
+import { documentLinkSchema } from "@/lib/documents/documentLink";
 import { z } from "zod";
 import { isValidCollateralTemplateId, isSalesBrochureTemplateId } from "@/lib/collateral/templates/ids";
 import { selectableStrTemplateIdSchema } from "@/lib/delivery/outreach/strTemplateId";
@@ -42,6 +43,11 @@ export const outreachGenerateRequestSchema = z.object({
   deliverables: z
     .array(z.enum(OUTREACH_DELIVERABLES))
     .default(["str", "lease_appraisal", "sales_brochure"]),
+  document_links: z.object({
+    str: documentLinkSchema.optional(),
+    lease_appraisal: documentLinkSchema.optional(),
+    sales_brochure: documentLinkSchema.refine((link) => link.mode !== "report", "Brochures require a custom destination").optional(),
+  }).optional(),
   templates: z
     .object({
       str: selectableStrTemplateIdSchema.optional(),

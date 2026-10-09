@@ -78,6 +78,9 @@ export type ListingImageMeta = {
 export type ListingImageMetaMap = Record<string, ListingImageMeta>;
 
 export type ParsedListing = {
+  /** Subject inputs used to generate each appraisal; absent on legacy evidence. */
+  appraisalInputFingerprints?: Partial<Record<"lease" | "sales", string>>;
+  domainAvmInputFingerprint?: string;
   title?: string;
   address?: string;
   suburb?: string;
@@ -449,7 +452,7 @@ export type AiCopyJson = {
 
 export type { AgencyBrandAdvanced } from "@/lib/branding/advanced";
 
-export type FinalReportJson = {
+export type FinalReportJson = import("@/lib/documents/documentLink").DocumentLinkFields & {
   version: string;
   template_id: string;
   generated_at: string;

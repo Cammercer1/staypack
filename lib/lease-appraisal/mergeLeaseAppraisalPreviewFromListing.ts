@@ -1,3 +1,4 @@
+import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import { ltrEnrichmentFromParsed } from "@/lib/lease-appraisal/ltrEnrichmentFromParsed";
 import { resolveLeaseAppraisalCopyDisclaimers } from "@/lib/lease-appraisal/leaseAppraisalDisclaimer";
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
@@ -12,7 +13,7 @@ export function mergeLeaseAppraisalPreviewFromListing(
     ...report,
     copy: resolveLeaseAppraisalCopyDisclaimers(report.copy),
   };
-  const parsed = listing.scraped_listing_json;
+  const parsed = resolveAppraisalInput(listing);
   if (!parsed) {
     return resolvedReport;
   }

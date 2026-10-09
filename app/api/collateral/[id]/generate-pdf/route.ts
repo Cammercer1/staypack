@@ -27,6 +27,9 @@ export async function POST(
       );
     }
 
+    if ("document_link_draft" in collateral.document_json && collateral.document_json.document_link_draft) {
+      return NextResponse.json({ error: "Publish the saved link choice before generating the PDF" }, { status: 409 });
+    }
     const document = collateral.document_json as CollateralDocumentJson;
     const template = getCollateralTemplate(document.template_id);
     const requestOrigin = new URL(request.url).origin;

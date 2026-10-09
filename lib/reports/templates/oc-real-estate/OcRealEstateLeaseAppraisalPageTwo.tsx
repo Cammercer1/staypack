@@ -1,3 +1,4 @@
+import { DocumentQr } from "@/components/documents/DocumentQr";
 import Image from "next/image";
 import {
   ReportCopyComparableDisclaimer,
@@ -166,10 +167,11 @@ export function OcRealEstateLeaseAppraisalPageTwo({
         </div>
       </section>
 
-      <footer className="mt-auto grid shrink-0 grid-cols-2 gap-8 border-t border-[#C0A591] pt-[13px]">
+      <footer style={{ gridTemplateColumns: report.document_link && report.document_link.mode !== "none" && report.assets.qr_code_url ? "1fr 1fr auto" : undefined }} className="mt-auto grid shrink-0 grid-cols-2 gap-8 border-t border-[#C0A591] pt-[13px]">
         {report.agents.slice(0, 2).map((agent) => (
           <AgentSummary key={agent.email || agent.name} agent={agent} />
         ))}
+        <DocumentQr document={report} />
       </footer>
     </section>
   );

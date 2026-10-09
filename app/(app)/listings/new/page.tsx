@@ -10,7 +10,7 @@ export default async function NewListingPage() {
         <h1 className="heading-gradient text-3xl font-semibold">New listing</h1>
         <p className="text-muted-foreground">
           Import or enter property details, choose photos, and assign listing agents.
-          Short-term rental appraisals and other marketing assets are created from the property page.
+          Use this property record to create appraisals, reports and marketing material.
         </p>
       </div>
       <NewListingFlow />

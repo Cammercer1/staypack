@@ -1,3 +1,4 @@
+import { LEGACY_PROPERTY_PAGE_TOOLS } from "@/lib/listings/legacyPropertyPages";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey, isLegacyPublicUrlHost } from "@/lib/env";
 import {
@@ -146,6 +147,7 @@ export async function ensureListingLandingProvisioned(
   agency: Agency,
   supabase: SupabaseClient,
 ): Promise<Listing> {
+  if (!LEGACY_PROPERTY_PAGE_TOOLS) return listing;
   // Skip the QR regeneration + DB write when the listing is already fully
   // provisioned with a current public URL. This runs on every listing open.
   if (listingLandingIsCurrent(listing, agency)) {

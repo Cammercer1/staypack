@@ -1,9 +1,11 @@
+import { LEGACY_PROPERTY_PAGE_TOOLS } from "@/lib/listings/legacyPropertyPages";
 import { NextResponse } from "next/server";
 import { resolveAgencyBySlug } from "@/lib/agencies/resolveAgencyBySlug";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createPublicLeadSchema } from "@/lib/validation/schemas";
 
 export async function POST(request: Request) {
+  if (!LEGACY_PROPERTY_PAGE_TOOLS) return NextResponse.json({ error: "Property pages and enquiry management have been retired. Contact the agent directly." }, { status: 410 });
   try {
     const body = createPublicLeadSchema.parse(await request.json());
     const admin = createAdminClient();

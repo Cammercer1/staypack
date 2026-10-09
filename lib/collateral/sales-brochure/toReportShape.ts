@@ -15,6 +15,8 @@ export function salesBrochureToReportShape(
   return {
     version: "standard_2_page_v1",
     template_id: document.template_id,
+    document_link: document.document_link,
+    document_link_draft: document.document_link_draft,
     generated_at: document.generated_at,
     agency: {
       name: agency.name,

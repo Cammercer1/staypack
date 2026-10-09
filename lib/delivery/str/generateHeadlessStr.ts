@@ -1,22 +1,18 @@
+import { applyDocumentLinkDraft, type DocumentLink } from "@/lib/documents/documentLink";
+import { createDocumentLinkDraft } from "@/lib/documents/createDocumentLinkDraft";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAirbticsEstimate } from "@/lib/airbtics/client";
 import { positionStrEstimate } from "@/lib/airbtics/positionEstimate";
 import { geocodeReportAddress } from "@/lib/geocoding";
 import { getPrintRenderBaseUrl, getReportsUrl } from "@/lib/env";
 import { renderPdfFromUrl, buildPdfImagePath, buildPdfStylesheetPath } from "@/lib/browserless/pdf";
-import { ensureListingLandingProvisioned } from "@/lib/listings/provisionLandingPage";
 import { generateListingSlug } from "@/lib/listings/provisionLandingPage";
-import {
-  buildListingQrTrackingUrl,
-  resolveListingDestinationUrl,
-} from "@/lib/listings/listingUrls";
 import { generateReportCopy } from "@/lib/openai/generateReportCopy";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
 import { buildPublicReportUrl, generateReportSlug } from "@/lib/reports/slugs";
-import { generateQrCodeBuffer } from "@/lib/reports/qr";
 import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
 import { resolveDeliveryAgency } from "@/lib/delivery/brand/ensureShadowAgency";
 import { agentProfileFromBrand } from "@/lib/delivery/brand/agentFromBrand";
@@ -48,6 +44,7 @@ export async function generateHeadlessStrReport({
   listing: existingListing,
   agency: existingAgency,
   templateIdOverride,
+  documentLink = { mode: "none" },
   resolvedAgents,
   agentProfile: agentProfileOverride,
   agencyAgents: agencyAgentsOverride,
@@ -58,6 +55,7 @@ export async function generateHeadlessStrReport({
   listing?: Listing;
   agency?: Agency;
   templateIdOverride?: string;
+  documentLink?: DocumentLink;
   resolvedAgents?: ReportAgent[];
   agentProfile?: AgentProfile | null;
   agencyAgents?: AgentProfile[];
@@ -280,12 +278,6 @@ export async function generateHeadlessStrReport({
     throw new Error(generatedError?.message ?? "Failed to generate report copy");
   }
 
-  listing = await ensureListingLandingProvisioned(
-    listing,
-    agency as Agency,
-    admin,
-  );
-
   const publicSlug = generateReportSlug();
   const publicUrl = buildPublicReportUrl(
     getReportsUrl(),
@@ -293,43 +285,14 @@ export async function generateHeadlessStrReport({
     publicSlug,
   );
 
-  const qrTrackingUrl = buildListingQrTrackingUrl(
-    agency.slug,
-    listing.public_slug!,
-  );
-  const qrDestinationUrl = resolveListingDestinationUrl(listing);
-
-  if (!qrDestinationUrl) {
-    throw new Error("Property page is not provisioned");
-  }
-
-  const qrBuffer = await generateQrCodeBuffer(qrTrackingUrl);
-  const qrPath = `${agency.id}/${report.id}/qr-${Date.now()}.png`;
-
-  const { error: qrUploadError } = await admin.storage
-    .from("report-assets")
-    .upload(qrPath, qrBuffer, { contentType: "image/png", upsert: true });
-
-  if (qrUploadError) {
-    throw new Error(qrUploadError.message);
-  }
-
-  const { data: qrPublic } = admin.storage.from("report-assets").getPublicUrl(qrPath);
-
-  const publishedFinalJson = {
-    ...(finalReportJson as Record<string, unknown>),
-    assets: {
-      ...((finalReportJson as { assets?: Record<string, string> }).assets ?? {}),
-      qr_code_url: qrPublic.publicUrl,
-    },
-  };
+  const publishedFinalJson = applyDocumentLinkDraft({ ...finalReportJson, document_link_draft: await createDocumentLinkDraft({ link: documentLink, agencyId: agency.id, documentId: report.id, reportUrl: publicUrl }) });
 
   const { data: publishedReport, error: publishError } = await admin
     .from("reports")
     .update({
       public_slug: publicSlug,
       public_url: publicUrl,
-      qr_code_url: qrPublic.publicUrl,
+      qr_code_url: publishedFinalJson.assets.qr_code_url || null,
       final_report_json: publishedFinalJson,
       status: "published",
       published_at: new Date().toISOString(),

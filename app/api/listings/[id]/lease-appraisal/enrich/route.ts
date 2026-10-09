@@ -1,3 +1,4 @@
+import { appraisalInputError } from "@/lib/appraisals/resolveAppraisalInput";
 import { NextResponse } from "next/server";
 import { requireListingAccess } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -68,9 +69,10 @@ export async function POST(
     const { id } = await params;
     const { supabase, listing, agency, user } = await requireListingAccess(id);
 
-    if (!listing.scraped_listing_json) {
+    const inputError = appraisalInputError(listing);
+    if (inputError) {
       return NextResponse.json(
-        { error: "Import the listing URL first" },
+        { error: inputError },
         { status: 400 },
       );
     }

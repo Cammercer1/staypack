@@ -1,3 +1,4 @@
+import { LEGACY_PROPERTY_PAGE_TOOLS } from "@/lib/listings/legacyPropertyPages";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ListingPageViewSource = "direct" | "qr";
@@ -26,6 +27,7 @@ export async function recordListingPageView({
   referrer,
   userAgent,
 }: RecordPageViewInput): Promise<PageViewResult> {
+  if (!LEGACY_PROPERTY_PAGE_TOOLS) return { ok: true, skipped: true };
   if (userAgent && isBotUserAgent(userAgent)) {
     return { ok: true, skipped: true };
   }

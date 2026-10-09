@@ -1,3 +1,4 @@
+import { hasLegacyPropertyPage } from "@/lib/listings/legacyPropertyPages";
 import { NextResponse } from "next/server";
 import { resolveAgencyBySlug } from "@/lib/agencies/resolveAgencyBySlug";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -49,7 +50,7 @@ export async function GET(
       );
     }
 
-    if (!listing) {
+    if (!listing || !hasLegacyPropertyPage(listing)) {
       return NextResponse.json({ error: "Not found", code: "listing" }, { status: 404 });
     }
 

@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireListingAccess } from "@/lib/auth/requireUser";
 import { prepareListingPatch } from "@/lib/listings/prepareListingInput";
-import { ensureListingLandingProvisioned } from "@/lib/listings/provisionLandingPage";
 import { updateListingSchema } from "@/lib/validation/schemas";
-import type { Listing } from "@/lib/types";
 
 export async function GET(
   _request: Request,
@@ -46,29 +44,31 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { supabase, agency, listing } = await requireListingAccess(id);
+    const { supabase, listing } = await requireListingAccess(id);
     const body = updateListingSchema.parse(await request.json());
+    if (body.custom_landing_url !== undefined || body.landing_template !== undefined) {
+      return NextResponse.json({ error: "Choose links on each report instead of the property" }, { status: 410 });
+    }
     const { prepared, geocodeWarning } = await prepareListingPatch(body, listing);
 
     const { data, error } = await supabase
       .from("listings")
       .update(prepared)
       .eq("id", listing.id)
+      .eq("agency_id", listing.agency_id)
+      .eq("updated_at", listing.updated_at)
       .select("*")
-      .single();
+      .maybeSingle();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    const provisionedListing = await ensureListingLandingProvisioned(
-      data as Listing,
-      agency,
-      supabase,
-    );
+
+    if (!data) return NextResponse.json({ error: "Property changed while saving. Reload and try again." }, { status: 409 });
 
     return NextResponse.json({
-      listing: provisionedListing,
+      listing: data,
       geocode_warning: geocodeWarning,
     });
   } catch (error) {

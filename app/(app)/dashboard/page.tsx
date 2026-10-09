@@ -4,27 +4,15 @@ import { requireAgency } from "@/lib/auth/requireUser";
 import { PageHeader } from "@/components/app-shell/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DashboardAnalytics } from "@/components/dashboard/DashboardAnalytics";
 import { formatCurrency } from "@/lib/reports/formatters";
 import type { Listing, Report } from "@/lib/types";
 
 export default async function DashboardPage() {
   const { supabase, agency } = await requireAgency();
 
-  const [{ data: listings }, { count: activeListings }] = await Promise.all([
-    supabase
-      .from("listings")
-      .select("*, reports(*)")
-      .eq("agency_id", agency.id)
-      .neq("status", "archived")
-      .order("created_at", { ascending: false })
-      .limit(5),
-    supabase
-      .from("listings")
-      .select("*", { count: "exact", head: true })
-      .eq("agency_id", agency.id)
-      .neq("status", "archived"),
-  ]);
+  const { data: listings } = await supabase.from("listings").select("*, reports(*)")
+    .eq("agency_id", agency.id).neq("status", "archived")
+    .order("created_at", { ascending: false }).limit(5);
 
   const recentListings = (listings ?? []).map((row) => {
     const reports = (row.reports ?? []) as Report[];
@@ -53,7 +41,6 @@ export default async function DashboardPage() {
         }
       />
 
-      <DashboardAnalytics activeListings={activeListings ?? 0} />
 
       <div className="surface-card p-6 md:p-8">
         <div className="mb-6 flex items-center justify-between gap-4">

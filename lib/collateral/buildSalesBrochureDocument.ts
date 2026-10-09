@@ -1,3 +1,4 @@
+import { preserveDocumentLink } from "@/lib/documents/documentLink";
 import { buildAgencyBrandSlice } from "@/lib/collateral/buildAgencyBrandSlice";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
 import {
@@ -91,6 +92,7 @@ export function buildBrochureDocument({
   const displayPrice = resolveReportDisplayPrice(listing, scraped);
 
   const base = {
+    ...preserveDocumentLink(collateral.document_json),
     template_id: resolveCollateralTemplateId(agency, collateral),
     generated_at: new Date().toISOString(),
     agency: buildAgencyBrandSlice(agency),

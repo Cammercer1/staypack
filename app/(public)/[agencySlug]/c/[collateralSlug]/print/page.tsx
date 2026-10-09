@@ -1,3 +1,4 @@
+import { publishedDocumentSnapshot } from "@/lib/documents/documentLink";
 import { notFound, redirect } from "next/navigation";
 import {
   agencySlugNeedsRedirect,
@@ -42,6 +43,8 @@ export default async function PublicCollateralPrintPage({
   if (!collateral?.document_json) {
     notFound();
   }
+  collateral.document_json = publishedDocumentSnapshot(collateral.document_json);
+
 
   const { document, metricsReport } = await resolveBrochurePrintContext({
     admin,

@@ -1,3 +1,4 @@
+import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import { buildLeaseAppraisalReport } from "@/lib/lease-appraisal/buildLeaseAppraisalReport";
 import type { LeaseAppraisalCopy } from "@/lib/lease-appraisal/deriveLeaseAppraisalCopy";
 import { mergeLeaseAppraisalCopyVariants } from "@/lib/lease-appraisal/mergeLeaseAppraisalCopyVariants";
@@ -32,10 +33,7 @@ export function rebuildLeaseAppraisalFinalReport({
   propertyImages?: ReportPropertyImageSelection;
   existingFinalReport?: FinalReportJson | null;
 }): FinalReportJson {
-  const parsed = listing.scraped_listing_json;
-  if (!parsed) {
-    throw new Error("Import the listing URL before saving the appraisal");
-  }
+  const parsed = resolveAppraisalInput(listing);
 
   if (!isLeaseAppraisalTemplateId(templateId)) {
     throw new Error("Invalid lease appraisal template");

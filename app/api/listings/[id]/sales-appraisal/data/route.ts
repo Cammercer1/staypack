@@ -1,3 +1,5 @@
+import { resolveAppraisalInput, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
+import { saveAppraisalResults } from "@/lib/appraisals/saveAppraisalResults";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireListingAccess } from "@/lib/auth/requireUser";
@@ -8,7 +10,6 @@ import {
   MAX_SALES_APPRAISAL_FEATURED_COMPS,
 } from "@/lib/sales-appraisal/salesAppraisalData";
 import { stripInternalSalesAppraisalWarnings } from "@/lib/sales/userFacingSalesWarnings";
-import type { ParsedListing } from "@/lib/types";
 
 const bodySchema = z.object({
   price_min: z.number().positive().optional().nullable(),
@@ -30,10 +31,10 @@ export async function PATCH(
     const { supabase, listing } = await requireListingAccess(id);
     const body = bodySchema.parse(await request.json());
 
-    const parsed = listing.scraped_listing_json as ParsedListing | null;
-    if (!parsed) {
+    const parsed = resolveAppraisalInput(listing);
+    if (hasStaleAppraisal(listing, "sales")) {
       return NextResponse.json(
-        { error: "Import the listing URL first" },
+        { error: "Property details changed. Fetch comparables again before saving appraisal data." },
         { status: 400 },
       );
     }
@@ -71,19 +72,7 @@ export async function PATCH(
       warnings: stripInternalSalesAppraisalWarnings(nextParsed.warnings ?? []),
     };
 
-    const { data: updatedListing, error } = await supabase
-      .from("listings")
-      .update({ scraped_listing_json: nextParsed })
-      .eq("id", listing.id)
-      .select("*")
-      .single();
-
-    if (error || !updatedListing) {
-      return NextResponse.json(
-        { error: error?.message ?? "Unable to save appraisal data" },
-        { status: 400 },
-      );
-    }
+    const updatedListing = await saveAppraisalResults({ supabase, listing, kind: "sales", parsed: nextParsed });
 
     return NextResponse.json({ listing: updatedListing });
   } catch (error) {

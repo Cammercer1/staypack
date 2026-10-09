@@ -1,3 +1,5 @@
+import { applyDocumentLinkDraft, type DocumentLink } from "@/lib/documents/documentLink";
+import { createDocumentLinkDraft } from "@/lib/documents/createDocumentLinkDraft";
 import { buildSalesBrochureDocument } from "@/lib/collateral/buildSalesBrochureDocument";
 import { provisionCollateralQr } from "@/lib/collateral/provisionCollateralQr";
 import {
@@ -36,6 +38,7 @@ export async function generateHeadlessSalesBrochure({
   listing,
   agency: existingAgency,
   templateIdOverride,
+  documentLink = { mode: "none" },
   resolvedAgents,
   agentProfile: agentProfileOverride,
   agencyAgents: agencyAgentsOverride,
@@ -44,6 +47,7 @@ export async function generateHeadlessSalesBrochure({
   listing: Listing;
   agency?: Agency;
   templateIdOverride?: string;
+  documentLink?: DocumentLink;
   resolvedAgents?: ReportAgent[];
   agentProfile?: AgentProfile | null;
   agencyAgents?: AgentProfile[];
@@ -135,13 +139,10 @@ export async function generateHeadlessSalesBrochure({
 
   const publicSlug = generateCollateralSlug();
   const publicUrl = buildPublicCollateralUrl(agency.slug, publicSlug);
-  const publishedDocument = withBrochureContentSaved({
+  const publishedDocument = withBrochureContentSaved(applyDocumentLinkDraft({
     ...documentJson,
-    assets: {
-      ...documentJson.assets,
-      qr_code_url: qrCodeUrl,
-    },
-  });
+    document_link_draft: await createDocumentLinkDraft({ link: documentLink, agencyId: agency.id, documentId: collateral.id }),
+  }));
 
   const { data: publishedCollateral, error: publishError } = await admin
     .from("collateral_items")

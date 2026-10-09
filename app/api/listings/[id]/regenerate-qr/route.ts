@@ -1,3 +1,4 @@
+import { LEGACY_PROPERTY_PAGE_TOOLS } from "@/lib/listings/legacyPropertyPages";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -11,6 +12,7 @@ export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (!LEGACY_PROPERTY_PAGE_TOOLS) return NextResponse.json({ error: "Choose a link on each report instead" }, { status: 410 });
   const { id } = await params;
   const supabase = await createClient();
   const {

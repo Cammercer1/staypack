@@ -1,3 +1,4 @@
+import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireReportWithListing } from "@/lib/auth/requireUser";
@@ -50,7 +51,7 @@ export async function PATCH(
     const { supabase, agency, report, listing } = await requireReportWithListing(id);
     const body = bodySchema.parse(await request.json());
 
-    const parsed = listing.scraped_listing_json;
+    const parsed = resolveAppraisalInput(listing);
     if (!parsed || !hasSalesAppraisalComps(parsed)) {
       return NextResponse.json(
         { error: "Complete appraisal data before editing content" },

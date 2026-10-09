@@ -83,7 +83,7 @@ export function applyHavenBrandKitToReport(
       : "haven-properties-str",
     assets: {
       ...report.assets,
-      qr_code_url: "",
+      qr_code_url: report.document_link && report.document_link.mode !== "none" ? report.assets.qr_code_url : "",
     },
     agent: havenAgent(),
     agents: havenAgents(),

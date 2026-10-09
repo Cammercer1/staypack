@@ -1,3 +1,4 @@
+import { publishedDocumentSnapshot } from "@/lib/documents/documentLink";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey } from "@/lib/env";
@@ -33,6 +34,8 @@ export default async function DraftReportPrintPage({
   if (!report?.final_report_json || !report.listing_id) {
     notFound();
   }
+  report.final_report_json = publishedDocumentSnapshot(report.final_report_json);
+
 
   const { data: agency } = await admin
     .from("agencies")

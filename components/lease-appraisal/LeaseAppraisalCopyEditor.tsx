@@ -1,5 +1,7 @@
 "use client";
 
+import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
+
 import {
   forwardRef,
   useCallback,
@@ -142,7 +144,7 @@ export const LeaseAppraisalCopyEditor = forwardRef<
   }, [report.final_report_json, report.updated_at]);
 
   const displayPrice = useMemo(() => resolveReportDisplayPrice(listing), [listing]);
-  const parsed = listing.scraped_listing_json;
+  const parsed = useMemo(() => resolveAppraisalInput(listing), [listing]);
   const appraisal = parsed?.rentalAppraisal;
 
   const rentRangeLabel = useMemo(() => {

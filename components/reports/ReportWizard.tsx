@@ -1,4 +1,6 @@
 "use client";
+import { DocumentLinkEditor } from "@/components/documents/DocumentLinkEditor";
+import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -40,6 +42,7 @@ export function ReportWizard({
   onListingChange?: (listing: Listing) => void;
   onReportChange?: (report: Report) => void;
 }) {
+  const [linkPending, setLinkPending] = useState(false);
   const [listing, setListing] = useState(initialListing);
   const [report, setReport] = useState(initialReport);
   const [previewAgency, setPreviewAgency] = useState<Agency | null>(null);
@@ -113,8 +116,9 @@ export function ReportWizard({
   const brandAgency = previewAgency?.id === agency.id ? previewAgency : agency;
 
   const previewReport = useMemo(() => {
-    const cached =
+    const rawCached =
       previewDraftReport ?? (report.final_report_json as FinalReportJson | null);
+    const cached = rawCached ? applyDocumentLinkDraft(rawCached) : null;
     if (!cached) {
       return null;
     }
@@ -232,6 +236,18 @@ export function ReportWizard({
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-6">
+          {report.final_report_json ? <DocumentLinkEditor
+            document={report.final_report_json}
+            endpoint={`/api/reports/${report.id}/link`}
+            allowReport
+            disabled={loading}
+            onPendingChange={setLinkPending}
+            onSaved={(payload) => {
+              const next = payload.report as Report;
+              setReport(next);
+              setPreviewDraftReport(next.final_report_json);
+            }}
+          /> : null}
           <AsyncLoadingOverlay
             active={loading || previewSyncing}
             title={
@@ -266,7 +282,7 @@ export function ReportWizard({
               url={report.pdf_url}
               reportId={report.id}
               cacheVersion={report.updated_at}
-              canGenerate={Boolean(previewReport) && !loading}
+              canGenerate={Boolean(previewReport) && !loading && !linkPending && !report.final_report_json?.document_link_draft}
               preview={report.status !== "published"}
               size="default"
               generateLabel="Generate PDF preview"
@@ -285,7 +301,7 @@ export function ReportWizard({
             {report.public_url ? (
               <CopyLinkButton url={report.public_url} />
             ) : null}
-            <Button onClick={publishReport} disabled={loading || !previewReport}>
+            <Button onClick={publishReport} disabled={loading || linkPending || !previewReport}>
               {loading ? (
                 <>
                   <Loader2 className="animate-spin" />

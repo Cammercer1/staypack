@@ -1,3 +1,4 @@
+import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import { buildSalesAppraisalReport } from "@/lib/sales-appraisal/buildSalesAppraisalReport";
 import { resolveAgentProfile } from "@/lib/lease-appraisal/generateLeaseAppraisalForListing";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
@@ -17,10 +18,7 @@ export function buildSalesAppraisalTemplatePreview({
   templateId: string;
   agencyAgents?: AgentProfile[];
 }): FinalReportJson | null {
-  const parsed = listing.scraped_listing_json;
-  if (!parsed) {
-    return null;
-  }
+  const parsed = resolveAppraisalInput(listing);
 
   const agentProfile = resolveAgentProfile(listing, agencyAgents);
 

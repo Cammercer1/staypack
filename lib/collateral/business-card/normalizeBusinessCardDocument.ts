@@ -247,6 +247,8 @@ export function ensureBusinessCardDocument(
     variants,
     qr_listing_id: document.qr_listing_id ?? null,
     qr_target_url: document.qr_target_url ?? "",
+    document_link: document.document_link,
+    document_link_draft: document.document_link_draft,
     assets: {
       qr_code_url: document.assets?.qr_code_url ?? "",
     },

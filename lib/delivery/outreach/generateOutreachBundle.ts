@@ -191,6 +191,7 @@ export async function generateOutreachBundle(
         listing,
         agency: agency as Agency,
         templateIdOverride: templates.str,
+        documentLink: request.document_links?.str,
         ...agentContext,
       });
 
@@ -218,6 +219,7 @@ export async function generateOutreachBundle(
         listing,
         agency: agency as Agency,
         templateIdOverride: templates.lease_appraisal,
+        documentLink: request.document_links?.lease_appraisal,
         ...agentContext,
       });
 
@@ -244,6 +246,7 @@ export async function generateOutreachBundle(
         listing,
         agency: agency as Agency,
         templateIdOverride: templates.sales_brochure,
+        documentLink: request.document_links?.sales_brochure,
         ...agentContext,
       });
 

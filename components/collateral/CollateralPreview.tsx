@@ -198,7 +198,8 @@ export function CollateralPreview({
                 size: ${pageFormat.width} ${pageFormat.height};
                 margin: 0;
               }
-              body {
+              html, body {
+                width: ${pageFormat.width} !important;
                 margin: 0;
               }
             }

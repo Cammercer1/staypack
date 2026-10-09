@@ -1,3 +1,4 @@
+import { DocumentQr } from "@/components/documents/DocumentQr";
 import { ReportCopyDisclaimer } from "@/components/reports/inline/ReportCopyFields";
 import type { FinalReportJson } from "@/lib/types";
 import { ClassicCompsGrid } from "@/lib/reports/templates/classic/ClassicCompsGrid";
@@ -73,6 +74,7 @@ export function BelleStrPageTwo({ report }: Props) {
           ) : null}
         </div>
       </div>
+      {report.document_link && report.document_link.mode !== "none" && report.assets.qr_code_url ? <div className="flex shrink-0 justify-end px-10 pb-3"><DocumentQr document={report} /></div> : null}
     </section>
   );
 }

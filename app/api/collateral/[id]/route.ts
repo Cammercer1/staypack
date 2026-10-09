@@ -1,3 +1,4 @@
+import { LEGACY_PROPERTY_PAGE_TOOLS } from "@/lib/listings/legacyPropertyPages";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
@@ -253,6 +254,10 @@ async function patchBusinessCard(
   }
 
   if (Object.hasOwn(body, "qr_listing_id")) {
+    return NextResponse.json({ error: "Choose a destination on the business card instead of a property" }, { status: 410 });
+  }
+
+  if (LEGACY_PROPERTY_PAGE_TOOLS && Object.hasOwn(body, "qr_listing_id")) {
     if (!body.qr_listing_id) {
       nextDocument = {
         ...nextDocument,

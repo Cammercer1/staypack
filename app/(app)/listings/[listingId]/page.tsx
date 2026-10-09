@@ -2,10 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireAgency } from "@/lib/auth/requireUser";
-import { ensureListingLandingProvisioned } from "@/lib/listings/provisionLandingPage";
 import { ListingWorkspace } from "@/components/listings/ListingWorkspace";
 import { Button } from "@/components/ui/button";
-import type { CollateralItem, Lead, Listing, ListingStats, Report } from "@/lib/types";
+import type { CollateralItem, Listing, Report } from "@/lib/types";
 
 export default async function ListingDetailPage({
   params,
@@ -27,56 +26,10 @@ export default async function ListingDetailPage({
     notFound();
   }
 
-  const provisionedListing = await ensureListingLandingProvisioned(
-    listing as Listing,
-    agency,
-    supabase,
-  );
-
-  // This async server page queries a rolling window for the current request.
-  // eslint-disable-next-line react-hooks/purity -- The query intentionally uses the request-time clock.
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-  const [
-    { data: reports },
-    { data: collateral },
-    { data: leads },
-    { count: totalViews },
-    { count: recentViews },
-  ] = await Promise.all([
-    supabase
-      .from("reports")
-      .select("*")
-      .eq("listing_id", listingId)
-      .neq("status", "archived")
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("collateral_items")
-      .select("*")
-      .eq("listing_id", listingId)
-      .neq("status", "archived")
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("leads")
-      .select("*")
-      .eq("listing_id", listingId)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("listing_page_views")
-      .select("*", { count: "exact", head: true })
-      .eq("listing_id", listingId),
-    supabase
-      .from("listing_page_views")
-      .select("*", { count: "exact", head: true })
-      .eq("listing_id", listingId)
-      .gte("created_at", thirtyDaysAgo),
+  const [{ data: reports }, { data: collateral }] = await Promise.all([
+    supabase.from("reports").select("*").eq("listing_id", listingId).neq("status", "archived").order("created_at", { ascending: false }),
+    supabase.from("collateral_items").select("*").eq("listing_id", listingId).neq("status", "archived").order("created_at", { ascending: true }),
   ]);
-
-  const stats: ListingStats = {
-    total_views: totalViews ?? 0,
-    views_last_30d: recentViews ?? 0,
-    total_leads: leads?.length ?? 0,
-  };
 
   return (
     <div className="space-y-6">
@@ -94,17 +47,17 @@ export default async function ListingDetailPage({
           {listing.property_address ?? "Listing"}
         </h1>
         <p className="text-muted-foreground">
-          Manage collateral, leads, and listing details for this property.
+          Create reports and marketing material for this property.
         </p>
       </div>
 
       <ListingWorkspace
         agencySlug={agency.slug}
-        listing={provisionedListing}
+        listing={listing as Listing}
         collateral={(collateral ?? []) as CollateralItem[]}
-        leads={(leads ?? []) as Lead[]}
+        leads={[]}
         reports={(reports ?? []) as Report[]}
-        stats={stats}
+        stats={{ total_views: 0, views_last_30d: 0, total_leads: 0 }}
       />
     </div>
   );

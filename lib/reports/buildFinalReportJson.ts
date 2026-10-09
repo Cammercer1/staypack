@@ -1,3 +1,4 @@
+import { preserveDocumentLink } from "@/lib/documents/documentLink";
 import type {
   Agency,
   AgentProfile,
@@ -77,6 +78,7 @@ export function buildFinalReportJson({
   const reportCopy = alignCopyWithEstimate(copy, estimate.annualRevenue);
 
   return {
+    ...preserveDocumentLink(report.final_report_json ?? { assets: { qr_code_url: report.qr_code_url ?? "" } }),
     version: "standard_2_page_v1",
     template_id: resolveReportTemplateId(agency, report),
     generated_at: new Date().toISOString(),

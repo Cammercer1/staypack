@@ -1,3 +1,4 @@
+import { documentLinkLabel } from "@/lib/documents/documentLink";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import { resolveBrochureAgents } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureAgents";
 import type { FinalReportJson } from "@/lib/types";
@@ -106,7 +107,7 @@ export function BrochureClosingBand({
                 className="max-w-[7rem] text-right text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-neutral-500"
                 style={{ fontFamily: headingFont }}
               >
-                Scan to view the listing
+                {documentLinkLabel(document)}
               </p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={qr} alt="QR code" className="h-16 w-16 shrink-0" />

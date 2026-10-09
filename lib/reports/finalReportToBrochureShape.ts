@@ -80,6 +80,8 @@ export function finalReportToBrochureShape(
     version: "sales_brochure_v1",
     type: "sales_brochure",
     template_id: report.template_id,
+    document_link: report.document_link,
+    document_link_draft: report.document_link_draft,
     generated_at: report.generated_at,
     agency: {
       name: report.agency.name,
@@ -148,7 +150,7 @@ export function finalReportToBrochureShape(
             ? (resolveStrBrochurePriceValue(report) ?? "")
             : (report.property.display_price ?? ""),
     },
-    qr_target_url: report.property.listing_url ?? "",
+    qr_target_url: report.document_link?.mode === "custom" ? report.document_link.url : "",
     assets: {
       qr_code_url: report.assets.qr_code_url,
     },

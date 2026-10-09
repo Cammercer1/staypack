@@ -141,7 +141,7 @@ export function SalesAppraisalTemplateStep({
             />
           ) : (
             <p className="text-sm text-muted-foreground">
-              Import the listing URL first to preview templates with your photos.
+              Add property details and photos to preview templates.
             </p>
           )}
         </div>

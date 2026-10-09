@@ -139,7 +139,7 @@ export function AdvancedStylesEditor({ form }: Props) {
 
       <AdvancedSection
         label="Cards & panels"
-        hint="Applies to enquiry forms and info panels."
+        hint="Applies to cards and information panels."
       >
         <div className="space-y-2">
           <Label className="text-xs">Corner radius</Label>

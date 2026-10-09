@@ -1,6 +1,7 @@
+import { appraisalInputError, resolveAppraisalInput, mergeAppraisalResults } from "@/lib/appraisals/resolveAppraisalInput";
 import { NextResponse } from "next/server";
 import { requireAgency, requireListingAccess } from "@/lib/auth/requireUser";
-import { enrichListingRentalAppraisal } from "@/lib/rental/enrichListingRentalAppraisal";
+import { enrichParsedListingForLeaseAppraisal } from "@/lib/lease-appraisal/enrichParsedListingForLeaseAppraisal";
 import { resolveRentalDisplayPrice } from "@/lib/rental/formatRentalDisplayPrice";
 import { extractListingFromUrl } from "@/lib/scraping/extractListing";
 import { z } from "zod";
@@ -49,16 +50,11 @@ export async function POST(request: Request) {
     }
 
     const { supabase, listing } = await requireListingAccess(listingId!);
-    const scraped = listing.scraped_listing_json;
+    const inputError = appraisalInputError(listing);
+    if (inputError) return NextResponse.json({ error: inputError }, { status: 400 });
+    const scraped = resolveAppraisalInput(listing);
 
-    if (!scraped) {
-      return NextResponse.json(
-        { error: "Listing has no scraped data. Scrape the listing URL first." },
-        { status: 400 },
-      );
-    }
-
-    const enriched = await enrichListingRentalAppraisal(scraped, {
+    const { parsed: enriched } = await enrichParsedListingForLeaseAppraisal(scraped, {
       subjectListingUrl: listing.listing_url,
     });
     const displayPrice = resolveRentalDisplayPrice(enriched);
@@ -66,17 +62,21 @@ export async function POST(request: Request) {
     const { data: updated, error } = await supabase
       .from("listings")
       .update({
-        scraped_listing_json: enriched,
+        scraped_listing_json: mergeAppraisalResults({ ...listing, listing_purpose: "lease", display_price: displayPrice ?? listing.display_price }, "lease", enriched),
         display_price: displayPrice ?? listing.display_price,
         listing_purpose: "lease",
       })
       .eq("id", listing.id)
+      .eq("agency_id", listing.agency_id)
+      .eq("updated_at", listing.updated_at)
       .select("*")
-      .single();
+      .maybeSingle();
 
     if (error) {
       throw error;
     }
+
+    if (!updated) return NextResponse.json({ error: "Property changed while fetching comparables. Reload and try again." }, { status: 409 });
 
     return NextResponse.json({
       listing: enriched,

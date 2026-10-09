@@ -1,4 +1,5 @@
 "use client";
+import { LEGACY_PROPERTY_PAGE_TOOLS } from "@/lib/listings/legacyPropertyPages";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -499,7 +500,7 @@ function CollateralTab({
         onGoToPhotos={onGoToPhotos}
       />
 
-      <LandingPageCard listing={listing} agencySlug={agencySlug} />
+      {LEGACY_PROPERTY_PAGE_TOOLS ? <LandingPageCard listing={listing} agencySlug={agencySlug} /> : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         {collateralOrderForPurpose(listing.listing_purpose).map((type) => {
@@ -959,7 +960,7 @@ export function ListingWorkspace({
 
   return (
     <div className="space-y-6">
-      <MetricsStrip stats={stats} />
+      {LEGACY_PROPERTY_PAGE_TOOLS ? <MetricsStrip stats={stats} /> : null}
 
       <div className="space-y-3">
         <ListingSummary listing={listing} />
@@ -967,10 +968,10 @@ export function ListingWorkspace({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="collateral">Collateral</TabsTrigger>
           <TabsTrigger value="photos">Photos</TabsTrigger>
-          <TabsTrigger value="leads">Leads</TabsTrigger>
+          {LEGACY_PROPERTY_PAGE_TOOLS ? <TabsTrigger value="leads">Leads</TabsTrigger> : null}
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -995,9 +996,9 @@ export function ListingWorkspace({
           </div>
         </TabsContent>
 
-        <TabsContent value="leads" className="mt-6">
+        {LEGACY_PROPERTY_PAGE_TOOLS ? <TabsContent value="leads" className="mt-6">
           <LeadsTab listingId={listing.id} leads={initialLeads} />
-        </TabsContent>
+        </TabsContent> : null}
 
         <TabsContent value="settings" className="mt-6">
           <SettingsTab listing={listing} onListingUpdated={setListing} />

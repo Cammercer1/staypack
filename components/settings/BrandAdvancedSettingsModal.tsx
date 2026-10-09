@@ -164,7 +164,7 @@ export function BrandAdvancedSettingsModal({
             Advanced brand settings
           </DialogTitle>
           <DialogDescription>
-            Fine-tune buttons, corners, and links on property pages and buyer-facing
+            Fine-tune buttons, corners, and links on reports and buyer-facing
             collateral. Changes apply across your account immediately.
           </DialogDescription>
         </DialogHeader>
@@ -256,7 +256,7 @@ export function BrandAdvancedSettingsModal({
 
           <AdvancedField
             label="Links & panels"
-            hint="Used for enquiry forms, cards, and text links on listing pages."
+            hint="Used for cards and text links in your documents."
           >
             <div className="space-y-3">
               <div className="space-y-1.5">

@@ -1,3 +1,4 @@
+import { preserveDocumentLink } from "@/lib/documents/documentLink";
 import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
 import { reportableSaleLandArea } from "@/lib/sales/reportableSaleArea";
 import { salesEnrichmentFromParsed } from "@/lib/sales-appraisal/salesEnrichmentFromParsed";
@@ -98,6 +99,7 @@ export function buildSalesAppraisalReport({
     });
 
   return {
+    ...preserveDocumentLink(report.final_report_json ?? { assets: { qr_code_url: report.qr_code_url ?? "" } }),
     version: "sales_appraisal_v1",
     template_id: templateId,
     generated_at: new Date().toISOString(),

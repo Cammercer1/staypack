@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DeleteListingButton } from "@/components/listings/DeleteListingButton";
 import { initialListingAgents } from "@/lib/reports/listingAgents";
-import type { ListingLibraryRow, ListingPurpose } from "@/lib/types";
+import type { Listing, ListingPurpose } from "@/lib/types";
 
 const cellClassName = "px-4 py-5 whitespace-normal";
 const headClassName = "h-auto px-4 py-4";
@@ -24,7 +24,7 @@ const PURPOSE_LABELS: Record<ListingPurpose, string> = {
   lease: "Lease",
 };
 
-function listingAgentsLabel(listing: ListingLibraryRow) {
+function listingAgentsLabel(listing: Listing) {
   const names = initialListingAgents(listing.scraped_listing_json?.agents)
     .map((agent) => agent.name.trim())
     .filter(Boolean);
@@ -36,7 +36,7 @@ function listingAgentsLabel(listing: ListingLibraryRow) {
   return names.join(", ");
 }
 
-export function ListingLibrary({ listings }: { listings: ListingLibraryRow[] }) {
+export function ListingLibrary({ listings }: { listings: Listing[] }) {
   return (
     <div className="surface-card overflow-hidden p-6 md:p-8">
       <Table>
@@ -45,7 +45,6 @@ export function ListingLibrary({ listings }: { listings: ListingLibraryRow[] }) 
             <TableHead className={headClassName}>Property</TableHead>
             <TableHead className={headClassName}>Type</TableHead>
             <TableHead className={headClassName}>Agents</TableHead>
-            <TableHead className={headClassName}>Total leads</TableHead>
             <TableHead className={headClassName}>Created</TableHead>
             <TableHead className={headClassName}>Actions</TableHead>
           </TableRow>
@@ -54,7 +53,7 @@ export function ListingLibrary({ listings }: { listings: ListingLibraryRow[] }) 
           {listings.length === 0 ? (
             <TableRow className="hover:bg-transparent">
               <TableCell
-                colSpan={6}
+                colSpan={5}
                 className="px-4 py-10 text-center text-muted-foreground"
               >
                 No listings yet.
@@ -86,9 +85,6 @@ export function ListingLibrary({ listings }: { listings: ListingLibraryRow[] }) 
                     ) : (
                       <span className="text-sm text-muted-foreground">—</span>
                     )}
-                  </TableCell>
-                  <TableCell className={cellClassName}>
-                    <span className="tabular-nums">{listing.total_leads.toLocaleString()}</span>
                   </TableCell>
                   <TableCell className={cellClassName}>
                     {format(new Date(listing.created_at), "dd MMM yyyy")}

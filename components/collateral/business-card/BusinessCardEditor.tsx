@@ -1,4 +1,5 @@
 "use client";
+import { DocumentLinkEditor } from "@/components/documents/DocumentLinkEditor";
 
 import { useState } from "react";
 import { Loader2, Plus, Save } from "lucide-react";
@@ -27,6 +28,7 @@ function getCardLabel(card: CollateralItem) {
 }
 
 export function BusinessCardEditor({ initialCards, agents, listings }: Props) {
+  const [linkPending, setLinkPending] = useState(false);
   const [cards, setCards] = useState(initialCards);
   const [selectedCardId, setSelectedCardId] = useState(initialCards[0]?.id ?? "");
   const [document, setDocument] = useState<BusinessCardDocumentJson | null>(() =>
@@ -185,11 +187,11 @@ export function BusinessCardEditor({ initialCards, agents, listings }: Props) {
                 <CollateralPdfButton
                   collateralId={selectedCard.id}
                   url={selectedCard.pdf_url}
-                  canGenerate
+                  canGenerate={!linkPending && !saving}
                   cacheVersion={selectedCard.updated_at}
                   onUpdated={updateSelectedCard}
                 />
-                <Button size="sm" onClick={() => saveDocument()} disabled={saving}>
+                <Button size="sm" onClick={() => saveDocument()} disabled={saving || linkPending}>
                   {saving ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
@@ -202,6 +204,19 @@ export function BusinessCardEditor({ initialCards, agents, listings }: Props) {
 
             {/* Layer panel */}
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              <DocumentLinkEditor
+                document={document}
+                endpoint={`/api/collateral/${selectedCard.id}/link`}
+                disabled={saving}
+                immediate
+                onPendingChange={setLinkPending}
+                onSaved={(payload) => {
+                  const next = payload.collateral as CollateralItem;
+                  const saved = next.document_json as BusinessCardDocumentJson;
+                  setCards((current) => current.map((card) => card.id === next.id ? next : card));
+                  setDocument((current) => current ? { ...current, document_link: saved.document_link, assets: saved.assets, qr_target_url: saved.qr_target_url } : saved);
+                }}
+              />
               <BusinessCardLayerPanel
                 document={document}
                 agents={agents}

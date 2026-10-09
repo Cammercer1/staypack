@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { requireAgency } from "@/lib/auth/requireUser";
 import { prepareListingInput } from "@/lib/listings/prepareListingInput";
 import {
-  ensureListingLandingProvisioned,
   generateListingSlug,
 } from "@/lib/listings/provisionLandingPage";
 import { createListingSchema } from "@/lib/validation/schemas";
@@ -57,6 +56,9 @@ export async function POST(request: Request) {
   try {
     const { supabase, agency, user } = await requireAgency();
     const body = createListingSchema.parse(await request.json());
+    if (body.custom_landing_url !== undefined || body.landing_template !== undefined) {
+      return NextResponse.json({ error: "Choose links on each report instead of the property" }, { status: 410 });
+    }
     const { prepared, geocodeWarning } = await prepareListingInput(body);
 
     const { data: listing, error: listingError } = await supabase
@@ -67,6 +69,8 @@ export async function POST(request: Request) {
         status: "active",
         agent_profile_id: prepared.agent_profile_id ?? null,
         listing_url: prepared.listing_url ?? null,
+        listing_purpose: prepared.listing_purpose ?? "sale",
+        bond: prepared.bond ?? null,
         property_address: prepared.property_address,
         suburb: prepared.suburb ?? null,
         state: prepared.state ?? null,
@@ -95,14 +99,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: listingError.message }, { status: 400 });
     }
 
-    const provisionedListing = await ensureListingLandingProvisioned(
-      listing,
-      agency,
-      supabase,
-    );
 
     return NextResponse.json({
-      listing: provisionedListing,
+      listing,
       geocode_warning: geocodeWarning,
     });
   } catch (error) {

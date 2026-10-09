@@ -1,3 +1,4 @@
+import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import { buildSalesAppraisalReport } from "@/lib/sales-appraisal/buildSalesAppraisalReport";
 import type { SalesAppraisalCopy } from "@/lib/sales-appraisal/deriveSalesAppraisalCopy";
 import { mergeLeaseAppraisalCopyVariants } from "@/lib/lease-appraisal/mergeLeaseAppraisalCopyVariants";
@@ -32,10 +33,7 @@ export function rebuildSalesAppraisalFinalReport({
   propertyImages?: ReportPropertyImageSelection;
   existingFinalReport?: FinalReportJson | null;
 }): FinalReportJson {
-  const parsed = listing.scraped_listing_json;
-  if (!parsed) {
-    throw new Error("Import the listing URL before saving the appraisal");
-  }
+  const parsed = resolveAppraisalInput(listing);
 
   if (!isSalesAppraisalTemplateId(templateId)) {
     throw new Error("Invalid sales appraisal template");

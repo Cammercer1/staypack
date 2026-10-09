@@ -3,7 +3,6 @@ import { enrichScrapedAgentsWithProfiles } from "@/lib/agents/enrichScrapedAgent
 import { buildScrapedListingFields } from "@/lib/listings/buildScrapedListingFields";
 import { expandListingDescriptionAfterScrape } from "@/lib/listings/expandListingDescriptionAfterScrape";
 import {
-  ensureListingLandingProvisioned,
   generateListingSlug,
 } from "@/lib/listings/provisionLandingPage";
 import { loadAgencyAgentProfiles } from "@/lib/reports/loadReportAgent";
@@ -140,7 +139,6 @@ export async function prepareListingFromScrape({
     }
   }
 
-  listing = await ensureListingLandingProvisioned(listing, agency, admin);
 
   const unknown_agents = findUnknownScrapedAgents(parsed.agents, agencyAgents);
 

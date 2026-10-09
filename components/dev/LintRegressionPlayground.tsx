@@ -1,4 +1,9 @@
 "use client";
+import { ReportWizard } from "@/components/reports/ReportWizard";
+import { LeaseAppraisalWizard } from "@/components/lease-appraisal/LeaseAppraisalWizard";
+import { SalesAppraisalWizard } from "@/components/sales-appraisal/SalesAppraisalWizard";
+import { ListingWorkspace } from "@/components/listings/ListingWorkspace";
+import { BusinessCardEditor } from "@/components/collateral/business-card/BusinessCardEditor";
 
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -24,7 +29,7 @@ import { REPORT_TEMPLATES } from "@/lib/reports/templates/registry";
 import { Button } from "@/components/ui/button";
 import type { AgencyInput } from "@/lib/validation/schemas";
 
-const cases = ["brochure", "editor", "wizard", "report", "gallery", "landing", "agents", "unknown-agents", "branding", "analytics", "leads", "progress", "social"] as const;
+const cases = ["brochure", "editor", "wizard", "report", "gallery", "landing", "agents", "unknown-agents", "branding", "analytics", "leads", "progress", "social", "report-wizard", "lease-wizard", "sales-wizard", "workspace", "business-card"] as const;
 
 export function LintRegressionPlayground() {
   const [fixtures] = useState(createLintRegressionFixtures);
@@ -64,6 +69,11 @@ function RegressionCase({ name, fixtures }: { name: string; fixtures: Regression
   const document = { ...fixtures.document, template_id: templateId };
   const report = { ...salesBrochureToReportShape(fixtures.document), template_id: reportTemplate };
 
+  if (name === "report-wizard") return <ReportWizard agency={agency} initialListing={listing} initialReport={fixtures.report} />;
+  if (name === "lease-wizard") return <LeaseAppraisalWizard agency={agency} initialListing={listing} initialReport={fixtures.lease} initialCollateral={fixtures.leaseCollateral} initialAgencyAgents={[fixtures.agent]} />;
+  if (name === "sales-wizard") return <SalesAppraisalWizard agency={agency} initialListing={listing} initialReport={fixtures.sales} initialCollateral={fixtures.salesCollateral} initialAgencyAgents={[fixtures.agent]} />;
+  if (name === "workspace") return <ListingWorkspace agencySlug={agency.slug} listing={listing} collateral={[collateral]} leads={[]} reports={[fixtures.report]} stats={{ total_views: 15, views_last_30d: 10, total_leads: 3 }} />;
+  if (name === "business-card") return <BusinessCardEditor initialCards={[fixtures.card]} agents={[fixtures.agent]} listings={[listing]} />;
   if (name === "brochure") return <section data-testid="brochure">
     <label>Brochure template <select aria-label="Brochure template" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>{SALES_BROCHURE_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.label} ({t.pages} pages)</option>)}</select></label>
     <FittedBrochurePreview document={document} useDocumentBrand />

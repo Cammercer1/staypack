@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
-import { provisionCollateralQr } from "@/lib/collateral/provisionCollateralQr";
+import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
 import {
   buildPublicCollateralUrl,
   generateCollateralSlug,
@@ -11,7 +11,6 @@ import {
   type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { getSiteUrl } from "@/lib/env";
-import type { Listing } from "@/lib/types";
 
 export async function POST(
   _request: Request,
@@ -19,7 +18,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { supabase, agency, collateral, listing } =
+    const { supabase, agency, collateral } =
       await requireCollateralAccess(id);
 
     if (collateral.type !== "sales_brochure" && collateral.type !== "rental_brochure") {
@@ -36,13 +35,6 @@ export async function POST(
       );
     }
 
-    const { qrCodeUrl } = await provisionCollateralQr({
-      agency,
-      listing: listing as Listing,
-      collateral,
-      supabase,
-    });
-
     const publicSlug = collateral.public_slug ?? generateCollateralSlug();
     const publicUrl = buildPublicCollateralUrl(agency.slug, publicSlug);
 
@@ -51,11 +43,7 @@ export async function POST(
       existingDocument,
     )
       ? withBrochureContentSaved({
-          ...existingDocument,
-          assets: {
-            ...existingDocument.assets,
-            qr_code_url: qrCodeUrl,
-          },
+          ...applyDocumentLinkDraft(existingDocument),
         })
       : existingDocument;
 
@@ -65,6 +53,7 @@ export async function POST(
         public_slug: publicSlug,
         public_url: publicUrl,
         document_json: documentJson,
+        ...(existingDocument.document_link_draft ? { pdf_url: null } : {}),
         status: "published",
         published_at: new Date().toISOString(),
       })

@@ -11,21 +11,10 @@ export async function enrichParsedListingForLeaseAppraisal(
   parsed: ParsedListing,
   options?: { subjectListingUrl?: string | null },
 ): Promise<{ parsed: ParsedListing; warnings: string[] }> {
-  const previousWarnings = new Set(parsed.warnings ?? []);
-  let enrichedRaw = await enrichListingRentalAppraisal(parsed, options);
-  const newOperationalFailure = (enrichedRaw.warnings ?? []).find(
-    (warning) =>
-      !previousWarnings.has(warning) &&
-      /^Rental appraisal (?:failed|skipped):/i.test(warning.trim()),
-  );
-  if (newOperationalFailure) {
-    throw new Error(
-      newOperationalFailure.replace(
-        /^Rental appraisal (?:failed|skipped):\s*/i,
-        "",
-      ),
-    );
-  }
+  const input = { ...parsed, warnings: parsed.warnings.filter((warning) => !/^Rental appraisal (?:failed|skipped):/i.test(warning.trim())) };
+  let enrichedRaw = await enrichListingRentalAppraisal(input, options);
+  const failure = enrichedRaw.warnings.find((warning) => /^Rental appraisal (?:failed|skipped):/i.test(warning.trim()));
+  if (failure) throw new Error(failure.replace(/^Rental appraisal (?:failed|skipped):\s*/i, ""));
   if (!hasLeaseAppraisalSelectedComps(enrichedRaw)) {
     enrichedRaw = applyLeaseAppraisalCompSelection(
       enrichedRaw,

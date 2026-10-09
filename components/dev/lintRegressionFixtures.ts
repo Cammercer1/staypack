@@ -1,5 +1,10 @@
+import { createEmptyReportDraft } from "@/lib/reports/emptyReportDraft";
+import { getStrPlaygroundReport } from "@/lib/reports/strPlayground";
+import { applyDocumentLinkDraft, documentLinkSchema } from "@/lib/documents/documentLink";
+import { generateQrCodeDataUrl } from "@/lib/reports/qr";
+import { buildBusinessCardDocument } from "@/lib/collateral/buildBusinessCardDocument";
 import { createPlaygroundSalesBrochureDocument } from "@/lib/collateral/sales-brochure/playgroundFixture";
-import type { Agency, AgentProfile, CollateralItem, LeadWithListing, Listing } from "@/lib/types";
+import type { Agency, AgentProfile, CollateralItem, LeadWithListing, Listing, Report } from "@/lib/types";
 
 /** Synthetic records only. Never load an account or listing in this playground. */
 export function createLintRegressionFixtures() {
@@ -43,7 +48,16 @@ export function createLintRegressionFixtures() {
     phone: null, status: "new", source: "landing_page", created_at: timestamp, updated_at: timestamp,
     listings: { id: listing.id, listing_title: listing.listing_title, property_address: listing.property_address, public_slug: "mock", status: "active" },
   };
-  return { document, agency, agent, listing, collateral, lead };
+  document.document_link = { mode: "none" };
+  document.assets.qr_code_url = "";
+  const final = { ...getStrPlaygroundReport(), document_link: { mode: "none" as const } };
+  const report = createEmptyReportDraft({ id: "mock-report", agency_id: agency.id, listing_id: listing.id, status: "generated", template_id: final.template_id ?? null, final_report_json: final });
+  const lease: Report = { ...report, id: "mock-lease", template_id: "classic-lease-appraisal", final_report_json: { ...final, version: "lease_appraisal_v1", template_id: "classic-lease-appraisal" } };
+  const sales: Report = { ...report, id: "mock-sales", template_id: "classic-sales-appraisal", final_report_json: { ...final, version: "sales_appraisal_v1", template_id: "classic-sales-appraisal" } };
+  const card: CollateralItem = { ...collateral, id: "mock-card", type: "agent_business_card", listing_id: null, document_json: buildBusinessCardDocument({ agency, agentProfile: agent, listing: null, collateral: { ...collateral, type: "agent_business_card", template_id: null } }) };
+  const leaseCollateral: CollateralItem = { ...collateral, type: "lease_appraisal", report_id: lease.id };
+  const salesCollateral: CollateralItem = { ...collateral, type: "sales_appraisal", report_id: sales.id };
+  return { document, agency, agent, listing, collateral, lead, report, lease, sales, card, leaseCollateral, salesCollateral };
 }
 
 export type RegressionFixtures = ReturnType<typeof createLintRegressionFixtures>;
@@ -62,6 +76,50 @@ export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: 
     await new Promise((resolve) => window.setTimeout(resolve, 250));
     if (init?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
     onRequest(label);
+    const reportMatch = url.pathname.match(/^\/api\/reports\/(mock-report|mock-lease|mock-sales)\/(link|publish|generate-pdf)$/);
+    if (reportMatch) {
+      const key = reportMatch[1] === "mock-report" ? "report" : reportMatch[1] === "mock-lease" ? "lease" : "sales";
+      let report = data[key];
+      const action = reportMatch[2];
+      if (action === "link") {
+        const link = documentLinkSchema.parse(body);
+        const target = link.mode === "custom" ? link.url : link.mode === "report" ? `https://example.test/reports/${report.id}` : "";
+        report = { ...report, final_report_json: { ...report.final_report_json!, document_link_draft: { link, target_url: target, qr_code_url: target ? await generateQrCodeDataUrl(target) : "" } } };
+      } else if (action === "publish") {
+        report = { ...report, status: "published", public_url: `https://example.test/reports/${report.id}`, final_report_json: applyDocumentLinkDraft(report.final_report_json!) };
+        onRequest(`PUBLISHED ${report.id} ${JSON.stringify(report.final_report_json!.document_link)}`);
+      } else {
+        report = { ...report, pdf_url: "https://example.test/mock.pdf" };
+      }
+      data[key] = report;
+      return Response.json({ report, pdf_url: report.pdf_url, public_url: report.public_url });
+    }
+    const collateralMatch = url.pathname.match(/^\/api\/collateral\/(mock-collateral|mock-card)\/(link|publish|generate-pdf)$/);
+    if (collateralMatch) {
+      const key = collateralMatch[1] === "mock-card" ? "card" : "collateral";
+      let item = data[key];
+      const action = collateralMatch[2];
+      const doc = item.document_json! as typeof data.document;
+      if (action === "link") {
+        const link = documentLinkSchema.parse(body);
+        const target = link.mode === "custom" ? link.url : "";
+        const pending = { ...doc, content_saved_at: new Date().toISOString(), document_link_draft: { link, target_url: target, qr_code_url: target ? await generateQrCodeDataUrl(target) : "" } };
+        item = { ...item, document_json: key === "card" ? applyDocumentLinkDraft(pending) : pending };
+      } else if (action === "publish") {
+        item = { ...item, status: "published", document_json: applyDocumentLinkDraft(doc) };
+        onRequest(`PUBLISHED ${item.id} ${JSON.stringify((item.document_json as typeof data.document).document_link)}`);
+      } else {
+        item = { ...item, pdf_url: "https://example.test/mock.pdf", document_json: { ...doc, pdf_synced_at: doc.content_saved_at } };
+      }
+      data[key] = item;
+      if (key === "collateral") data.document = item.document_json as typeof data.document;
+      return Response.json({ collateral: item, pdf_url: item.pdf_url });
+    }
+    if (url.pathname === "/api/collateral/mock-card") {
+      data.card = { ...data.card, document_json: { ...data.card.document_json!, ...body } };
+      return Response.json({ collateral: data.card });
+    }
+    if (/^\/api\/listings\/mock-listing\/(lease|sales)-appraisal\/enrich$/.test(url.pathname)) return Response.json({ listing: data.listing });
     if (url.pathname === "/api/agents") {
       return Response.json(method === "GET" ? { agents: [data.agent] } : { agent: { ...data.agent, ...body } });
     }

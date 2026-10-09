@@ -19,6 +19,9 @@ export async function POST(
 
   try {
     const { supabase, agency, report } = await requireReportAccess(id);
+    if (report.final_report_json && "document_link_draft" in report.final_report_json && report.final_report_json.document_link_draft) {
+      return NextResponse.json({ error: "Publish the saved link choice before generating the PDF" }, { status: 409 });
+    }
     const body = generatePdfSchema.parse(await request.json().catch(() => ({})));
     const preview = body.preview === true;
 

@@ -1,3 +1,4 @@
+import { preserveDocumentLink } from "@/lib/documents/documentLink";
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import { ltrEnrichmentFromParsed } from "@/lib/lease-appraisal/ltrEnrichmentFromParsed";
 import { HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/templates/ids";
@@ -102,6 +103,7 @@ export function buildLeaseAppraisalReport({
   );
 
   return {
+    ...preserveDocumentLink(report.final_report_json ?? { assets: { qr_code_url: report.qr_code_url ?? "" } }),
     version: "lease_appraisal_v1",
     template_id: templateId,
     generated_at: new Date().toISOString(),

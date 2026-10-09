@@ -1,3 +1,4 @@
+import { DocumentQr } from "@/components/documents/DocumentQr";
 import { Bath, BedDouble, Car } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
@@ -208,7 +209,8 @@ function MinimalistSidebar({
         </div>
       </div>
 
-      <div className="mt-auto flex justify-end pt-2">
+      <div className="mt-auto flex items-end justify-end gap-2 pt-2">
+        <DocumentQr document={document} />
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

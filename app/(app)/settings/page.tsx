@@ -114,7 +114,7 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm leading-6 text-muted-foreground">
-              Design reusable front-and-back agent cards with optional property QR codes.
+              Design reusable front-and-back agent cards with optional QR links.
             </p>
           </CardContent>
         </Card>

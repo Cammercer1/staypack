@@ -358,7 +358,7 @@ export function BrandSettingsForm({ agency: initialAgency }: { agency: Agency })
 
                 <AdvancedSection
                   label="Cards & panels"
-                  hint="Applies to enquiry forms and info panels on listing pages."
+                  hint="Applies to cards and information panels."
                 >
                   <div className="space-y-3">
                     <div className="space-y-2">

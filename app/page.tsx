@@ -27,7 +27,7 @@ import styles from "./home.module.css";
 export const metadata: Metadata = {
   title: "StayPack | Branded property collateral, without the design bottleneck",
   description:
-    "Turn a property listing into branded landing pages, appraisals, brochures, social posts and data-backed property collateral.",
+    "Turn a property listing into branded reports, appraisals, brochures, social posts and data-backed property collateral.",
   robots: {
     index: false,
     follow: false,
@@ -80,7 +80,7 @@ const outputs: ProductOutput[] = [
     icon: LayoutTemplate,
     label: "Branded property brochures",
     title: "One source. Every useful format.",
-    copy: "Turn approved listing details and imagery into beautifully branded brochures, with social assets and live pages ready to follow.",
+    copy: "Turn approved listing details and imagery into beautifully branded brochures and social assets.",
     accent: "gold",
     number: "04",
   },
@@ -268,7 +268,7 @@ export default function HomePage() {
               <br /><em>No designer or data scientist required.</em>
             </h1>
             <p className={styles.heroLead}>
-              Turn one listing into branded property pages with lead capture,
+              Turn one listing into branded reports,
               sales and lease appraisals, brochures, social posts and
               data-backed STR potential reports—all from one property record.
             </p>
@@ -294,7 +294,7 @@ export default function HomePage() {
       <section className={styles.proofStrip} aria-label="StayPack capabilities">
         <div className={styles.proofStripInner}>
           <p>One listing in.</p>
-          <div><Globe2 size={17} /> Listing page + lead capture</div>
+          <div><Globe2 size={17} /> Optional report links and QR codes</div>
           <div><TrendingUp size={17} /> Sales &amp; lease appraisals</div>
           <div><LayoutTemplate size={17} /> Brochures + social posts</div>
           <div><BarChart3 size={17} /> STR potential reports</div>
@@ -463,7 +463,7 @@ export default function HomePage() {
               <span>3</span>
               <div className={styles.stepVisual}><Sparkles size={27} /></div>
               <h3>Publish the pack</h3>
-              <p>Choose your approved design, check the preview and share a polished PDF, live page or collateral set.</p>
+              <p>Choose your approved design, check the preview and share a polished PDF, online report or collateral set.</p>
             </li>
           </ol>
         </div>

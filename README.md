@@ -119,9 +119,21 @@ Open [http://localhost:3000](http://localhost:3000).
 
 - Email auth, agency onboarding, brand settings, agent profiles
 - Report library and 5-step report wizard
+- Rental and sales appraisals accept manually entered properties; saved property details take precedence over imported facts, and changed details require refreshed comparables
 - Listing scrape pipeline with static fetch + Browserless fallback stub
 - Dev mocks for Airbtics, OpenAI copy, QR/PDF when third-party keys are missing
 - Public report and print routes rendered from `final_report_json`
+- Optional QR destinations chosen independently for each report, brochure, or business card; new documents default to no QR
+
+## Report links and retired property pages
+
+Choose **Optional link and QR code** in the preview step. Reports can link to their own online version or a custom website. Brochures and business cards accept a custom URL. Save the choice, then publish the report or brochure to apply it. Business cards apply it when saved. PDF generation waits for pending report/brochure link choices to be published.
+
+Saving a link draft does not change an existing published QR or PDF. New QR images use unique storage paths and encode that document's destination directly. Regenerating copy preserves the choice. Existing documents without link metadata keep their original QR assets until explicitly changed.
+
+Property-page creation, enquiry capture/status editing, and landing-page analytics are retired. The main navigation, dashboard, property library, and workspace focus on reports. Existing public property pages and printed redirects continue working, with agent contact details replacing enquiry forms. Enquiry history is removed from Settings and the old enquiries page returns 404. Source code, database history, and old assets are retained; no database migration is required.
+
+The full dependency inventory and rollout notes are in [the property-pages audit](docs/property-pages-deprecation-audit.md).
 
 ## Milestone status
 
@@ -159,7 +171,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 `/dev/lint-regression` renders the real affected UI components with synthetic records. Click **Start mock test session** before selecting a test screen. All app API calls are intercepted in that tab; saves are kept in memory and reset on reload. Unhandled API calls fail closed. The landing-template iframe contains a fixture page; the modal's selection, cancellation, and save behaviour are tested separately from landing-page content.
 
-The route is available in development. A preview build must explicitly set `STAYPACK_REGRESSION_PREVIEW=1`; normal production builds return 404. Do not enable this flag on production. This does not create a separate Supabase environment or replace authenticated integration tests.
+The route is available in development. `/dev/document-print` also renders synthetic documents through the actual report/card/brochure print components, with optional `kind`, `template`, and `qr=on` parameters. A preview build must explicitly set `STAYPACK_REGRESSION_PREVIEW=1`; normal production builds return 404 for both routes. Do not enable this flag on production. This does not create a separate Supabase environment or replace authenticated integration tests.
 
 Run the browser checks sequentially against a mock-enabled preview:
 
@@ -169,3 +181,5 @@ STAGING_BASE_URL=https://YOUR-PREVIEW.netlify.app npm run test:staging
 ```
 
 The suite covers all brochure template renders, pagination resets, brochure/report editing, wizard navigation, the mobile gallery, landing template save/cancel, listing and scraped agents, branding and font search, analytics, lead status, scrape progress, and the social agent picker. It also fails if an app API request escapes the mock layer. Playwright writes its report to `playwright-report/` and failure artifacts to `test-results/` (both ignored by Git and ESLint).
+
+The document-link scenarios cover all three report wizards, brochure publish/republish, independent business-card destinations, the simplified property workspace, mobile controls, invalid URLs, and save-failure recovery. Legacy component scenarios remain available only in the synthetic harness so the retained source can still be checked. Unit coverage in `lib/documents/` checks actual API handlers, builders, publishers, legacy redirects, headless delivery, immutable QR uploads, and all report and brochure templates with QR enabled and disabled.

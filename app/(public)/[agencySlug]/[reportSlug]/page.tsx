@@ -1,3 +1,4 @@
+import { publishedDocumentSnapshot } from "@/lib/documents/documentLink";
 import { notFound, redirect } from "next/navigation";
 import {
   agencySlugNeedsRedirect,
@@ -50,6 +51,8 @@ export default async function PublicReportPage({
   if (!report?.final_report_json || !report.listing_id) {
     notFound();
   }
+  report.final_report_json = publishedDocumentSnapshot(report.final_report_json);
+
 
   const { data: listing } = await admin
     .from("listings")

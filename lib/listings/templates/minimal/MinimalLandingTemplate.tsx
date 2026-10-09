@@ -1,4 +1,5 @@
 "use client";
+import { LEGACY_PROPERTY_PAGE_TOOLS } from "@/lib/listings/legacyPropertyPages";
 
 import { useState } from "react";
 import { BedDouble, Bath, Car, Mail, Phone } from "lucide-react";
@@ -286,14 +287,14 @@ export function MinimalLandingTemplate({
             )}
           </div>
 
-          <MinimalLeadForm
+          {LEGACY_PROPERTY_PAGE_TOOLS ? <MinimalLeadForm
             agencySlug={agencySlug}
             listingSlug={listingSlug}
             brandAdvanced={brandAdvanced}
             cardBorderRadiusPx={brandAdvanced.cardBorderRadiusPx}
             agent={agent}
             primaryColour={primaryColour}
-          />
+          /> : <div className="rounded-2xl bg-white p-6 text-slate-900"><h2 className="mb-3 font-semibold">Contact the agent</h2>{agent ? <AgentRow agent={agent} brandAdvanced={brandAdvanced} primaryColour={primaryColour} /> : <><p>{a.name}</p>{a.phone ? <a className="block" href={`tel:${a.phone}`}>{a.phone}</a> : null}{a.email ? <a className="block" href={`mailto:${a.email}`}>{a.email}</a> : null}</>}</div>}
         </div>
       </div>
     </div>

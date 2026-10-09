@@ -1,4 +1,6 @@
 "use client";
+import { DocumentLinkEditor } from "@/components/documents/DocumentLinkEditor";
+import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -54,6 +56,7 @@ export function SalesBrochureWizard({
   collateralType = "sales_brochure",
 }: Props) {
   const listing = initialListing;
+  const [linkPending, setLinkPending] = useState(false);
   const [collateral, setCollateral] = useState(initialCollateral);
   const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
 
@@ -144,7 +147,7 @@ export function SalesBrochureWizard({
       return null;
     }
 
-    return doc;
+    return applyDocumentLinkDraft(doc);
   }, [previewDraftDocument]);
 
   const hasDownloadablePdf = Boolean(collateral.pdf_url);
@@ -243,6 +246,17 @@ export function SalesBrochureWizard({
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-6">
+          {collateral.document_json && isBrochureDocument(collateral.document_json) ? <DocumentLinkEditor
+            document={collateral.document_json}
+            endpoint={`/api/collateral/${collateral.id}/link`}
+            disabled={loading}
+            onPendingChange={setLinkPending}
+            onSaved={(payload) => {
+              const next = payload.collateral as CollateralItem;
+              setCollateral(next);
+              setPreviewDraftDocument(next.document_json as BrochureDocumentJson);
+            }}
+          /> : null}
           <AsyncLoadingOverlay
             active={loading || previewSyncing}
             title={
@@ -300,7 +314,7 @@ export function SalesBrochureWizard({
             {showPublish ? (
               <Button
                 onClick={publishBrochure}
-                disabled={loading || !previewDocument}
+                disabled={loading || linkPending || !previewDocument}
               >
                 {loading ? (
                   <>

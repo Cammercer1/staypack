@@ -1,3 +1,4 @@
+import { preserveDocumentLink } from "@/lib/documents/documentLink";
 import { buildAgencyBrandSlice } from "@/lib/collateral/buildAgencyBrandSlice";
 import { getDefaultBusinessCardVariants } from "@/lib/collateral/business-card/normalizeBusinessCardDocument";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
@@ -67,6 +68,7 @@ export function buildBusinessCardDocument({
 
   return {
     version: "business_card_v1",
+    ...preserveDocumentLink(collateral.document_json),
     type: "agent_business_card",
     template_id: resolveCollateralTemplateId(agency, collateral),
     generated_at: new Date().toISOString(),

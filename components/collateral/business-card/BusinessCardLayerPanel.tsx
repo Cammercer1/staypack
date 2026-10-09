@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, Image, Palette, Sparkles } from "lucide-react";
+import { Image, Palette } from "lucide-react";
 import { LayerSection } from "@/components/collateral/social/LayerSection";
 import { LayerScaleControl } from "@/components/collateral/social/LayerScaleControl";
 import { LayerChoiceControl } from "@/components/collateral/social/LayerChoiceControl";
@@ -383,7 +383,7 @@ function BackPanel({
               ? (selectedListingLabel ?? "QR ready")
               : qrPending
                 ? "Save to generate"
-                : "Select a listing below"
+                : "Choose a destination above"
             : "Hidden"
         }
         open={isOpen("qr")}
@@ -405,35 +405,7 @@ function BackPanel({
           </label>
         }
       >
-        {/* Listing picker */}
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Property listing</Label>
-          <select
-            value={qrListingId ?? ""}
-            onChange={(e) =>
-              onChange({ ...document, qr_listing_id: e.target.value || null })
-            }
-            className="h-8 w-full rounded-lg border border-border bg-background px-2 text-sm"
-          >
-            <option value="">No property QR</option>
-            {sortedListings.map((listing) => (
-              <option key={listing.id} value={listing.id}>
-                {listing.property_address ?? listing.listing_title ?? "Listing"}
-              </option>
-            ))}
-          </select>
-          {qrPending ? (
-            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-400">
-              <Sparkles className="h-3.5 w-3.5 shrink-0" />
-              QR code will be generated when you save.
-            </div>
-          ) : qrCodeUrl ? (
-            <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-800/40 dark:bg-green-900/20 dark:text-green-400">
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-              QR ready.{selectedListingLabel ? ` ${selectedListingLabel}` : ""}
-            </div>
-          ) : null}
-        </div>
+        <p className="text-xs text-muted-foreground">Choose the destination in Optional link and QR code above.</p>
         {/* QR position */}
         <CardPositionPicker
           label="Position"
@@ -461,7 +433,6 @@ function BackPanel({
 function FrontPanel({
   document,
   agents,
-  listings,
   onChange,
 }: {
   document: BusinessCardDocumentJson;

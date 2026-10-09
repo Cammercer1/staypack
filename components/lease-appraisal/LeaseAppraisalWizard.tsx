@@ -1,5 +1,9 @@
 "use client";
 
+import { resolveAppraisalInput, appraisalInputError } from "@/lib/appraisals/resolveAppraisalInput";
+import { DocumentLinkEditor } from "@/components/documents/DocumentLinkEditor";
+import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -57,6 +61,7 @@ export function LeaseAppraisalWizard({
   initialAgencyAgents,
   skipTemplateSelection = false,
 }: Props) {
+  const [linkPending, setLinkPending] = useState(false);
   const [listing, setListing] = useState(initialListing);
   const [report, setReport] = useState(initialReport);
   const [collateral, setCollateral] = useState(initialCollateral);
@@ -107,10 +112,11 @@ export function LeaseAppraisalWizard({
   }, [listing.id]);
 
   useEffect(() => {
-    if (hasLeaseAppraisalComps(listing.scraped_listing_json)) {
+    if (hasLeaseAppraisalComps(resolveAppraisalInput(listing))) {
       setCompsPrefetching(false);
       return;
     }
+    if (appraisalInputError(listing)) return;
     if (compsPrefetchStartedRef.current) {
       return;
     }
@@ -144,7 +150,7 @@ export function LeaseAppraisalWizard({
     return () => {
       cancelled = true;
     };
-  }, [listing.id, listing.scraped_listing_json]);
+  }, [listing]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
@@ -156,7 +162,8 @@ export function LeaseAppraisalWizard({
   }, []);
 
   const previewReport = useMemo(() => {
-    const cached = previewDraftReport ?? (report.final_report_json as FinalReportJson | null);
+    const rawCached = previewDraftReport ?? (report.final_report_json as FinalReportJson | null);
+    const cached = rawCached ? applyDocumentLinkDraft(rawCached) : null;
     if (!cached) {
       return null;
     }
@@ -334,6 +341,18 @@ export function LeaseAppraisalWizard({
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-6">
+          {report.final_report_json ? <DocumentLinkEditor
+            document={report.final_report_json}
+            endpoint={`/api/reports/${report.id}/link`}
+            allowReport
+            disabled={loading}
+            onPendingChange={setLinkPending}
+            onSaved={(payload) => {
+              const next = payload.report as Report;
+              setReport(next);
+              setPreviewDraftReport(next.final_report_json);
+            }}
+          /> : null}
           <p className="text-sm text-muted-foreground">
             To change photos or edit copy inline, open the{" "}
             <button
@@ -385,7 +404,7 @@ export function LeaseAppraisalWizard({
               url={report.pdf_url}
               reportId={report.id}
               cacheVersion={report.updated_at}
-              canGenerate={Boolean(previewReport) && !loading}
+              canGenerate={Boolean(previewReport) && !loading && !linkPending && !report.final_report_json?.document_link_draft}
               preview={report.status !== "published"}
               size="default"
               generateLabel="Generate PDF preview"
@@ -401,7 +420,7 @@ export function LeaseAppraisalWizard({
               }}
             />
             {report.public_url ? <CopyLinkButton url={report.public_url} /> : null}
-            <Button onClick={publishReport} disabled={loading || !previewReport}>
+            <Button onClick={publishReport} disabled={loading || linkPending || !previewReport}>
               {loading ? (
                 <>
                   <Loader2 className="animate-spin" />
@@ -463,7 +482,7 @@ function getInitialStep(
     return "template";
   }
 
-  const parsed = listing.scraped_listing_json;
+  const parsed = resolveAppraisalInput(listing);
   if (!hasLeaseAppraisalComps(parsed) || !hasLeaseAppraisalSelectedComps(parsed)) {
     return "data";
   }

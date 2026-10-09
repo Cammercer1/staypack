@@ -1,3 +1,5 @@
+import { assertAppraisalInput, resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
+import { saveAppraisalResults } from "@/lib/appraisals/saveAppraisalResults";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import {
@@ -16,14 +18,6 @@ function assertSaleListing(listing: Listing) {
   }
 }
 
-function assertScrapedListing(listing: Listing) {
-  if (!listing.scraped_listing_json) {
-    throw new Error(
-      "Import the listing URL first so we can find sold and for-sale comparables",
-    );
-  }
-}
-
 export async function enrichListingForSalesAppraisal({
   supabase,
   listing,
@@ -34,10 +28,10 @@ export async function enrichListingForSalesAppraisal({
   requestId?: string;
 }): Promise<{ listing: Listing; parsed: ParsedListing; warnings: string[] }> {
   assertSaleListing(listing);
-  assertScrapedListing(listing);
+  assertAppraisalInput(listing);
 
   const { parsed, warnings } = await enrichParsedListingForSalesAppraisal(
-    listing.scraped_listing_json!,
+    resolveAppraisalInput(listing),
     { subjectListingUrl: listing.listing_url },
   );
   const previousStatus = salesAppraisalEnrichmentStatus(
@@ -49,16 +43,7 @@ export async function enrichListingForSalesAppraisal({
     completedSalesAppraisalEnrichmentStatus(previousStatus, enrichmentRequestId),
   );
 
-  const { data: updatedListing, error: listingError } = await supabase
-    .from("listings")
-    .update({ scraped_listing_json: completedParsed })
-    .eq("id", listing.id)
-    .select("*")
-    .single();
-
-  if (listingError || !updatedListing) {
-    throw new Error(listingError?.message ?? "Failed to save sales appraisal data");
-  }
+  const updatedListing = await saveAppraisalResults({ supabase, listing, kind: "sales", parsed: completedParsed });
 
   return {
     listing: updatedListing as Listing,

@@ -1,3 +1,5 @@
+import { LEGACY_PROPERTY_PAGE_TOOLS } from "@/lib/listings/legacyPropertyPages";
+import { hasLegacyPropertyPage } from "@/lib/listings/legacyPropertyPages";
 import { notFound, redirect } from "next/navigation";
 import {
   agencySlugNeedsRedirect,
@@ -66,7 +68,7 @@ export default async function PublicListingLandingPage({
     .eq("status", "active")
     .maybeSingle();
 
-  if (!listing) notFound();
+  if (!listing || !hasLegacyPropertyPage(listing)) notFound();
 
   const a = agency as Agency;
   const l = listing as Listing;
@@ -156,7 +158,7 @@ export default async function PublicListingLandingPage({
 
   return (
     <>
-      {!isOwner && !isPreview ? <ListingViewTracker listingId={l.id} /> : null}
+      {LEGACY_PROPERTY_PAGE_TOOLS && !isOwner && !isPreview ? <ListingViewTracker listingId={l.id} /> : null}
 
       {activeTemplateId === "classic" ? (
         <ClassicLandingTemplate {...templateProps} />
@@ -164,7 +166,7 @@ export default async function PublicListingLandingPage({
         <MinimalLandingTemplate {...templateProps} />
       )}
 
-      {isPreview && !isEmbedded ? (
+      {LEGACY_PROPERTY_PAGE_TOOLS && isPreview && !isEmbedded ? (
         <LandingTemplatePreviewBar
           listingId={l.id}
           agencySlug={agencySlug}

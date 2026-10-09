@@ -1,3 +1,4 @@
+import { DocumentQr } from "@/components/documents/DocumentQr";
 import type { FinalReportJson } from "@/lib/types";
 import {
   ClassicCompsGrid,
@@ -75,6 +76,7 @@ export function HavenPageTwo({ report }: Props) {
           </section>
         </div>
       </div>
+      {report.document_link && report.document_link.mode !== "none" && report.assets.qr_code_url ? <div className="flex shrink-0 justify-end px-10 pb-3"><DocumentQr document={report} /></div> : null}
     </section>
   );
 }

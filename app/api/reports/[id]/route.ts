@@ -1,3 +1,4 @@
+import { preserveDocumentLink } from "@/lib/documents/documentLink";
 import { NextResponse } from "next/server";
 import { requireReportWithListing } from "@/lib/auth/requireUser";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
@@ -165,6 +166,10 @@ export async function PATCH(
       if (rebuildResult.error) {
         return rebuildResult.error;
       }
+    }
+
+    if (body.final_report_json) {
+      body.final_report_json = { ...body.final_report_json, ...preserveDocumentLink(report.final_report_json) };
     }
 
     const { data, error } = await supabase

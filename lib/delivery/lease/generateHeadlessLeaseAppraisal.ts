@@ -1,3 +1,6 @@
+import { resolveAppraisalInput, assertAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
+import { applyDocumentLinkDraft, type DocumentLink } from "@/lib/documents/documentLink";
+import { createDocumentLinkDraft } from "@/lib/documents/createDocumentLinkDraft";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPrintRenderBaseUrl, getReportsUrl } from "@/lib/env";
 import { renderPdfFromUrl, buildPdfImagePath, buildPdfStylesheetPath } from "@/lib/browserless/pdf";
@@ -38,6 +41,7 @@ export async function generateHeadlessLeaseAppraisal({
   listing: existingListing,
   agency: existingAgency,
   templateIdOverride,
+  documentLink = { mode: "none" },
   resolvedAgents,
   agentProfile: agentProfileOverride,
   agencyAgents: agencyAgentsOverride,
@@ -48,12 +52,18 @@ export async function generateHeadlessLeaseAppraisal({
   listing?: Listing;
   agency?: Agency;
   templateIdOverride?: string;
+  documentLink?: DocumentLink;
   resolvedAgents?: ReportAgent[];
   agentProfile?: AgentProfile | null;
   agencyAgents?: AgentProfile[];
 }): Promise<HeadlessLeaseAppraisalResult> {
+  if (existingListing) {
+    const subjectListing = { ...existingListing, scraped_listing_json: parsed };
+    assertAppraisalInput(subjectListing);
+    parsed = resolveAppraisalInput(subjectListing);
+  }
   if (!parsed.address?.trim()) {
-    throw new Error("Scraped listing is missing a property address");
+    throw new Error("Property address is required");
   }
 
   const admin = createAdminClient();
@@ -169,11 +179,14 @@ export async function generateHeadlessLeaseAppraisal({
     publicSlug,
   );
 
+  const publishedFinalJson = applyDocumentLinkDraft({ ...finalReportJson, document_link_draft: await createDocumentLinkDraft({ link: documentLink, agencyId: agency.id, documentId: report.id, reportUrl: publicUrl }) });
+
   const { data: publishedReport, error: publishError } = await admin
     .from("reports")
     .update({
       template_id: templateId,
-      final_report_json: finalReportJson,
+      final_report_json: publishedFinalJson,
+      qr_code_url: publishedFinalJson.assets.qr_code_url || null,
       status: "published",
       public_slug: publicSlug,
       public_url: publicUrl,
@@ -226,9 +239,9 @@ export async function generateHeadlessLeaseAppraisal({
     .update({
       pdf_url: pdfUrl,
       final_report_json: {
-        ...finalReportJson,
+        ...publishedFinalJson,
         assets: {
-          ...finalReportJson.assets,
+          ...publishedFinalJson.assets,
           pdf_url: pdfUrl,
         },
       },

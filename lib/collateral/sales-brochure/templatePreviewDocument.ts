@@ -3,8 +3,8 @@ import {
   getMockRentalBrochureCopy,
   getMockSalesBrochureCopy,
 } from "@/lib/collateral/buildSalesBrochureDocument";
-import { createPlaygroundSalesBrochureDocument } from "@/lib/collateral/sales-brochure/playgroundFixture";
-import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { isBrochureDocument, type BrochureDocumentJson } from "@/lib/collateral/templates/types";
+import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
 import type { Agency, CollateralItem, CollateralType, Listing } from "@/lib/types";
 
 type BrochureCollateralType = Extract<
@@ -12,7 +12,7 @@ type BrochureCollateralType = Extract<
   "sales_brochure" | "rental_brochure"
 >;
 
-/** Draft brochure for template picker preview (listing photos + placeholder QR). */
+/** Draft brochure preview using the document's own optional QR choice. */
 export function buildBrochureTemplatePreview({
   agency,
   listing,
@@ -26,21 +26,23 @@ export function buildBrochureTemplatePreview({
   templateId: string;
   collateralType: BrochureCollateralType;
 }): BrochureDocumentJson {
-  const playground = createPlaygroundSalesBrochureDocument(templateId);
+  const existing = collateral.document_json && isBrochureDocument(collateral.document_json)
+    ? collateral.document_json
+    : null;
   const mockCopy =
     collateralType === "rental_brochure"
       ? getMockRentalBrochureCopy(listing, agency)
       : getMockSalesBrochureCopy(listing, agency);
 
-  return buildBrochureDocument({
+  return applyDocumentLinkDraft(buildBrochureDocument({
     collateralType,
     agency,
     listing,
     collateral: { ...collateral, template_id: templateId },
     copy: mockCopy,
-    qrCodeUrl: playground.assets.qr_code_url,
-    qrTargetUrl: playground.qr_target_url,
-  });
+    qrCodeUrl: existing?.assets.qr_code_url ?? "",
+    qrTargetUrl: existing?.qr_target_url ?? "",
+  }));
 }
 
 /** @deprecated Use buildBrochureTemplatePreview */

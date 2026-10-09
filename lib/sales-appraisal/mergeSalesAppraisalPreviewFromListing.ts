@@ -1,3 +1,4 @@
+import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import { salesEnrichmentFromParsed } from "@/lib/sales-appraisal/salesEnrichmentFromParsed";
 import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
 import type { FinalReportJson, Listing } from "@/lib/types";
@@ -7,7 +8,7 @@ export function mergeSalesAppraisalPreviewFromListing(
   report: FinalReportJson,
   listing: Listing,
 ): FinalReportJson {
-  const parsed = listing.scraped_listing_json;
+  const parsed = resolveAppraisalInput(listing);
   if (!parsed) {
     return report;
   }

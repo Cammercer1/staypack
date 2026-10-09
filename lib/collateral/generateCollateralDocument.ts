@@ -9,6 +9,7 @@ import { buildSocialPostsDocument } from "@/lib/collateral/buildSocialPostsDocum
 import { provisionCollateralQr } from "@/lib/collateral/provisionCollateralQr";
 import {
   isBrochureDocument,
+  isBusinessCardDocument,
   type BrochureCopyJson,
   type CollateralDocumentJson,
 } from "@/lib/collateral/templates/types";
@@ -51,6 +52,7 @@ export async function generateCollateralDocument({
     });
   }
 
+  const existingCard = collateral.document_json && isBusinessCardDocument(collateral.document_json) ? collateral.document_json : null;
   const qr =
     listing != null
       ? await provisionCollateralQr({
@@ -69,8 +71,8 @@ export async function generateCollateralDocument({
         collateral,
         agentProfile,
         agencyAgents,
-        qrCodeUrl: qr?.qrCodeUrl ?? "",
-        qrTargetUrl: qr?.qrTargetUrl ?? "",
+        qrCodeUrl: qr?.qrCodeUrl ?? existingCard?.assets.qr_code_url ?? "",
+        qrTargetUrl: qr?.qrTargetUrl ?? existingCard?.qr_target_url ?? "",
         qrListingId: qr?.provisionedListing.id ?? null,
       });
     case "sales_brochure": {
