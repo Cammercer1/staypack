@@ -1,5 +1,7 @@
 "use client";
 
+import type { TemplatesResponse } from "@/components/templates/useAvailableTemplates";
+
 import { LeaseAppraisalWizard } from "@/components/lease-appraisal/LeaseAppraisalWizard";
 import type {
   Agency,
@@ -10,6 +12,7 @@ import type {
 } from "@/lib/types";
 
 type Props = {
+  availableTemplates?: TemplatesResponse;
   listing: Listing;
   report: Report;
   collateral: CollateralItem;
@@ -25,6 +28,7 @@ export function LeaseAppraisalEditor({
   agency,
   agencyAgents,
   skipTemplateSelection = false,
+  availableTemplates,
 }: Props) {
   return (
     <LeaseAppraisalWizard
@@ -33,6 +37,7 @@ export function LeaseAppraisalEditor({
       initialCollateral={collateral}
       agency={agency}
       initialAgencyAgents={agencyAgents}
+      availableTemplates={availableTemplates}
       skipTemplateSelection={skipTemplateSelection}
     />
   );

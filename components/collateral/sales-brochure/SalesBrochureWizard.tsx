@@ -1,226 +1,181 @@
 "use client";
-import { DocumentLinkEditor } from "@/components/documents/DocumentLinkEditor";
-import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import {
   GeneratedBrochureCopyEditor,
   type BrochureCopyEditorHandle,
 } from "@/components/collateral/sales-brochure/GeneratedBrochureCopyEditor";
 import { SalesBrochureTemplateStep } from "@/components/collateral/sales-brochure/SalesBrochureTemplateStep";
-import { FittedBrochurePreview } from "@/components/collateral/sales-brochure/FittedBrochurePreview";
-import { CollateralPdfButton } from "@/components/collateral/CollateralPdfButton";
-import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
-import { salesBrochureNeedsRepublish } from "@/lib/collateral/sales-brochure/brochurePublishSync";
-import {
-  isBrochureDocument,
-  type BrochureDocumentJson,
-} from "@/lib/collateral/templates/types";
-import type { Agency, AgentProfile, CollateralItem, CollateralType, Listing } from "@/lib/types";
-
-type BrochureCollateralType = Extract<
-  CollateralType,
-  "sales_brochure" | "rental_brochure"
->;
-
-const BROCHURE_LABELS: Record<BrochureCollateralType, string> = {
-  sales_brochure: "Property brochure",
-  rental_brochure: "Rental brochure",
-};
+import { BrochureDeliveryStep } from "@/components/collateral/sales-brochure/BrochureDeliveryStep";
+import { BrochureGenerationStatus } from "@/components/collateral/sales-brochure/BrochureGenerationStatus";
+import { isBrochureDocument } from "@/lib/collateral/templates/types";
+import type { TemplatesResponse } from "@/components/templates/useAvailableTemplates";
+import type {
+  Agency,
+  AgentProfile,
+  CollateralItem,
+  Listing,
+} from "@/lib/types";
 
 const steps = [
-  { id: "template", label: "Choose template" },
-  { id: "copy", label: "Edit content" },
-  { id: "preview", label: "Preview & publish" },
+  { id: "template", label: "Design" },
+  { id: "copy", label: "Edit brochure" },
+  { id: "preview", label: "Download & share" },
 ];
-
-/** Minimum time the preview sync overlay stays visible so the refresh is perceptible. */
-const PREVIEW_SYNC_MIN_MS = 400;
-
-type Props = {
-  initialListing: Listing;
-  initialCollateral: CollateralItem;
-  agency: Agency;
-  collateralType?: BrochureCollateralType;
-};
 
 export function SalesBrochureWizard({
   initialListing,
   initialCollateral,
   agency,
   collateralType = "sales_brochure",
-}: Props) {
-  const listing = initialListing;
-  const [linkPending, setLinkPending] = useState(false);
+  initialAgencyAgents,
+  availableTemplates,
+}: {
+  initialListing: Listing;
+  initialCollateral: CollateralItem;
+  agency: Agency;
+  collateralType?: "sales_brochure" | "rental_brochure";
+  initialAgencyAgents?: AgentProfile[];
+  availableTemplates?: TemplatesResponse;
+}) {
   const [collateral, setCollateral] = useState(initialCollateral);
-  const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
-
+  const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>(
+    initialAgencyAgents ?? [],
+  );
+  const [step, setStep] = useState(
+    initialCollateral.document_json ? "preview" : "template",
+  );
+  const [busy, setBusy] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const copyEditorRef = useRef<BrochureCopyEditorHandle>(null);
+  const navigationPending = useRef(false);
+  const listing = initialListing;
   useEffect(() => {
+    if (initialAgencyAgents) return;
+    let cancelled = false;
     fetch("/api/agents")
       .then((response) => response.json())
-      .then((payload) => setAgencyAgents(payload.agents ?? []))
-      .catch(() => {
-        // Preview still works with listing agents only.
-      });
-  }, []);
-
-  const agentProfile = useMemo(() => {
-    if (listing.agent_profile_id != null) {
-      return (
-        agencyAgents.find((agent) => agent.id === listing.agent_profile_id) ?? null
-      );
-    }
-
-    return agencyAgents.find((agent) => agent.is_default) ?? agencyAgents[0] ?? null;
-  }, [agencyAgents, listing.agent_profile_id]);
-  const [step, setStep] = useState(getInitialStep(initialCollateral));
-  const [loading, setLoading] = useState(false);
-  const [publishStage, setPublishStage] = useState<
-    "idle" | "publishing" | "generating-pdf"
-  >("idle");
-  const copyEditorRef = useRef<BrochureCopyEditorHandle>(null);
-  const previewSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [previewSyncing, setPreviewSyncing] = useState(false);
-  const [previewDraftDocument, setPreviewDraftDocument] =
-    useState<BrochureDocumentJson | null>(() => {
-      const raw = initialCollateral.document_json;
-      return raw && isBrochureDocument(raw) ? raw : null;
-    });
-
-  const [previousDocument, setPreviousDocument] = useState(collateral.document_json);
-  if (previousDocument !== collateral.document_json) {
-    setPreviousDocument(collateral.document_json);
-    const raw = collateral.document_json;
-    if (raw && isBrochureDocument(raw)) {
-      setPreviewDraftDocument(raw);
-    }
-  }
-
-  useEffect(() => {
+      .then((payload) => {
+        if (!cancelled) setAgencyAgents(payload.agents ?? []);
+      })
+      .catch(() => {});
     return () => {
-      if (previewSyncTimeoutRef.current) {
-        clearTimeout(previewSyncTimeoutRef.current);
-      }
+      cancelled = true;
     };
-  }, []);
+  }, [initialAgencyAgents]);
+  const agentProfile = useMemo(
+    () =>
+      listing.agent_profile_id != null
+        ? (agencyAgents.find(
+            (agent) => agent.id === listing.agent_profile_id,
+          ) ?? null)
+        : (agencyAgents.find((agent) => agent.is_default) ??
+          agencyAgents[0] ??
+          null),
+    [agencyAgents, listing.agent_profile_id],
+  );
+  const document =
+    collateral.document_json && isBrochureDocument(collateral.document_json)
+      ? collateral.document_json
+      : null;
 
-  function handleStepChange(next: string) {
-    if (next === "preview") {
-      if (step === "preview") {
+  async function handleStepChange(next: string) {
+    if (next === step || busy || navigationPending.current) return;
+    navigationPending.current = true;
+    try {
+      if (
+        step === "copy" &&
+        copyEditorRef.current &&
+        !(await copyEditorRef.current.savePendingEdits())
+      )
         return;
-      }
-
-      copyEditorRef.current?.flushPendingEdits();
-      const liveDocument = copyEditorRef.current?.getPreviewDocument();
-      if (liveDocument) {
-        setPreviewDraftDocument(liveDocument);
-      }
-
-      if (previewSyncTimeoutRef.current) {
-        clearTimeout(previewSyncTimeoutRef.current);
-      }
-      setPreviewSyncing(true);
-      setStep("preview");
-      previewSyncTimeoutRef.current = setTimeout(() => {
-        previewSyncTimeoutRef.current = null;
-        setPreviewSyncing(false);
-      }, PREVIEW_SYNC_MIN_MS);
-      return;
+      setStep(next);
+    } finally {
+      navigationPending.current = false;
     }
-
-    if (previewSyncTimeoutRef.current) {
-      clearTimeout(previewSyncTimeoutRef.current);
-      previewSyncTimeoutRef.current = null;
-    }
-    setPreviewSyncing(false);
-    setStep(next);
   }
 
-  const previewDocument = useMemo((): BrochureDocumentJson | null => {
-    const doc = previewDraftDocument;
-    if (!doc || !isBrochureDocument(doc)) {
-      return null;
+  async function handleDesignSelected(next: CollateralItem) {
+    setCollateral(next);
+    setStep("copy");
+    setGenerationError(null);
+    if (next.document_json && isBrochureDocument(next.document_json)) return;
+    setGenerating(true);
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/collateral/${next.id}/generate-copy`, {
+        method: "POST",
+      });
+      const payload = await response.json();
+      if (
+        !response.ok ||
+        !payload.collateral?.document_json ||
+        !isBrochureDocument(payload.collateral.document_json)
+      )
+        throw new Error(
+          payload.error ?? "Unable to write your brochure. Try again below.",
+        );
+      setCollateral(payload.collateral);
+    } catch (err) {
+      setGenerationError(
+        err instanceof Error
+          ? err.message
+          : "Unable to write your brochure. Try again below.",
+      );
+    } finally {
+      setGenerating(false);
+      setBusy(false);
     }
-
-    return applyDocumentLinkDraft(doc);
-  }, [previewDraftDocument]);
-
-  const hasDownloadablePdf = Boolean(collateral.pdf_url);
-  const needsRepublish = salesBrochureNeedsRepublish(collateral);
-  const showDownload = hasDownloadablePdf && !needsRepublish;
-  const showPublish = !showDownload;
-
-  async function publishBrochure() {
-    setLoading(true);
-    setPublishStage("publishing");
-
-    const publishResponse = await fetch(`/api/collateral/${collateral.id}/publish`, {
-      method: "POST",
-    });
-    const publishPayload = await publishResponse.json();
-
-    if (!publishResponse.ok) {
-      toast.error(publishPayload.error ?? "Publish failed");
-      setLoading(false);
-      setPublishStage("idle");
-      return;
-    }
-
-    if (publishPayload.collateral) {
-      setCollateral(publishPayload.collateral);
-    }
-
-    setPublishStage("generating-pdf");
-    const pdfResponse = await fetch(`/api/collateral/${collateral.id}/generate-pdf`, {
-      method: "POST",
-    });
-    const pdfPayload = await pdfResponse.json();
-
-    if (!pdfResponse.ok) {
-      toast.error(pdfPayload.error ?? "PDF generation failed");
-      setLoading(false);
-      setPublishStage("idle");
-      return;
-    }
-
-    if (pdfPayload.collateral) {
-      setCollateral(pdfPayload.collateral);
-    }
-
-    toast.success(`${BROCHURE_LABELS[collateralType]} published`);
-    setLoading(false);
-    setPublishStage("idle");
   }
 
   return (
-    <div className="space-y-6">
-      <Tabs value={step} onValueChange={handleStepChange}>
-        <TabsList className="grid w-full grid-cols-3">
-          {steps.map((item) => (
-            <TabsTrigger key={item.id} value={item.id}>
+    <div data-theme="staypack-workspace" className="space-y-5">
+      <Tabs value={step} onValueChange={(next) => void handleStepChange(next)}>
+        <TabsList className="mb-2 grid h-auto w-full grid-cols-3 gap-1 p-1">
+          {steps.map((item, index) => (
+            <TabsTrigger
+              key={item.id}
+              value={item.id}
+              disabled={
+                busy ||
+                (item.id === "copy" && !collateral.template_id) ||
+                (item.id === "preview" && !document)
+              }
+              className="min-h-12 whitespace-normal px-2 text-xs sm:text-sm"
+            >
+              <span
+                aria-hidden="true"
+                className="hidden size-6 shrink-0 items-center justify-center rounded-full border text-xs sm:flex"
+              >
+                {index + 1}
+              </span>
               {item.label}
             </TabsTrigger>
           ))}
         </TabsList>
-
         <TabsContent value="template">
           <SalesBrochureTemplateStep
             agency={agency}
             listing={listing}
             collateral={collateral}
             collateralType={collateralType}
-            onCollateralChange={setCollateral}
-            onContinue={() => setStep("copy")}
+            agencyAgents={agencyAgents}
+            availableTemplates={availableTemplates}
+            onBusyChange={setBusy}
+            onContinue={(next) => void handleDesignSelected(next)}
           />
         </TabsContent>
-
-        <TabsContent value="copy">
-          {collateral.template_id ? (
+        <TabsContent value="copy" className="space-y-4">
+          {generationError ? (
+            <p role="alert" className="du-alert du-alert-error du-alert-soft">
+              {generationError}
+            </p>
+          ) : null}
+          {generating ? (
+            <BrochureGenerationStatus />
+          ) : (
             <GeneratedBrochureCopyEditor
               ref={copyEditorRef}
               agency={agency}
@@ -228,123 +183,27 @@ export function SalesBrochureWizard({
               collateral={collateral}
               agencyAgents={agencyAgents}
               agentProfile={agentProfile}
-              onCollateralChange={setCollateral}
-              onContinueToPreview={() => handleStepChange("preview")}
+              onBusyChange={setBusy}
+              onCollateralChange={(next) => {
+                setCollateral(next);
+                setGenerationError(null);
+              }}
+              onContinueToPreview={() => setStep("preview")}
             />
-          ) : (
-            <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-              <p>Choose a brochure template before generating content.</p>
-              <Button
-                className="mt-4"
-                variant="outline"
-                onClick={() => setStep("template")}
-              >
-                Back to choose template
-              </Button>
-            </div>
           )}
         </TabsContent>
-
-        <TabsContent value="preview" className="space-y-6">
-          {collateral.document_json && isBrochureDocument(collateral.document_json) ? <DocumentLinkEditor
-            document={collateral.document_json}
-            endpoint={`/api/collateral/${collateral.id}/link`}
-            disabled={loading}
-            onPendingChange={setLinkPending}
-            onSaved={(payload) => {
-              const next = payload.collateral as CollateralItem;
-              setCollateral(next);
-              setPreviewDraftDocument(next.document_json as BrochureDocumentJson);
-            }}
-          /> : null}
-          <AsyncLoadingOverlay
-            active={loading || previewSyncing}
-            title={
-              previewSyncing
-                ? "Preparing preview"
-                : publishStage === "generating-pdf"
-                  ? "Generating PDF"
-                  : "Publishing brochure"
-            }
-            description={
-              previewSyncing
-                ? "Syncing your latest edits…"
-                : publishStage === "generating-pdf"
-                  ? "Rendering your print-ready brochure. This can take 15–30 seconds."
-                  : "Saving the published brochure."
-            }
-          >
-            {previewSyncing ? (
-              <div
-                className="min-h-[min(80vh,900px)] rounded-xl border border-transparent"
-                aria-hidden
-              />
-            ) : previewDocument ? (
-              <FittedBrochurePreview
-                document={previewDocument}
-                listing={listing}
-                agencyAgents={agencyAgents}
-                agentProfile={agentProfile}
-                collateralType={collateralType}
-                maxHeight="min(80vh, 900px)"
-                fitToWidth
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Generate collateral first to preview the brochure.
-              </p>
-            )}
-          </AsyncLoadingOverlay>
-
-          <div className="sticky bottom-3 z-10 flex flex-wrap gap-3 rounded-xl border border-border bg-background p-4 shadow-sm no-print">
-            {showDownload ? (
-              <CollateralPdfButton
-                collateralId={collateral.id}
-                url={collateral.pdf_url}
-                canGenerate={false}
-                cacheVersion={collateral.updated_at}
-                size="default"
-                downloadLabel="Download PDF"
-                onUpdated={setCollateral}
-              />
-            ) : null}
-            {showDownload && collateral.public_url ? (
-              <CopyLinkButton url={collateral.public_url} />
-            ) : null}
-            {showPublish ? (
-              <Button
-                onClick={publishBrochure}
-                disabled={loading || linkPending || !previewDocument}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="animate-spin" />
-                    {publishStage === "generating-pdf"
-                      ? "Generating PDF..."
-                      : "Publishing..."}
-                  </>
-                ) : collateral.status === "published" || needsRepublish ? (
-                  "Republish brochure"
-                ) : (
-                  "Publish brochure"
-                )}
-              </Button>
-            ) : null}
-          </div>
+        <TabsContent value="preview">
+          {document ? (
+            <BrochureDeliveryStep
+              collateral={collateral}
+              document={document}
+              onCollateralChange={setCollateral}
+              onEdit={() => setStep("copy")}
+              onBusyChange={setBusy}
+            />
+          ) : null}
         </TabsContent>
       </Tabs>
     </div>
   );
-}
-
-function getInitialStep(collateral: CollateralItem) {
-  if (collateral.status === "published" || collateral.document_json) {
-    return "preview";
-  }
-
-  if (collateral.template_id) {
-    return "copy";
-  }
-
-  return "template";
 }

@@ -3,26 +3,36 @@
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useImperativeHandle,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { ChevronDown, Loader2, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronDown,
+  Loader2,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
-import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
+import { DocumentStepHeader } from "@/components/documents/DocumentStepHeader";
+import { BrochureGenerationStatus } from "@/components/collateral/sales-brochure/BrochureGenerationStatus";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { BlurbVariantsEditor } from "@/components/collateral/sales-brochure/BlurbVariantsEditor";
 import { BlurbLengthMappingPanel } from "@/components/dev/BlurbLengthMappingPanel";
-import { BlurbBlockEditor } from "@/components/collateral/sales-brochure/BlurbBlockEditor";
 import { FittedBrochurePreview } from "@/components/collateral/sales-brochure/FittedBrochurePreview";
 import { BrochureImagePickerDialog } from "@/components/collateral/sales-brochure/inline/BrochureImagePickerDialog";
 import type { BrochureImageSlot } from "@/components/collateral/sales-brochure/inline/EditableContext";
-import { enforceSalesBrochureCopyLimits } from "@/lib/collateral/sales-brochure/copyLimits";
+import {
+  getBrochureEditorBlurb,
+  setBrochureEditorBlurb,
+} from "@/lib/collateral/sales-brochure/brochureEditorBlurb";
 import { pagesFromTemplateId } from "@/lib/reports/templates/playgroundResolve";
 import { SALES_BROCHURE_COPY_LIMITS } from "@/lib/collateral/sales-brochure/copyLimits";
 import {
@@ -30,11 +40,7 @@ import {
   type BrochureCopyFieldPath,
 } from "@/lib/collateral/sales-brochure/editablePaths";
 import { replaceBrochureImageAtSlot } from "@/lib/collateral/sales-brochure/brochureImageSlots";
-import {
-  blurbBlocksToPlainText,
-  getBlurbBlocksForEditor,
-  normalizeBlurbBlocksForEditor,
-} from "@/lib/collateral/sales-brochure/blurbBlocks";
+import { normalizeBlurbBlocksForEditor } from "@/lib/collateral/sales-brochure/blurbBlocks";
 import { coerceSalesBrochureCopyForEditor } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import type { BrochureBlurbBlock } from "@/lib/collateral/templates/types";
 import { getBrochureImageUrlAtSlot } from "@/lib/collateral/sales-brochure/brochureImageSlots";
@@ -44,9 +50,17 @@ import {
   type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { resolveListingImageMetaForPool } from "@/lib/listings/syncListingImageMeta";
-import { resolveAdvertisedPrice, avmPriceSuggestion } from "@/lib/listings/pricing";
+import {
+  resolveAdvertisedPrice,
+  avmPriceSuggestion,
+} from "@/lib/listings/pricing";
 import { cn } from "@/lib/utils";
-import type { Agency, AgentProfile, CollateralItem, Listing } from "@/lib/types";
+import type {
+  Agency,
+  AgentProfile,
+  CollateralItem,
+  Listing,
+} from "@/lib/types";
 
 type Props = {
   agency: Agency;
@@ -56,6 +70,7 @@ type Props = {
   agentProfile?: AgentProfile | null;
   onCollateralChange: (collateral: CollateralItem) => void;
   onContinueToPreview?: () => void;
+  onBusyChange?: (busy: boolean) => void;
 };
 
 type ApiError = {
@@ -65,6 +80,7 @@ type ApiError = {
 
 export type BrochureCopyEditorHandle = {
   flushPendingEdits: () => void;
+  savePendingEdits: () => Promise<boolean>;
   getPreviewDocument: () => BrochureDocumentJson | null;
 };
 
@@ -79,6 +95,7 @@ export const GeneratedBrochureCopyEditor = forwardRef<
     agentProfile = null,
     onCollateralChange,
     onContinueToPreview,
+    onBusyChange,
   }: Props,
   ref,
 ) {
@@ -92,7 +109,14 @@ export const GeneratedBrochureCopyEditor = forwardRef<
 
   const [copy, setCopy] = useState<SalesBrochureCopyJson | null>(initialCopy);
   const copyRef = useRef(initialCopy);
-  const blurbFlushRef = useRef<(() => BrochureBlurbBlock[] | null) | null>(null);
+  const templateId =
+    collateral.template_id ??
+    (collateral.document_json && isBrochureDocument(collateral.document_json)
+      ? collateral.document_json.template_id
+      : "");
+  const blurbFlushRef = useRef<(() => BrochureBlurbBlock[] | null) | null>(
+    null,
+  );
   const [propertyImages, setPropertyImages] = useState<
     BrochureDocumentJson["property"] | null
   >(() => {
@@ -102,20 +126,20 @@ export const GeneratedBrochureCopyEditor = forwardRef<
   const propertyImagesRef = useRef(propertyImages);
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
-  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(() =>
-    initialCopy && propertyImages ? brochureEditorSnapshot(initialCopy, propertyImages) : null,
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(
+    () =>
+      initialCopy && propertyImages
+        ? brochureEditorSnapshot(initialCopy, propertyImages)
+        : null,
   );
 
   const commitCopy = useCallback(
     (updater: (current: SalesBrochureCopyJson) => SalesBrochureCopyJson) => {
-      setCopy((current) => {
-        if (!current) {
-          return current;
-        }
-        const next = updater(current);
-        copyRef.current = next;
-        return next;
-      });
+      const current = copyRef.current;
+      if (!current) return;
+      const next = updater(current);
+      copyRef.current = next;
+      setCopy(next);
     },
     [],
   );
@@ -127,15 +151,30 @@ export const GeneratedBrochureCopyEditor = forwardRef<
     const flushedBlocks = blurbFlushRef.current?.();
     if (flushedBlocks && copyRef.current) {
       const blurb_blocks = normalizeBlurbBlocksForEditor(flushedBlocks);
-      const blurb = blurbBlocksToPlainText(blurb_blocks);
-      const next = { ...copyRef.current, blurb_blocks, blurb };
+      if (
+        JSON.stringify(blurb_blocks) ===
+        JSON.stringify(
+          normalizeBlurbBlocksForEditor(
+            getBrochureEditorBlurb(copyRef.current, templateId),
+          ),
+        )
+      )
+        return;
+      const next = setBrochureEditorBlurb(
+        copyRef.current,
+        blurb_blocks,
+        templateId,
+      );
       copyRef.current = next;
       setCopy(next);
     }
-  }, []);
+  }, [templateId]);
   const [generating, setGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
-  const [previousDocument, setPreviousDocument] = useState(collateral.document_json);
+  const [previousDocument, setPreviousDocument] = useState(
+    collateral.document_json,
+  );
   if (previousDocument !== collateral.document_json) {
     setPreviousDocument(collateral.document_json);
     const document = collateral.document_json;
@@ -148,22 +187,36 @@ export const GeneratedBrochureCopyEditor = forwardRef<
     }
   }
 
+  const savedSnapshotRef = useRef(lastSavedSnapshot);
+  const saveInFlightRef = useRef(false);
+  useEffect(() => {
+    onBusyChange?.(saving || generating);
+    return () => onBusyChange?.(false);
+  }, [saving, generating, onBusyChange]);
+
   // Imperative preview/save handlers read the last committed editor state.
   useLayoutEffect(() => {
     copyRef.current = copy;
     propertyImagesRef.current = propertyImages;
-  }, [copy, propertyImages]);
+    savedSnapshotRef.current = lastSavedSnapshot;
+  }, [copy, propertyImages, lastSavedSnapshot]);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
-  const [imagePickerSlot, setImagePickerSlot] = useState<BrochureImageSlot | null>(
-    null,
-  );
+  const [imagePickerSlot, setImagePickerSlot] =
+    useState<BrochureImageSlot | null>(null);
 
   const displayPrice = useMemo(
-    () => resolveAdvertisedPrice(listing, collateral.type === "rental_brochure" ? "lease" : "sale"),
+    () =>
+      resolveAdvertisedPrice(
+        listing,
+        collateral.type === "rental_brochure" ? "lease" : "sale",
+      ),
     [listing, collateral.type],
   );
 
-  const estimate = avmPriceSuggestion(listing, collateral.type === "rental_brochure" ? "lease" : "sale");
+  const estimate = avmPriceSuggestion(
+    listing,
+    collateral.type === "rental_brochure" ? "lease" : "sale",
+  );
 
   const scrapedPrice = useMemo(() => {
     const document = collateral.document_json;
@@ -186,7 +239,12 @@ export const GeneratedBrochureCopyEditor = forwardRef<
 
   const previewDocument = useMemo((): BrochureDocumentJson | null => {
     const document = collateral.document_json;
-    if (!document || !isBrochureDocument(document) || !copy || !propertyImages) {
+    if (
+      !document ||
+      !isBrochureDocument(document) ||
+      !copy ||
+      !propertyImages
+    ) {
       return null;
     }
 
@@ -202,7 +260,12 @@ export const GeneratedBrochureCopyEditor = forwardRef<
     const document = collateral.document_json;
     const copyToUse = copyRef.current;
     const propertyToUse = propertyImagesRef.current;
-    if (!document || !isBrochureDocument(document) || !copyToUse || !propertyToUse) {
+    if (
+      !document ||
+      !isBrochureDocument(document) ||
+      !copyToUse ||
+      !propertyToUse
+    ) {
       return null;
     }
 
@@ -214,136 +277,129 @@ export const GeneratedBrochureCopyEditor = forwardRef<
     };
   }, [collateral.document_json, listing]);
 
+  const persistBrochure = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (saveInFlightRef.current) return false;
+      flushPendingEdits();
+      const copyToSave = copyRef.current;
+      const propertyToSave = propertyImagesRef.current;
+      if (!copyToSave || !propertyToSave) return true;
+      const snapshotToSave = brochureEditorSnapshot(copyToSave, propertyToSave);
+      if (snapshotToSave === savedSnapshotRef.current) return true;
+      saveInFlightRef.current = true;
+      setSaving(true);
+      setSaveFailed(false);
+      try {
+        const response = await fetch(`/api/collateral/${collateral.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            copy: copyToSave,
+            property: {
+              hero_image_url: propertyToSave.hero_image_url,
+              selected_image_urls: propertyToSave.selected_image_urls,
+              page_one_image_urls: propertyToSave.page_one_image_urls,
+              page_two_image_urls: propertyToSave.page_two_image_urls,
+            },
+          }),
+        });
+        const payload = (await response.json()) as ApiError & {
+          collateral?: CollateralItem;
+        };
+        if (!response.ok || !payload.collateral)
+          throw new Error(payload.error ?? "Unable to save brochure");
+        savedSnapshotRef.current = snapshotToSave;
+        setLastSavedSnapshot(snapshotToSave);
+        onCollateralChange(payload.collateral);
+        if (!options?.silent) toast.success("Brochure saved");
+        return true;
+      } catch (err) {
+        setSaveFailed(true);
+        toast.error(
+          err instanceof Error ? err.message : "Unable to save brochure",
+        );
+        return false;
+      } finally {
+        setSaving(false);
+        saveInFlightRef.current = false;
+      }
+    },
+    [collateral.id, flushPendingEdits, onCollateralChange],
+  );
+
   useImperativeHandle(
     ref,
     () => ({
       flushPendingEdits,
       getPreviewDocument: buildPreviewDocument,
+      savePendingEdits: () => persistBrochure({ silent: true }),
     }),
-    [buildPreviewDocument, flushPendingEdits],
-  );
-
-  const persistBrochure = useCallback(
-    async (options?: { silent?: boolean }) => {
-    flushPendingEdits();
-    const copyToSave = copyRef.current;
-    const propertyToSave = propertyImagesRef.current;
-    if (!copyToSave || !propertyToSave) {
-      return true;
-    }
-
-    setSaving(true);
-    setSaveFailed(false);
-    const snapshotToSave = brochureEditorSnapshot(copyToSave, propertyToSave);
-    const response = await fetch(`/api/collateral/${collateral.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        copy: copyToSave,
-        property: {
-          hero_image_url: propertyToSave.hero_image_url,
-          selected_image_urls: propertyToSave.selected_image_urls,
-          page_one_image_urls: propertyToSave.page_one_image_urls,
-          page_two_image_urls: propertyToSave.page_two_image_urls,
-        },
-      }),
-    });
-    const payload = (await response.json()) as ApiError & {
-      collateral?: CollateralItem;
-    };
-
-    if (!response.ok) {
-      toast.error(payload.error ?? "Unable to save brochure");
-      setSaving(false);
-      setSaveFailed(true);
-      return false;
-    }
-
-    if (payload.collateral) {
-      onCollateralChange(payload.collateral);
-    }
-
-    if (snapshotToSave) {
-      setLastSavedSnapshot(snapshotToSave);
-    }
-
-    if (!options?.silent) {
-      toast.success("Brochure saved");
-    }
-
-    setSaving(false);
-    return true;
-  },
-    [collateral.id, flushPendingEdits, onCollateralChange],
+    [buildPreviewDocument, flushPendingEdits, persistBrochure],
   );
 
   async function generateCopy() {
+    if (generating || saving) return;
     if (copy && !confirmRegenerate) {
       setConfirmRegenerate(true);
       return;
     }
-
+    if (!(await persistBrochure({ silent: true }))) return;
     setConfirmRegenerate(false);
     setGenerating(true);
-
-    const response = await fetch(`/api/collateral/${collateral.id}/generate-copy`, {
-      method: "POST",
-    });
-    const payload = (await response.json()) as ApiError & {
-      copy?: SalesBrochureCopyJson;
-      collateral?: CollateralItem;
-    };
-
-    if (!response.ok) {
-      toast.error(payload.error ?? "Unable to generate brochure");
-      setGenerating(false);
-      return;
-    }
-
-    if (payload.copy) {
-      const nextCopy = enforceSalesBrochureCopyLimits(payload.copy);
-      copyRef.current = nextCopy;
-      setCopy(nextCopy);
-    }
-
-    if (payload.collateral) {
+    setGenerationError(null);
+    try {
+      const response = await fetch(
+        `/api/collateral/${collateral.id}/generate-copy`,
+        { method: "POST" },
+      );
+      const payload = (await response.json()) as ApiError & {
+        collateral?: CollateralItem;
+      };
+      if (
+        !response.ok ||
+        !payload.collateral?.document_json ||
+        !isBrochureDocument(payload.collateral.document_json)
+      )
+        throw new Error(
+          payload.error ?? "Unable to write your brochure. Try again.",
+        );
       onCollateralChange(payload.collateral);
-      const doc = payload.collateral.document_json;
-      if (doc && isBrochureDocument(doc)) {
-        propertyImagesRef.current = doc.property;
-        setPropertyImages(doc.property);
-      }
+    } catch (err) {
+      setGenerationError(
+        err instanceof Error
+          ? err.message
+          : "Unable to write your brochure. Try again.",
+      );
+    } finally {
+      setGenerating(false);
     }
-
-    toast.success("Brochure generated");
-    setGenerating(false);
   }
 
   async function continueToPreview() {
-    flushPendingEdits();
-    const copyToCheck = copyRef.current;
-    const propertyToCheck = propertyImagesRef.current;
-    const snapshot =
-      copyToCheck && propertyToCheck
-        ? brochureEditorSnapshot(copyToCheck, propertyToCheck)
-        : null;
-    if (snapshot && lastSavedSnapshot && snapshot !== lastSavedSnapshot) {
-      toast.error("Save your changes before continuing to preview");
-      return;
-    }
-
-    onContinueToPreview?.();
+    if (await persistBrochure({ silent: true })) onContinueToPreview?.();
   }
 
-  function updateField(field: keyof SalesBrochureCopyJson, value: string | string[]) {
+  function updateField(
+    field: keyof SalesBrochureCopyJson,
+    value: string | string[],
+  ) {
     commitCopy((current) => ({ ...current, [field]: value }));
   }
 
-  const updateBlurbBlocks = useCallback((blocks: BrochureBlurbBlock[]) => {
-    const blurb_blocks = normalizeBlurbBlocksForEditor(blocks);
-    const blurb = blurbBlocksToPlainText(blurb_blocks);
-    commitCopy((current) => ({ ...current, blurb_blocks, blurb }));
-  }, [commitCopy]);
+  const updateBlurbBlocks = useCallback(
+    (blocks: BrochureBlurbBlock[]) => {
+      commitCopy((current) => {
+        const normalized = normalizeBlurbBlocksForEditor(blocks);
+        if (
+          JSON.stringify(normalized) ===
+          JSON.stringify(getBrochureEditorBlurb(current, templateId))
+        )
+          return current;
+        return setBrochureEditorBlurb(current, normalized, templateId);
+      });
+    },
+    [commitCopy, templateId],
+  );
 
   const handleInlineSetField = useCallback(
     (path: BrochureCopyFieldPath, value: string) => {
@@ -361,7 +417,11 @@ export const GeneratedBrochureCopyEditor = forwardRef<
       if (!previewDocument || !imagePickerSlot) {
         return;
       }
-      const next = replaceBrochureImageAtSlot(previewDocument, imagePickerSlot, url);
+      const next = replaceBrochureImageAtSlot(
+        previewDocument,
+        imagePickerSlot,
+        url,
+      );
       propertyImagesRef.current = next.property;
       setPropertyImages(next.property);
       setImagePickerSlot(null);
@@ -380,112 +440,121 @@ export const GeneratedBrochureCopyEditor = forwardRef<
 
   const limits = SALES_BROCHURE_COPY_LIMITS;
 
+  if (generating) return <BrochureGenerationStatus />;
   return (
-    <AsyncLoadingOverlay
-      active={generating}
-      title="Generating collateral"
-      description="Writing buyer-facing brochure copy from your listing. This usually takes 10–20 seconds."
-    >
-      <div
-        className={cn(
-          "mx-auto flex w-full max-w-5xl flex-col gap-4",
-          copy && isDirty && "pb-24",
-        )}
+    <section data-theme="staypack-workspace" className="space-y-5">
+      <DocumentStepHeader
+        title={copy ? "Edit your brochure" : "Create your brochure"}
+        description={
+          copy
+            ? "Click the text to edit, or a photo to replace it. Your changes save when you continue."
+            : "Your design is saved. Generate the wording to start editing."
+        }
+        status={
+          <span role="status" className="du-badge du-badge-sm">
+            {saving
+              ? "Saving…"
+              : saveFailed
+                ? "Save failed"
+                : isDirty
+                  ? "Unsaved changes"
+                  : copy
+                    ? "All changes saved"
+                    : "Ready to generate"}
+          </span>
+        }
       >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              {copy && isDirty ? (
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full bg-amber-500"
-                  aria-hidden
-                />
-              ) : null}
-              {copy ? "Edit brochure" : "Edit content"}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {copy
-                ? "Click the description on the brochure to edit. A small format menu appears above your cursor for paragraphs and section headings."
-                : "Generate buyer-facing copy from your listing, then edit directly on the brochure."}
-            </p>
-            {addressLine ? (
-              <p className="mt-1 truncate text-sm font-medium text-foreground">
-                {addressLine}
-              </p>
-            ) : null}
-            {copy && listingContextSummary(listing, displayPrice) ? (
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {listingContextSummary(listing, displayPrice)}
-              </p>
-            ) : null}
-            {saveFailed ? (
-              <p className="mt-1 text-xs text-destructive">Save failed — try again below.</p>
-            ) : null}
-          </div>
-
-          <div className="flex shrink-0 flex-wrap gap-2">
-            {copy && isDirty ? (
-              <Button
-                disabled={generating || saving}
-                onClick={() => void persistBrochure()}
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="animate-spin" />
-                    Saving…
-                  </>
-                ) : (
-                  "Save changes"
-                )}
-              </Button>
-            ) : null}
-            <Button onClick={generateCopy} disabled={generating || saving}>
-              {generating ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Generating...
-                </>
-              ) : copy && confirmRegenerate ? (
-                "Confirm regenerate"
-              ) : copy ? (
-                "Regenerate copy"
-              ) : (
-                "Generate collateral"
-              )}
-            </Button>
-            {copy ? (
-              <Button
-                variant="outline"
-                onClick={continueToPreview}
-                disabled={generating || saving || isDirty}
-                title={
-                  isDirty
-                    ? "Save your changes before continuing to preview"
-                    : undefined
-                }
-              >
-                Continue to preview
-              </Button>
-            ) : null}
-          </div>
+        <button
+          type="button"
+          className="du-btn du-btn-sm du-btn-primary min-h-11"
+          disabled={saving}
+          onClick={() => void (copy ? continueToPreview() : generateCopy())}
+        >
+          {saving ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          ) : null}
+          {saving
+            ? "Saving…"
+            : copy
+              ? isDirty || saveFailed
+                ? "Save & preview"
+                : "Review & download"
+              : "Generate brochure"}
+          {!saving ? (
+            <ArrowRight className="size-4" aria-hidden="true" />
+          ) : null}
+        </button>
+      </DocumentStepHeader>
+      {saveFailed ? (
+        <p role="alert" className="du-alert du-alert-error du-alert-soft">
+          Your changes couldn’t be saved. Try Save & preview again.
+        </p>
+      ) : null}
+      {generationError ? (
+        <p role="alert" className="du-alert du-alert-error du-alert-soft">
+          {generationError}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div className="min-w-0">
+          <p className="font-medium">{addressLine}</p>
+          <p className="text-xs text-muted-foreground">
+            {listingContextSummary(listing, displayPrice)}
+          </p>
         </div>
-
+        {copy ? (
+          <details className="group rounded-xl border border-base-300 bg-base-100 p-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Rewrite brochure copy
+            </summary>
+            <p className="mt-3 max-w-sm text-sm text-muted-foreground">
+              Generate fresh wording from the listing. This replaces your
+              current copy; your selected photos and price are kept.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="du-btn du-btn-sm min-h-11"
+                disabled={saving}
+                onClick={() => void generateCopy()}
+              >
+                <RefreshCw className="size-4" aria-hidden="true" />
+                {confirmRegenerate ? "Confirm rewrite" : "Rewrite copy"}
+              </button>
+              {confirmRegenerate ? (
+                <button
+                  type="button"
+                  className="du-btn du-btn-sm du-btn-ghost min-h-11"
+                  onClick={() => setConfirmRegenerate(false)}
+                >
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+          </details>
+        ) : null}
+      </div>
+      <fieldset
+        disabled={saving}
+        className="mx-auto flex w-full max-w-4xl flex-col gap-5 disabled:pointer-events-none disabled:opacity-70"
+      >
         {!copy ? (
           <div className="rounded-xl border border-border/70 bg-muted/20 p-6 text-sm">
             <p className="font-medium">Listing context</p>
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
               <ContextMetric
                 label="Bedrooms"
-                value={listing.bedrooms != null ? String(listing.bedrooms) : "—"}
+                value={
+                  listing.bedrooms != null ? String(listing.bedrooms) : "—"
+                }
               />
               <ContextMetric
                 label="Bathrooms"
-                value={listing.bathrooms != null ? String(listing.bathrooms) : "—"}
+                value={
+                  listing.bathrooms != null ? String(listing.bathrooms) : "—"
+                }
               />
-              <ContextMetric
-                label="Guide price"
-                value={displayPrice ?? "—"}
-              />
+              <ContextMetric label="Guide price" value={displayPrice ?? "—"} />
             </div>
           </div>
         ) : null}
@@ -502,9 +571,11 @@ export const GeneratedBrochureCopyEditor = forwardRef<
                   ? "rental_brochure"
                   : "sales_brochure"
               }
+              useDocumentBrand
+              pageLabels={["Cover", "Property details"]}
               maxHeight="min(85vh, 960px)"
               editable={{
-                blurbBlocks: getBlurbBlocksForEditor(copy),
+                blurbBlocks: getBrochureEditorBlurb(copy, templateId),
                 setField: handleInlineSetField,
                 setBlurbBlocks: updateBlurbBlocks,
                 openImagePicker: handleOpenImagePicker,
@@ -514,9 +585,12 @@ export const GeneratedBrochureCopyEditor = forwardRef<
 
             <details className="group rounded-xl border border-border/70 bg-muted/10">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
-                <span>More options</span>
+                <span>Text and property details</span>
                 <span className="text-xs font-normal text-muted-foreground">
-                  Headings, highlights, {collateral.type === "rental_brochure" ? "rent, bond, legal" : "price, legal"}
+                  Headings, highlights,{" "}
+                  {collateral.type === "rental_brochure"
+                    ? "rent, bond, legal"
+                    : "price, legal"}
                 </span>
                 <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
               </summary>
@@ -540,7 +614,9 @@ export const GeneratedBrochureCopyEditor = forwardRef<
                   hint={limits.property_highlights.hint}
                   values={copy.property_highlights ?? []}
                   maxItems={limits.property_highlights.max}
-                  onChange={(values) => updateField("property_highlights", values)}
+                  onChange={(values) =>
+                    updateField("property_highlights", values)
+                  }
                 />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <CopyField
@@ -550,10 +626,16 @@ export const GeneratedBrochureCopyEditor = forwardRef<
                         ? "Rent label"
                         : limits.price_label.label
                     }
-                    hint={collateral.type === "rental_brochure" ? "Wording shown above the weekly rent. Leave blank for For lease." : limits.price_label.hint}
+                    hint={
+                      collateral.type === "rental_brochure"
+                        ? "Wording shown above the weekly rent. Leave blank for For lease."
+                        : limits.price_label.hint
+                    }
                     value={copy.price_label ?? ""}
                     placeholder={
-                      collateral.type === "rental_brochure" ? "For lease" : "Price"
+                      collateral.type === "rental_brochure"
+                        ? "For lease"
+                        : "Price"
                     }
                     recommendedMax={limits.price_label.max}
                     onChange={(value) => updateField("price_label", value)}
@@ -561,27 +643,56 @@ export const GeneratedBrochureCopyEditor = forwardRef<
                   <CopyField
                     id="price_value"
                     label={
-                      collateral.type === "rental_brochure" ? "Rent" : limits.price_value.label
+                      collateral.type === "rental_brochure"
+                        ? "Rent"
+                        : limits.price_value.label
                     }
                     hint={
                       collateral.type === "rental_brochure"
                         ? `Only this rental brochure. Leave blank to use advertised weekly rent${scrapedPrice ? `: ${scrapedPrice}` : ", if available"}.`
-                        : scrapedPrice ? `${limits.price_value.hint} Advertised sale price: ${scrapedPrice}` : limits.price_value.hint
+                        : scrapedPrice
+                          ? `${limits.price_value.hint} Advertised sale price: ${scrapedPrice}`
+                          : limits.price_value.hint
                     }
                     value={copy.price_value ?? ""}
-                    placeholder={scrapedPrice || (collateral.type === "rental_brochure" ? "e.g. $850 per week" : "e.g. $750,000 or Contact Agent")}
+                    placeholder={
+                      scrapedPrice ||
+                      (collateral.type === "rental_brochure"
+                        ? "e.g. $850 per week"
+                        : "e.g. $750,000 or Contact Agent")
+                    }
                     recommendedMax={limits.price_value.max}
                     onChange={(value) => updateField("price_value", value)}
                   />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {copy.price_value?.trim() ? "Your override" : scrapedPrice ? "Advertised price" : "No advertised price available"}. Changes here apply only to this brochure.
+                  {copy.price_value?.trim()
+                    ? "Your override"
+                    : scrapedPrice
+                      ? "Advertised price"
+                      : "No advertised price available"}
+                  . Changes here apply only to this brochure.
                 </p>
                 {!scrapedPrice && estimate && (
                   <div className="rounded-xl border p-4 text-sm space-y-2">
-                    <p>Automated estimate: {estimate.display}{estimate.date ? ` · ${estimate.date}` : ""}{estimate.confidence ? ` · ${estimate.confidence} confidence` : ""}. Review before using as an advertised price.</p>
-                    <Button type="button" variant="outline" onClick={() => updateField("price_value", estimate.display)}>
-                      {collateral.type === "rental_brochure" ? "Use estimated rent" : "Use estimated sale price"}
+                    <p>
+                      Automated estimate: {estimate.display}
+                      {estimate.date ? ` · ${estimate.date}` : ""}
+                      {estimate.confidence
+                        ? ` · ${estimate.confidence} confidence`
+                        : ""}
+                      . Review before using as an advertised price.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        updateField("price_value", estimate.display)
+                      }
+                    >
+                      {collateral.type === "rental_brochure"
+                        ? "Use estimated rent"
+                        : "Use estimated sale price"}
                     </Button>
                   </div>
                 )}
@@ -650,42 +761,8 @@ export const GeneratedBrochureCopyEditor = forwardRef<
             Generate collateral to preview and edit your brochure here.
           </div>
         )}
-      </div>
-
-      {copy && isDirty ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed inset-x-0 bottom-0 z-50 border-t border-amber-200/90 bg-amber-50/95 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm dark:border-amber-800/60 dark:bg-amber-950/95"
-        >
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap">
-            <div className="min-w-0 space-y-0.5">
-              <p className="text-sm font-semibold text-foreground">
-                Unsaved changes
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Save your brochure before continuing to preview.
-              </p>
-            </div>
-            <Button
-              size="lg"
-              className="shrink-0 shadow-md"
-              disabled={saving || generating}
-              onClick={() => void persistBrochure()}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Saving…
-                </>
-              ) : (
-                "Save brochure"
-              )}
-            </Button>
-          </div>
-        </div>
-      ) : null}
-    </AsyncLoadingOverlay>
+      </fieldset>
+    </section>
   );
 });
 
@@ -775,7 +852,9 @@ function CopyField({
       <p
         className={cn(
           "text-xs",
-          overRecommended ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground",
+          overRecommended
+            ? "text-amber-700 dark:text-amber-400"
+            : "text-muted-foreground",
         )}
       >
         {value.length} characters
@@ -800,9 +879,7 @@ function StringListField({
   maxItems: number;
   onChange: (values: string[]) => void;
 }) {
-  const filled = values
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const filled = values.map((item) => item.trim()).filter(Boolean);
   const canAdd = values.length < maxItems;
 
   function updateAt(index: number, text: string) {
@@ -825,8 +902,8 @@ function StringListField({
 
       {values.length === 0 ? (
         <p className="rounded-lg border border-dashed bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
-          No bullet points yet. Optional — add some if you want a quick list on the
-          brochure.
+          No bullet points yet. Optional — add some if you want a quick list on
+          the brochure.
         </p>
       ) : (
         <div className="space-y-2">

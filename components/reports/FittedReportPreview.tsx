@@ -23,6 +23,8 @@ type Props = {
   orientation?: ReportPageOrientation;
   /** Scale to container width and scroll vertically instead of shrinking to fit height. */
   fitToWidth?: boolean;
+  thumbnail?: boolean;
+  pageLabels?: string[];
   editable?: {
     setField: (path: ReportCopyFieldPath, value: string) => void;
     openImagePicker: (slot: ReportImageSlot) => void;
@@ -39,6 +41,8 @@ export function FittedReportPreview({
   orientation = "portrait",
   fitToWidth = false,
   editable,
+  thumbnail = false,
+  pageLabels,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const pageFormat = getReportPageFormat(orientation);
@@ -116,7 +120,15 @@ export function FittedReportPreview({
       )}
       style={fitToPanel ? { height: maxHeight, maxHeight } : undefined}
     >
-      {paginated ? (
+      {paginated && pageLabels && !thumbnail ? (
+        <nav aria-label="Report pages" className="flex shrink-0 items-center justify-center gap-2 border-b bg-muted/30 p-2">
+          {Array.from({ length: pageCount }, (_, index) => (
+            <button key={index} type="button" aria-pressed={index === currentPage} onClick={() => setCurrentPage(index)} className={cn("du-btn du-btn-sm min-h-11 flex-1 sm:flex-none", index === currentPage ? "du-btn-primary" : "du-btn-ghost")}>
+              {index + 1}. {pageLabels[index] ?? `Page ${index + 1}`}
+            </button>
+          ))}
+        </nav>
+      ) : paginated && !thumbnail ? (
         <div className="flex items-center justify-between border-b bg-muted/70 px-4 py-3 shadow-sm">
           <button
             type="button"

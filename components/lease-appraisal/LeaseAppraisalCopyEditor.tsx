@@ -11,11 +11,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ArrowRight, ChevronDown, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
-import { Button } from "@/components/ui/button";
-import { CopyEditorContextMetric, CopyEditorField } from "@/components/copy-editor/primitives";
+import {
+  CopyEditorContextMetric,
+  CopyEditorField,
+} from "@/components/copy-editor/primitives";
 import { BlurbVariantsEditor } from "@/components/collateral/sales-brochure/BlurbVariantsEditor";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { ReportImagePickerDialog } from "@/components/reports/inline/ReportImagePickerDialog";
@@ -39,7 +41,7 @@ import type { LeaseAppraisalCopy } from "@/lib/lease-appraisal/deriveLeaseApprai
 import { isLeaseAppraisalTemplateId } from "@/lib/lease-appraisal/leaseAppraisalTemplates";
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import { resolveAdvertisedPrice } from "@/lib/listings/pricing";
-import { cn } from "@/lib/utils";
+import { AppraisalStepHeader } from "@/components/appraisals/AppraisalStepHeader";
 import type {
   Agency,
   AgentProfile,
@@ -50,6 +52,7 @@ import type {
 } from "@/lib/types";
 
 type Props = {
+  onBusyChange?: (busy: boolean) => void;
   agency: Agency;
   agencyAgents: AgentProfile[];
   listing: Listing;
@@ -59,6 +62,7 @@ type Props = {
   onReportChange: (report: Report) => void;
   onCollateralChange: (collateral: CollateralItem) => void;
   onContinueToPreview?: () => void;
+  needsRebuild?: boolean;
 };
 
 type ApiError = {
@@ -68,6 +72,7 @@ type ApiError = {
 export type LeaseAppraisalCopyEditorHandle = {
   flushPendingEdits: () => void;
   getPreviewReport: () => FinalReportJson | null;
+  savePendingEdits: () => Promise<boolean>;
 };
 
 function copyFromReport(report: Report): LeaseAppraisalCopy | null {
@@ -85,7 +90,9 @@ function editorSnapshot(
   return JSON.stringify({ copy, propertyImages });
 }
 
-function propertyImagesFromReport(report: Report | null): ReportPropertyImageSelection | null {
+function propertyImagesFromReport(
+  report: Report | null,
+): ReportPropertyImageSelection | null {
   const json = report?.final_report_json as FinalReportJson | null;
   if (!json?.property) {
     return null;
@@ -106,6 +113,8 @@ export const LeaseAppraisalCopyEditor = forwardRef<
     onReportChange,
     onCollateralChange,
     onContinueToPreview,
+    needsRebuild = false,
+    onBusyChange,
   },
   ref,
 ) {
@@ -117,18 +126,22 @@ export const LeaseAppraisalCopyEditor = forwardRef<
     copyFromReport(report),
   );
   const copyRef = useRef(copy);
+  const blurbBaselineRef = useRef<string | null>(null);
   const blurbFlushRef = useRef<(() => string | null) | null>(null);
-  const [propertyImages, setPropertyImages] = useState<ReportPropertyImageSelection | null>(
-    () => propertyImagesFromReport(report),
-  );
+  const [propertyImages, setPropertyImages] =
+    useState<ReportPropertyImageSelection | null>(() =>
+      propertyImagesFromReport(report),
+    );
   const propertyImagesRef = useRef(propertyImages);
-  const [imagePickerSlot, setImagePickerSlot] = useState<ReportImageSlot | null>(null);
+  const [imagePickerSlot, setImagePickerSlot] =
+    useState<ReportImageSlot | null>(null);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
-  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(() =>
-    copy ? editorSnapshot(copy, propertyImagesFromReport(report)) : null,
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(
+    () =>
+      copy ? editorSnapshot(copy, propertyImagesFromReport(report)) : null,
   );
 
   useEffect(() => {
@@ -138,12 +151,13 @@ export const LeaseAppraisalCopyEditor = forwardRef<
     propertyImagesRef.current = nextImages;
     setCopy(next);
     setPropertyImages(nextImages);
-    setLastSavedSnapshot(
-      next ? editorSnapshot(next, nextImages) : null,
-    );
+    setLastSavedSnapshot(next ? editorSnapshot(next, nextImages) : null);
   }, [report.final_report_json, report.updated_at]);
 
-  const displayPrice = useMemo(() => resolveAdvertisedPrice(listing, "lease"), [listing]);
+  const displayPrice = useMemo(
+    () => resolveAdvertisedPrice(listing, "lease"),
+    [listing],
+  );
   const parsed = useMemo(() => resolveAppraisalInput(listing), [listing]);
   const appraisal = parsed?.rentalAppraisal;
 
@@ -160,9 +174,7 @@ export const LeaseAppraisalCopyEditor = forwardRef<
     return null;
   }, [appraisal]);
 
-  const currentSnapshot = copy
-    ? editorSnapshot(copy, propertyImages)
-    : null;
+  const currentSnapshot = copy ? editorSnapshot(copy, propertyImages) : null;
   const isDirty =
     currentSnapshot != null &&
     lastSavedSnapshot != null &&
@@ -211,7 +223,11 @@ export const LeaseAppraisalCopyEditor = forwardRef<
       if (!previewReport || !imagePickerSlot) {
         return;
       }
-      const next = replaceReportImageAtSlot(previewReport, imagePickerSlot, url);
+      const next = replaceReportImageAtSlot(
+        previewReport,
+        imagePickerSlot,
+        url,
+      );
       const images = pickReportPropertyImages(next.property);
       propertyImagesRef.current = images;
       setPropertyImages(images);
@@ -239,7 +255,12 @@ export const LeaseAppraisalCopyEditor = forwardRef<
       document.activeElement.blur();
     }
     const flushedBlurb = blurbFlushRef.current?.();
-    if (flushedBlurb != null && copyRef.current) {
+    if (
+      flushedBlurb != null &&
+      copyRef.current &&
+      blurbBaselineRef.current != null &&
+      flushedBlurb !== blurbBaselineRef.current
+    ) {
       const next = setReportCopyValueAtPath(
         copyRef.current,
         "copy.blurb",
@@ -250,14 +271,11 @@ export const LeaseAppraisalCopyEditor = forwardRef<
     }
   }, []);
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      flushPendingEdits,
-      getPreviewReport: () => previewReport,
-    }),
-    [flushPendingEdits, previewReport],
-  );
+  useImperativeHandle(ref, () => ({
+    flushPendingEdits,
+    getPreviewReport: () => previewReport,
+    savePendingEdits: () => persistCopy({ silent: true }),
+  }));
 
   async function persistCopy(options?: { silent?: boolean }) {
     flushPendingEdits();
@@ -267,42 +285,50 @@ export const LeaseAppraisalCopyEditor = forwardRef<
       return true;
     }
 
+    if (
+      !needsRebuild &&
+      editorSnapshot(copyToSave, imagesToSave) === lastSavedSnapshot
+    ) {
+      return true;
+    }
+
     setSaving(true);
     setSaveFailed(false);
-    const response = await fetch(`/api/reports/${report.id}/lease-appraisal-copy`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        copy: copyToSave,
-        template_id: templateId,
-        property_images: imagesToSave ?? undefined,
-      }),
-    });
-    const payload = (await response.json()) as ApiError & {
-      report?: Report;
-      listing?: Listing;
-    };
+    try {
+      const response = await fetch(
+        `/api/reports/${report.id}/lease-appraisal-copy`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            copy: copyToSave,
+            template_id: templateId,
+            property_images: imagesToSave ?? undefined,
+          }),
+        },
+      );
+      const payload = (await response.json()) as ApiError & {
+        report?: Report;
+        listing?: Listing;
+      };
 
-    if (!response.ok) {
-      toast.error(payload.error ?? "Unable to save appraisal");
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to save appraisal");
+      }
+      if (payload.report) onReportChange(payload.report);
+      if (payload.listing) onListingChange(payload.listing);
+      setLastSavedSnapshot(editorSnapshot(copyToSave, imagesToSave));
+      if (!options?.silent) toast.success("Appraisal saved");
+      return true;
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to save appraisal",
+      );
       setSaveFailed(true);
-      setSaving(false);
       return false;
+    } finally {
+      setSaving(false);
     }
-
-    if (payload.report) {
-      onReportChange(payload.report);
-    }
-    if (payload.listing) {
-      onListingChange(payload.listing);
-    }
-
-    setLastSavedSnapshot(editorSnapshot(copyToSave, imagesToSave));
-    if (!options?.silent) {
-      toast.success("Collateral saved");
-    }
-    setSaving(false);
-    return true;
   }
 
   async function generateContent() {
@@ -318,7 +344,10 @@ export const LeaseAppraisalCopyEditor = forwardRef<
       return;
     }
 
-    if (!hasLeaseAppraisalComps(parsed) || !hasLeaseAppraisalSelectedComps(parsed)) {
+    if (
+      !hasLeaseAppraisalComps(parsed) ||
+      !hasLeaseAppraisalSelectedComps(parsed)
+    ) {
       toast.error("Complete appraisal data before generating collateral");
       return;
     }
@@ -365,15 +394,22 @@ export const LeaseAppraisalCopyEditor = forwardRef<
         template_id: templateId,
       });
 
-      toast.success("Collateral generated");
+      toast.success("Appraisal generated");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Unable to generate collateral",
+        error instanceof Error
+          ? error.message
+          : "Unable to generate collateral",
       );
     } finally {
       setGenerating(false);
     }
   }
+
+  useEffect(() => {
+    onBusyChange?.(saving || generating);
+    return () => onBusyChange?.(false);
+  }, [saving, generating, onBusyChange]);
 
   async function continueToPreview() {
     if (copy) {
@@ -394,8 +430,10 @@ export const LeaseAppraisalCopyEditor = forwardRef<
 
   const handleInlineSetField = useCallback(
     (path: ReportCopyFieldPath, value: string) => {
-      commitCopy((current) =>
-        setReportCopyValueAtPath(current, path, value) as LeaseAppraisalCopy,
+      if (path === "copy.blurb" && value === blurbBaselineRef.current) return;
+      commitCopy(
+        (current) =>
+          setReportCopyValueAtPath(current, path, value) as LeaseAppraisalCopy,
       );
     },
     [commitCopy],
@@ -427,94 +465,98 @@ export const LeaseAppraisalCopyEditor = forwardRef<
       description="Writing landlord-ready rental appraisal copy from the property details and comparable rentals. This usually takes 15–30 seconds."
     >
       <div
-        className={cn(
-          "mx-auto flex w-full max-w-5xl flex-col gap-4",
-          copy && isDirty && "pb-24",
-        )}
+        data-theme="staypack-workspace"
+        className="flex w-full flex-col gap-5"
       >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              {copy && isDirty ? (
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full bg-amber-500"
-                  aria-hidden
-                />
+        <AppraisalStepHeader
+          title={copy ? "Make the report yours" : "Generate your appraisal"}
+          description={
+            copy
+              ? "Click text to edit. Select a photo to replace it. Review both pages before sharing."
+              : "Your chosen design and reviewed evidence are ready."
+          }
+          status={
+            copy ? (
+              <span role="status" className="du-badge du-badge-sm">
+                {saving
+                  ? "Saving…"
+                  : isDirty || needsRebuild
+                    ? "Unsaved changes"
+                    : "All changes saved"}
+              </span>
+            ) : undefined
+          }
+        >
+          {copy ? (
+            <button
+              type="button"
+              className="du-btn du-btn-sm du-btn-primary min-h-11 w-full sm:w-auto"
+              onClick={continueToPreview}
+              disabled={generating || saving}
+            >
+              {saving ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               ) : null}
-              {copy ? "Edit rental appraisal" : "Appraisal content"}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {copy
-                ? "Hover photos on the preview and click Change photo to pick another image or floor plan. Click text to edit copy inline."
-                : "Generate landlord-ready copy from the property details and comparable rentals, then edit it directly on the appraisal."}
-            </p>
-            {addressLine ? (
-              <p className="mt-1 truncate text-sm font-medium text-foreground">
-                {addressLine}
-              </p>
-            ) : null}
-            {copy && contextSummary ? (
-              <p className="mt-0.5 text-xs text-muted-foreground">{contextSummary}</p>
-            ) : null}
-            {saveFailed ? (
-              <p className="mt-1 text-xs text-destructive">Save failed — try again below.</p>
-            ) : null}
-            {!compsReady && !copy ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Complete the Appraisal data step before generating collateral.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex shrink-0 flex-wrap gap-2">
-            {copy && isDirty ? (
-              <Button
-                disabled={generating || saving}
-                onClick={() => void persistCopy()}
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="animate-spin" />
-                    Saving…
-                  </>
-                ) : (
-                  "Save changes"
-                )}
-              </Button>
-            ) : null}
-            <Button
+              {saving
+                ? "Saving…"
+                : isDirty || needsRebuild
+                  ? "Save & preview"
+                  : "Review & download"}
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="du-btn du-btn-sm du-btn-primary min-h-11"
               onClick={generateContent}
               disabled={generating || saving || !compsReady}
             >
-              {generating ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Generating…
-                </>
-              ) : copy && confirmRegenerate ? (
-                "Confirm regenerate"
-              ) : copy ? (
-                "Regenerate copy"
-              ) : (
-                "Generate appraisal"
-              )}
-            </Button>
-            {copy ? (
-              <Button
-                variant="outline"
-                onClick={continueToPreview}
-                disabled={generating || saving || isDirty}
-                title={
-                  isDirty
-                    ? "Save your changes before continuing to preview"
-                    : undefined
-                }
+              {generating ? "Generating…" : "Generate appraisal"}
+            </button>
+          )}
+        </AppraisalStepHeader>
+        {saveFailed ? (
+          <p role="alert" className="du-alert du-alert-error du-alert-soft">
+            Your changes couldn’t be saved. Try Save & preview again.
+          </p>
+        ) : null}
+        {copy ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4 text-sm">
+            <div className="min-w-0">
+              <p className="font-medium">{addressLine}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {contextSummary}
+              </p>
+            </div>
+            <details className="max-w-md">
+              <summary className="cursor-pointer text-sm text-muted-foreground underline-offset-4 hover:underline">
+                Rewrite content
+              </summary>
+              <p className="my-3 text-xs text-muted-foreground">
+                Generate a new version using the current appraisal evidence.
+                This replaces the wording and any text edits.
+              </p>
+              <button
+                type="button"
+                className="du-btn du-btn-sm du-btn-outline min-h-11"
+                onClick={generateContent}
+                disabled={generating || saving || !compsReady}
               >
-                Continue to preview
-              </Button>
-            ) : null}
+                <RefreshCw className="size-4" aria-hidden="true" />
+                {confirmRegenerate ? "Confirm regenerate" : "Regenerate copy"}
+              </button>
+              {confirmRegenerate ? (
+                <button
+                  type="button"
+                  className="du-btn du-btn-sm du-btn-ghost min-h-11 ml-2"
+                  onClick={() => setConfirmRegenerate(false)}
+                >
+                  Cancel
+                </button>
+              ) : null}
+            </details>
           </div>
-        </div>
+        ) : null}
 
         {!copy ? (
           <div className="rounded-xl border border-border/70 bg-muted/20 p-6 text-sm">
@@ -522,11 +564,15 @@ export const LeaseAppraisalCopyEditor = forwardRef<
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
               <CopyEditorContextMetric
                 label="Bedrooms"
-                value={listing.bedrooms != null ? String(listing.bedrooms) : "—"}
+                value={
+                  listing.bedrooms != null ? String(listing.bedrooms) : "—"
+                }
               />
               <CopyEditorContextMetric
                 label="Bathrooms"
-                value={listing.bathrooms != null ? String(listing.bathrooms) : "—"}
+                value={
+                  listing.bathrooms != null ? String(listing.bathrooms) : "—"
+                }
               />
               <CopyEditorContextMetric
                 label="Listing price"
@@ -546,17 +592,25 @@ export const LeaseAppraisalCopyEditor = forwardRef<
 
         {previewReport && copy ? (
           <>
-            <FittedReportPreview
-              report={previewReport}
-              maxHeight="min(85vh, 960px)"
-              fitToWidth
-              editable={{
-                setField: handleInlineSetField,
-                openImagePicker: handleOpenImagePicker,
-                brandPrimaryColour: previewReport.agency.primary_colour,
-                blurbFlushRef,
-              }}
-            />
+            <div className="mx-auto w-full max-w-4xl">
+              <FittedReportPreview
+                report={previewReport}
+                maxHeight="min(82vh, 960px)"
+                pageLabels={["Cover", "Comparable evidence"]}
+                fitToWidth
+                editable={{
+                  setField: handleInlineSetField,
+                  openImagePicker: handleOpenImagePicker,
+                  brandPrimaryColour: previewReport.agency.primary_colour,
+                  blurbFlushRef,
+                  onFieldFocus: (path) => {
+                    if (path === "copy.blurb")
+                      blurbBaselineRef.current =
+                        blurbFlushRef.current?.() ?? null;
+                  },
+                }}
+              />
+            </div>
 
             <ReportImagePickerDialog
               open={imagePickerSlot != null}
@@ -569,7 +623,10 @@ export const LeaseAppraisalCopyEditor = forwardRef<
               slot={imagePickerSlot}
               currentUrl={
                 previewReport && imagePickerSlot
-                  ? getReportImageUrlAtSlot(previewReport.property, imagePickerSlot)
+                  ? getReportImageUrlAtSlot(
+                      previewReport.property,
+                      imagePickerSlot,
+                    )
                   : undefined
               }
               onSelect={handleImageSelect}
@@ -577,7 +634,7 @@ export const LeaseAppraisalCopyEditor = forwardRef<
 
             <details className="group rounded-xl border border-border/70 bg-muted/10">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
-                <span>More options</span>
+                <span>All report fields</span>
                 <span className="text-xs font-normal text-muted-foreground">
                   Headings, highlights, comparable evidence, legal
                 </span>
@@ -639,13 +696,17 @@ export const LeaseAppraisalCopyEditor = forwardRef<
                 <CopyEditorField
                   label="Comparable evidence (page 2)"
                   value={copy.comparable_evidence}
-                  onChange={(value) => updateField("comparable_evidence", value)}
+                  onChange={(value) =>
+                    updateField("comparable_evidence", value)
+                  }
                   textarea
                 />
                 <CopyEditorField
                   label="Comparable disclaimer"
                   value={copy.comparable_disclaimer}
-                  onChange={(value) => updateField("comparable_disclaimer", value)}
+                  onChange={(value) =>
+                    updateField("comparable_disclaimer", value)
+                  }
                   textarea
                 />
                 <CopyEditorField
@@ -676,38 +737,6 @@ export const LeaseAppraisalCopyEditor = forwardRef<
           </div>
         )}
       </div>
-
-      {copy && isDirty ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed inset-x-0 bottom-0 z-50 border-t border-amber-200/90 bg-amber-50/95 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm dark:border-amber-800/60 dark:bg-amber-950/95"
-        >
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap">
-            <div className="min-w-0 space-y-0.5">
-              <p className="text-sm font-semibold text-foreground">Unsaved changes</p>
-              <p className="text-xs text-muted-foreground">
-                Save your appraisal before continuing to preview.
-              </p>
-            </div>
-            <Button
-              size="lg"
-              className="shrink-0 shadow-md"
-              disabled={saving || generating}
-              onClick={() => void persistCopy()}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Saving…
-                </>
-              ) : (
-                "Save appraisal"
-              )}
-            </Button>
-          </div>
-        </div>
-      ) : null}
     </AsyncLoadingOverlay>
   );
 });

@@ -39,9 +39,11 @@ export async function POST(
     const publicUrl = buildPublicCollateralUrl(agency.slug, publicSlug);
 
     const existingDocument = collateral.document_json as BrochureDocumentJson;
+    // Sharing an unchanged document does not make its prepared PDF stale.
+    // Applying a pending QR choice does change the rendered document.
     const documentJson: BrochureDocumentJson = isBrochureDocument(
       existingDocument,
-    )
+    ) && existingDocument.document_link_draft
       ? withBrochureContentSaved({
           ...applyDocumentLinkDraft(existingDocument),
         })

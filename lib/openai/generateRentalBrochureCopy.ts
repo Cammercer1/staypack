@@ -7,6 +7,7 @@ import {
   getSalesBrochureCopyPromptLimits,
 } from "@/lib/collateral/sales-brochure/copyLimits";
 import { getMockRentalBrochureCopy } from "@/lib/collateral/buildSalesBrochureDocument";
+import { resolveRentalInspectionCta } from "@/lib/collateral/rental-brochure/inspectionCta";
 import {
   DEFAULT_RENTAL_BROCHURE_PRICE_LABEL,
   type BrochureCopyJson,
@@ -133,7 +134,7 @@ function parseCopyResponse(raw: unknown, agency: Agency) {
 
   const pageOne = pageOneFromAiShape(pageOneParsed.data);
   const brochure = brochureCopyFromPageOneAi(pageOne, {
-    inspection_cta: agency.default_cta?.trim() || "",
+    inspection_cta: resolveRentalInspectionCta(agency.default_cta),
     disclaimer: agency.default_disclaimer?.trim() || DEFAULT_DISCLAIMER,
   });
   const parsed = salesBrochureCopySchema.safeParse(brochure);

@@ -40,6 +40,8 @@ type Props = {
   className?: string;
   maxHeight?: string;
   fitToWidth?: boolean;
+  thumbnail?: boolean;
+  pageLabels?: string[];
   /** When true, use agency/fonts from `document` (listing playground) instead of session preview-brand API. */
   useDocumentBrand?: boolean;
   metricsReport?: FinalReportJson;
@@ -63,6 +65,8 @@ export function FittedBrochurePreview({
   className,
   maxHeight = "min(80vh, 900px)",
   fitToWidth = true,
+  thumbnail = false,
+  pageLabels,
   useDocumentBrand = false,
   metricsReport,
   reportVariant,
@@ -196,7 +200,27 @@ export function FittedBrochurePreview({
       )}
       style={fitToPanel ? { height: maxHeight, maxHeight } : undefined}
     >
-      {paginated ? (
+      {paginated && !thumbnail && pageLabels ? (
+        <nav
+          aria-label="Document pages"
+          className="flex shrink-0 justify-center gap-2 border-b bg-base-100 p-2"
+        >
+          {Array.from({ length: pageCount }, (_, index) => (
+            <button
+              key={index}
+              type="button"
+              aria-pressed={currentPage === index}
+              className={cn(
+                "du-btn du-btn-sm min-h-11",
+                currentPage === index ? "du-btn-primary" : "du-btn-ghost",
+              )}
+              onClick={() => setCurrentPage(index)}
+            >
+              {index + 1}. {pageLabels[index] ?? `Page ${index + 1}`}
+            </button>
+          ))}
+        </nav>
+      ) : paginated && !thumbnail ? (
         <div className="flex items-center justify-between border-b bg-muted/70 px-4 py-3 shadow-sm">
           <button
             type="button"

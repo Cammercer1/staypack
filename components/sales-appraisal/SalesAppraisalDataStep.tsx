@@ -1,4 +1,6 @@
 "use client";
+import { AppraisalDataToolbar } from "@/components/appraisals/AppraisalDataToolbar";
+import { ComparableFilters } from "@/components/appraisals/ComparableFilters";
 import { avmPriceSuggestion } from "@/lib/listings/pricing";
 
 import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
@@ -7,7 +9,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,12 +30,14 @@ import type { Listing, SalesAppraisalJob } from "@/lib/types";
 const POLL_INTERVAL_MS = 2000;
 
 type Props = {
+  onBusyChange?: (busy: boolean) => void;
   listing: Listing;
   activeJob?: SalesAppraisalJob | null;
   compsPrefetching?: boolean;
   onListingChange: (listing: Listing) => void;
   onJobChange?: (job: SalesAppraisalJob | null) => void;
   onContinue: () => void;
+  continueLabel?: string;
 };
 
 type ApiError = {
@@ -48,6 +51,8 @@ export function SalesAppraisalDataStep({
   onListingChange,
   onJobChange,
   onContinue,
+  continueLabel,
+  onBusyChange,
 }: Props) {
   const parsed = useMemo(() => resolveAppraisalInput(listing), [listing]);
   const pool = useMemo(
@@ -63,6 +68,8 @@ export function SalesAppraisalDataStep({
   const priceEdited = useRef(false);
   const estimate = avmPriceSuggestion(listing, "sale");
   const hasPriceOverride = Boolean(listing.appraisal_overrides_json?.sales);
+  const [query, setQuery] = useState("");
+  const [selectedOnly, setSelectedOnly] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
   const pollErrorShownRef = useRef(false);
@@ -112,6 +119,10 @@ export function SalesAppraisalDataStep({
         id: saleCompListingId(comp, index),
       })),
     [pool],
+  );
+  const visibleCompRows = compRows.filter(({ comp, id }) =>
+    (!selectedOnly || selectedIds.includes(id)) &&
+    `${comp.address} ${comp.suburb ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()),
   );
   const discoveryGaps = [
     appraisal?.discovery?.sold && !appraisal.discovery.sold.targetMet
@@ -288,6 +299,11 @@ export function SalesAppraisalDataStep({
     } finally { setSaving(false); }
   }
 
+  useEffect(() => {
+    onBusyChange?.(saving);
+    return () => onBusyChange?.(false);
+  }, [saving, onBusyChange]);
+
   async function saveAndContinue() {
     if (!canContinue) {
       toast.error("Fetch comps and select at least one comparable");
@@ -337,31 +353,38 @@ export function SalesAppraisalDataStep({
   const fetchingComps = compsPrefetching || fetching || initialCompsProcessing;
 
   return (
-    <AsyncLoadingOverlay
-      active={loading}
-      title={fetchingComps ? "Fetching sales comps" : "Saving appraisal data"}
-      description={
-        fetchingComps
-          ? "Searching recently sold and for-sale comparables. This can take 1–3 minutes."
-          : "Saving your price band and comparable selection."
-      }
-      className="space-y-8"
-    >
+    <div className="space-y-6">
+      <AppraisalDataToolbar
+        summary={priceSummary}
+        selectedCount={selectedIds.length}
+        maxSelected={MAX_SALES_APPRAISAL_FEATURED_COMPS}
+        saving={saving}
+        disabled={loading || !canContinue}
+        guidance={inputError ?? (fetchingComps && !compsReady
+          ? "Finding comparables. You can review the figures while we search."
+          : !compsReady ? "Fetch comparable evidence below to continue."
+          : selectedIds.length === 0 ? "Select at least one comparable below to continue." : needsAgentReview && !agentReviewConfirmed ? "Confirm the agency guide review below to continue."
+          : "Review the figures and selected comparables, then continue.")}
+        continueLabel={continueLabel}
+        onContinue={saveAndContinue}
+      />
+      <fieldset disabled={saving} className="min-w-0 space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">Appraisal data</h2>
+        <h2 className="text-lg font-semibold">Review appraisal evidence</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {compsReady
             ? refreshingComps
               ? "Comparable sales are refreshing in the background. Current comps remain available while the appraisal updates."
-              : `Comps are sorted by relevance — same suburb, property type, and bed/bath match first. Recently sold and for-sale listings are mixed together; pick up to six for page 2 and use Refresh to re-fetch from REA.`
+              : `Review the suggested price range and choose up to six comparable properties. The most relevant recent sales and current listings appear first.`
             : jobProcessing
               ? "Comparable sales are being fetched in the background. This page will update when they are ready."
               : "Recently sold and for-sale comparables load when you start the appraisal. Adjust the estimated sale price band if needed, then choose featured comps."}
         </p>
       </div>
 
-      <div className="surface-card space-y-4 p-6">
+      <div className="surface-card space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <p className="font-medium">Comparable sales</p>
           {refreshingComps ? (
             <Badge variant="secondary">Refreshing</Badge>
@@ -379,7 +402,7 @@ export function SalesAppraisalDataStep({
         <Button
           variant="outline"
           onClick={() => void fetchComps()}
-          disabled={loading || refreshingComps || Boolean(inputError)}
+          disabled={loading || compsPrefetching || jobProcessing || Boolean(inputError)}
         >
           {compsPrefetching || fetching || jobProcessing ? (
             <>
@@ -392,6 +415,7 @@ export function SalesAppraisalDataStep({
             "Fetch sales comps"
           )}
         </Button>
+        </div>
         {refreshingComps ? (
           <p className="text-sm text-muted-foreground">
             The current comps are shown below. The refresh will replace them when
@@ -523,18 +547,35 @@ export function SalesAppraisalDataStep({
               </div>
             ) : null}
 
+            {compRows.length > 0 ? (
+              <ComparableFilters
+                query={query}
+                onQueryChange={setQuery}
+                selectedOnly={selectedOnly}
+                onSelectedOnlyChange={setSelectedOnly}
+                totalCount={compRows.length}
+                selectedCount={selectedIds.length}
+                visibleCount={visibleCompRows.length}
+              />
+            ) : null}
+
             {compRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No comparables returned — try refreshing comps.
+                {fetchingComps ? "Searching for comparables… Results will appear here automatically." : "No comparables available. Fetch comparable evidence to get started."}
+              </p>
+            ) : visibleCompRows.length === 0 ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                No comparables match this view. Clear the search or choose All to see more.
               </p>
             ) : (
               <ul className="grid gap-3 sm:grid-cols-2">
-                {compRows.map(({ comp, id }) => {
+                {visibleCompRows.map(({ comp, id }) => {
                   const selected = selectedIds.includes(id);
                   return (
                     <li key={id}>
                       <button
                         type="button"
+                        aria-pressed={selected}
                         onClick={() => toggleComp(id)}
                         className={cn(
                           "flex w-full gap-3 rounded-xl border p-3 text-left transition-colors",
@@ -587,17 +628,9 @@ export function SalesAppraisalDataStep({
           </div>
       </>
 
-      <Button onClick={saveAndContinue} disabled={loading || !canContinue}>
-        {saving ? (
-          <>
-            <Loader2 className="animate-spin" />
-            Saving...
-          </>
-        ) : (
-          "Continue to edit content"
-        )}
-      </Button>
-    </AsyncLoadingOverlay>
+
+      </fieldset>
+    </div>
   );
 }
 

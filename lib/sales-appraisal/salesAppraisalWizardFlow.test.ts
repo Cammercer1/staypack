@@ -29,14 +29,14 @@ describe("getInitialSalesAppraisalWizardStep", () => {
     ).toBe("template");
   });
 
-  it("keeps generated single-template drafts on appraisal data", () => {
+  it("resumes generated single-template drafts at download and share", () => {
     expect(
       getInitialSalesAppraisalWizardStep({
         ...readyDraft,
         hasFinalReport: true,
         skipTemplateSelection: true,
       }),
-    ).toBe("data");
+    ).toBe("preview");
   });
 
   it("opens published reports at preview", () => {

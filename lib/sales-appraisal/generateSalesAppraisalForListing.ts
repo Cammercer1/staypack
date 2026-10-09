@@ -183,7 +183,11 @@ export async function generateSalesAppraisalReportContent({
     .from("reports")
     .update({
       template_id: resolvedTemplateId,
-      final_report_json: finalReportJson,
+      final_report_json: {
+        ...finalReportJson,
+        assets: { ...finalReportJson.assets, pdf_url: "" },
+      },
+      pdf_url: null,
       status: preservePublished ? report.status : "generated",
       generated_at: new Date().toISOString(),
     })

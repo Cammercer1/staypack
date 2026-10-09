@@ -4,17 +4,24 @@ import { useEffect, useState } from "react";
 import type { TemplateApiEntry } from "@/lib/templates/serializeForApi";
 import type { TemplateProduct } from "@/lib/templates/types";
 
-type TemplatesResponse = {
+export type TemplatesResponse = {
   default_template_id: string;
   templates: TemplateApiEntry[];
 };
 
-export function useAvailableTemplates(product: TemplateProduct) {
-  const [data, setData] = useState<TemplatesResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+export function useAvailableTemplates(
+  product: TemplateProduct,
+  initialData?: TemplatesResponse,
+) {
+  const [reloadKey, setReloadKey] = useState(0);
+  const [data, setData] = useState<TemplatesResponse | null>(
+    initialData ?? null,
+  );
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (initialData && reloadKey === 0) return;
     let cancelled = false;
 
     async function load() {
@@ -33,7 +40,9 @@ export function useAvailableTemplates(product: TemplateProduct) {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load templates");
+          setError(
+            err instanceof Error ? err.message : "Failed to load templates",
+          );
           setData(null);
         }
       } finally {
@@ -47,7 +56,12 @@ export function useAvailableTemplates(product: TemplateProduct) {
     return () => {
       cancelled = true;
     };
-  }, [product]);
+  }, [product, reloadKey, initialData]);
 
-  return { data, loading, error };
+  return {
+    data: initialData && reloadKey === 0 ? initialData : data,
+    loading: initialData && reloadKey === 0 ? false : loading,
+    error,
+    reload: () => setReloadKey((key) => key + 1),
+  };
 }

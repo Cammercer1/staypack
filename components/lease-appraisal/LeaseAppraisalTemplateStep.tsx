@@ -1,19 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import type { TemplatesResponse } from "@/components/templates/useAvailableTemplates";
+
+import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { AppraisalStepHeader } from "@/components/appraisals/AppraisalStepHeader";
+import { AppraisalTemplateGallery } from "@/components/appraisals/AppraisalTemplateGallery";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
-import { LeaseAppraisalTemplatePicker } from "@/components/lease-appraisal/LeaseAppraisalTemplatePicker";
-import {
-  resolveLeaseAppraisalTemplateSelection,
-} from "@/lib/lease-appraisal/leaseAppraisalTemplates";
-import { resolveAgentProfile } from "@/lib/lease-appraisal/generateLeaseAppraisalForListing";
+import { resolveLeaseAppraisalTemplateSelection } from "@/lib/lease-appraisal/leaseAppraisalTemplates";
 import { buildLeaseAppraisalTemplatePreview } from "@/lib/lease-appraisal/templatePreviewDocument";
-import type { Agency, AgentProfile, CollateralItem, Listing, Report } from "@/lib/types";
+import type {
+  Agency,
+  AgentProfile,
+  CollateralItem,
+  Listing,
+  Report,
+} from "@/lib/types";
 
 type Props = {
+  availableTemplates?: TemplatesResponse;
+  onBusyChange?: (busy: boolean) => void;
   agency: Agency;
   listing: Listing;
   report: Report;
@@ -30,6 +37,7 @@ type ApiError = {
 
 export function LeaseAppraisalTemplateStep({
   agency,
+  availableTemplates,
   listing,
   report,
   collateral,
@@ -37,13 +45,17 @@ export function LeaseAppraisalTemplateStep({
   onReportChange,
   onCollateralChange,
   onContinue,
+  onBusyChange,
 }: Props) {
-  const [selectedTemplateId, setSelectedTemplateId] = useState(() =>
-    resolveLeaseAppraisalTemplateSelection(
-      report.template_id ?? collateral.template_id,
-    ),
+  const [selectedTemplateId, setSelectedTemplateId] = useState(
+    () =>
+      report.template_id ??
+      collateral.template_id ??
+      resolveLeaseAppraisalTemplateSelection(null),
   );
   const [saving, setSaving] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const previewReport = useMemo(() => {
     return buildLeaseAppraisalTemplatePreview({
@@ -55,97 +67,116 @@ export function LeaseAppraisalTemplateStep({
     });
   }, [agency, listing, report, selectedTemplateId, agencyAgents]);
 
-  async function proceedToContentGeneration() {
+  useEffect(() => {
+    onBusyChange?.(saving);
+    return () => onBusyChange?.(false);
+  }, [saving, onBusyChange]);
+
+  async function proceedToAppraisalData() {
+    if (saving || !ready) return;
     setSaving(true);
-
-    const [reportResponse, collateralResponse] = await Promise.all([
-      fetch(`/api/reports/${report.id}`, {
+    setError(null);
+    try {
+      const response = await fetch(`/api/reports/${report.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ template_id: selectedTemplateId }),
-      }),
-      collateral.report_id === report.id ? fetch(`/api/collateral/${collateral.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ template_id: selectedTemplateId }),
-      }) : Promise.resolve({ ok: true, json: async () => ({ collateral }) }),
-    ]);
-
-    const reportPayload = (await reportResponse.json()) as ApiError & {
-      report?: Report;
-    };
-    const collateralPayload = (await collateralResponse.json()) as ApiError & {
-      collateral?: CollateralItem;
-    };
-
-    if (!reportResponse.ok) {
-      toast.error(reportPayload.error ?? "Unable to save template");
+      });
+      const payload = (await response.json()) as ApiError & { report?: Report };
+      if (!response.ok || !payload.report)
+        throw new Error(payload.error ?? "Unable to save design");
+      onReportChange(payload.report);
+      if (collateral.report_id === report.id) {
+        const collateralResponse = await fetch(
+          `/api/collateral/${collateral.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ template_id: selectedTemplateId }),
+          },
+        );
+        const collateralPayload = await collateralResponse.json();
+        if (!collateralResponse.ok)
+          throw new Error(collateralPayload.error ?? "Unable to save design");
+        if (collateralPayload.collateral)
+          onCollateralChange(collateralPayload.collateral);
+      }
+      onContinue();
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unable to save design. Try again.";
+      setError(message);
+      toast.error(message);
+    } finally {
       setSaving(false);
-      return;
     }
-
-    if (reportPayload.report) {
-      onReportChange(reportPayload.report);
-    }
-
-    if (collateralResponse.ok && collateralPayload.collateral) {
-      onCollateralChange(collateralPayload.collateral);
-    }
-
-    setSaving(false);
-    onContinue();
   }
 
-  const assignedAgent = resolveAgentProfile(listing, agencyAgents);
-
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold">Choose template</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Pick the rental appraisal layout. Preview uses your agency brand
-            {assignedAgent ? ` and ${assignedAgent.name}` : ""}, listing photos,
-            and placeholder copy until you fetch comps and generate content.
-          </p>
-        </div>
-
-        <Button
-          className="shrink-0"
-          onClick={proceedToContentGeneration}
-          disabled={saving}
+    <section data-theme="staypack-workspace" className="space-y-5">
+      <AppraisalStepHeader
+        title="Choose your report design"
+        description="See your property in each layout. You can change the design later."
+      >
+        <button
+          type="button"
+          className="du-btn du-btn-sm du-btn-primary min-h-11 w-full sm:w-auto"
+          onClick={proceedToAppraisalData}
+          disabled={saving || !ready}
         >
           {saving ? (
-            <>
-              <Loader2 className="animate-spin" />
-              Saving...
-            </>
-          ) : (
-            "Proceed to appraisal data"
-          )}
-        </Button>
-      </div>
-
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,22rem)_1fr]">
-        <LeaseAppraisalTemplatePicker
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          ) : null}
+          {saving ? "Saving design…" : "Use design & review evidence"}
+          {!saving ? (
+            <ArrowRight className="size-4" aria-hidden="true" />
+          ) : null}
+        </button>
+      </AppraisalStepHeader>
+      {error ? (
+        <p role="alert" className="du-alert du-alert-error du-alert-soft">
+          {error}
+        </p>
+      ) : null}
+      <div className="grid min-w-0 grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.2fr)]">
+        <AppraisalTemplateGallery
+          initialTemplates={availableTemplates}
+          product="lease"
           value={selectedTemplateId}
           onChange={setSelectedTemplateId}
+          onReady={setReady}
+          disabled={saving}
+          previewForTemplate={(templateId) =>
+            buildLeaseAppraisalTemplatePreview({
+              agency,
+              listing,
+              report,
+              templateId,
+              agencyAgents,
+            })
+          }
         />
-
-        <div className="min-w-0">
+        <div className="min-w-0 xl:sticky xl:top-32">
+          <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
+            <span>YOUR PROPERTY · DESIGN PREVIEW</span>
+            <span>Sample wording</span>
+          </div>
           {previewReport ? (
             <FittedReportPreview
               report={previewReport}
-              maxHeight="min(85vh, 920px)"
+              pageLabels={["Cover", "Comparable evidence"]}
+              maxHeight="min(78vh, 900px)"
               fitToWidth
             />
           ) : (
             <p className="text-sm text-muted-foreground">
-              Add property details and photos to preview templates.
+              Add property details and photos to preview designs.
             </p>
           )}
         </div>
       </div>
-    </div>
+    </section>
   );
 }

@@ -391,6 +391,16 @@ export function GalleryPageOneSpread({
       <GalleryInfoBar document={document} />
       <GalleryDetailsRow document={document} report={report} />
       <GalleryBottomBar document={document} />
+      {document.copy.disclaimer?.trim() ? (
+        <Editable
+          as="p"
+          path="copy.disclaimer"
+          className="shrink-0 px-8 pb-4 text-[0.56rem] leading-[1.45] text-neutral-600"
+          style={{ fontFamily: bodyFont }}
+        >
+          {document.copy.disclaimer}
+        </Editable>
+      ) : null}
     </>
   );
 }

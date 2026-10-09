@@ -1,4 +1,5 @@
 import { preserveDocumentLink } from "@/lib/documents/documentLink";
+import { resolveRentalInspectionCta } from "@/lib/collateral/rental-brochure/inspectionCta";
 import { buildAgencyBrandSlice } from "@/lib/collateral/buildAgencyBrandSlice";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
 import {
@@ -246,8 +247,7 @@ export function getMockRentalBrochureCopy(
       "Presented for tenants seeking quality and location.",
       "Generous living zones with flexible accommodation.",
     ],
-    inspection_cta:
-      agency.default_cta || "Contact us to arrange your inspection.",
+    inspection_cta: resolveRentalInspectionCta(agency.default_cta),
     disclaimer:
       agency.default_disclaimer ??
       "Information is general in nature. Applicants should make their own enquiries.",

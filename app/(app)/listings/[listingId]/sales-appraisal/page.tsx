@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { serializeTemplateForApi } from "@/lib/templates/serializeForApi";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireListingAccess } from "@/lib/auth/requireUser";
@@ -30,8 +31,6 @@ export default async function ListingSalesAppraisalPage({
     notFound();
   }
 
-
-
   const availableTemplates = await resolveAvailableTemplates(
     agency,
     "sales_appraisal",
@@ -52,7 +51,13 @@ export default async function ListingSalesAppraisalPage({
   let report: Report | null = null;
 
   if (reportId) {
-    const { data } = await supabase.from("reports").select("*").eq("id", reportId).eq("listing_id", listing.id).neq("status", "archived").maybeSingle();
+    const { data } = await supabase
+      .from("reports")
+      .select("*")
+      .eq("id", reportId)
+      .eq("listing_id", listing.id)
+      .neq("status", "archived")
+      .maybeSingle();
     if (!data || !data.template_id?.includes("sales-appraisal")) notFound();
     report = data as Report;
   }
@@ -81,7 +86,8 @@ export default async function ListingSalesAppraisalPage({
   }
 
   if (!report) {
-    if (collateralPhotoRequirementError(listing)) redirect(`/listings/${listingId}`);
+    if (collateralPhotoRequirementError(listing))
+      redirect(`/listings/${listingId}`);
     const { data: createdReport, error: reportError } = await supabase
       .from("reports")
       .insert({
@@ -186,6 +192,10 @@ export default async function ListingSalesAppraisalPage({
         collateral={collateral as CollateralItem}
         agency={agency}
         agencyAgents={agencyAgents}
+        availableTemplates={{
+          default_template_id: availableTemplates.defaultTemplateId,
+          templates: availableTemplates.templates.map(serializeTemplateForApi),
+        }}
         skipTemplateSelection={Boolean(soleTemplateId)}
       />
     </div>

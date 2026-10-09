@@ -1,4 +1,3 @@
-import { saveAppraisalResults } from "@/lib/appraisals/saveAppraisalResults";
 import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
@@ -10,7 +9,6 @@ import { generateLeaseAppraisalCopy } from "@/lib/openai/generateLeaseAppraisalC
 import {
   hasLeaseAppraisalSelectedComps,
 } from "@/lib/lease-appraisal/leaseAppraisalData";
-import { ensureLeaseAppraisalPositioning } from "@/lib/lease-appraisal/positionLeaseAppraisal";
 import type {
   Agency,
   AgentProfile,
@@ -126,15 +124,10 @@ export async function generateLeaseAppraisalReportContent({
   templateId?: string;
 }): Promise<{ report: Report; listing: Listing; parsed: ParsedListing }> {
 
-  let listing = initialListing;
-
-  const appraisalInput = resolveAppraisalInput(listing);
-
-  const parsed = listing.appraisal_overrides_json?.lease ? appraisalInput : await ensureLeaseAppraisalPositioning(appraisalInput);
-
-  if (parsed !== appraisalInput) {
-    listing = await saveAppraisalResults({ supabase, listing, kind: "lease", parsed });
-  }
+  const listing = initialListing;
+  // Generation consumes the figures and evidence reviewed on the data step.
+  // Repositioning here silently changed both after the user had saved them.
+  const parsed = resolveAppraisalInput(listing);
 
   if (!hasLeaseAppraisalComps(parsed)) {
     throw new Error("Fetch rental comps before generating appraisal content");
@@ -188,7 +181,11 @@ export async function generateLeaseAppraisalReportContent({
     .from("reports")
     .update({
       template_id: resolvedTemplateId,
-      final_report_json: finalReportJson,
+      final_report_json: {
+        ...finalReportJson,
+        assets: { ...finalReportJson.assets, pdf_url: "" },
+      },
+      pdf_url: null,
       status: preservePublished ? report.status : "generated",
       generated_at: new Date().toISOString(),
     })

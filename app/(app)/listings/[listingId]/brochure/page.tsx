@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { loadAgencyAgentProfiles } from "@/lib/reports/loadReportAgent";
+import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
+import { serializeTemplateForApi } from "@/lib/templates/serializeForApi";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { SalesBrochureEditor } from "@/components/collateral/sales-brochure/SalesBrochureEditor";
@@ -55,6 +58,10 @@ export default async function ListingSalesBrochurePage({
     collateral = created;
   }
 
+  const [availableTemplates, agencyAgents] = await Promise.all([
+    resolveAvailableTemplates(agency, "sales_brochure"),
+    loadAgencyAgentProfiles(supabase, agency.id),
+  ]);
   const meta = COLLATERAL_TYPE_META.sales_brochure;
 
   return (
@@ -79,6 +86,8 @@ export default async function ListingSalesBrochurePage({
         listing={listing}
         agency={agency}
         collateral={collateral as CollateralItem}
+        agencyAgents={agencyAgents}
+        availableTemplates={{ default_template_id: availableTemplates.defaultTemplateId, templates: availableTemplates.templates.map(serializeTemplateForApi) }}
       />
     </div>
   );

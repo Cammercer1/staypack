@@ -1,4 +1,6 @@
 "use client";
+import { AppraisalDataToolbar } from "@/components/appraisals/AppraisalDataToolbar";
+import { ComparableFilters } from "@/components/appraisals/ComparableFilters";
 import { avmPriceSuggestion } from "@/lib/listings/pricing";
 
 import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
@@ -7,7 +9,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,12 +34,14 @@ import type { LeaseAppraisalJob, Listing } from "@/lib/types";
 const POLL_INTERVAL_MS = 2000;
 
 type Props = {
+  onBusyChange?: (busy: boolean) => void;
   listing: Listing;
   activeJob?: LeaseAppraisalJob | null;
   compsPrefetching?: boolean;
   onListingChange: (listing: Listing) => void;
   onJobChange?: (job: LeaseAppraisalJob | null) => void;
   onContinue: () => void;
+  continueLabel?: string;
 };
 
 type ApiError = {
@@ -52,6 +55,8 @@ export function LeaseAppraisalDataStep({
   onListingChange,
   onJobChange,
   onContinue,
+  continueLabel,
+  onBusyChange,
 }: Props) {
   const parsed = useMemo(() => resolveAppraisalInput(listing), [listing]);
   const pool = useMemo(
@@ -69,6 +74,8 @@ export function LeaseAppraisalDataStep({
   const priceEdited = useRef(false);
   const estimate = avmPriceSuggestion(listing, "lease");
   const hasPriceOverride = Boolean(listing.appraisal_overrides_json?.lease);
+  const [query, setQuery] = useState("");
+  const [selectedOnly, setSelectedOnly] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
   const pollErrorShownRef = useRef(false);
@@ -116,11 +123,15 @@ export function LeaseAppraisalDataStep({
       })),
     [pool, subjectPropertyType],
   );
-  const exactCompRows = compRows.filter((row) => row.tier === "exact");
-  const fallbackCompRows = compRows.filter(
+  const visibleCompRows = compRows.filter(({ comp, id }) =>
+    (!selectedOnly || selectedIds.includes(id)) &&
+    `${comp.address} ${comp.suburb ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+  const exactCompRows = visibleCompRows.filter((row) => row.tier === "exact");
+  const fallbackCompRows = visibleCompRows.filter(
     (row) => row.tier === "upper_band_unit_fallback",
   );
-  const otherCompRows = compRows.filter((row) => row.tier === "other");
+  const otherCompRows = visibleCompRows.filter((row) => row.tier === "other");
   const discovery = appraisal?.discovery;
 
   const rentSummary = useMemo(() => {
@@ -285,6 +296,11 @@ export function LeaseAppraisalDataStep({
     } finally { setSaving(false); }
   }
 
+  useEffect(() => {
+    onBusyChange?.(saving);
+    return () => onBusyChange?.(false);
+  }, [saving, onBusyChange]);
+
   async function saveAndContinue() {
     if (!canContinue) {
       toast.error("Fetch comps and select at least one comparable");
@@ -331,31 +347,38 @@ export function LeaseAppraisalDataStep({
   const fetchingComps = compsPrefetching || fetching || initialCompsProcessing;
 
   return (
-    <AsyncLoadingOverlay
-      active={loading}
-      title={fetchingComps ? "Fetching rental comps" : "Saving appraisal data"}
-      description={
-        fetchingComps
-          ? "Searching comparable rentals and suburb context. This can take 1–3 minutes."
-          : "Saving your rent band and comparable selection."
-      }
-      className="space-y-8"
-    >
+    <div className="space-y-6">
+      <AppraisalDataToolbar
+        summary={rentSummary}
+        selectedCount={selectedIds.length}
+        maxSelected={MAX_LEASE_APPRAISAL_FEATURED_COMPS}
+        saving={saving}
+        disabled={loading || !canContinue}
+        guidance={inputError ?? (fetchingComps && !compsReady
+          ? "Finding comparables. You can review the figures while we search."
+          : !compsReady ? "Fetch comparable evidence below to continue."
+          : selectedIds.length === 0 ? "Select at least one comparable below to continue."
+          : "Review the figures and selected comparables, then continue.")}
+        continueLabel={continueLabel}
+        onContinue={saveAndContinue}
+      />
+      <fieldset disabled={saving} className="min-w-0 space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">Appraisal data</h2>
+        <h2 className="text-lg font-semibold">Review appraisal evidence</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {compsReady
             ? refreshingComps
               ? "Comparable rentals are refreshing in the background. Current comps remain available while the appraisal updates."
-              : `Comps are sorted with ${listing.suburb ?? "your suburb"} first, then nearby areas. Review the rent band, pick up to ${MAX_LEASE_APPRAISAL_FEATURED_COMPS} for page 2, and use Refresh to re-fetch from REA.`
+              : `Review the suggested rent range and choose up to ${MAX_LEASE_APPRAISAL_FEATURED_COMPS} comparable rentals. Properties in ${listing.suburb ?? "your suburb"} appear first, followed by nearby areas.`
             : jobProcessing
               ? "Comparable rentals are being fetched in the background. This page will update when they are ready."
               : "Comparable rentals load when you start the appraisal. Adjust the weekly rent band if needed, then choose featured comps."}
         </p>
       </div>
 
-      <div className="surface-card space-y-4 p-6">
+      <div className="surface-card space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <p className="font-medium">Comparable rentals</p>
           {refreshingComps ? (
             <Badge variant="secondary">Refreshing</Badge>
@@ -373,7 +396,7 @@ export function LeaseAppraisalDataStep({
         <Button
           variant="outline"
           onClick={() => void fetchComps()}
-          disabled={loading || refreshingComps || Boolean(inputError)}
+          disabled={loading || compsPrefetching || jobProcessing || Boolean(inputError)}
         >
           {compsPrefetching || fetching || jobProcessing ? (
             <>
@@ -386,6 +409,7 @@ export function LeaseAppraisalDataStep({
             "Fetch rental comps"
           )}
         </Button>
+        </div>
         {refreshingComps ? (
           <p className="text-sm text-muted-foreground">
             The current comps are shown below. The refresh will replace them when
@@ -480,10 +504,10 @@ export function LeaseAppraisalDataStep({
               </div>
             ) : null}
 
-            {fallbackCompRows.length > 0 ? (
+            {compRows.some((row) => row.tier === "upper_band_unit_fallback") ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
                 <p className="font-medium">
-                  {exactCompRows.length} exact {formatPropertyType(subjectPropertyType).toLowerCase()} {exactCompRows.length === 1 ? "match" : "matches"}
+                  {compRows.filter((row) => row.tier === "exact").length} exact {formatPropertyType(subjectPropertyType).toLowerCase()} {compRows.filter((row) => row.tier === "exact").length === 1 ? "match" : "matches"}
                 </p>
                 <p className="mt-1 text-amber-900/80">
                   The rent estimate uses the exact matches. Upper-band units are
@@ -493,9 +517,25 @@ export function LeaseAppraisalDataStep({
               </div>
             ) : null}
 
+            {compRows.length > 0 ? (
+              <ComparableFilters
+                query={query}
+                onQueryChange={setQuery}
+                selectedOnly={selectedOnly}
+                onSelectedOnlyChange={setSelectedOnly}
+                totalCount={compRows.length}
+                selectedCount={selectedIds.length}
+                visibleCount={visibleCompRows.length}
+              />
+            ) : null}
+
             {compRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No comparables returned — try refreshing comps.
+                {fetchingComps ? "Searching for comparables… Results will appear here automatically." : "No comparables available. Fetch comparable evidence to get started."}
+              </p>
+            ) : visibleCompRows.length === 0 ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                No comparables match this view. Clear the search or choose All to see more.
               </p>
             ) : (
               <div className="space-y-6">
@@ -609,17 +649,9 @@ export function LeaseAppraisalDataStep({
           </div>
       </>
 
-      <Button onClick={saveAndContinue} disabled={loading || !canContinue}>
-        {saving ? (
-          <>
-            <Loader2 className="animate-spin" />
-            Saving...
-          </>
-        ) : (
-          "Continue to edit content"
-        )}
-      </Button>
-    </AsyncLoadingOverlay>
+
+      </fieldset>
+    </div>
   );
 }
 

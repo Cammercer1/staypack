@@ -140,11 +140,11 @@ export function HavenSalesCompsGrid({
               <img
                 src={comp.thumbnail_url}
                 alt=""
-                className={`${denseSix ? "aspect-[4/2]" : imageAspectClass} w-full object-cover`}
+                className={[imageAspectClass, "w-full object-cover"].join(" ")}
               />
             ) : (
               <div
-                className={`${denseSix ? "aspect-[4/2]" : imageAspectClass} w-full bg-neutral-200`}
+                className={[imageAspectClass, "w-full bg-neutral-200"].join(" ")}
               />
             )}
             <div className={`space-y-0.5 ${denseSix ? "mt-1" : "mt-2"}`}>

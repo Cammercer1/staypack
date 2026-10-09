@@ -1,3 +1,4 @@
+import { getBrochureEditorBlurb } from "./brochureEditorBlurb";
 import { coerceSalesBrochureCopy } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import { resolveCopyForTemplate } from "@/lib/copy/resolveCopyForTemplate";
 import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
@@ -23,7 +24,9 @@ export function coerceSalesBrochureDocument(
     copy: {
       ...coerced,
       blurb: resolved.blurb,
-      blurb_blocks: resolved.blurb_blocks,
+      blurb_blocks: options?.allowDevBlurbLengthMap
+        ? resolved.blurb_blocks
+        : getBrochureEditorBlurb(coerced, document.template_id),
       blurb_variants: resolved.blurb_variants,
     },
   };

@@ -108,7 +108,11 @@ export async function PATCH(
       .from("reports")
       .update({
         template_id: templateId,
-        final_report_json: finalReportJson,
+        final_report_json: {
+          ...finalReportJson,
+          assets: { ...finalReportJson.assets, pdf_url: "" },
+        },
+        pdf_url: null,
         status: report.status === "published" ? report.status : "generated",
         generated_at: new Date().toISOString(),
       })

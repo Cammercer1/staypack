@@ -1,8 +1,8 @@
 export const SALES_APPRAISAL_WIZARD_STEPS = [
-  { id: "template", label: "Choose template" },
-  { id: "data", label: "Appraisal data" },
-  { id: "copy", label: "Edit content" },
-  { id: "preview", label: "Preview & publish" },
+  { id: "template", label: "Design" },
+  { id: "data", label: "Review evidence" },
+  { id: "copy", label: "Edit report" },
+  { id: "preview", label: "Download & share" },
 ] as const;
 
 export type SalesAppraisalWizardStep =
@@ -29,12 +29,12 @@ export function getInitialSalesAppraisalWizardStep({
     return "preview";
   }
 
-  if (skipTemplateSelection) {
-    return "data";
-  }
-
   if (hasFinalReport) {
     return "preview";
+  }
+
+  if (skipTemplateSelection) {
+    return "data";
   }
 
   if (!hasTemplate) {

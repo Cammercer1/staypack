@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { serializeTemplateForApi } from "@/lib/templates/serializeForApi";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireListingAccess } from "@/lib/auth/requireUser";
@@ -6,52 +7,9 @@ import { LeaseAppraisalEditor } from "@/components/lease-appraisal/LeaseAppraisa
 import { Button } from "@/components/ui/button";
 import { LEASE_APPRAISAL_LABEL } from "@/lib/listings/collateralTypes";
 import { collateralPhotoRequirementError } from "@/lib/listings/collateralPhotoRequirements";
-import { DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID } from "@/lib/lease-appraisal/leaseAppraisalTemplates";
 import { loadAgencyAgentProfiles } from "@/lib/reports/loadReportAgent";
 import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
 import type { CollateralItem, Report } from "@/lib/types";
-
-/** Drafts auto-assigned Classic before template step existed — reopen on Choose template. */
-async function clearLegacyAutoTemplate(
-  supabase: Awaited<ReturnType<typeof requireListingAccess>>["supabase"],
-  report: Report,
-  collateral: CollateralItem | null,
-) {
-  if (report.final_report_json || report.status !== "draft") {
-    return { report, collateral };
-  }
-
-  const hadAutoTemplate =
-    report.template_id === DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID ||
-    collateral?.template_id === DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID;
-
-  if (!hadAutoTemplate) {
-    return { report, collateral };
-  }
-
-  const { data: updatedReport } = await supabase
-    .from("reports")
-    .update({ template_id: null })
-    .eq("id", report.id)
-    .select("*")
-    .single();
-
-  let nextCollateral = collateral;
-  if (collateral?.id) {
-    const { data: updatedCollateral } = await supabase
-      .from("collateral_items")
-      .update({ template_id: null })
-      .eq("id", collateral.id)
-      .select("*")
-      .single();
-    nextCollateral = (updatedCollateral as CollateralItem | null) ?? collateral;
-  }
-
-  return {
-    report: (updatedReport as Report | null) ?? { ...report, template_id: null },
-    collateral: nextCollateral,
-  };
-}
 
 export default async function ListingLeaseAppraisalPage({
   params,
@@ -73,8 +31,6 @@ export default async function ListingLeaseAppraisalPage({
     notFound();
   }
 
-
-
   const availableTemplates = await resolveAvailableTemplates(agency, "lease");
   const soleTemplateId =
     availableTemplates.templates.length === 1
@@ -92,7 +48,13 @@ export default async function ListingLeaseAppraisalPage({
   let report: Report | null = null;
 
   if (reportId) {
-    const { data } = await supabase.from("reports").select("*").eq("id", reportId).eq("listing_id", listing.id).neq("status", "archived").maybeSingle();
+    const { data } = await supabase
+      .from("reports")
+      .select("*")
+      .eq("id", reportId)
+      .eq("listing_id", listing.id)
+      .neq("status", "archived")
+      .maybeSingle();
     if (!data || !data.template_id?.includes("lease-appraisal")) notFound();
     report = data as Report;
   }
@@ -121,7 +83,8 @@ export default async function ListingLeaseAppraisalPage({
   }
 
   if (!report) {
-    if (collateralPhotoRequirementError(listing)) redirect(`/listings/${listingId}`);
+    if (collateralPhotoRequirementError(listing))
+      redirect(`/listings/${listingId}`);
     const { data: createdReport, error: reportError } = await supabase
       .from("reports")
       .insert({
@@ -198,14 +161,6 @@ export default async function ListingLeaseAppraisalPage({
     collateral = updatedCollateral;
   }
 
-  if (!soleTemplateId) {
-    ({ report, collateral } = await clearLegacyAutoTemplate(
-      supabase,
-      report,
-      collateral as CollateralItem | null,
-    ));
-  }
-
   const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
 
   return (
@@ -234,6 +189,10 @@ export default async function ListingLeaseAppraisalPage({
         collateral={collateral as CollateralItem}
         agency={agency}
         agencyAgents={agencyAgents}
+        availableTemplates={{
+          default_template_id: availableTemplates.defaultTemplateId,
+          templates: availableTemplates.templates.map(serializeTemplateForApi),
+        }}
         skipTemplateSelection={Boolean(soleTemplateId)}
       />
     </div>

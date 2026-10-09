@@ -6,7 +6,7 @@
 /* Opt in per workspace view; omit daisyUI's global base/reset styles. */
 @plugin "daisyui" {
   themes: false;
-  include: button, badge, input, select, list, stat, card, alert, menu;
+  include: skeleton, button, badge, input, select, list, stat, card, alert, menu;
   prefix: "du-";
   logs: false;
 }

@@ -1,13 +1,18 @@
 "use client";
 
-import { resolveAppraisalInput, appraisalInputError } from "@/lib/appraisals/resolveAppraisalInput";
-import { DocumentLinkEditor } from "@/components/documents/DocumentLinkEditor";
+import type { TemplatesResponse } from "@/components/templates/useAvailableTemplates";
+
+import {
+  resolveAppraisalInput,
+  appraisalInputError,
+} from "@/lib/appraisals/resolveAppraisalInput";
 import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
 
+import { AppraisalDeliveryStep } from "@/components/appraisals/AppraisalDeliveryStep";
+import { AppraisalGenerationStatus } from "@/components/appraisals/AppraisalGenerationStatus";
+
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { SalesAppraisalTemplateStep } from "@/components/sales-appraisal/SalesAppraisalTemplateStep";
@@ -16,11 +21,6 @@ import {
   SalesAppraisalCopyEditor,
   type SalesAppraisalCopyEditorHandle,
 } from "@/components/sales-appraisal/SalesAppraisalCopyEditor";
-import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
-import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
-import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
-import { mergeSalesAppraisalPreviewFromListing } from "@/lib/sales-appraisal/mergeSalesAppraisalPreviewFromListing";
-import { mergeAppraisalPreviewAgents } from "@/lib/reports/mergeAppraisalPreviewAgents";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { hasSalesAppraisalComps } from "@/lib/sales-appraisal/generateSalesAppraisalForListing";
 import { hasSalesAppraisalSelectedComps } from "@/lib/sales-appraisal/salesAppraisalData";
@@ -29,7 +29,6 @@ import {
   SALES_APPRAISAL_WIZARD_STEPS,
   type SalesAppraisalWizardStep,
 } from "@/lib/sales-appraisal/salesAppraisalWizardFlow";
-import { SALES_APPRAISAL_LABEL } from "@/lib/listings/collateralTypes";
 import type {
   Agency,
   AgentProfile,
@@ -40,9 +39,8 @@ import type {
   SalesAppraisalJob,
 } from "@/lib/types";
 
-const PREVIEW_SYNC_MIN_MS = 400;
-
 type Props = {
+  availableTemplates?: TemplatesResponse;
   initialListing: Listing;
   initialReport: Report;
   initialCollateral: CollateralItem;
@@ -58,8 +56,8 @@ export function SalesAppraisalWizard({
   agency,
   initialAgencyAgents,
   skipTemplateSelection = false,
+  availableTemplates,
 }: Props) {
-  const [linkPending, setLinkPending] = useState(false);
   const [listing, setListing] = useState(initialListing);
   const [report, setReport] = useState(initialReport);
   const [collateral, setCollateral] = useState(initialCollateral);
@@ -78,16 +76,10 @@ export function SalesAppraisalWizard({
       skipTemplateSelection,
     }),
   );
+  const [evidenceChanged, setEvidenceChanged] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [publishStage, setPublishStage] = useState<
-    "idle" | "publishing" | "generating-pdf"
-  >("idle");
+  const [generating, setGenerating] = useState(false);
   const copyEditorRef = useRef<SalesAppraisalCopyEditorHandle>(null);
-  const previewSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [previewSyncing, setPreviewSyncing] = useState(false);
-  const [previewDraftReport, setPreviewDraftReport] = useState<FinalReportJson | null>(
-    () => (initialReport.final_report_json as FinalReportJson | null) ?? null,
-  );
   const [compsPrefetching, setCompsPrefetching] = useState(false);
   const [salesAppraisalJob, setSalesAppraisalJob] =
     useState<SalesAppraisalJob | null>(null);
@@ -102,13 +94,6 @@ export function SalesAppraisalWizard({
     setReport(initialReport);
     setCollateral(initialCollateral);
   }, [initialReport, initialCollateral]);
-
-  useEffect(() => {
-    const cached = report.final_report_json as FinalReportJson | null;
-    if (cached) {
-      setPreviewDraftReport(cached);
-    }
-  }, [report.final_report_json]);
 
   useEffect(() => {
     compsPrefetchStartedRef.current = false;
@@ -129,7 +114,9 @@ export function SalesAppraisalWizard({
     let cancelled = false;
     setCompsPrefetching(true);
 
-    fetch(`/api/listings/${listing.id}/sales-appraisal/enrich`, { method: "POST" })
+    fetch(`/api/listings/${listing.id}/sales-appraisal/enrich`, {
+      method: "POST",
+    })
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) {
@@ -157,108 +144,63 @@ export function SalesAppraisalWizard({
   }, [listing]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  useEffect(() => {
-    return () => {
-      if (previewSyncTimeoutRef.current) {
-        clearTimeout(previewSyncTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const previewReport = useMemo(() => {
-    const rawCached = previewDraftReport ?? (report.final_report_json as FinalReportJson | null);
+    const rawCached = report.final_report_json as FinalReportJson | null;
     const cached = rawCached ? applyDocumentLinkDraft(rawCached) : null;
     if (!cached) {
       return null;
     }
-    const withListing = mergeSalesAppraisalPreviewFromListing(cached, listing);
-    return resolveFinalReportForDisplay(
-      mergeAppraisalPreviewAgents(withListing, listing, agencyAgents),
-    );
-  }, [previewDraftReport, report.final_report_json, listing, agencyAgents]);
+    return resolveFinalReportForDisplay(cached);
+  }, [report.final_report_json]);
 
-  function handleStepChange(next: string) {
-    if (!SALES_APPRAISAL_WIZARD_STEPS.some((item) => item.id === next)) {
-      return;
-    }
-    const nextStep = next as SalesAppraisalWizardStep;
-
-    if (nextStep === "preview") {
-      if (step === "preview") {
-        return;
+  async function handleStepChange(next: string) {
+    if (next === step || loading || generating) return;
+    if (step === "copy" && copyEditorRef.current) {
+      setLoading(true);
+      try {
+        if (!(await copyEditorRef.current.savePendingEdits())) return;
+      } finally {
+        setLoading(false);
       }
-
-      copyEditorRef.current?.flushPendingEdits();
-      const live = copyEditorRef.current?.getPreviewReport();
-      if (live) {
-        setPreviewDraftReport(live);
-      }
-
-      if (previewSyncTimeoutRef.current) {
-        clearTimeout(previewSyncTimeoutRef.current);
-      }
-      setPreviewSyncing(true);
-      setStep("preview");
-      previewSyncTimeoutRef.current = setTimeout(() => {
-        previewSyncTimeoutRef.current = null;
-        setPreviewSyncing(false);
-      }, PREVIEW_SYNC_MIN_MS);
-      return;
     }
-
-    if (previewSyncTimeoutRef.current) {
-      clearTimeout(previewSyncTimeoutRef.current);
-      previewSyncTimeoutRef.current = null;
-    }
-    setPreviewSyncing(false);
-    setStep(nextStep);
+    setStep(next as SalesAppraisalWizardStep);
   }
 
-  async function publishReport() {
-    if (!previewReport) {
-      toast.error("Generate appraisal content before publishing");
+  async function continueFromData() {
+    setStep("copy");
+    if (report.final_report_json) {
+      setEvidenceChanged(true);
       return;
     }
-
-    setLoading(true);
-    setPublishStage("publishing");
-
-    const publishResponse = await fetch(`/api/reports/${report.id}/publish`, {
-      method: "POST",
-    });
-    const publishPayload = await publishResponse.json();
-
-    if (!publishResponse.ok) {
-      toast.error(publishPayload.error ?? "Publish failed");
-      setLoading(false);
-      setPublishStage("idle");
-      return;
+    setGenerating(true);
+    try {
+      const response = await fetch(
+        `/api/reports/${report.id}/generate-sales-appraisal`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            template_id: report.template_id ?? collateral.template_id,
+          }),
+        },
+      );
+      const payload = await response.json();
+      if (!response.ok || !payload.report)
+        throw new Error(
+          payload.error ?? "Unable to generate appraisal. Try again.",
+        );
+      setReport(payload.report);
+      if (payload.listing) setListing(payload.listing);
+      setCollateral({ ...collateral, status: "generated" });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to generate appraisal. Try again.",
+      );
+    } finally {
+      setGenerating(false);
     }
-
-    if (publishPayload.report) {
-      setReport(publishPayload.report);
-    }
-
-    setPublishStage("generating-pdf");
-    const pdfResponse = await fetch(`/api/reports/${report.id}/generate-pdf`, {
-      method: "POST",
-    });
-    const pdfPayload = await pdfResponse.json();
-
-    if (!pdfResponse.ok) {
-      toast.error(pdfPayload.error ?? "PDF generation failed");
-      setLoading(false);
-      setPublishStage("idle");
-      return;
-    }
-
-    if (pdfPayload.report) {
-      setReport(pdfPayload.report);
-    }
-
-    toast.success(`${SALES_APPRAISAL_LABEL} published`);
-    setLoading(false);
-    setPublishStage("idle");
   }
 
   const hasTemplate = Boolean(report.template_id || collateral.template_id);
@@ -267,14 +209,38 @@ export function SalesAppraisalWizard({
     : SALES_APPRAISAL_WIZARD_STEPS;
 
   return (
-    <div className="space-y-6">
-      <Tabs value={step} onValueChange={handleStepChange}>
+    <div data-theme="staypack-workspace" className="space-y-6">
+      <Tabs value={step} onValueChange={(next) => void handleStepChange(next)}>
         <TabsList
-          className="grid w-full"
-          style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+          className={
+            steps.length === 3
+              ? "grid w-full grid-cols-2 gap-1 group-data-horizontal/tabs:h-auto sm:grid-cols-3"
+              : "grid w-full grid-cols-2 gap-1 group-data-horizontal/tabs:h-auto sm:grid-cols-4"
+          }
         >
-          {steps.map((item) => (
-            <TabsTrigger key={item.id} value={item.id}>
+          {steps.map((item, index) => (
+            <TabsTrigger
+              key={item.id}
+              value={item.id}
+              disabled={
+                loading ||
+                generating ||
+                (item.id === "preview" &&
+                  (!report.final_report_json ||
+                    (step !== "copy" &&
+                      (evidenceChanged ||
+                        report.template_id !==
+                          report.final_report_json.template_id)))) ||
+                (item.id !== "template" && !hasTemplate)
+              }
+              className="min-h-12 gap-2 whitespace-normal text-xs sm:text-sm"
+            >
+              <span
+                className="flex size-6 shrink-0 items-center justify-center rounded-full border border-current text-xs opacity-60"
+                aria-hidden="true"
+              >
+                {index + 1}
+              </span>
               {item.label}
             </TabsTrigger>
           ))}
@@ -283,6 +249,8 @@ export function SalesAppraisalWizard({
         {!skipTemplateSelection ? (
           <TabsContent value="template">
             <SalesAppraisalTemplateStep
+              availableTemplates={availableTemplates}
+              onBusyChange={setLoading}
               agency={agency}
               listing={listing}
               report={report}
@@ -298,12 +266,18 @@ export function SalesAppraisalWizard({
         <TabsContent value="data">
           {hasTemplate ? (
             <SalesAppraisalDataStep
+              onBusyChange={setLoading}
               listing={listing}
               activeJob={salesAppraisalJob}
               compsPrefetching={compsPrefetching}
               onListingChange={setListing}
               onJobChange={setSalesAppraisalJob}
-              onContinue={() => setStep("copy")}
+              continueLabel={
+                report.final_report_json
+                  ? "Save & edit report"
+                  : "Save & generate report"
+              }
+              onContinue={() => void continueFromData()}
             />
           ) : (
             <StepGate
@@ -320,18 +294,28 @@ export function SalesAppraisalWizard({
         </TabsContent>
 
         <TabsContent value="copy">
-          {hasTemplate ? (
+          {generating ? (
+            <AppraisalGenerationStatus />
+          ) : hasTemplate ? (
             <SalesAppraisalCopyEditor
+              onBusyChange={setLoading}
               ref={copyEditorRef}
+              needsRebuild={
+                evidenceChanged ||
+                report.template_id !== report.final_report_json?.template_id
+              }
               agency={agency}
               agencyAgents={agencyAgents}
               listing={listing}
               report={report}
               collateral={collateral}
               onListingChange={setListing}
-              onReportChange={setReport}
+              onReportChange={(next) => {
+                setReport(next);
+                setEvidenceChanged(false);
+              }}
               onCollateralChange={setCollateral}
-              onContinueToPreview={() => handleStepChange("preview")}
+              onContinueToPreview={() => setStep("preview")}
             />
           ) : (
             <StepGate
@@ -347,101 +331,21 @@ export function SalesAppraisalWizard({
           )}
         </TabsContent>
 
-        <TabsContent value="preview" className="space-y-6">
-          {report.final_report_json ? <DocumentLinkEditor
-            document={report.final_report_json}
-            endpoint={`/api/reports/${report.id}/link`}
-            allowReport
-            disabled={loading}
-            onPendingChange={setLinkPending}
-            onSaved={(payload) => {
-              const next = payload.report as Report;
-              setReport(next);
-              setPreviewDraftReport(next.final_report_json);
-            }}
-          /> : null}
-          <p className="text-sm text-muted-foreground">
-            To change photos or edit copy inline, open the{" "}
-            <button
-              type="button"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-              onClick={() => handleStepChange("copy")}
-            >
-              Edit content
-            </button>{" "}
-            tab.
-          </p>
-          <AsyncLoadingOverlay
-            active={loading || previewSyncing}
-            title={
-              previewSyncing
-                ? "Preparing preview"
-                : publishStage === "generating-pdf"
-                  ? "Generating PDF"
-                  : "Publishing appraisal"
-            }
-            description={
-              previewSyncing
-                ? "Syncing your latest edits…"
-                : publishStage === "generating-pdf"
-                  ? "Rendering your print-ready appraisal. This can take 15–30 seconds."
-                  : "Saving the published appraisal."
-            }
-          >
-            {previewSyncing ? (
-              <div
-                className="min-h-[min(80vh,900px)] rounded-xl border border-transparent"
-                aria-hidden
-              />
-            ) : previewReport ? (
-              <FittedReportPreview
-                report={previewReport}
-                maxHeight="min(80vh, 900px)"
-                fitToWidth
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Generate appraisal content first to preview the report.
-              </p>
-            )}
-          </AsyncLoadingOverlay>
-
-          <div className="sticky bottom-3 z-10 flex flex-wrap gap-3 rounded-xl border border-border bg-background p-4 shadow-sm no-print">
-            <DownloadPdfButton
-              url={report.pdf_url}
-              reportId={report.id}
-              cacheVersion={report.updated_at}
-              canGenerate={Boolean(previewReport) && !loading && !linkPending && !report.final_report_json?.document_link_draft}
-              preview={report.status !== "published"}
-              size="default"
-              generateLabel="Generate PDF preview"
-              regenerateLabel="Regenerate PDF preview"
-              onGenerated={({ report: nextReport, pdf_url }) => {
-                if (nextReport) {
-                  setReport(nextReport);
-                  return;
-                }
-                if (pdf_url) {
-                  setReport({ ...report, pdf_url });
-                }
-              }}
+        <TabsContent value="preview">
+          {previewReport ? (
+            <AppraisalDeliveryStep
+              report={report}
+              preview={previewReport}
+              onReportChange={setReport}
+              onEdit={() => void handleStepChange("copy")}
+              onBusyChange={setLoading}
             />
-            {report.public_url ? <CopyLinkButton url={report.public_url} /> : null}
-            <Button onClick={publishReport} disabled={loading || linkPending || !previewReport}>
-              {loading ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  {publishStage === "generating-pdf"
-                    ? "Generating PDF..."
-                    : "Publishing..."}
-                </>
-              ) : report.status === "published" ? (
-                "Republish appraisal"
-              ) : (
-                "Publish appraisal"
-              )}
-            </Button>
-          </div>
+          ) : (
+            <StepGate
+              message="Generate your appraisal to review and download it."
+              onBack={() => setStep("data")}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>
