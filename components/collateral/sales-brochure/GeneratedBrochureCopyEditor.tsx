@@ -536,7 +536,7 @@ export const GeneratedBrochureCopyEditor = forwardRef<
       </div>
       <fieldset
         disabled={saving}
-        className="mx-auto flex w-full max-w-4xl flex-col gap-5 disabled:pointer-events-none disabled:opacity-70"
+        className="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-5 disabled:pointer-events-none disabled:opacity-70"
       >
         {!copy ? (
           <div className="rounded-xl border border-border/70 bg-muted/20 p-6 text-sm">

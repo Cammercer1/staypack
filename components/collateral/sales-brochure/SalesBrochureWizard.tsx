@@ -132,8 +132,12 @@ export function SalesBrochureWizard({
 
   return (
     <div data-theme="staypack-workspace" className="space-y-5">
-      <Tabs value={step} onValueChange={(next) => void handleStepChange(next)}>
-        <TabsList className="mb-2 grid h-auto w-full grid-cols-3 gap-1 p-1">
+      <Tabs
+        value={step}
+        onValueChange={(next) => void handleStepChange(next)}
+        className="gap-4"
+      >
+        <TabsList className="grid w-full grid-cols-3 gap-1 p-1 group-data-horizontal/tabs:h-auto">
           {steps.map((item, index) => (
             <TabsTrigger
               key={item.id}
@@ -143,7 +147,7 @@ export function SalesBrochureWizard({
                 (item.id === "copy" && !collateral.template_id) ||
                 (item.id === "preview" && !document)
               }
-              className="min-h-12 whitespace-normal px-2 text-xs sm:text-sm"
+              className="h-auto min-h-12 whitespace-normal px-2 py-2 text-xs sm:text-sm"
             >
               <span
                 aria-hidden="true"

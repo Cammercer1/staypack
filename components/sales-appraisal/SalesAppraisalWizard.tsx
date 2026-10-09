@@ -210,7 +210,11 @@ export function SalesAppraisalWizard({
 
   return (
     <div data-theme="staypack-workspace" className="space-y-6">
-      <Tabs value={step} onValueChange={(next) => void handleStepChange(next)}>
+      <Tabs
+        value={step}
+        onValueChange={(next) => void handleStepChange(next)}
+        className="gap-4"
+      >
         <TabsList
           className={
             steps.length === 3
@@ -233,7 +237,7 @@ export function SalesAppraisalWizard({
                           report.final_report_json.template_id)))) ||
                 (item.id !== "template" && !hasTemplate)
               }
-              className="min-h-12 gap-2 whitespace-normal text-xs sm:text-sm"
+              className="h-auto min-h-12 gap-2 whitespace-normal px-2 py-2 text-xs sm:text-sm"
             >
               <span
                 className="flex size-6 shrink-0 items-center justify-center rounded-full border border-current text-xs opacity-60"

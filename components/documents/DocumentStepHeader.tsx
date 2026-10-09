@@ -14,7 +14,7 @@ export function DocumentStepHeader({
   return (
     <header
       data-theme="staypack-workspace"
-      className="sticky top-3 z-20 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-base-300 bg-base-100 p-4 text-base-content shadow-sm sm:p-5"
+      className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-base-300 bg-base-100 p-4 text-base-content shadow-sm sm:p-5 lg:sticky lg:top-3 lg:z-20"
     >
       <div className="min-w-0 flex-1 basis-60">
         <div className="flex flex-wrap items-center gap-3">

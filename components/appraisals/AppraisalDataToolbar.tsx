@@ -26,7 +26,7 @@ export function AppraisalDataToolbar({
   return (
     <div
       data-theme="staypack-workspace"
-      className="sticky top-3 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-base-300 bg-base-100 p-4 text-base-content shadow-sm"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-base-300 bg-base-100 p-4 text-base-content shadow-sm lg:sticky lg:top-3 lg:z-20"
     >
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
