@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AgentPhotoUploader } from "@/components/settings/AgentPhotoUploader";
 import type { ParsedListing } from "@/lib/types";
 
 type UnknownAgent = ParsedListing["agents"][number] & { name: string };
@@ -219,19 +220,14 @@ export function UnknownAgentsAfterScrapeModal({
                 key={agent.name}
                 className="space-y-4 rounded-xl border border-border/70 bg-muted/20 p-4"
               >
-                <div className="flex items-start gap-4">
-                  {draft.photo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={draft.photo_url}
-                      alt=""
-                      className="h-16 w-16 shrink-0 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium">
-                      {draft.name.charAt(0)}
-                    </div>
-                  )}
+                <div className="space-y-4">
+                  <AgentPhotoUploader
+                    fieldId={`agent-photo-${agent.name}`}
+                    value={draft.photo_url}
+                    fallbackInitial={draft.name}
+                    readOnly={isSaved || isSkipped || savingName === agent.name}
+                    onChange={(photo_url) => updateDraft(agent.name, { photo_url })}
+                  />
                   <div className="min-w-0 flex-1 space-y-3">
                     <div className="space-y-2">
                       <Label htmlFor={`agent-name-${agent.name}`}>Name *</Label>
@@ -279,17 +275,6 @@ export function UnknownAgentsAfterScrapeModal({
                         disabled={isSaved || isSkipped}
                         onChange={(event) =>
                           updateDraft(agent.name, { email: event.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`agent-photo-${agent.name}`}>Photo URL</Label>
-                      <Input
-                        id={`agent-photo-${agent.name}`}
-                        value={draft.photo_url}
-                        disabled={isSaved || isSkipped}
-                        onChange={(event) =>
-                          updateDraft(agent.name, { photo_url: event.target.value })
                         }
                       />
                     </div>

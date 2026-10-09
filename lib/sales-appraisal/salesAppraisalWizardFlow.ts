@@ -1,7 +1,7 @@
 export const SALES_APPRAISAL_WIZARD_STEPS = [
   { id: "template", label: "Choose template" },
   { id: "data", label: "Appraisal data" },
-  { id: "copy", label: "Content generation" },
+  { id: "copy", label: "Edit content" },
   { id: "preview", label: "Preview & publish" },
 ] as const;
 

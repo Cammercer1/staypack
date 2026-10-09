@@ -70,7 +70,7 @@ describe("reviewAgencyGuideAgainstCompBand", () => {
 });
 
 describe("applyAgencyGuideToCompBand", () => {
-  it("uses the agency's explicit range while retaining a review of comp divergence", () => {
+  it("retains the estimate independently of the asking guide and flags divergence", () => {
     const result = applyAgencyGuideToCompBand({
       displayPrice: "$2,000,000 – $2,200,000",
       compBand: {
@@ -83,9 +83,9 @@ describe("applyAgencyGuideToCompBand", () => {
     });
 
     expect(result.band).toMatchObject({
-      priceMin: 2_000_000,
-      priceMax: 2_200_000,
-      priceMidpoint: 2_100_000,
+      priceMin: 1_180_000,
+      priceMax: 1_350_000,
+      priceMidpoint: 1_265_000,
       compCount: 17,
     });
     expect(result.review?.required).toBe(true);

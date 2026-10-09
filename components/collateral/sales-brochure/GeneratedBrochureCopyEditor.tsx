@@ -44,7 +44,7 @@ import {
   type BrochureDocumentJson,
 } from "@/lib/collateral/templates/types";
 import { resolveListingImageMetaForPool } from "@/lib/listings/syncListingImageMeta";
-import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
+import { resolveAdvertisedPrice, avmPriceSuggestion } from "@/lib/listings/pricing";
 import { cn } from "@/lib/utils";
 import type { Agency, AgentProfile, CollateralItem, Listing } from "@/lib/types";
 
@@ -159,9 +159,11 @@ export const GeneratedBrochureCopyEditor = forwardRef<
   );
 
   const displayPrice = useMemo(
-    () => resolveReportDisplayPrice(listing),
-    [listing],
+    () => resolveAdvertisedPrice(listing, collateral.type === "rental_brochure" ? "lease" : "sale"),
+    [listing, collateral.type],
   );
+
+  const estimate = avmPriceSuggestion(listing, collateral.type === "rental_brochure" ? "lease" : "sale");
 
   const scrapedPrice = useMemo(() => {
     const document = collateral.document_json;
@@ -399,7 +401,7 @@ export const GeneratedBrochureCopyEditor = forwardRef<
                   aria-hidden
                 />
               ) : null}
-              {copy ? "Edit brochure" : "Content generation"}
+              {copy ? "Edit brochure" : "Edit content"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {copy
@@ -482,7 +484,7 @@ export const GeneratedBrochureCopyEditor = forwardRef<
               />
               <ContextMetric
                 label="Guide price"
-                value={displayPrice ?? listing.display_price ?? "—"}
+                value={displayPrice ?? "—"}
               />
             </div>
           </div>
@@ -548,7 +550,7 @@ export const GeneratedBrochureCopyEditor = forwardRef<
                         ? "Rent label"
                         : limits.price_label.label
                     }
-                    hint={limits.price_label.hint}
+                    hint={collateral.type === "rental_brochure" ? "Wording shown above the weekly rent. Leave blank for For lease." : limits.price_label.hint}
                     value={copy.price_label ?? ""}
                     placeholder={
                       collateral.type === "rental_brochure" ? "For lease" : "Price"
@@ -562,16 +564,27 @@ export const GeneratedBrochureCopyEditor = forwardRef<
                       collateral.type === "rental_brochure" ? "Rent" : limits.price_value.label
                     }
                     hint={
-                      scrapedPrice
-                        ? `${limits.price_value.hint} Listing: ${scrapedPrice}`
-                        : limits.price_value.hint
+                      collateral.type === "rental_brochure"
+                        ? `Only this rental brochure. Leave blank to use advertised weekly rent${scrapedPrice ? `: ${scrapedPrice}` : ", if available"}.`
+                        : scrapedPrice ? `${limits.price_value.hint} Advertised sale price: ${scrapedPrice}` : limits.price_value.hint
                     }
                     value={copy.price_value ?? ""}
-                    placeholder={scrapedPrice || "e.g. $750,000 or Contact Agent"}
+                    placeholder={scrapedPrice || (collateral.type === "rental_brochure" ? "e.g. $850 per week" : "e.g. $750,000 or Contact Agent")}
                     recommendedMax={limits.price_value.max}
                     onChange={(value) => updateField("price_value", value)}
                   />
                 </div>
+                <p className="text-sm text-muted-foreground">
+                  {copy.price_value?.trim() ? "Your override" : scrapedPrice ? "Advertised price" : "No advertised price available"}. Changes here apply only to this brochure.
+                </p>
+                {!scrapedPrice && estimate && (
+                  <div className="rounded-xl border p-4 text-sm space-y-2">
+                    <p>Automated estimate: {estimate.display}{estimate.date ? ` · ${estimate.date}` : ""}{estimate.confidence ? ` · ${estimate.confidence} confidence` : ""}. Review before using as an advertised price.</p>
+                    <Button type="button" variant="outline" onClick={() => updateField("price_value", estimate.display)}>
+                      {collateral.type === "rental_brochure" ? "Use estimated rent" : "Use estimated sale price"}
+                    </Button>
+                  </div>
+                )}
                 {collateral.type === "rental_brochure" ? (
                   <div className="grid gap-4 sm:grid-cols-2">
                     <CopyField
@@ -702,7 +715,7 @@ function listingContextSummary(
   if (listing.bathrooms != null) {
     parts.push(`${listing.bathrooms} bath`);
   }
-  const price = displayPrice ?? listing.display_price;
+  const price = displayPrice;
   if (price) {
     parts.push(`Listing price: ${price}`);
   }

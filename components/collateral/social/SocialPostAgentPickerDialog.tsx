@@ -62,9 +62,9 @@ export function SocialPostAgentPickerDialog({
           <div className="flex items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
-        ) : agencyAgents.length > 0 ? (
+        ) : agencyAgents.some((profile) => !profile.archived_at) ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            {agencyAgents.map((profile) => {
+            {agencyAgents.filter((profile) => !profile.archived_at).map((profile) => {
               const isSelected = agentMatchesSelection(profile, selectedAgent);
 
               return (

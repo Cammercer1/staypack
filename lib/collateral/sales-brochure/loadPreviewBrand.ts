@@ -86,7 +86,7 @@ export async function loadSalesBrochurePreviewBrand(): Promise<SalesBrochurePrev
 
   const { data: agents } = await admin
     .from("agent_profiles")
-    .select("*")
+    .select("*").is("archived_at", null)
     .eq("agency_id", agencyId)
     .order("is_default", { ascending: false });
 

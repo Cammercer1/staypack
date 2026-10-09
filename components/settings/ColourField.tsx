@@ -24,7 +24,7 @@ type Props = {
 };
 
 export function ColourField({ form, name, label, helper, example }: Props) {
-  const value = form.watch(name) || example;
+  const value = form.watch(name) ?? example;
   const error = form.formState.errors[name]?.message;
   const pickerRef = useRef<HTMLInputElement>(null);
 
@@ -34,7 +34,12 @@ export function ColourField({ form, name, label, helper, example }: Props) {
         <Label htmlFor={name} className="text-base font-medium">
           {label}
         </Label>
-        <p className="max-w-sm text-sm leading-6 text-muted-foreground">{helper}</p>
+        <p
+          id={`${name}-hint`}
+          className="max-w-sm text-sm leading-6 text-muted-foreground"
+        >
+          {helper}
+        </p>
       </div>
       <div className="mt-4 flex items-center gap-3">
         <div
@@ -45,9 +50,13 @@ export function ColourField({ form, name, label, helper, example }: Props) {
           <Input
             id={name}
             aria-invalid={!!error}
+            aria-describedby={`${name}-hint${error ? ` ${name}-error` : ""}`}
             value={value}
             onChange={(event) =>
-              form.setValue(name, event.target.value, { shouldValidate: true })
+              form.setValue(name, event.target.value, {
+                shouldValidate: true,
+                shouldDirty: true,
+              })
             }
             className="w-32 font-mono text-sm"
             placeholder={example}
@@ -55,9 +64,20 @@ export function ColourField({ form, name, label, helper, example }: Props) {
           <input
             ref={pickerRef}
             type="color"
-            value={value}
+            value={
+              value.toLowerCase() === "white"
+                ? "#ffffff"
+                : value.toLowerCase() === "black"
+                  ? "#000000"
+                  : /^#[0-9a-f]{6}$/i.test(value)
+                    ? value
+                    : example
+            }
             onChange={(event) =>
-              form.setValue(name, event.target.value, { shouldValidate: true })
+              form.setValue(name, event.target.value, {
+                shouldValidate: true,
+                shouldDirty: true,
+              })
             }
             className="sr-only"
             tabIndex={-1}
@@ -65,6 +85,7 @@ export function ColourField({ form, name, label, helper, example }: Props) {
           />
           <Button
             type="button"
+            aria-label={`Pick ${label.toLowerCase()}`}
             size="sm"
             variant="outline"
             onClick={() => pickerRef.current?.click()}
@@ -73,7 +94,15 @@ export function ColourField({ form, name, label, helper, example }: Props) {
           </Button>
         </div>
       </div>
-      {error ? <p className="mt-2 text-sm text-destructive">{String(error)}</p> : null}
+      {error ? (
+        <p
+          id={`${name}-error`}
+          role="alert"
+          className="mt-2 text-sm text-destructive"
+        >
+          {String(error)}
+        </p>
+      ) : null}
     </div>
   );
 }

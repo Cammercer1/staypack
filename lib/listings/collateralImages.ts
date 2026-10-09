@@ -34,11 +34,17 @@ export function getChannelImageLimit(channel: CollateralImageChannel) {
   return CHANNEL_LIMITS[channel];
 }
 
+/** Video thumbnails and their resized placeholders are not document photos. */
+export function isPropertyPhoto(url: string) {
+  try { return !["img.youtube.com", "i.ytimg.com"].includes(new URL(url).hostname.toLowerCase()); }
+  catch { return true; }
+}
+
 /** Scraped images (visually deduped) first, then uploads. */
 export function getListingImagePool(
   listing: Pick<Listing, "scraped_listing_json" | "uploaded_image_urls">,
 ) {
-  const pool = dedupeImageUrls(listing.scraped_listing_json?.images ?? []);
+  const pool = dedupeImageUrls(listing.scraped_listing_json?.images ?? []).filter(isPropertyPhoto);
   const seen = new Set(pool.map((url) => imageDedupeKey(url)));
 
   for (const url of listing.uploaded_image_urls ?? []) {
@@ -58,7 +64,7 @@ export function getListingImagePool(
 export function getDedupedScrapedImages(
   listing: Pick<Listing, "scraped_listing_json">,
 ) {
-  return dedupeImageUrls(listing.scraped_listing_json?.images ?? []);
+  return dedupeImageUrls(listing.scraped_listing_json?.images ?? []).filter(isPropertyPhoto);
 }
 
 export function normalizeSelectionToPool(
@@ -139,7 +145,8 @@ export function buildDefaultMasterSelection(
 export function resolveMasterPhotoSelection(listing: Listing): CollateralImageSelection {
   const pool = getListingImagePool(listing);
 
-  if (listing.selected_image_urls?.length || listing.hero_image_url) {
+  if (listing.selected_image_urls?.length || listing.hero_image_url ||
+    (listing.scraped_listing_json?.propertyLookup && Array.isArray(listing.selected_image_urls))) {
     return normalizeSelectionToPool(
       normalizeSelection({
         hero_image_url: listing.hero_image_url,

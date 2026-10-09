@@ -54,7 +54,7 @@ export default async function PublicReportPrintPage({
 
   const { data: listing } = await admin
     .from("listings")
-    .select("display_price, scraped_listing_json, agent_profile_id")
+    .select("*")
     .eq("id", report.listing_id)
     .maybeSingle();
 

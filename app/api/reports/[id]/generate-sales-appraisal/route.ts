@@ -24,12 +24,6 @@ export async function POST(
     const { supabase, agency, report, listing } = await requireReportWithListing(id);
     const body = bodySchema.parse(await request.json().catch(() => ({})));
 
-    if (listing.listing_purpose === "lease") {
-      return NextResponse.json(
-        { error: "Property appraisals are only available for properties for sale" },
-        { status: 400 },
-      );
-    }
 
     const templateId = body.template_id ?? report.template_id ?? undefined;
     if (!templateId || !isSalesAppraisalTemplateId(templateId)) {

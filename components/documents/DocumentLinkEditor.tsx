@@ -54,8 +54,9 @@ function DocumentLinkForm({ document, endpoint, allowReport = false, disabled, i
   }
 
   return (
-    <form onSubmit={handleSubmit(save)} className="surface-card space-y-3 p-5" aria-label="Document link">
-      <h3 className="font-medium">Optional link and QR code</h3>
+    <details className="rounded-xl border border-border bg-background p-4">
+      <summary className="cursor-pointer text-sm font-medium">Link and QR code <span className="font-normal text-muted-foreground">· Optional</span></summary>
+      <form onSubmit={handleSubmit(save)} className="mt-4 space-y-3" aria-label="Document link">
       <p className="text-sm text-muted-foreground">Choose a destination for this document. Each report has its own choice.</p>
       <div className="text-sm"><label htmlFor={`${id}-destination`}>Destination</label>
         <select id={`${id}-destination`} {...register("mode")} disabled={disabled || saving} className="mt-1 block w-full rounded-lg border border-border bg-background p-2">
@@ -73,5 +74,6 @@ function DocumentLinkForm({ document, endpoint, allowReport = false, disabled, i
       {isDirty ? <p className="text-sm text-muted-foreground">Save this choice before publishing.</p> : null}
       <Button type="submit" variant="outline" disabled={disabled || saving || !isDirty || mode === "legacy"}>{saving ? "Saving…" : "Save link choice"}</Button>
     </form>
+    </details>
   );
 }

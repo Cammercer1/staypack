@@ -1,334 +1,310 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+
+import { useEffect, useId, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
-import { Search, Upload } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  BODY_FONT_PRESETS,
-  HEADING_FONT_PRESETS,
-} from "@/lib/branding/presets";
+import { Button } from "@/components/ui/button";
 import {
   getFontDisplayName,
   POPULAR_BODY_FONTS,
   POPULAR_HEADING_FONTS,
   type GoogleFontListItem,
 } from "@/lib/branding/google-fonts";
-import { BrandFontLoader, useBrandFontStyles } from "@/components/settings/BrandFontLoader";
+import { uploadBrandAsset } from "@/lib/branding/assetUpload";
 import type { AgencyInput } from "@/lib/validation/schemas";
-import { cn } from "@/lib/utils";
 
 type Props = {
   form: UseFormReturn<AgencyInput>;
   agencyId?: string;
+  onUploadStateChange?: (busy: boolean) => void;
 };
 
 function FontField({
-  label,
-  helper,
-  value,
-  popularPresets,
-  presets,
-  onQuickPick,
-}: {
-  label: string;
-  helper: string;
-  value: string;
-  popularPresets: string[];
-  presets: typeof HEADING_FONT_PRESETS;
-  onQuickPick: (fontId: string) => void;
-}) {
+  target,
+  form,
+  onUploadStateChange,
+}: Props & { target: "heading" | "body" }) {
+  const id = useId();
+  const label = target === "heading" ? "Heading font" : "Body font";
+  const familyField =
+    target === "heading" ? "heading_font_family" : "body_font_family";
+  const fileField =
+    target === "heading" ? "heading_font_file_url" : "body_font_file_url";
+  const value = form.watch(familyField);
+  const file = form.watch(fileField);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<GoogleFontListItem[]>([]);
+  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-
+  const [active, setActive] = useState(-1);
+  const [error, setError] = useState("");
+  const [uploadError, setUploadError] = useState("");
+  const [uploading, setUploading] = useState(false);
   useEffect(() => {
-    const trimmed = query.trim();
-    if (trimmed.length < 2) return;
-
+    if (query.trim().length < 2) return;
     const controller = new AbortController();
-    const timeout = window.setTimeout(async () => {
-      setLoading(true);
+    const timer = setTimeout(async () => {
       try {
-        const params = new URLSearchParams({
-          q: trimmed,
-          limit: "10",
-        });
-        const response = await fetch(`/api/google-fonts?${params.toString()}`, {
-          signal: controller.signal,
-        });
+        const response = await fetch(
+          `/api/google-fonts?${new URLSearchParams({ q: query.trim(), limit: "10" })}`,
+          { signal: controller.signal },
+        );
         const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to search fonts");
+        if (!response.ok)
+          throw new Error(
+            "Font search is unavailable. Try again or choose a popular font.",
+          );
+        if (!controller.signal.aborted) {
+          setResults(payload.fonts ?? []);
+          setOpen(true);
         }
-        if (controller.signal.aborted) return;
-        setResults(payload.fonts ?? []);
-        setOpen(true);
-      } catch (error) {
-        if (!controller.signal.aborted && !(error instanceof DOMException && error.name === "AbortError")) {
-          setResults([]);
-          setOpen(false);
-        }
+      } catch {
+        if (!controller.signal.aborted)
+          setError(
+            "Font search is unavailable. Try again or choose a popular font.",
+          );
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
     }, 200);
-
     return () => {
+      clearTimeout(timer);
       controller.abort();
-      window.clearTimeout(timeout);
     };
   }, [query]);
+  useEffect(() => {
+    if (open && active >= 0)
+      document
+        .getElementById(`${id}-option-${active}`)
+        ?.scrollIntoView?.({ block: "nearest" });
+  }, [active, id, open]);
 
-  function updateQuery(next: string) {
+  function search(next: string) {
     setQuery(next);
-    if (next.trim().length < 2) {
-      setResults([]);
-      setOpen(false);
-      setLoading(false);
+    setResults([]);
+    setActive(-1);
+    setError("");
+    setOpen(next.trim().length >= 2);
+    setLoading(next.trim().length >= 2);
+  }
+  function removeFile() {
+    form.setValue(fileField, "", { shouldDirty: true });
+    if (target === "body")
+      form.setValue("font_file_url", "", { shouldDirty: true });
+  }
+  function select(family: string) {
+    form.setValue(familyField, family, { shouldDirty: true });
+    removeFile();
+    search("");
+  }
+  async function upload(file: File) {
+    setUploadError("");
+    setUploading(true);
+    onUploadStateChange?.(true);
+    try {
+      const url = await uploadBrandAsset(
+        file,
+        target === "heading" ? "heading-font" : "body-font",
+      );
+      form.setValue(fileField, url, { shouldDirty: true });
+      if (target === "body")
+        form.setValue("font_file_url", url, { shouldDirty: true });
+    } catch (error) {
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : "Upload failed. Please try again.",
+      );
+    } finally {
+      setUploading(false);
+      onUploadStateChange?.(false);
     }
   }
-
   return (
-    <div className="space-y-3 rounded-xl border border-border/70 bg-background/80 p-4">
+    <section className="space-y-3">
       <div>
-        <Label className="text-base font-medium">{label}</Label>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">{helper}</p>
-      </div>
-
-      <div>
-        <p className="text-sm text-muted-foreground">Current font</p>
-        <p className="mt-1 text-base font-medium">{getFontDisplayName(value)}</p>
-      </div>
-
-      <div className="relative">
-        <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(event) => updateQuery(event.target.value)}
-          onFocus={() => {
-            if (results.length > 0) setOpen(true);
-          }}
-          onBlur={() => {
-            window.setTimeout(() => setOpen(false), 100);
-          }}
-          placeholder="Type 2+ letters to search Google Fonts"
-          className="pl-9"
-        />
-        {open ? (
-          <div className="absolute z-20 mt-2 max-h-56 w-full overflow-y-auto rounded-xl border border-border bg-white p-1 shadow-md">
-            {loading ? (
-              <div className="px-3 py-2 text-sm text-muted-foreground">Searching fonts...</div>
-            ) : results.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-muted-foreground">No fonts found.</div>
-            ) : (
-              results.map((font) => (
-                <button
-                  key={font.family}
-                  type="button"
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/60"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    onQuickPick(font.family);
-                    updateQuery("");
-                    setOpen(false);
-                  }}
-                >
-                  {font.family}
-                </button>
-              ))
-            )}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Popular picks
+        <h3 className="font-medium">{label}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {target === "heading"
+            ? "Titles, addresses and section headings."
+            : "Descriptions, contact details and small print."}
         </p>
-        <div className="flex flex-wrap gap-2">
-          {popularPresets.map((presetId) => {
-            const preset = presets.find((item) => item.id === presetId);
-            if (!preset) return null;
-
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => onQuickPick(preset.id)}
-                className={cn(
-                  "rounded-full border px-3 py-1.5 text-sm transition-colors hover:bg-muted/60",
-                  value === preset.id && "border-primary bg-primary/5 text-primary",
-                )}
-              >
-                {preset.label.split(" · ")[0]}
-              </button>
-            );
-          })}
-        </div>
       </div>
-    </div>
+      <p className="text-sm">
+        <span className="text-muted-foreground">Selected: </span>
+        {file ? "Custom font" : getFontDisplayName(value)}
+      </p>
+      <div className="relative">
+        <label className="sr-only" htmlFor={id}>
+          Search {label.toLowerCase()}s
+        </label>
+        <Input
+          aria-label={`Search ${label.toLowerCase()}s`}
+          id={id}
+          role="combobox"
+          autoComplete="off"
+          aria-autocomplete="list"
+          aria-controls={`${id}-results`}
+          aria-expanded={open}
+          aria-activedescendant={
+            open && active >= 0 ? `${id}-option-${active}` : undefined
+          }
+          value={query}
+          placeholder="Search Google Fonts…"
+          onChange={(event) => search(event.target.value)}
+          onFocus={() => {
+            if (results.length) setOpen(true);
+          }}
+          onBlur={() => setOpen(false)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setOpen(false);
+              return;
+            }
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              setOpen(true);
+              setActive((current) =>
+                results.length
+                  ? current === -1
+                    ? event.key === "ArrowDown"
+                      ? 0
+                      : results.length - 1
+                    : (current +
+                        (event.key === "ArrowDown" ? 1 : -1) +
+                        results.length) %
+                      results.length
+                  : -1,
+              );
+            }
+            if (event.key === "Enter" && open) {
+              event.preventDefault();
+              if (results[active]) select(results[active].family);
+            }
+          }}
+        />
+        {open && (
+          <ul
+            id={`${id}-results`}
+            role="listbox"
+            aria-label={`${label} results`}
+            className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-lg border border-border bg-background p-1 shadow-md"
+          >
+            {results.map((font, index) => (
+              <li
+                key={font.family}
+                id={`${id}-option-${index}`}
+                role="option"
+                aria-selected={index === active}
+                className={cn(
+                  "cursor-pointer rounded-md px-3 py-2 text-sm",
+                  index === active ? "bg-muted" : "hover:bg-muted",
+                )}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => select(font.family)}
+              >
+                {font.family}
+              </li>
+            ))}
+            {!results.length && (
+              <li
+                role="presentation"
+                className="px-3 py-2 text-sm text-muted-foreground"
+              >
+                {loading
+                  ? "Searching…"
+                  : error || "No matching fonts. Try another name."}
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+      <p className="sr-only" role="status">
+        {loading
+          ? "Searching fonts"
+          : error || (query.length >= 2 ? `${results.length} fonts found` : "")}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {(target === "heading"
+          ? POPULAR_HEADING_FONTS
+          : POPULAR_BODY_FONTS
+        ).map((font) => (
+          <Button
+            key={font}
+            type="button"
+            variant={!file && value === font ? "default" : "outline"}
+            size="sm"
+            aria-pressed={!file && value === font}
+            onClick={() => select(font)}
+          >
+            {getFontDisplayName(font)}
+          </Button>
+        ))}
+      </div>
+      <details
+        className="rounded-lg border border-border/60 p-3"
+        open={file ? true : undefined}
+      >
+        <summary className="cursor-pointer text-sm font-medium">
+          {file ? "Custom font attached" : "Use a custom font"}
+        </summary>
+        <div className="mt-3 space-y-3">
+          <label className="block text-sm" htmlFor={`${id}-upload`}>
+            Upload {label.toLowerCase()}
+          </label>
+          <input
+            aria-label={`Upload ${label.toLowerCase()}`}
+            id={`${id}-upload`}
+            type="file"
+            accept=".woff,.woff2,.ttf,.otf"
+            disabled={uploading}
+            className="block w-full min-w-0 text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-background file:px-3 file:py-2"
+            onChange={(event) => {
+              const input = event.currentTarget;
+              const file = input.files?.[0];
+              if (file)
+                void upload(file).finally(() => {
+                  input.value = "";
+                });
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            WOFF, WOFF2, TTF or OTF · Up to 10 MB. Choosing a Google font
+            replaces the custom font.
+          </p>
+          {uploading && (
+            <p role="status" className="text-sm">
+              Uploading…
+            </p>
+          )}
+          {file && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={removeFile}
+            >
+              Remove custom {target} font
+            </Button>
+          )}
+          {uploadError && (
+            <p role="alert" className="text-sm text-destructive">
+              {uploadError}
+            </p>
+          )}
+        </div>
+      </details>
+    </section>
   );
 }
 
-export function FontPicker({ form, agencyId }: Props) {
-  const headingUploadRef = useRef<HTMLInputElement>(null);
-  const bodyUploadRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState<"heading" | "body" | null>(null);
-
-  const fonts = {
-    heading_font_family: form.watch("heading_font_family") || "fraunces",
-    body_font_family: form.watch("body_font_family") || "inter",
-    heading_font_file_url: form.watch("heading_font_file_url") || "",
-    body_font_file_url: form.watch("body_font_file_url") || "",
-  };
-
-  const { headingFamily, bodyFamily } = useBrandFontStyles(fonts);
-
-  async function uploadFont(file: File, target: "heading" | "body") {
-    const allowed = [".woff", ".woff2", ".ttf", ".otf"];
-    const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
-    if (!allowed.includes(extension)) {
-      toast.error("Upload a .woff, .woff2, .ttf or .otf font file.");
-      return;
-    }
-
-    setUploading(target);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("type", target === "heading" ? "heading-font" : "body-font");
-
-    const response = await fetch("/api/agencies/upload-asset", {
-      method: "POST",
-      body: formData,
-    });
-    const payload = await response.json();
-    setUploading(null);
-
-    if (!response.ok) {
-      toast.error(payload.error ?? "Font upload failed");
-      return;
-    }
-
-    if (target === "heading") {
-      form.setValue("heading_font_file_url", payload.url, { shouldDirty: true });
-    } else {
-      form.setValue("body_font_file_url", payload.url, { shouldDirty: true });
-    }
-
-    toast.success(`${target === "heading" ? "Heading" : "Body"} font uploaded`);
-  }
-
+export function FontPicker(props: Props) {
   return (
-    <div className="space-y-6 rounded-2xl border border-border/70 bg-background/70 p-4">
-      <BrandFontLoader fonts={fonts} />
-
-      <div>
-        <Label className="text-base font-medium">Report fonts</Label>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          Choose from the full Google Fonts library, or upload a custom font file
-          if your agency has one from your marketing team.
-        </p>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <FontField
-          label="Heading font"
-          helper="Used for report titles, property address and section headings."
-          value={fonts.heading_font_family}
-          popularPresets={POPULAR_HEADING_FONTS}
-          presets={HEADING_FONT_PRESETS}
-          onQuickPick={(fontId) =>
-            form.setValue("heading_font_family", fontId, { shouldDirty: true })
-          }
-        />
-        <FontField
-          label="Body font"
-          helper="Used for descriptions, notes, disclaimers and smaller text."
-          value={fonts.body_font_family}
-          popularPresets={POPULAR_BODY_FONTS}
-          presets={BODY_FONT_PRESETS}
-          onQuickPick={(fontId) =>
-            form.setValue("body_font_family", fontId, { shouldDirty: true })
-          }
-        />
-      </div>
-
-      <div
-        className="rounded-xl border border-dashed border-border p-4"
-        style={{ fontFamily: bodyFamily, color: "inherit" }}
-      >
-        <p className="text-lg font-semibold" style={{ fontFamily: headingFamily }}>
-          Short-Term Rental Potential Report
-        </p>
-        <p className="mt-2 text-sm opacity-80">
-          12 Example Street, Sunshine Coast QLD
-        </p>
-        <p className="mt-3 text-sm leading-6 opacity-80">
-          This preview shows your heading font on the title and your body font on
-          the property details and paragraph text.
-        </p>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="heading_font_upload">Custom heading font (optional)</Label>
-          <input
-            ref={headingUploadRef}
-            id="heading_font_upload"
-            type="file"
-            accept=".woff,.woff2,.ttf,.otf"
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) uploadFont(file, "heading");
-            }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={uploading === "heading"}
-            onClick={() => headingUploadRef.current?.click()}
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            {uploading === "heading" ? "Uploading..." : "Upload heading font"}
-          </Button>
-          {fonts.heading_font_file_url ? (
-            <p className="text-xs text-muted-foreground">Custom heading font attached.</p>
-          ) : null}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="body_font_upload">Custom body font (optional)</Label>
-          <input
-            ref={bodyUploadRef}
-            id="body_font_upload"
-            type="file"
-            accept=".woff,.woff2,.ttf,.otf"
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) uploadFont(file, "body");
-            }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={uploading === "body"}
-            onClick={() => bodyUploadRef.current?.click()}
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            {uploading === "body" ? "Uploading..." : "Upload body font"}
-          </Button>
-          {fonts.body_font_file_url ? (
-            <p className="text-xs text-muted-foreground">Custom body font attached.</p>
-          ) : null}
-        </div>
-      </div>
+    <div className="space-y-7 divide-y divide-border/60 [&>section+section]:pt-7">
+      <FontField {...props} target="heading" />
+      <FontField {...props} target="body" />
     </div>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Upload, Eye } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   MAX_REPORT_IMAGES,
@@ -54,6 +55,7 @@ type Props = {
   title?: string;
   selectionHint?: string;
   onUploaded: (uploadedImageUrls: string[]) => void;
+  onBusyChange?: (busy: boolean) => void;
   onChange: (heroImageUrl: string, selectedImageUrls: string[]) => void;
   listingImageMeta?: ListingImageMetaMap;
   onListingImageMetaChange?: (meta: ListingImageMetaMap) => void;
@@ -72,6 +74,7 @@ export function ReportMediaPicker({
   title = "Report photos",
   selectionHint,
   onUploaded,
+  onBusyChange,
   onChange,
   listingImageMeta,
   onListingImageMetaChange,
@@ -81,6 +84,7 @@ export function ReportMediaPicker({
   const canUpload = Boolean(reportId || listingId);
   const uploadRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  useEffect(() => {onBusyChange?.(uploading); return () => onBusyChange?.(false);},[uploading,onBusyChange]);
   const [dragActive, setDragActive] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
 
@@ -91,7 +95,6 @@ export function ReportMediaPicker({
       : [];
 
   const uploadSlotsRemaining = Math.max(0, maxUploads - uploadedImages.length);
-  const selectionSlotsRemaining = Math.max(0, maxSelected - selected.length);
 
   function toggleImage(image: string) {
     if (selected.includes(image)) {
@@ -373,7 +376,7 @@ export function ReportMediaPicker({
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           Drag and drop up to {maxUploads} photos, or browse from your device.
-          Importing from a listing URL often misses gallery images — uploads fill the gap.
+          PNG, JPG, WebP or AVIF.
         </p>
         <Button
           type="button"
@@ -459,7 +462,7 @@ export function ReportMediaPicker({
       ) : null}
 
       <p className="text-xs text-muted-foreground">
-        Click to select (max {maxSelected}). Double-click to set the hero image.
+        Select up to {maxSelected} photos. Use Set as cover to choose the main photo.
       </p>
     </div>
   );
@@ -487,6 +490,8 @@ function MediaSection({
   onListingImageMetaChange?: (meta: ListingImageMetaMap) => void;
 }) {
   const showMeta = Boolean(listingImageMeta && onListingImageMetaChange);
+  const [preview,setPreview] = useState<string | null>(null);
+  const [failed,setFailed] = useState<string[]>([]);
 
   return (
     <div className="space-y-3">
@@ -495,7 +500,7 @@ function MediaSection({
         <p className="text-xs text-muted-foreground">{subtitle}</p>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {images.map((image) => {
+        {images.map((image,index) => {
           const isSelected = selected.includes(image);
           const isHero = heroImageUrl === image;
           const presentation = resolveBrochureImagePresentation(
@@ -509,7 +514,9 @@ function MediaSection({
               <button
                 type="button"
                 onClick={() => onToggle(image)}
-                onDoubleClick={() => onSetHero(image)}
+                aria-label={`${isSelected ? "Deselect" : "Select"} ${title.toLowerCase()} photo ${index + 1}`}
+                aria-pressed={isSelected}
+                disabled={failed.includes(image) && !isSelected}
                 className={cn(
                   "relative w-full overflow-hidden rounded-lg border",
                   isSelected && "ring-2 ring-primary",
@@ -520,12 +527,14 @@ function MediaSection({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={image}
-                  alt=""
+                  alt={`Property photo ${index + 1}`}
+                  loading="lazy"
+                  onError={() => setFailed(current => current.includes(image) ? current : [...current,image])}
                   className={cn("aspect-[4/3] w-full", presentation.imgClassName)}
                 />
                 {isHero ? (
                   <span className="absolute top-2 left-2 rounded-full bg-foreground px-2 py-0.5 text-[10px] font-medium text-background">
-                    Hero
+                    Cover
                   </span>
                 ) : null}
                 {isSelected && !isHero ? (
@@ -537,6 +546,10 @@ function MediaSection({
                   <ListingImageMetaBadge url={image} meta={listingImageMeta} />
                 ) : null}
               </button>
+              {failed.includes(image) ? <p role="status" className="text-xs text-destructive">Photo unavailable. Deselect it before saving.</p> : <div className="flex flex-wrap gap-1">
+                <Button type="button" variant="ghost" size="sm" aria-label={`Preview ${title.toLowerCase()} photo ${index+1}`} onClick={() => setPreview(image)}><Eye className="size-3.5"/>Preview</Button>
+                <Button type="button" variant="ghost" size="sm" disabled={isHero} onClick={() => onSetHero(image)} aria-label={`Set ${title.toLowerCase()} photo ${index+1} as cover`}>{isHero ? "Cover photo" : "Set as cover"}</Button>
+              </div>}
               {showMeta && listingImageMeta && onListingImageMetaChange ? (
                 <ListingImageMetaControls
                   url={image}
@@ -548,6 +561,16 @@ function MediaSection({
           );
         })}
       </div>
+      <Dialog open={!!preview} onOpenChange={open => {if(!open) setPreview(null);}}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogTitle>Property photo</DialogTitle>
+          {preview && (
+            // User uploads and listing hosts use the original photo in this preview.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="Property photo preview" className="max-h-[75dvh] w-full rounded-lg object-contain"/>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

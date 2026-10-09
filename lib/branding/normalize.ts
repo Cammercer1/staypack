@@ -16,16 +16,15 @@ export function normalizeAgencyBrandPayload(body: AgencyInput) {
     logo_light_url: body.logo_light_url?.trim() || null,
     logo_dark_url: body.logo_dark_url?.trim() || null,
     logo_url:
-      body.logo_dark_url?.trim() ||
-      body.logo_url?.trim() ||
+      (body.logo_dark_url === undefined ? body.logo_url?.trim() : body.logo_dark_url?.trim()) ||
       body.logo_light_url?.trim() ||
       null,
     heading_font_family: headingFontFamily,
     body_font_family: bodyFontFamily,
     font_family: bodyFontFamily,
-    heading_font_file_url: body.heading_font_file_url || body.font_file_url || null,
-    body_font_file_url: body.body_font_file_url || body.font_file_url || null,
-    font_file_url: body.body_font_file_url || body.font_file_url || null,
+    heading_font_file_url: (body.heading_font_file_url ?? body.font_file_url) || null,
+    body_font_file_url: (body.body_font_file_url ?? body.font_file_url) || null,
+    font_file_url: (body.body_font_file_url ?? body.font_file_url) || null,
     default_disclaimer: body.default_disclaimer || null,
     report_template_id: body.report_template_id || DEFAULT_REPORT_TEMPLATE_ID,
     secondary_colour: body.background_colour,

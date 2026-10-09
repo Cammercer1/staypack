@@ -1,3 +1,4 @@
+import { parseAgencySettingsUpdate } from "@/lib/agencies/settingsInput";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -19,7 +20,9 @@ export async function POST(request: Request) {
 
     if (existing) {
       return NextResponse.json(
-        { error: "Agency already exists. Update your existing agency instead." },
+        {
+          error: "Agency already exists. Update your existing agency instead.",
+        },
         { status: 409 },
       );
     }
@@ -64,13 +67,14 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const { supabase, agency } = await requireAgencyAdmin();
-    const body = agencySchema.parse(await request.json());
-    const payload = normalizeAgencyBrandPayload(body);
-    const slugChanged = payload.slug !== agency.slug;
+    const payload = parseAgencySettingsUpdate(await request.json(), agency);
+    const nextSlug =
+      typeof payload.slug === "string" ? payload.slug : agency.slug;
+    const slugChanged = nextSlug !== agency.slug;
     const staleSlugs = await discoverStaleAgencySlugsInPublicUrls(
       supabase,
       agency.id,
-      payload.slug,
+      nextSlug,
     );
     const slugAliases = [
       ...new Set([
@@ -100,7 +104,10 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ agency: data });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to update agency" },
+      {
+        error:
+          error instanceof Error ? error.message : "Unable to update agency",
+      },
       { status: 400 },
     );
   }
@@ -118,7 +125,9 @@ export async function GET() {
     return NextResponse.json({ agency: membership.agency });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to load agency" },
+      {
+        error: error instanceof Error ? error.message : "Unable to load agency",
+      },
       { status: 400 },
     );
   }

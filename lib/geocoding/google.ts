@@ -24,6 +24,7 @@ type GoogleGeocodeResponse = {
   results?: Array<{
     formatted_address: string;
     place_id: string;
+    partial_match?: boolean;
     geometry: {
       location: {
         lat: number;
@@ -75,6 +76,9 @@ export async function geocodeAddress(query: string): Promise<GeocodeResult> {
   }
 
   const result = payload.results[0];
+  if (result.partial_match) {
+    throw new Error("The address only partially matched. Check the unit and street number before requesting an estimate.");
+  }
 
   return {
     latitude: result.geometry.location.lat,

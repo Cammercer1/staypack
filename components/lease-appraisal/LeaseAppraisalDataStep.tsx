@@ -1,4 +1,5 @@
 "use client";
+import { avmPriceSuggestion } from "@/lib/listings/pricing";
 
 import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
 
@@ -65,6 +66,9 @@ export function LeaseAppraisalDataStep({
     activeJob?.status === "pending" || activeJob?.status === "processing";
   const jobFailed = activeJob?.status === "failed";
 
+  const priceEdited = useRef(false);
+  const estimate = avmPriceSuggestion(listing, "lease");
+  const hasPriceOverride = Boolean(listing.appraisal_overrides_json?.lease);
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
   const pollErrorShownRef = useRef(false);
@@ -90,9 +94,11 @@ export function LeaseAppraisalDataStep({
 
   /* eslint-disable react-hooks/set-state-in-effect -- sync editable fields when job polling refreshes the listing. */
   useEffect(() => {
-    setWeeklyMin(String(appraisal?.weeklyMin ?? ""));
-    setWeeklyMax(String(appraisal?.weeklyMax ?? ""));
-    setWeeklyMid(String(appraisal?.weeklyMidpoint ?? ""));
+    if (!priceEdited.current) {
+      setWeeklyMin(String(appraisal?.weeklyMin ?? ""));
+      setWeeklyMax(String(appraisal?.weeklyMax ?? ""));
+      setWeeklyMid(String(appraisal?.weeklyMidpoint ?? ""));
+    }
     if (appraisal?.selectedCompListingIds?.length) {
       setSelectedIds(appraisal.selectedCompListingIds);
     } else if (parsed && pool.length > 0) {
@@ -264,6 +270,21 @@ export function LeaseAppraisalDataStep({
     }
   }
 
+  async function resetPrice() {
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/listings/${listing.id}/lease-appraisal/data`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset_price: true }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Unable to reset appraisal");
+      priceEdited.current = false;
+      onListingChange(payload.listing);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to reset appraisal");
+    } finally { setSaving(false); }
+  }
+
   async function saveAndContinue() {
     if (!canContinue) {
       toast.error("Fetch comps and select at least one comparable");
@@ -278,9 +299,11 @@ export function LeaseAppraisalDataStep({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            weekly_min: parseRent(weeklyMin),
-            weekly_max: parseRent(weeklyMax),
-            weekly_midpoint: parseRent(weeklyMid),
+            ...(priceEdited.current ? {
+              weekly_min: parseRent(weeklyMin),
+              weekly_max: parseRent(weeklyMax),
+              weekly_midpoint: parseRent(weeklyMid),
+            } : {}),
             selected_comp_listing_ids: selectedIds,
           }),
         },
@@ -292,6 +315,7 @@ export function LeaseAppraisalDataStep({
       if (payload.listing) {
         onListingChange(payload.listing);
       }
+      priceEdited.current = false;
       toast.success("Appraisal data saved");
       onContinue();
     } catch (error) {
@@ -303,7 +327,7 @@ export function LeaseAppraisalDataStep({
     }
   }
 
-  const loading = fetching || saving || compsPrefetching || initialCompsProcessing;
+  const loading = fetching || saving;
   const fetchingComps = compsPrefetching || fetching || initialCompsProcessing;
 
   return (
@@ -386,9 +410,15 @@ export function LeaseAppraisalDataStep({
 
       {inputError ? <p role="alert" className="text-sm text-destructive">{inputError}</p> : staleEvidence ? <p role="status" className="text-sm text-muted-foreground">Property details changed. Fetch comparables again to update the appraisal.</p> : null}
 
-      {compsReady ? (
-        <>
+      <>
           <div className="surface-card grid gap-4 p-6 sm:grid-cols-3">
+            <div className="sm:col-span-3 space-y-2 text-sm">
+              <p className="font-medium">{hasPriceOverride ? "Your appraisal override" : "Suggested appraisal"}</p>
+              <p className="text-muted-foreground">Edit any amount below. Your saved figures are kept when comparables refresh.</p>
+              {estimate && <p className="text-muted-foreground">Automated estimate: {estimate.display}{estimate.date ? ` · ${estimate.date}` : ""}{estimate.confidence ? ` · ${estimate.confidence} confidence` : ""}. This may be outdated; use your local knowledge.</p>}
+              {hasPriceOverride && <Button type="button" variant="outline" disabled={loading || refreshingComps} onClick={resetPrice}>Use latest suggested appraisal</Button>}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="weekly-min">Weekly min ($)</Label>
               <Input
@@ -396,7 +426,7 @@ export function LeaseAppraisalDataStep({
                 type="number"
                 min={0}
                 value={weeklyMin}
-                onChange={(e) => setWeeklyMin(e.target.value)}
+                onChange={(e) => { priceEdited.current = true; setWeeklyMin(e.target.value); }}
               />
             </div>
             <div className="space-y-2">
@@ -406,7 +436,7 @@ export function LeaseAppraisalDataStep({
                 type="number"
                 min={0}
                 value={weeklyMax}
-                onChange={(e) => setWeeklyMax(e.target.value)}
+                onChange={(e) => { priceEdited.current = true; setWeeklyMax(e.target.value); }}
               />
             </div>
             <div className="space-y-2">
@@ -416,7 +446,7 @@ export function LeaseAppraisalDataStep({
                 type="number"
                 min={0}
                 value={weeklyMid}
-                onChange={(e) => setWeeklyMid(e.target.value)}
+                onChange={(e) => { priceEdited.current = true; setWeeklyMid(e.target.value); }}
               />
             </div>
             {rentSummary ? (
@@ -577,8 +607,7 @@ export function LeaseAppraisalDataStep({
               </div>
             )}
           </div>
-        </>
-      ) : null}
+      </>
 
       <Button onClick={saveAndContinue} disabled={loading || !canContinue}>
         {saving ? (
@@ -587,7 +616,7 @@ export function LeaseAppraisalDataStep({
             Saving...
           </>
         ) : (
-          "Continue to content generation"
+          "Continue to edit content"
         )}
       </Button>
     </AsyncLoadingOverlay>

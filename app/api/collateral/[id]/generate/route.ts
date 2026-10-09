@@ -67,7 +67,7 @@ export async function POST(
       listing?.agent_profile_id != null
         ? agencyAgents?.find((agent) => agent.id === listing.agent_profile_id) ??
           null
-        : agencyAgents?.find((agent) => agent.is_default) ?? agencyAgents?.[0] ?? null;
+        : agencyAgents?.find((agent) => agent.is_default && !agent.archived_at) ?? agencyAgents?.find((agent) => !agent.archived_at) ?? null;
 
     const documentJson = await generateCollateralDocument({
       agency,

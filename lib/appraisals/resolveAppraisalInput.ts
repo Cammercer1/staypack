@@ -63,7 +63,7 @@ export function hasStaleAppraisal(listing: Listing, kind: AppraisalKind) {
 }
 
 /** A working view only: never persist this over the original imported subject. */
-export function resolveAppraisalInput(listing: Listing): ParsedListing {
+export function resolveAppraisalInput(listing: Listing, options: { applyOverrides?: boolean } = {}): ParsedListing {
   const parsed = subject(listing);
   const staleLease = hasStaleAppraisal(listing, "lease");
   const staleSales = hasStaleAppraisal(listing, "sales");
@@ -77,10 +77,31 @@ export function resolveAppraisalInput(listing: Listing): ParsedListing {
     delete parsed.salesComps;
   }
   const avmFingerprint = parsed.domainAvmInputFingerprint;
-  const staleAvm = avmFingerprint
-    ? avmFingerprint !== appraisalInputFingerprint(listing)
-    : staleLease || staleSales || hasChangedLegacySubject(listing);
+  // Advertising copy and asking prices do not change the property matched by the AVM.
+  const avmFields = INPUT_FIELDS.filter((key) => !["purpose", "title", "description", "displayPrice"].includes(key));
+  let staleAvm: boolean;
+  if (avmFingerprint) {
+    try {
+      const previous = JSON.parse(avmFingerprint) as unknown[];
+      staleAvm = !Array.isArray(previous) || previous.length !== INPUT_FIELDS.length + 1 ||
+        avmFields.some((key) => (previous[INPUT_FIELDS.indexOf(key) + 1] ?? null) !== (parsed[key] ?? null));
+    } catch { staleAvm = true; }
+  } else {
+    staleAvm = avmFields.some((key) => listing.scraped_listing_json?.[key] != null && listing.scraped_listing_json[key] !== parsed[key]);
+  }
   if (staleAvm) delete parsed.domainAvm;
+  const rental = parsed.domainAvm?.rentalEstimate;
+  if (rental?.weeklyRent && !parsed.rentalAppraisal?.weeklyMidpoint) {
+    parsed.rentalAppraisal = { ...parsed.rentalAppraisal, weeklyMidpoint: rental.weeklyRent };
+  }
+  const sale = parsed.domainAvm?.valuation;
+  if (sale?.midPrice && !parsed.salesAppraisal?.priceMidpoint) {
+    parsed.salesAppraisal = { ...parsed.salesAppraisal, priceMin: sale.lowerPrice, priceMax: sale.upperPrice, priceMidpoint: sale.midPrice };
+  }
+  if (options.applyOverrides !== false) {
+    if (listing.appraisal_overrides_json?.lease) parsed.rentalAppraisal = { ...parsed.rentalAppraisal, ...Object.fromEntries(Object.entries(listing.appraisal_overrides_json.lease).map(([key, value]) => [key, value ?? undefined])) };
+    if (listing.appraisal_overrides_json?.sales) parsed.salesAppraisal = { ...parsed.salesAppraisal, ...Object.fromEntries(Object.entries(listing.appraisal_overrides_json.sales).map(([key, value]) => [key, value ?? undefined])) };
+  }
   return parsed;
 }
 

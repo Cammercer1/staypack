@@ -106,7 +106,7 @@ function listingAddressQuery(listing: ParsedListing) {
   return [address, ...locality].join(" ");
 }
 
-async function fetchDomainJson(path: string, params: URLSearchParams) {
+export async function fetchDomainJson(path: string, params: URLSearchParams) {
   const key = getRapidApiReaKey();
   if (!key) {
     throw new Error("RapidAPI key is not configured.");
@@ -264,7 +264,7 @@ function normalizeComparable(value: unknown): DomainAvmSaleComparable | null {
   };
 }
 
-function normalizeDomainAvm(
+export function normalizeDomainAvm(
   details: JsonObject,
   urlSlug: string,
 ): DomainAvm {

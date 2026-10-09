@@ -1,3 +1,4 @@
+import { resolveAdvertisedPrice } from "@/lib/listings/pricing";
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import {
@@ -110,7 +111,7 @@ function buildUserPayload({ agency, listing }: { agency: Agency; listing: Listin
       car_spaces: listing.car_spaces,
       listing_title: listing.listing_title,
       listing_description: listing.listing_description,
-      display_price: listing.display_price,
+      display_price: resolveAdvertisedPrice(listing, "sale"),
     },
     copy_limits: getSalesBrochureCopyPromptLimits(),
     output_schema: PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,

@@ -6,6 +6,7 @@ import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSal
 import type { FinalReportJson, Listing } from "@/lib/types";
 
 type ReportRowForPrint = {
+  status?: string;
   template_id?: string | null;
 };
 
@@ -28,6 +29,8 @@ export function resolveFinalReportForPrint(
   listing: ListingForAppraisalPrint | null,
   finalReport: FinalReportJson,
 ): FinalReportJson {
+  // Published values are a snapshot; later appraisal edits belong to a new draft.
+  if (reportRow.status === "published") return resolveFinalReportForDisplay(finalReport);
   const rowTemplateId = reportRow.template_id?.trim() || null;
   const jsonTemplateId = finalReport.template_id?.trim() || null;
   const templateId =

@@ -1,524 +1,655 @@
 "use client";
 
-import { useMemo } from "react";
-import { useState } from "react";
-import { useForm, useFormState } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { cn } from "@/lib/utils";
+
+import { useEffect, useMemo, useState } from "react";
+import { useForm, useFormState, type FieldErrors } from "react-hook-form";
+import { Check, Eye } from "lucide-react";
 import { toast } from "sonner";
-import { BrandKitEditor } from "@/components/settings/BrandKitEditor";
-import { BrandPreviewCard } from "@/components/settings/BrandPreviewCard";
-import { BrandAgencyPreviewCard } from "@/components/settings/BrandAgencyPreviewCard";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  CARD_SHADOW_PRESETS,
-  DEFAULT_BRAND_ADVANCED,
-  getBrandButtonInlineStyle,
-  getBrandCardInlineStyle,
-  hasBrandAdvancedOverrides,
-  parseAgencyBrandAdvanced,
-  resolveBrandAdvanced,
-  type AgencyBrandAdvanced,
-} from "@/lib/branding/advanced";
-import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
-import { agencySchema, type AgencyInput } from "@/lib/validation/schemas";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { AgencyLogoUploader } from "./AgencyLogoUploader";
+import { ColourField } from "./ColourField";
+import { FontPicker } from "./FontPicker";
+import { BrandAdvancedFields } from "./BrandAdvancedFields";
+import { BrandPreviewCard } from "./BrandPreviewCard";
+import { FittedBrochurePreview } from "@/components/collateral/sales-brochure/FittedBrochurePreview";
+import { createPlaygroundSalesBrochureDocument } from "@/lib/collateral/sales-brochure/playgroundFixture";
+import { SALES_BROCHURE_CLASSIC_1PG_TEMPLATE_ID } from "@/lib/collateral/templates/ids";
+import { buildAgencyBrandSlice } from "@/lib/collateral/buildAgencyBrandSlice";
+import {
+  agencyToFormInput,
+  normalizeAgencyBrandPayload,
+} from "@/lib/branding/normalize";
+import { BRAND_COLOUR_FIELDS } from "@/lib/branding/presets";
+import { type AgencyInput } from "@/lib/validation/schemas";
+import {
+  agencyDetailsSchema,
+  brandSettingsSchema,
+  selectAgencySettings,
+} from "@/lib/agencies/settingsInput";
 import type { Agency } from "@/lib/types";
 
-const BRAND_SETTINGS_TABS = [
-  { id: "agency", label: "Agency" },
-  { id: "brand", label: "Brand kit" },
-  { id: "advanced", label: "Advanced styles" },
+const sections = ["Logo", "Colours", "Fonts"] as const;
+type Section = (typeof sections)[number] | "Agency";
+const agencyFields = [
+  ["name", "Agency name", "text"],
+  ["website_url", "Website", "url"],
+  ["email", "Contact email", "email"],
+  ["phone", "Contact phone", "tel"],
+  ["slug", "Public link name", "text"],
 ] as const;
 
-type BrandSettingsTab = (typeof BRAND_SETTINGS_TABS)[number]["id"];
-
-const TAB_DIRTY_FIELDS: Record<BrandSettingsTab, (keyof AgencyInput)[]> = {
-  agency: ["name", "slug", "website_url", "email", "phone"],
-  brand: [
-    "logo_url",
-    "logo_light_url",
-    "logo_dark_url",
-    "primary_colour",
-    "secondary_colour",
-    "accent_colour",
-    "text_colour",
-    "callout_heading_colour",
-    "callout_text_colour",
-    "background_colour",
-    "heading_font_family",
-    "body_font_family",
-    "heading_font_file_url",
-    "body_font_file_url",
-    "font_file_url",
-    "font_family",
-  ],
-  advanced: ["brand_advanced_json"],
-};
-
-function tabIsDirty(
-  dirtyFields: Partial<Record<keyof AgencyInput, boolean | object>>,
-  tab: BrandSettingsTab,
-) {
-  return TAB_DIRTY_FIELDS[tab].some((field) => Boolean(dirtyFields[field]));
-}
-
-function RadiusPresets({
-  value,
-  onChange,
-  presets,
+export function BrandSettingsForm({
+  agency: initialAgency,
+  mode = "brand",
 }: {
-  value: number;
-  onChange: (px: number) => void;
-  presets: { label: string; px: number }[];
+  agency: Agency;
+  mode?: "brand" | "details";
 }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {presets.map((preset) => (
-        <Button
-          key={preset.label}
-          type="button"
-          size="sm"
-          variant={value === preset.px ? "default" : "outline"}
-          onClick={() => onChange(preset.px)}
-        >
-          {preset.label}
-        </Button>
-      ))}
-    </div>
-  );
-}
-
-function AdvancedSection({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-4">
-      <div>
-        <p className="text-sm font-medium">{label}</p>
-        {hint ? <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p> : null}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-export function BrandSettingsForm({ agency: initialAgency }: { agency: Agency }) {
+  const detailsOnly = mode === "details";
   const [agency, setAgency] = useState(initialAgency);
-  const [tab, setTab] = useState<BrandSettingsTab>("brand");
-  const [loading, setLoading] = useState(false);
-
+  const [section, setSection] = useState<Section>(
+    detailsOnly ? "Agency" : "Logo",
+  );
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewType, setPreviewType] = useState("report");
+  const [leaveUrl, setLeaveUrl] = useState<string | null>(null);
   const form = useForm<AgencyInput>({
-    resolver: zodResolver(agencySchema),
-    defaultValues: {
-      name: agency.name,
-      slug: agency.slug,
-      website_url: agency.website_url ?? "",
-      email: agency.email ?? "",
-      phone: agency.phone ?? "",
-      logo_url: agency.logo_url ?? "",
-      logo_light_url: agency.logo_light_url ?? "",
-      logo_dark_url: agency.logo_dark_url ?? agency.logo_url ?? "",
-      primary_colour: agency.primary_colour,
-      secondary_colour: agency.secondary_colour,
-      accent_colour: agency.accent_colour,
-      text_colour: agency.text_colour ?? agency.primary_colour,
-      callout_heading_colour: agency.callout_heading_colour ?? agency.text_colour ?? agency.primary_colour,
-      callout_text_colour: agency.callout_text_colour ?? agency.text_colour ?? agency.primary_colour,
-      background_colour: agency.background_colour ?? agency.secondary_colour,
-      heading_font_family: agency.heading_font_family ?? agency.font_family ?? "fraunces",
-      body_font_family: agency.body_font_family ?? agency.font_family ?? "inter",
-      font_family: agency.body_font_family ?? agency.font_family ?? "inter",
-      heading_font_file_url: agency.heading_font_file_url ?? "",
-      body_font_file_url: agency.body_font_file_url ?? agency.font_file_url ?? "",
-      font_file_url: agency.body_font_file_url ?? agency.font_file_url ?? "",
-      default_report_title: agency.default_report_title,
-      default_cta: agency.default_cta,
-      default_disclaimer: agency.default_disclaimer ?? "",
-      report_template_id: agency.report_template_id ?? DEFAULT_REPORT_TEMPLATE_ID,
-      brand_advanced_json: parseAgencyBrandAdvanced(agency.brand_advanced_json),
+    resolver: async (values) => {
+      const result = (
+        detailsOnly ? agencyDetailsSchema : brandSettingsSchema
+      ).safeParse(values);
+      if (result.success)
+        return { values: { ...values, ...result.data }, errors: {} };
+      const errors = Object.fromEntries(
+        result.error.issues.map((issue) => [
+          issue.path[0],
+          { type: issue.code, message: issue.message },
+        ]),
+      ) as FieldErrors<AgencyInput>;
+      return { values: {}, errors };
     },
+    defaultValues: agencyToFormInput(initialAgency),
+    shouldFocusError: false,
   });
-
-  const preview = form.watch();
-  const { isDirty, dirtyFields } = useFormState({ control: form.control });
-  const showBuyerPreview = tab === "brand" || tab === "advanced";
-
-  const tabDirty = useMemo(
-    () => ({
-      agency: tabIsDirty(dirtyFields, "agency"),
-      brand: tabIsDirty(dirtyFields, "brand"),
-      advanced: tabIsDirty(dirtyFields, "advanced"),
-    }),
-    [dirtyFields],
-  );
-
-  // Derive live advanced values for the inline preview
-  const advancedDraft = (preview.brand_advanced_json ?? {}) as AgencyBrandAdvanced;
-  const resolvedAdvanced = useMemo(
+  const { isDirty, errors } = useFormState({ control: form.control });
+  const draft = form.watch();
+  const busy = saving || uploading;
+  const brochure = useMemo(
     () =>
-      resolveBrandAdvanced({
-        primary_colour: preview.primary_colour || agency.primary_colour,
-        text_colour: preview.text_colour || agency.text_colour,
-        brand_advanced_json: advancedDraft,
-      }),
-    [agency.primary_colour, agency.text_colour, advancedDraft, preview.primary_colour, preview.text_colour],
+      createPlaygroundSalesBrochureDocument(
+        SALES_BROCHURE_CLASSIC_1PG_TEMPLATE_ID,
+      ),
+    [],
   );
+  const previewDocument = {
+    ...brochure,
+    agency: buildAgencyBrandSlice({
+      ...agency,
+      ...normalizeAgencyBrandPayload(draft),
+    }),
+  };
 
-  function updateAdvanced(patch: Partial<AgencyBrandAdvanced>) {
-    const current = (form.getValues("brand_advanced_json") ?? {}) as AgencyBrandAdvanced;
-    form.setValue(
-      "brand_advanced_json",
-      { ...current, ...patch } as AgencyInput["brand_advanced_json"],
-      { shouldDirty: true },
+  useEffect(() => {
+    if (!isDirty && !busy) return;
+    function beforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    function navigate(event: MouseEvent) {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      const link =
+        event.target instanceof Element
+          ? event.target.closest<HTMLAnchorElement>("a[href]")
+          : null;
+      if (!link || link.target === "_blank" || link.hasAttribute("download"))
+        return;
+      const url = new URL(link.href, window.location.href);
+      if (
+        url.origin === window.location.origin &&
+        url.pathname === window.location.pathname &&
+        url.search === window.location.search
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!busy) setLeaveUrl(link.href);
+    }
+    window.addEventListener("beforeunload", beforeUnload);
+    document.addEventListener("click", navigate, true);
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("click", navigate, true);
+    };
+  }, [isDirty, busy]);
+
+  function invalid(fieldErrors: FieldErrors<AgencyInput>) {
+    const key = Object.keys(fieldErrors)[0] as keyof AgencyInput;
+    setSection(
+      detailsOnly
+        ? "Agency"
+        : key.includes("colour")
+          ? "Colours"
+          : key.includes("font")
+            ? "Fonts"
+            : "Logo",
     );
+    setSaveError("Please check the highlighted fields before saving.");
+    requestAnimationFrame(() => document.getElementById(key)?.focus());
   }
-
-  async function onSubmit(values: AgencyInput) {
-    setLoading(true);
-    const response = await fetch("/api/agencies", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
-    });
-    const payload = await response.json();
-
-    if (!response.ok) {
-      toast.error(payload.error ?? "Failed to update agency");
-      setLoading(false);
+  async function save(values: AgencyInput) {
+    // Colours can also be CSS names (older brand kits use values such as “white”).
+    const invalidColour =
+      !detailsOnly &&
+      BRAND_COLOUR_FIELDS.find(
+        ({ key }) =>
+          !values[key]?.trim() || !CSS.supports("color", values[key]!),
+      );
+    if (invalidColour) {
+      form.setError(invalidColour.key, {
+        message: "Enter a valid colour, such as #095b42.",
+      });
+      invalid({ [invalidColour.key]: { type: "validate" } });
       return;
     }
-
-    if (payload.agency) {
-      setAgency(payload.agency as Agency);
+    setSaving(true);
+    setSaveError("");
+    try {
+      const response = await fetch("/api/agencies", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...selectAgencySettings(values, mode),
+          settings_section: mode,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.agency)
+        throw new Error(
+          payload?.error || "We couldn’t save your changes. Please try again.",
+        );
+      setAgency(payload.agency);
+      form.reset(agencyToFormInput(payload.agency));
+      toast.success(
+        detailsOnly ? "Agency details saved" : "Brand settings saved",
+      );
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "We couldn’t save your changes. Please try again.",
+      );
+    } finally {
+      setSaving(false);
     }
-
-    toast.success("Brand settings saved");
-    setLoading(false);
   }
+  function discard() {
+    form.reset(agencyToFormInput(agency));
+    setSaveError("");
+  }
+  const previewContent = (
+    <div className="min-w-0 space-y-4">
+      <div>
+        <label
+          htmlFor={previewOpen ? "mobile-preview-type" : "preview-type"}
+          className="sr-only"
+        >
+          Preview format
+        </label>
+        <select
+          aria-label="Preview format"
+          id={previewOpen ? "mobile-preview-type" : "preview-type"}
+          value={previewType}
+          onChange={(event) => setPreviewType(event.target.value)}
+          className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm"
+        >
+          <option value="report">Report brand sample</option>
+          <option value="brochure">Sales brochure</option>
+        </select>
+      </div>
+      {previewType === "report" ? (
+        <BrandPreviewCard preview={draft} />
+      ) : (
+        <FittedBrochurePreview
+          className="min-w-0 max-w-full"
+          document={previewDocument}
+          useDocumentBrand
+          maxHeight={previewOpen ? "none" : "min(65vh, 700px)"}
+          fitToWidth={previewOpen}
+        />
+      )}
+      <p className="text-xs leading-5 text-muted-foreground">
+        {previewType === "report"
+          ? "Sample content and estimate for preview only. Report layouts vary by template."
+          : "A sample property in the Classic brochure template. Your brand updates as you edit."}
+      </p>
+    </div>
+  );
 
   return (
-    <Tabs
-      value={tab}
-      onValueChange={(value) => setTab(value as BrandSettingsTab)}
-    >
-      <TabsList className="mb-3 h-auto bg-transparent px-0">
-        {BRAND_SETTINGS_TABS.map((item) => (
-          <TabsTrigger key={item.id} value={item.id} className="px-4 py-2 text-sm">
-            <span className="flex items-center gap-1.5">
-              {item.label}
-              {tabDirty[item.id] ? (
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-label="Unsaved changes" />
-              ) : null}
-            </span>
-          </TabsTrigger>
-        ))}
-      </TabsList>
-
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-          <div className="surface-card">
-            <div className="px-6 py-8 md:px-8">
-
-              {/* ── Agency ── */}
-              <TabsContent value="agency" className="mt-0 space-y-6">
-                <p className="text-sm text-muted-foreground">
-                  How buyers and StayPacks identify your agency on public links.
-                </p>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="name">Agency name</Label>
-                    <Input id="name" {...form.register("name")} />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="slug">Report link name</Label>
-                    <Input id="slug" {...form.register("slug")} />
-                    <p className="text-xs text-muted-foreground">
-                      Used in public report and listing URLs for your agency.
+    <>
+      <form
+        noValidate
+        onSubmit={form.handleSubmit(save, invalid)}
+        className="pb-28"
+      >
+        <div
+          className={cn(
+            "grid items-start gap-8",
+            detailsOnly
+              ? "max-w-2xl"
+              : "xl:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]",
+          )}
+        >
+          <div className="min-w-0 space-y-5">
+            {!detailsOnly && (
+              <div
+                data-theme="staypack-workspace"
+                className="grid grid-cols-3 gap-1 rounded-xl bg-base-200 p-1"
+                role="tablist"
+                aria-label="Brand settings sections"
+              >
+                {sections.map((item, index) => (
+                  <button
+                    key={item}
+                    id={`tab-${item}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={section === item}
+                    aria-controls={`panel-${item}`}
+                    tabIndex={section === item ? 0 : -1}
+                    disabled={busy}
+                    className={cn(
+                      "du-btn du-btn-sm min-h-11 border-0 px-2 shadow-none",
+                      section === item
+                        ? "bg-base-100 text-primary"
+                        : "du-btn-ghost text-base-content/65",
+                    )}
+                    onClick={() => setSection(item)}
+                    onKeyDown={(event) => {
+                      const next =
+                        event.key === "ArrowRight"
+                          ? (index + 1) % sections.length
+                          : event.key === "ArrowLeft"
+                            ? (index + sections.length - 1) % sections.length
+                            : event.key === "Home"
+                              ? 0
+                              : event.key === "End"
+                                ? sections.length - 1
+                                : -1;
+                      if (next >= 0) {
+                        event.preventDefault();
+                        setSection(sections[next]);
+                        document
+                          .getElementById(`tab-${sections[next]}`)
+                          ?.focus();
+                      }
+                    }}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            )}
+            <fieldset
+              disabled={busy}
+              role={detailsOnly ? undefined : "tabpanel"}
+              aria-label={detailsOnly ? "Agency details" : undefined}
+              id={`panel-${section}`}
+              aria-labelledby={detailsOnly ? undefined : `tab-${section}`}
+              className="min-w-0 space-y-6 rounded-2xl border border-border/70 bg-card p-5 sm:p-6"
+            >
+              {section === "Logo" && (
+                <>
+                  <div>
+                    <h2 className="font-display text-2xl">
+                      Start with your logo
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      Add the logo you use on light backgrounds. We’ll use it
+                      across your branded documents and listing pages.
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="website_url">Website</Label>
-                    <Input id="website_url" {...form.register("website_url")} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" {...form.register("email")} />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input id="phone" {...form.register("phone")} />
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* ── Brand kit ── */}
-              <TabsContent value="brand" className="mt-0 space-y-8">
-                <p className="text-sm text-muted-foreground">
-                  Logo, colours and fonts used on reports, collateral and listing pages.
-                </p>
-                <BrandKitEditor
-                  form={form}
-                  agencyId={agency.id}
-                  showPreview={false}
-                  numberedSections={false}
-                />
-              </TabsContent>
-
-              {/* ── Advanced styles ── */}
-              <TabsContent value="advanced" className="mt-0 space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Fine-tune buttons, corners and links on listing pages and collateral. All fields
-                  default to your brand colours when left as-is.
-                </p>
-
-                <AdvancedSection
-                  label="Buttons"
-                  hint="Leave colours empty to use your brand primary and white text."
-                >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Background</Label>
-                      <Input
-                        type="color"
-                        value={advancedDraft.button_background_colour ?? agency.primary_colour}
-                        onChange={(e) => updateAdvanced({ button_background_colour: e.target.value })}
-                        className="h-11 w-full cursor-pointer"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Text</Label>
-                      <Input
-                        type="color"
-                        value={advancedDraft.button_text_colour ?? "#ffffff"}
-                        onChange={(e) => updateAdvanced({ button_text_colour: e.target.value })}
-                        className="h-11 w-full cursor-pointer"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs">Corner radius</Label>
-                    <RadiusPresets
-                      value={advancedDraft.button_border_radius_px ?? 0}
-                      onChange={(px) => updateAdvanced({ button_border_radius_px: px })}
-                      presets={[
-                        { label: "Square", px: 0 },
-                        { label: "Soft", px: 6 },
-                        { label: "Rounded", px: 12 },
-                        { label: "Pill", px: 32 },
-                      ]}
+                  <AgencyLogoUploader
+                    variant="dark"
+                    value={draft.logo_dark_url || ""}
+                    onUploadStateChange={setUploading}
+                    onChange={(value) => {
+                      form.setValue("logo_dark_url", value, {
+                        shouldDirty: true,
+                      });
+                      form.setValue("logo_url", value, { shouldDirty: true });
+                    }}
+                  />
+                  <details className="rounded-xl border border-border/60 p-4">
+                    <summary className="cursor-pointer font-medium">
+                      Alternate logo{" "}
+                      <span className="font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                    </summary>
+                    <p className="my-3 text-sm text-muted-foreground">
+                      Add a white or light version if your agency uses a
+                      separate mark on dark backgrounds.
+                    </p>
+                    <AgencyLogoUploader
+                      variant="light"
+                      value={draft.logo_light_url || ""}
+                      onUploadStateChange={setUploading}
+                      onChange={(value) =>
+                        form.setValue("logo_light_url", value, {
+                          shouldDirty: true,
+                        })
+                      }
                     />
+                  </details>
+                </>
+              )}
+              {section === "Colours" && (
+                <>
+                  <div>
+                    <h2 className="font-display text-2xl">
+                      Your brand palette
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      Choose a colour or paste its code. Check the preview to
+                      make sure the text is easy to read.
+                    </p>
                   </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Border width (px)</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={8}
-                        value={advancedDraft.button_border_width_px ?? 0}
-                        onChange={(e) => updateAdvanced({ button_border_width_px: Number(e.target.value) })}
+                  <div className="space-y-4">
+                    {BRAND_COLOUR_FIELDS.slice(0, 3).map((field) => (
+                      <ColourField
+                        key={field.key}
+                        form={form}
+                        name={field.key}
+                        label={field.label}
+                        helper={field.helper}
+                        example={field.example}
                       />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Border colour</Label>
-                      <Input
-                        type="color"
-                        value={advancedDraft.button_border_colour ?? "#002e36"}
-                        onChange={(e) => updateAdvanced({ button_border_colour: e.target.value })}
-                        className="h-11 w-full cursor-pointer"
-                      />
-                    </div>
+                    ))}
                   </div>
-                </AdvancedSection>
-
-                <AdvancedSection
-                  label="Links"
-                  hint="Used for headings and text links on listing pages."
-                >
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Link colour</Label>
-                    <Input
-                      type="color"
-                      value={advancedDraft.link_colour ?? agency.primary_colour}
-                      onChange={(e) => updateAdvanced({ link_colour: e.target.value })}
-                      className="h-11 w-[8rem] cursor-pointer"
-                    />
-                  </div>
-                </AdvancedSection>
-
-                <AdvancedSection
-                  label="Cards & panels"
-                  hint="Applies to cards and information panels."
-                >
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label className="text-xs">Corner radius</Label>
-                      <RadiusPresets
-                        value={advancedDraft.card_border_radius_px ?? 0}
-                        onChange={(px) => updateAdvanced({ card_border_radius_px: px })}
-                        presets={[
-                          { label: "Square", px: 0 },
-                          { label: "Soft", px: 8 },
-                          { label: "Rounded", px: 16 },
-                        ]}
-                      />
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Border width (px)</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={8}
-                          value={advancedDraft.card_border_width_px ?? 1}
-                          onChange={(e) => updateAdvanced({ card_border_width_px: Number(e.target.value) })}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Border colour</Label>
-                        <Input
-                          type="color"
-                          value={advancedDraft.card_border_colour ?? "#e5e7eb"}
-                          onChange={(e) => updateAdvanced({ card_border_colour: e.target.value })}
-                          className="h-11 w-full cursor-pointer"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Background colour</Label>
-                        <Input
-                          type="color"
-                          value={advancedDraft.card_background_colour ?? "#ffffff"}
-                          onChange={(e) => updateAdvanced({ card_background_colour: e.target.value })}
-                          className="h-11 w-full cursor-pointer"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-xs">Drop shadow</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {CARD_SHADOW_PRESETS.map((preset) => (
-                          <Button
-                            key={preset.value}
-                            type="button"
-                            size="sm"
-                            variant={(advancedDraft.card_shadow ?? "none") === preset.value ? "default" : "outline"}
-                            onClick={() => updateAdvanced({ card_shadow: preset.value })}
-                          >
-                            {preset.label}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </AdvancedSection>
-
-                <AdvancedSection
-                  label="Inputs"
-                  hint="Text fields inside forms on listing pages."
-                >
-                  <div className="space-y-2">
-                    <Label className="text-xs">Corner radius</Label>
-                    <RadiusPresets
-                      value={advancedDraft.input_border_radius_px ?? 4}
-                      onChange={(px) => updateAdvanced({ input_border_radius_px: px })}
-                      presets={[
-                        { label: "Square", px: 0 },
-                        { label: "Soft", px: 4 },
-                        { label: "Rounded", px: 8 },
-                      ]}
-                    />
-                  </div>
-                </AdvancedSection>
-
-                {hasBrandAdvancedOverrides(advancedDraft) ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      form.setValue(
-                        "brand_advanced_json",
-                        DEFAULT_BRAND_ADVANCED as AgencyInput["brand_advanced_json"],
-                        { shouldDirty: true },
+                  <details
+                    className="rounded-xl border border-border/60 p-4"
+                    open={
+                      BRAND_COLOUR_FIELDS.slice(3).some(
+                        (field) => errors[field.key],
                       )
+                        ? true
+                        : undefined
                     }
                   >
-                    Reset to defaults
-                  </Button>
-                ) : null}
-              </TabsContent>
-            </div>
-
-            <div className="flex flex-col gap-3 rounded-b-2xl border-t border-border/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-between md:px-8">
-              <p className="text-sm text-muted-foreground">
-                {isDirty ? "You have unsaved changes." : "All changes saved."}
-              </p>
-              <Button type="submit" size="lg" disabled={loading} className="sm:min-w-44">
-                {loading ? "Saving..." : "Save brand settings"}
-              </Button>
-            </div>
-          </div>
-
-          {/* Right — sticky preview */}
-          <div className="surface-card h-fit p-6 md:p-8 xl:sticky xl:top-24">
-            <h3 className="font-display text-xl tracking-tight">
-              {showBuyerPreview ? "Live preview" : "Agency summary"}
-            </h3>
-            <p className="mt-1 mb-6 text-sm text-muted-foreground">
-              {showBuyerPreview
-                ? "Check this looks right before saving. Buyers will see something similar on published collateral."
-                : "How your agency appears on public links and contact blocks."}
-            </p>
-            {showBuyerPreview ? (
-              <div className="space-y-4">
-                <BrandPreviewCard preview={preview} />
-                {tab === "advanced" ? (
-                  <div className="rounded-xl border border-dashed border-border p-4">
-                    <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Button & panel preview
-                    </p>
-                    <div
-                      className="space-y-3 p-4"
-                      style={getBrandCardInlineStyle(resolvedAdvanced)}
-                    >
-                      <p className="text-sm font-semibold" style={{ color: resolvedAdvanced.linkColour }}>
-                        Sample link colour
-                      </p>
-                      <Input
-                        readOnly
-                        value="Sample input"
-                        className="bg-white"
-                        style={{ borderRadius: resolvedAdvanced.inputBorderRadiusPx }}
-                      />
-                      <button
-                        type="button"
-                        className="px-5 py-2.5 text-sm font-semibold shadow-sm"
-                        style={getBrandButtonInlineStyle(resolvedAdvanced)}
-                      >
-                        Sample button
-                      </button>
+                    <summary className="cursor-pointer font-medium">
+                      Highlight colours
+                    </summary>
+                    <div className="mt-4 space-y-4">
+                      {BRAND_COLOUR_FIELDS.slice(3).map((field) => (
+                        <ColourField
+                          key={field.key}
+                          form={form}
+                          name={field.key}
+                          label={field.label}
+                          helper={field.helper}
+                          example={field.example}
+                        />
+                      ))}
                     </div>
+                  </details>
+                  <BrandAdvancedFields form={form} />
+                </>
+              )}
+              {section === "Fonts" && (
+                <>
+                  <div>
+                    <h2 className="font-display text-2xl">Set the tone</h2>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      Choose fonts your agency already uses, or try one of the
+                      popular options.
+                    </p>
                   </div>
-                ) : null}
-              </div>
-            ) : (
-              <BrandAgencyPreviewCard preview={preview} />
+                  <FontPicker form={form} onUploadStateChange={setUploading} />
+                </>
+              )}
+              {section === "Agency" && (
+                <>
+                  <div>
+                    <h2 className="font-display text-2xl">Agency details</h2>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      The name and contact details shown on your branded
+                      material.
+                    </p>
+                  </div>
+                  <div className="space-y-5">
+                    {agencyFields.map(([key, label, type]) => (
+                      <div key={key}>
+                        <label
+                          htmlFor={key}
+                          className="mb-2 block text-sm font-medium"
+                        >
+                          {label}
+                          {key !== "name" && key !== "slug" && (
+                            <span className="font-normal text-muted-foreground">
+                              {" "}
+                              (optional)
+                            </span>
+                          )}
+                        </label>
+                        <input
+                          aria-label={label}
+                          id={key}
+                          type={type === "url" ? "text" : type}
+                          {...form.register(key)}
+                          aria-invalid={!!errors[key]}
+                          aria-describedby={
+                            errors[key]
+                              ? `${key}-error`
+                              : key === "slug"
+                                ? "slug-hint"
+                                : undefined
+                          }
+                          className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring aria-invalid:border-destructive"
+                        />
+                        {errors[key] && (
+                          <p
+                            id={`${key}-error`}
+                            role="alert"
+                            className="mt-2 text-sm text-destructive"
+                          >
+                            {errors[key]?.message}
+                          </p>
+                        )}
+                        {key === "slug" && (
+                          <p
+                            id="slug-hint"
+                            className="mt-2 break-all text-xs leading-5 text-muted-foreground"
+                          >
+                            Example listing link: staypack.app/
+                            {draft.slug || "your-agency"}/l/example-property
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </fieldset>
+            {!detailsOnly && (
+              <fieldset disabled={busy} className="min-w-0">
+                {" "}
+                <details className="rounded-xl border border-border/60 p-4">
+                  <summary className="cursor-pointer font-medium">
+                    Report defaults{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (optional)
+                    </span>
+                  </summary>
+                  <div className="mt-4 space-y-4">
+                    {(
+                      [
+                        ["default_report_title", "Default report title"],
+                        ["default_cta", "Call to action"],
+                        ["default_disclaimer", "Agency disclaimer"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <div key={key}>
+                        <label
+                          className="mb-2 block text-sm font-medium"
+                          htmlFor={key}
+                        >
+                          {label}
+                        </label>
+                        <textarea
+                          aria-label={label}
+                          id={key}
+                          {...form.register(key)}
+                          rows={key === "default_disclaimer" ? 4 : 2}
+                          className="w-full rounded-lg border border-border bg-background p-3 text-sm"
+                        />
+                      </div>
+                    ))}
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Leave this blank to use StayPack’s standard report
+                      disclaimer. Every report includes a disclaimer.
+                    </p>
+                  </div>
+                </details>
+              </fieldset>
             )}
+            <p className="text-xs leading-5 text-muted-foreground">
+              {detailsOnly
+                ? "These details are shared across your agency’s branded material and public listing pages."
+                : "Saved branding is used for new documents and pages that use your agency brand. Published report snapshots stay unchanged."}
+            </p>
+          </div>
+          {!detailsOnly && (
+            <aside
+              aria-label="Live brand preview"
+              className="sticky top-8 hidden min-w-0 space-y-4 xl:block"
+            >
+              <div>
+                <h2 className="font-display text-2xl">See it come together</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Your draft brand, before you save.
+                </p>
+              </div>
+              {!previewOpen && previewContent}
+            </aside>
+          )}
+        </div>
+        <div
+          data-theme="staypack-workspace"
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-base-300 bg-base-100 px-5 py-3 text-base-content shadow-sm lg:left-64"
+        >
+          <div className="mx-auto max-w-6xl space-y-2">
+            {saveError && (
+              <p role="alert" className="text-sm text-error">
+                {saveError}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p
+                role="status"
+                className="flex items-center gap-2 text-xs sm:text-sm"
+              >
+                {!isDirty && !busy && (
+                  <Check className="size-4 text-primary" aria-hidden="true" />
+                )}
+                {uploading
+                  ? "Uploading asset…"
+                  : saving
+                    ? "Saving changes…"
+                    : isDirty
+                      ? "Unsaved changes"
+                      : "All changes saved"}
+              </p>
+              <div className="flex items-center gap-1 sm:gap-2">
+                {!detailsOnly && (
+                  <button
+                    type="button"
+                    className="du-btn du-btn-ghost du-btn-sm min-h-11 xl:hidden"
+                    onClick={() => setPreviewOpen(true)}
+                  >
+                    <Eye className="size-4" aria-hidden="true" />
+                    Preview
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="du-btn du-btn-ghost du-btn-sm min-h-11"
+                  disabled={!isDirty || busy}
+                  onClick={discard}
+                >
+                  Discard
+                </button>
+                <button
+                  type="submit"
+                  className="du-btn du-btn-primary du-btn-sm min-h-11 px-4"
+                  disabled={!isDirty || busy}
+                >
+                  {saving ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </form>
-    </Tabs>
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
+          <DialogTitle>Brand preview</DialogTitle>
+          <DialogDescription>Check your draft before saving.</DialogDescription>
+          {previewOpen && previewContent}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!leaveUrl}
+        onOpenChange={(open) => {
+          if (!open) setLeaveUrl(null);
+        }}
+      >
+        <DialogContent>
+          <DialogTitle>Leave without saving?</DialogTitle>
+          <DialogDescription>
+            You have unsaved changes. Stay here to save them, or discard them
+            and leave.
+          </DialogDescription>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setLeaveUrl(null)}
+            >
+              Keep editing
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                const url = leaveUrl;
+                discard();
+                setLeaveUrl(null);
+                if (url) setTimeout(() => window.location.assign(url), 0);
+              }}
+            >
+              Discard and leave
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

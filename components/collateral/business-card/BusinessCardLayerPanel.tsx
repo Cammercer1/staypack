@@ -683,7 +683,7 @@ function FrontPanel({
               <option value="" disabled>
                 Choose an agent
               </option>
-              {agents.map((agent) => (
+              {agents.filter((agent) => !agent.archived_at).map((agent) => (
                 <option key={agent.id} value={agent.id}>
                   {agent.name}
                 </option>

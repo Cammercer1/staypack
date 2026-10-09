@@ -1,3 +1,4 @@
+import { normalizeAdvertisedPrice } from "@/lib/listings/pricing";
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import type { ParsedListing } from "@/lib/types";
 
@@ -19,5 +20,5 @@ export function resolveRentalDisplayPrice(scraped?: ParsedListing | null) {
     );
   }
 
-  return scraped?.displayPrice?.trim() || null;
+  return scraped?.purpose === "lease" ? normalizeAdvertisedPrice(scraped.displayPrice, "lease") : null;
 }

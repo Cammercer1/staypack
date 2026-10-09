@@ -1,4 +1,7 @@
+import { normalizeAdvertisedPrice } from "@/lib/listings/pricing";
 import { z } from "zod";
+import { domainAvmSchema } from "@/lib/domain-avm/schema";
+import { propertyLookupSourceSchema } from "@/lib/listings/propertyLookupTypes";
 import { pageOneMarketingCopyAiSchema } from "@/lib/copy/pageOneMarketingCopy";
 import { isValidReportTemplateId } from "@/lib/reports/templates/ids";
 import { normalizeDisplayPrice } from "@/lib/scraping/normalizeDisplayPrice";
@@ -80,7 +83,7 @@ export const agencySchema = z.object({
 });
 
 export const agentProfileSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().trim().min(1, "Name is required").max(120, "Use 120 characters or fewer"),
   email: optionalEmail,
   phone: z.string().optional(),
   role_title: z.string().optional(),
@@ -97,6 +100,8 @@ export const listingAgentSchema = z.object({
 });
 
 export const parsedListingSchema = z.object({
+  domainAvm: domainAvmSchema.optional(),
+  propertyLookup: propertyLookupSourceSchema.optional(),
   title: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
   suburb: z.string().nullable().optional(),
@@ -187,6 +192,8 @@ const listingPropertyFields = {
       const trimmed = value.trim();
       return trimmed === "" ? null : trimmed;
     }),
+  advertised_sale_price: z.string().nullable().optional().refine((v) => !v?.trim() || normalizeAdvertisedPrice(v, "sale") !== null, "Enter a sale price, not weekly rent").transform((v) => v === undefined ? undefined : normalizeAdvertisedPrice(v, "sale")),
+  advertised_weekly_rent: z.string().nullable().optional().refine((v) => !v?.trim() || normalizeAdvertisedPrice(v, "lease") !== null, "Enter weekly rent, not a sale price").transform((v) => v === undefined ? undefined : normalizeAdvertisedPrice(v, "lease")),
   bond: z
     .string()
     .nullable()

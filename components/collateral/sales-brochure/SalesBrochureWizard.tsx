@@ -35,7 +35,7 @@ const BROCHURE_LABELS: Record<BrochureCollateralType, string> = {
 
 const steps = [
   { id: "template", label: "Choose template" },
-  { id: "copy", label: "Content generation" },
+  { id: "copy", label: "Edit content" },
   { id: "preview", label: "Preview & publish" },
 ];
 
@@ -296,7 +296,7 @@ export function SalesBrochureWizard({
             )}
           </AsyncLoadingOverlay>
 
-          <div className="flex flex-wrap gap-3 no-print">
+          <div className="sticky bottom-3 z-10 flex flex-wrap gap-3 rounded-xl border border-border bg-background p-4 shadow-sm no-print">
             {showDownload ? (
               <CollateralPdfButton
                 collateralId={collateral.id}
@@ -304,7 +304,7 @@ export function SalesBrochureWizard({
                 canGenerate={false}
                 cacheVersion={collateral.updated_at}
                 size="default"
-                downloadLabel="Download asset"
+                downloadLabel="Download PDF"
                 onUpdated={setCollateral}
               />
             ) : null}

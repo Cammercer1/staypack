@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import {
   getDedupedScrapedImages,
   getListingImagePool,
   getMasterSelectionLimit,
-  mergeNewPhotosIntoSelection,
   normalizeSelectionToPool,
 } from "@/lib/listings/collateralImages";
 import { resolveListingImageMetaForPool } from "@/lib/listings/syncListingImageMeta";
@@ -19,9 +18,14 @@ import type { Listing, ListingImageMetaMap } from "@/lib/types";
 type Props = {
   listing: Listing;
   onUpdated: (listing: Listing) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
-export function CollateralImageEditor({ listing, onUpdated }: Props) {
+export function CollateralImageEditor({
+  listing,
+  onUpdated,
+  onDirtyChange,
+}: Props) {
   const [uploadedImages, setUploadedImages] = useState(
     listing.uploaded_image_urls ?? [],
   );
@@ -35,9 +39,11 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
     () => resolveListingImageMetaForPool(listing),
   );
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const imagePool = useMemo(
-    () => getListingImagePool({ ...listing, uploaded_image_urls: uploadedImages }),
+    () =>
+      getListingImagePool({ ...listing, uploaded_image_urls: uploadedImages }),
     [listing, uploadedImages],
   );
   const scrapedImages = useMemo(
@@ -53,7 +59,10 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
   const currentSelection = useMemo(
     () =>
       normalizeSelectionToPool(
-        { hero_image_url: heroImageUrl || null, selected_image_urls: selectedImageUrls },
+        {
+          hero_image_url: heroImageUrl || null,
+          selected_image_urls: selectedImageUrls,
+        },
         imagePool,
       ),
     [heroImageUrl, selectedImageUrls, imagePool],
@@ -71,6 +80,27 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
   const isCustomized =
     currentSelection.selected_image_urls.join("|") !==
     defaultSelection.selected_image_urls.join("|");
+
+  const savedSelection = normalizeSelectionToPool(
+    {
+      hero_image_url: listing.hero_image_url,
+      selected_image_urls: listing.selected_image_urls ?? [],
+    },
+    imagePool,
+  );
+  const dirty =
+    JSON.stringify(currentSelection) !== JSON.stringify(savedSelection) ||
+    JSON.stringify(listingImageMeta) !==
+      JSON.stringify(resolveListingImageMetaForPool(listing));
+  useEffect(() => {
+    onDirtyChange?.(dirty || saving || uploading);
+    return () => onDirtyChange?.(false);
+  }, [dirty, saving, uploading, onDirtyChange]);
+  function discard() {
+    setHeroImageUrl(listing.hero_image_url ?? "");
+    setSelectedImageUrls(listing.selected_image_urls ?? []);
+    setListingImageMeta(resolveListingImageMetaForPool(listing));
+  }
 
   function updateSelection(hero: string, selected: string[]) {
     setHeroImageUrl(hero);
@@ -110,20 +140,20 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
       onUpdated(saved);
       toast.success("Photos saved");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to save photos");
+      toast.error(
+        error instanceof Error ? error.message : "Unable to save photos",
+      );
     } finally {
       setSaving(false);
     }
   }
 
   async function handleSave() {
-    const selectionToSave = mergeNewPhotosIntoSelection(
-      {
-        hero_image_url: currentSelection.hero_image_url,
-        selected_image_urls: currentSelection.selected_image_urls,
-      },
-      imagePool,
-    );
+    if (!currentSelection.selected_image_urls.length) {
+      toast.error("Select at least one property photo before saving.");
+      return;
+    }
+    const selectionToSave = currentSelection;
 
     setHeroImageUrl(selectionToSave.hero_image_url ?? "");
     setSelectedImageUrls(selectionToSave.selected_image_urls);
@@ -135,8 +165,9 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
     });
   }
 
-  async function resetToAll() {
-    await saveSelection(defaultSelection);
+  function resetToAll() {
+    setHeroImageUrl(defaultSelection.hero_image_url ?? "");
+    setSelectedImageUrls(defaultSelection.selected_image_urls);
   }
 
   return (
@@ -146,11 +177,17 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
           Property photos
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          All photos are selected by default. Mark floor plans so brochures fit
-          them inside any image slot without cropping.
+          Choose the photos available to new collateral and set a cover photo.
+          Published collateral keeps its saved photos.
         </p>
       </div>
 
+      {rawScrapedCount > scrapedImages.length && (
+        <p className="text-xs text-muted-foreground">
+          Duplicate images and video thumbnails are excluded from collateral
+          photos.
+        </p>
+      )}
       <ReportMediaPicker
         title=""
         scrapedImages={scrapedImages}
@@ -161,13 +198,28 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
         listingId={listing.id}
         maxSelected={maxSelected}
         onUploaded={setUploadedImages}
+        onBusyChange={setUploading}
         onChange={updateSelection}
         listingImageMeta={listingImageMeta}
         onListingImageMetaChange={setListingImageMeta}
       />
 
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={handleSave} disabled={saving}>
+      <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-background p-4 shadow-sm">
+        <p role="status" className="mr-auto text-sm text-muted-foreground">
+          {saving
+            ? "Saving…"
+            : dirty
+              ? "Unsaved photo changes"
+              : "All changes saved"}
+        </p>
+        <Button
+          variant="ghost"
+          disabled={!dirty || saving || uploading}
+          onClick={discard}
+        >
+          Discard
+        </Button>
+        <Button onClick={handleSave} disabled={saving || uploading || !dirty}>
           {saving ? (
             <>
               <Loader2 className="animate-spin" />
@@ -181,7 +233,7 @@ export function CollateralImageEditor({ listing, onUpdated }: Props) {
           type="button"
           variant="outline"
           onClick={resetToAll}
-          disabled={saving}
+          disabled={saving || uploading}
         >
           Select all
         </Button>

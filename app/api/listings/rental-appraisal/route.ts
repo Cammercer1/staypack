@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     const { supabase, listing } = await requireListingAccess(listingId!);
     const inputError = appraisalInputError(listing);
     if (inputError) return NextResponse.json({ error: inputError }, { status: 400 });
-    const scraped = resolveAppraisalInput(listing);
+    const scraped = resolveAppraisalInput(listing, { applyOverrides: false });
 
     const { parsed: enriched } = await enrichParsedListingForLeaseAppraisal(scraped, {
       subjectListingUrl: listing.listing_url,

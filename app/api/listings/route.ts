@@ -5,6 +5,8 @@ import {
   generateListingSlug,
 } from "@/lib/listings/provisionLandingPage";
 import { createListingSchema } from "@/lib/validation/schemas";
+import { findExistingProperty } from "@/lib/listings/findExistingProperty";
+import { unstable_rethrow } from "next/navigation";
 import type { Report } from "@/lib/types";
 
 export async function GET(request: Request) {
@@ -42,6 +44,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ listings });
   } catch (error) {
+    unstable_rethrow(error);
     return NextResponse.json(
       {
         error:
@@ -56,6 +59,10 @@ export async function POST(request: Request) {
   try {
     const { supabase, agency, user } = await requireAgency();
     const body = createListingSchema.parse(await request.json());
+    const duplicate = await findExistingProperty(supabase, agency.id, body);
+    if (duplicate) {
+      return NextResponse.json({ error: "This property is already in your library.", duplicate }, { status: 409 });
+    }
     if (body.custom_landing_url !== undefined || body.landing_template !== undefined) {
       return NextResponse.json({ error: "Choose links on each report instead of the property" }, { status: 410 });
     }
@@ -86,9 +93,12 @@ export async function POST(request: Request) {
         listing_title: prepared.listing_title ?? null,
         listing_description: prepared.listing_description ?? null,
         display_price: prepared.display_price ?? null,
+        advertised_sale_price: prepared.advertised_sale_price ?? null,
+        advertised_weekly_rent: prepared.advertised_weekly_rent ?? null,
         hero_image_url: prepared.hero_image_url ?? null,
         selected_image_urls: prepared.selected_image_urls ?? [],
         uploaded_image_urls: prepared.uploaded_image_urls ?? [],
+        listing_image_meta: prepared.listing_image_meta ?? {},
         scraped_listing_json: prepared.scraped_listing_json ?? null,
         public_slug: generateListingSlug(),
       })
@@ -105,6 +115,7 @@ export async function POST(request: Request) {
       geocode_warning: geocodeWarning,
     });
   } catch (error) {
+    unstable_rethrow(error);
     return NextResponse.json(
       {
         error:

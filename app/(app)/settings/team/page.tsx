@@ -22,11 +22,11 @@ export default async function TeamSettingsPage() {
             Ask an admin to manage team access
           </h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            You can still use the agency workspace, listings and reports available
-            to your role. Team invitations are restricted to admins.
+            You can still use the agency workspace, listings and reports
+            available to your role. Team invitations are restricted to admins.
           </p>
-          <Link href="/settings" className="mt-5 inline-block">
-            <Button variant="outline">Back to settings</Button>
+          <Link href="/dashboard" className="mt-5 inline-block">
+            <Button variant="outline">Back to dashboard</Button>
           </Link>
         </div>
       </div>

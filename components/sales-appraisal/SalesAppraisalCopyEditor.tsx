@@ -38,7 +38,7 @@ import { hasSalesAppraisalSelectedComps } from "@/lib/sales-appraisal/salesAppra
 import type { SalesAppraisalCopy } from "@/lib/sales-appraisal/deriveSalesAppraisalCopy";
 import { isSalesAppraisalTemplateId } from "@/lib/sales-appraisal/salesAppraisalTemplates";
 import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
-import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
+import { resolveAdvertisedPrice } from "@/lib/listings/pricing";
 import { defaultBlurbLengthForTemplateId } from "@/lib/copy/blurbVariants";
 import { cn } from "@/lib/utils";
 import type {
@@ -147,7 +147,7 @@ export const SalesAppraisalCopyEditor = forwardRef<
     );
   }, [report.final_report_json, report.updated_at]);
 
-  const displayPrice = useMemo(() => resolveReportDisplayPrice(listing), [listing]);
+  const displayPrice = useMemo(() => resolveAdvertisedPrice(listing, "sale"), [listing]);
   const parsed = useMemo(() => resolveAppraisalInput(listing), [listing]);
   const appraisal = parsed?.salesAppraisal;
 
@@ -732,7 +732,7 @@ function saleListingContextSummary(
   if (listing.bathrooms != null) {
     parts.push(`${listing.bathrooms} bath`);
   }
-  const price = displayPrice ?? listing.display_price;
+  const price = displayPrice;
   if (price) {
     parts.push(`Listing price: ${price}`);
   }

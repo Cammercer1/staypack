@@ -98,6 +98,11 @@ export async function POST(
       existing && isBrochureDocument(existing)
         ? {
             ...built,
+            copy: {
+              ...built.copy,
+              price_value: existing.copy.price_value,
+              price_label: existing.copy.price_label ?? built.copy.price_label,
+            },
             property: {
               ...built.property,
               hero_image_url: existing.property.hero_image_url,

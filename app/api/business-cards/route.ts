@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
     const { data: agents, error: agentsError } = await supabase
       .from("agent_profiles")
-      .select("*")
+      .select("*").is("archived_at", null)
       .eq("agency_id", agency.id)
       .order("is_default", { ascending: false })
       .order("created_at", { ascending: true });

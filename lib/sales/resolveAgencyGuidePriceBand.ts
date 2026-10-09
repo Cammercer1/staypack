@@ -97,7 +97,7 @@ export function reviewAgencyGuideAgainstCompBand({
   };
 }
 
-/** Keep a numeric agency guide authoritative while retaining comp evidence for review. */
+/** Keep the advertised asking guide as context, independently of the estimated value. */
 export function applyAgencyGuideToCompBand({
   displayPrice,
   compBand,
@@ -113,12 +113,7 @@ export function applyAgencyGuideToCompBand({
   }
 
   return {
-    band: {
-      ...compBand,
-      priceMin: agencyGuide.priceMin,
-      priceMax: agencyGuide.priceMax,
-      priceMidpoint: agencyGuide.priceMidpoint,
-    },
+    band: compBand,
     agencyGuide,
     review: reviewAgencyGuideAgainstCompBand({
       agencyGuide,

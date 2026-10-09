@@ -152,7 +152,7 @@ export function buildSalesAppraisalReport({
         propertyImages?.selected_image_urls?.length
           ? propertyImages.selected_image_urls
           : selectedFromListing,
-      display_price: listing.display_price ?? priceRangeLabel,
+      display_price: priceRangeLabel,
       land_area_sqm: reportableSaleLandArea(propertyType, parsed.landAreaSqm),
       floor_area_sqm: parsed.floorAreaSqm ?? null,
     },

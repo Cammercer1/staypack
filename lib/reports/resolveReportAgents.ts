@@ -56,8 +56,8 @@ export function resolveAgencyAccountReportAgents({
 }): ReportAgent[] {
   const primary =
     agentProfile ??
-    agencyAgents.find((agent) => agent.is_default) ??
-    agencyAgents[0] ??
+    agencyAgents.find((agent) => agent.is_default && !agent.archived_at) ??
+    agencyAgents.find((agent) => !agent.archived_at) ??
     null;
 
   if (!primary) {
@@ -66,7 +66,7 @@ export function resolveAgencyAccountReportAgents({
 
   const ordered: AgentProfile[] = [primary];
   for (const agent of agencyAgents) {
-    if (agent.id === primary.id || ordered.length >= MAX_LISTING_AGENTS) {
+    if (agent.archived_at || agent.id === primary.id || ordered.length >= MAX_LISTING_AGENTS) {
       continue;
     }
     ordered.push(agent);

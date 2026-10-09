@@ -1,5 +1,7 @@
+import type { AppraisalOverrides } from "@/lib/listings/pricing";
 import type { ComparableDiscoverySummary } from "@/lib/comparables/discoveryPolicy";
 import type { DomainAvm } from "@/lib/domain-avm/types";
+import type { PropertyLookupSource } from "@/lib/listings/propertyLookupTypes";
 
 export type AgencyRole = "owner" | "admin" | "member";
 
@@ -109,6 +111,8 @@ export type ParsedListing = {
   floorAreaSqm?: number;
   /** Exact-address Domain property profile and AVM evidence. */
   domainAvm?: DomainAvm;
+  /** Original lookup evidence; reviewed property fields remain on the listing. */
+  propertyLookup?: PropertyLookupSource;
   rentalAppraisal?: {
     weeklyMin?: number;
     weeklyMax?: number;
@@ -617,6 +621,7 @@ export type AgentProfile = {
   role_title: string | null;
   photo_url: string | null;
   is_default: boolean;
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -648,6 +653,9 @@ export type Listing = {
   listing_title: string | null;
   listing_description: string | null;
   display_price: string | null;
+  advertised_sale_price?: string | null;
+  advertised_weekly_rent?: string | null;
+  appraisal_overrides_json?: AppraisalOverrides;
   /** Security bond for lease listings (e.g. "$6,800"). */
   bond: string | null;
   hero_image_url: string | null;

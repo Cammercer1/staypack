@@ -18,13 +18,6 @@ import type {
 
 export { DEFAULT_SALES_APPRAISAL_TEMPLATE_ID as SALES_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/templates/sales-appraisal/ids";
 
-function assertSaleListing(listing: Listing) {
-  if (listing.listing_purpose === "lease") {
-    throw new Error(
-      "Property appraisals are only available for listings marked for sale",
-    );
-  }
-}
 
 
 export function hasSalesAppraisalComps(parsed: ParsedListing | null | undefined) {
@@ -48,7 +41,6 @@ export async function createSalesAppraisalDraft({
   listing: Listing;
   userId?: string;
 }): Promise<{ report: Report; listing: Listing }> {
-  assertSaleListing(listing);
 
   const { data: existingCollateral } = await supabase
     .from("collateral_items")
@@ -117,7 +109,6 @@ export async function generateSalesAppraisalReportContent({
   agencyAgents?: AgentProfile[];
   templateId?: string;
 }): Promise<{ report: Report; listing: Listing; parsed: ParsedListing }> {
-  assertSaleListing(initialListing);
 
   const listing = initialListing;
 
@@ -212,7 +203,8 @@ export async function generateSalesAppraisalReportContent({
       template_id: resolvedTemplateId,
     })
     .eq("listing_id", listing.id)
-    .eq("type", "sales_appraisal");
+    .eq("type", "sales_appraisal")
+    .eq("report_id", savedReport.id);
 
   return {
     report: savedReport as Report,

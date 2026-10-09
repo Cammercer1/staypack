@@ -10,13 +10,6 @@ import {
 import { enrichParsedListingForLeaseAppraisal } from "@/lib/lease-appraisal/enrichParsedListingForLeaseAppraisal";
 import type { Listing, ParsedListing } from "@/lib/types";
 
-function assertSaleListing(listing: Listing) {
-  if (listing.listing_purpose === "lease") {
-    throw new Error(
-      "Rental appraisals are only available for listings marked for sale",
-    );
-  }
-}
 
 export async function enrichListingForLeaseAppraisal({
   supabase,
@@ -27,11 +20,10 @@ export async function enrichListingForLeaseAppraisal({
   listing: Listing;
   requestId?: string;
 }): Promise<{ listing: Listing; parsed: ParsedListing; warnings: string[] }> {
-  assertSaleListing(listing);
   assertAppraisalInput(listing);
 
   const { parsed, warnings } = await enrichParsedListingForLeaseAppraisal(
-    resolveAppraisalInput(listing),
+    resolveAppraisalInput(listing, { applyOverrides: false }),
     { subjectListingUrl: listing.listing_url },
   );
   const previousStatus = leaseAppraisalEnrichmentStatus(

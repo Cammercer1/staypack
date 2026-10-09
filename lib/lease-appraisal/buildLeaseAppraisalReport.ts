@@ -156,7 +156,7 @@ export function buildLeaseAppraisalReport({
         propertyImages?.selected_image_urls?.length
           ? propertyImages.selected_image_urls
           : selectedFromListing,
-      display_price: listing.display_price ?? rentRangeLabel,
+      display_price: rentRangeLabel,
     },
     str: {
       annual_revenue: null,

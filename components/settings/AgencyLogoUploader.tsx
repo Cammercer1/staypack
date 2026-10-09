@@ -1,117 +1,131 @@
 "use client";
 
+import { cn } from "@/lib/utils";
+
 import { useRef, useState } from "react";
 import { Upload } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { uploadBrandAsset } from "@/lib/branding/assetUpload";
 import type { BrandLogoSurface } from "@/lib/branding/logos";
 
 export type AgencyLogoVariant = BrandLogoSurface;
-
-const VARIANT_COPY: Record<
-  AgencyLogoVariant,
-  { title: string; description: string; previewBg: string; uploadType: string; fieldId: string }
-> = {
-  light: {
-    title: "Logo for dark backgrounds",
-    description:
-      "Light or white version of your mark — for coloured headers, photos, and dark panels.",
-    previewBg: "bg-[#002e36]",
-    uploadType: "logo-light",
-    fieldId: "logo_light_url",
-  },
-  dark: {
-    title: "Logo for light backgrounds",
-    description:
-      "Full-colour or dark version of your mark — for report pages, white cards, and light panels.",
-    previewBg: "bg-white",
-    uploadType: "logo-dark",
-    fieldId: "logo_dark_url",
-  },
-};
-
 type Props = {
   variant: AgencyLogoVariant;
   value: string;
   onChange: (value: string) => void;
   agencyId?: string;
+  onUploadStateChange?: (busy: boolean) => void;
 };
 
-export function AgencyLogoUploader({ variant, value, onChange, agencyId }: Props) {
+export function AgencyLogoUploader({
+  variant,
+  value,
+  onChange,
+  onUploadStateChange,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const copy = VARIANT_COPY[variant];
-
-  async function uploadLogo(file: File) {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file for your logo.");
-      return;
-    }
-
+  const [error, setError] = useState("");
+  const title = variant === "dark" ? "Main logo" : "Logo for dark backgrounds";
+  async function upload(file: File) {
+    setError("");
     setUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("type", copy.uploadType);
-
-    const response = await fetch("/api/agencies/upload-asset", {
-      method: "POST",
-      body: formData,
-    });
-    const payload = await response.json();
-    setUploading(false);
-
-    if (!response.ok) {
-      toast.error(payload.error ?? "Logo upload failed");
-      return;
+    onUploadStateChange?.(true);
+    try {
+      onChange(
+        await uploadBrandAsset(
+          file,
+          variant === "dark" ? "logo-dark" : "logo-light",
+        ),
+      );
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Upload failed. Please try again.",
+      );
+    } finally {
+      setUploading(false);
+      onUploadStateChange?.(false);
+      if (inputRef.current) inputRef.current.value = "";
     }
-
-    onChange(payload.url);
-    toast.success("Logo uploaded");
   }
-
   return (
-    <div className="space-y-4 rounded-2xl border border-border/70 bg-background/70 p-4">
-      <div>
-        <Label htmlFor={copy.fieldId} className="text-base font-medium">
-          {copy.title}
-        </Label>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy.description}</p>
+    <div className="space-y-3">
+      <div
+        className={cn(
+          "flex min-h-32 items-center justify-center rounded-xl border border-border/60 p-6",
+          variant === "light" ? "bg-foreground" : "bg-white",
+        )}
+      >
+        {value ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={value}
+            alt={`${title} preview`}
+            width={240}
+            height={80}
+            className="h-20 w-60 max-w-full object-contain"
+          />
+        ) : (
+          <p
+            className={cn(
+              "text-sm",
+              variant === "light" ? "text-background" : "text-muted-foreground",
+            )}
+          >
+            Your logo will appear here
+          </p>
+        )}
       </div>
-
-      {value ? (
-        <div className={`rounded-xl border border-border/60 p-4 ${copy.previewBg}`}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="" className="h-16 object-contain" />
-        </div>
-      ) : (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/40 px-4 py-8 text-center text-sm text-muted-foreground">
-          No logo added yet
-        </div>
-      )}
-
-      <div>
-        <input
-          id={copy.fieldId}
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) uploadLogo(file);
-          }}
-        />
+      <input
+        ref={inputRef}
+        aria-label={title}
+        id={`logo-${variant}`}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void upload(file);
+        }}
+      />
+      <div className="flex flex-wrap gap-2">
         <Button
           type="button"
           variant="outline"
           disabled={uploading}
           onClick={() => inputRef.current?.click()}
         >
-          <Upload className="mr-2 h-4 w-4" />
-          {uploading ? "Uploading..." : "Upload"}
+          <Upload className="size-4" />
+          {uploading
+            ? "Uploading…"
+            : value
+              ? `Replace ${title.toLowerCase()}`
+              : `Upload ${title.toLowerCase()}`}
         </Button>
+        {value && (
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={uploading}
+            onClick={() => {
+              onChange("");
+              setError("");
+            }}
+          >
+            Remove {title.toLowerCase()}
+          </Button>
+        )}
       </div>
+      <p className="text-xs text-muted-foreground">
+        PNG, JPG, WebP or SVG · Up to 5 MB. A transparent background works best.
+      </p>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

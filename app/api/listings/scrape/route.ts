@@ -68,7 +68,7 @@ async function loadAgencyAgents(
 ) {
   const { data: agencyAgents, error: agentsError } = await supabase
     .from("agent_profiles")
-    .select("*")
+    .select("*").is("archived_at", null)
     .eq("agency_id", agencyId);
 
   if (agentsError) {

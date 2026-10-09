@@ -17,14 +17,8 @@ export const COLLATERAL_TYPE_ORDER: CollateralType[] = [
 export function collateralOrderForPurpose(
   purpose: ListingPurpose,
 ): CollateralType[] {
-  return COLLATERAL_TYPE_ORDER.filter((type) =>
-    purpose === "lease"
-      ? type !== "str_report" &&
-        type !== "sales_brochure" &&
-        type !== "lease_appraisal" &&
-        type !== "sales_appraisal"
-      : type !== "rental_brochure",
-  );
+  void purpose;
+  return [...COLLATERAL_TYPE_ORDER];
 }
 
 export const COLLATERAL_TYPE_META: Record<

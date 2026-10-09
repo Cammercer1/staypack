@@ -107,7 +107,7 @@ export function SalesBrochureTemplateStep({
                   Saving...
                 </>
               ) : (
-                "Proceed to content generation"
+                "Continue to edit content"
               )}
             </Button>
           </div>

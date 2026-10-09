@@ -1,3 +1,4 @@
+import { normalizeAdvertisedPrice } from "./pricing";
 import { mergeScrapeMasterSelection } from "@/lib/listings/collateralImages";
 import { detectListingPurpose } from "@/lib/listings/detectListingPurpose";
 import { listingImageMetaForScrapeUpdate } from "@/lib/listings/syncListingImageMeta";
@@ -21,7 +22,10 @@ export function buildScrapedListingFields(
       : null,
   );
 
+  const importedPurpose = detectListingPurpose({ url: listingUrl, displayPrice: listing.displayPrice, aiPurpose: listing.purpose ?? null });
   return {
+    advertised_sale_price: existing?.advertised_sale_price !== undefined ? existing.advertised_sale_price : importedPurpose === "sale" ? normalizeAdvertisedPrice(listing.displayPrice, "sale") : null,
+    advertised_weekly_rent: existing?.advertised_weekly_rent !== undefined ? existing.advertised_weekly_rent : importedPurpose === "lease" ? normalizeAdvertisedPrice(listing.displayPrice, "lease") : null,
     listing_url: listingUrl,
     listing_purpose:
       existing?.listing_purpose ??

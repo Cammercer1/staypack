@@ -38,7 +38,7 @@ import { hasLeaseAppraisalSelectedComps } from "@/lib/lease-appraisal/leaseAppra
 import type { LeaseAppraisalCopy } from "@/lib/lease-appraisal/deriveLeaseAppraisalCopy";
 import { isLeaseAppraisalTemplateId } from "@/lib/lease-appraisal/leaseAppraisalTemplates";
 import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
-import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
+import { resolveAdvertisedPrice } from "@/lib/listings/pricing";
 import { cn } from "@/lib/utils";
 import type {
   Agency,
@@ -143,7 +143,7 @@ export const LeaseAppraisalCopyEditor = forwardRef<
     );
   }, [report.final_report_json, report.updated_at]);
 
-  const displayPrice = useMemo(() => resolveReportDisplayPrice(listing), [listing]);
+  const displayPrice = useMemo(() => resolveAdvertisedPrice(listing, "lease"), [listing]);
   const parsed = useMemo(() => resolveAppraisalInput(listing), [listing]);
   const appraisal = parsed?.rentalAppraisal;
 
@@ -725,7 +725,7 @@ function leaseListingContextSummary(
   if (listing.bathrooms != null) {
     parts.push(`${listing.bathrooms} bath`);
   }
-  const price = displayPrice ?? listing.display_price;
+  const price = displayPrice;
   if (price) {
     parts.push(`Listing price: ${price}`);
   }

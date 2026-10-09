@@ -2,14 +2,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { mergeAppraisalResults, type AppraisalKind } from "./resolveAppraisalInput";
 import type { Listing, ParsedListing } from "@/lib/types";
 
-export async function saveAppraisalResults({ supabase, listing, kind, parsed }: {
+export async function saveAppraisalResults({ supabase, listing, kind, parsed, priceOverrides }: {
   supabase: SupabaseClient;
   listing: Listing;
   kind: AppraisalKind;
   parsed: ParsedListing;
+  priceOverrides?: Listing["appraisal_overrides_json"];
 }): Promise<Listing> {
   const { data, error } = await supabase.from("listings")
-    .update({ scraped_listing_json: mergeAppraisalResults(listing, kind, parsed) })
+    .update({ scraped_listing_json: mergeAppraisalResults(listing, kind, parsed), ...(priceOverrides ? { appraisal_overrides_json: priceOverrides } : {}) })
     .eq("id", listing.id)
     .eq("agency_id", listing.agency_id)
     .eq("updated_at", listing.updated_at)

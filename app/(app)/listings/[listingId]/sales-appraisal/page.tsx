@@ -12,10 +12,13 @@ import type { CollateralItem, Report } from "@/lib/types";
 
 export default async function ListingSalesAppraisalPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ listingId: string }>;
+  searchParams: Promise<{ reportId?: string }>;
 }) {
   const { listingId } = await params;
+  const { reportId } = await searchParams;
 
   let agency;
   let listing;
@@ -27,14 +30,7 @@ export default async function ListingSalesAppraisalPage({
     notFound();
   }
 
-  const photoError = collateralPhotoRequirementError(listing);
-  if (photoError) {
-    redirect(`/listings/${listingId}`);
-  }
 
-  if (listing.listing_purpose === "lease") {
-    redirect(`/listings/${listingId}`);
-  }
 
   const availableTemplates = await resolveAvailableTemplates(
     agency,
@@ -55,7 +51,13 @@ export default async function ListingSalesAppraisalPage({
 
   let report: Report | null = null;
 
-  if (collateral?.report_id) {
+  if (reportId) {
+    const { data } = await supabase.from("reports").select("*").eq("id", reportId).eq("listing_id", listing.id).neq("status", "archived").maybeSingle();
+    if (!data || !data.template_id?.includes("sales-appraisal")) notFound();
+    report = data as Report;
+  }
+
+  if (!report && collateral?.report_id) {
     const { data } = await supabase
       .from("reports")
       .select("*")
@@ -79,6 +81,7 @@ export default async function ListingSalesAppraisalPage({
   }
 
   if (!report) {
+    if (collateralPhotoRequirementError(listing)) redirect(`/listings/${listingId}`);
     const { data: createdReport, error: reportError } = await supabase
       .from("reports")
       .insert({
@@ -139,6 +142,7 @@ export default async function ListingSalesAppraisalPage({
   if (
     soleTemplateId &&
     report.status !== "published" &&
+    collateral.report_id === report.id &&
     collateral.template_id !== soleTemplateId
   ) {
     const { data: updatedCollateral, error: updateError } = await supabase
@@ -172,10 +176,7 @@ export default async function ListingSalesAppraisalPage({
           {SALES_APPRAISAL_LABEL}
         </h1>
         <p className="text-muted-foreground">
-          {soleTemplateId ? "Review" : "Choose a template, then review"} sold and
-          for-sale comps and the price band, generate and edit vendor content,
-          then publish a PDF for{" "}
-          {listing.property_address ?? "this property"}.
+          {listing.property_address ?? "This property"}
         </p>
       </div>
 

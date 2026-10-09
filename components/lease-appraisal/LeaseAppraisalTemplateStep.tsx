@@ -64,11 +64,11 @@ export function LeaseAppraisalTemplateStep({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ template_id: selectedTemplateId }),
       }),
-      fetch(`/api/collateral/${collateral.id}`, {
+      collateral.report_id === report.id ? fetch(`/api/collateral/${collateral.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ template_id: selectedTemplateId }),
-      }),
+      }) : Promise.resolve({ ok: true, json: async () => ({ collateral }) }),
     ]);
 
     const reportPayload = (await reportResponse.json()) as ApiError & {

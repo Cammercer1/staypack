@@ -1,4 +1,5 @@
 "use client";
+import { avmPriceSuggestion } from "@/lib/listings/pricing";
 
 import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
 
@@ -59,6 +60,9 @@ export function SalesAppraisalDataStep({
     activeJob?.status === "pending" || activeJob?.status === "processing";
   const jobFailed = activeJob?.status === "failed";
 
+  const priceEdited = useRef(false);
+  const estimate = avmPriceSuggestion(listing, "sale");
+  const hasPriceOverride = Boolean(listing.appraisal_overrides_json?.sales);
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
   const pollErrorShownRef = useRef(false);
@@ -87,9 +91,11 @@ export function SalesAppraisalDataStep({
 
   /* eslint-disable react-hooks/set-state-in-effect -- sync editable fields when job polling refreshes the listing. */
   useEffect(() => {
-    setPriceMin(String(appraisal?.priceMin ?? ""));
-    setPriceMax(String(appraisal?.priceMax ?? ""));
-    setPriceMid(String(appraisal?.priceMidpoint ?? ""));
+    if (!priceEdited.current) {
+      setPriceMin(String(appraisal?.priceMin ?? ""));
+      setPriceMax(String(appraisal?.priceMax ?? ""));
+      setPriceMid(String(appraisal?.priceMidpoint ?? ""));
+    }
     setAgentReviewConfirmed(agencyGuideReview?.confirmed ?? false);
     if (appraisal?.selectedCompListingIds?.length) {
       setSelectedIds(appraisal.selectedCompListingIds);
@@ -267,6 +273,21 @@ export function SalesAppraisalDataStep({
     }
   }
 
+  async function resetPrice() {
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/listings/${listing.id}/sales-appraisal/data`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset_price: true }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Unable to reset appraisal");
+      priceEdited.current = false;
+      onListingChange(payload.listing);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to reset appraisal");
+    } finally { setSaving(false); }
+  }
+
   async function saveAndContinue() {
     if (!canContinue) {
       toast.error("Fetch comps and select at least one comparable");
@@ -281,9 +302,11 @@ export function SalesAppraisalDataStep({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            price_min: parsePrice(priceMin),
-            price_max: parsePrice(priceMax),
-            price_midpoint: parsePrice(priceMid),
+            ...(priceEdited.current ? {
+              price_min: parsePrice(priceMin),
+              price_max: parsePrice(priceMax),
+              price_midpoint: parsePrice(priceMid),
+            } : {}),
             selected_comp_listing_ids: selectedIds,
             agent_review_confirmed: needsAgentReview
               ? agentReviewConfirmed
@@ -298,6 +321,7 @@ export function SalesAppraisalDataStep({
       if (payload.listing) {
         onListingChange(payload.listing);
       }
+      priceEdited.current = false;
       toast.success("Appraisal data saved");
       onContinue();
     } catch (error) {
@@ -309,7 +333,7 @@ export function SalesAppraisalDataStep({
     }
   }
 
-  const loading = fetching || saving || compsPrefetching || initialCompsProcessing;
+  const loading = fetching || saving;
   const fetchingComps = compsPrefetching || fetching || initialCompsProcessing;
 
   return (
@@ -392,9 +416,15 @@ export function SalesAppraisalDataStep({
 
       {inputError ? <p role="alert" className="text-sm text-destructive">{inputError}</p> : staleEvidence ? <p role="status" className="text-sm text-muted-foreground">Property details changed. Fetch comparables again to update the appraisal.</p> : null}
 
-      {compsReady ? (
-        <>
+      <>
           <div className="surface-card grid gap-4 p-6 sm:grid-cols-3">
+            <div className="sm:col-span-3 space-y-2 text-sm">
+              <p className="font-medium">{hasPriceOverride ? "Your appraisal override" : "Suggested appraisal"}</p>
+              <p className="text-muted-foreground">Edit any amount below. Your saved figures are kept when comparables refresh.</p>
+              {estimate && <p className="text-muted-foreground">Automated estimate: {estimate.display}{estimate.date ? ` · ${estimate.date}` : ""}{estimate.confidence ? ` · ${estimate.confidence} confidence` : ""}. This may be outdated; use your local knowledge.</p>}
+              {hasPriceOverride && <Button type="button" variant="outline" disabled={loading || refreshingComps} onClick={resetPrice}>Use latest suggested appraisal</Button>}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="price-min">Price min ($)</Label>
               <Input
@@ -402,7 +432,7 @@ export function SalesAppraisalDataStep({
                 type="number"
                 min={0}
                 value={priceMin}
-                onChange={(e) => setPriceMin(e.target.value)}
+                onChange={(e) => { priceEdited.current = true; setPriceMin(e.target.value); }}
               />
             </div>
             <div className="space-y-2">
@@ -412,7 +442,7 @@ export function SalesAppraisalDataStep({
                 type="number"
                 min={0}
                 value={priceMax}
-                onChange={(e) => setPriceMax(e.target.value)}
+                onChange={(e) => { priceEdited.current = true; setPriceMax(e.target.value); }}
               />
             </div>
             <div className="space-y-2">
@@ -422,7 +452,7 @@ export function SalesAppraisalDataStep({
                 type="number"
                 min={0}
                 value={priceMid}
-                onChange={(e) => setPriceMid(e.target.value)}
+                onChange={(e) => { priceEdited.current = true; setPriceMid(e.target.value); }}
               />
             </div>
             {priceSummary ? (
@@ -555,8 +585,7 @@ export function SalesAppraisalDataStep({
               </ul>
             )}
           </div>
-        </>
-      ) : null}
+      </>
 
       <Button onClick={saveAndContinue} disabled={loading || !canContinue}>
         {saving ? (
@@ -565,7 +594,7 @@ export function SalesAppraisalDataStep({
             Saving...
           </>
         ) : (
-          "Continue to content generation"
+          "Continue to edit content"
         )}
       </Button>
     </AsyncLoadingOverlay>

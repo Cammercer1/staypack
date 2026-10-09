@@ -39,7 +39,7 @@ export function buildBrochureTemplatePreview({
     agency,
     listing,
     collateral: { ...collateral, template_id: templateId },
-    copy: mockCopy,
+    copy: { ...mockCopy, price_value: existing?.copy.price_value, price_label: existing?.copy.price_label ?? mockCopy.price_label },
     qrCodeUrl: existing?.assets.qr_code_url ?? "",
     qrTargetUrl: existing?.qr_target_url ?? "",
   }));

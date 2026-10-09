@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AgentPhotoUploader } from "@/components/settings/AgentPhotoUploader";
 import { MAX_LISTING_AGENTS } from "@/lib/reports/constants";
 import {
   EMPTY_LISTING_AGENT,
@@ -57,9 +58,9 @@ export function AddListingAgentDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {agencyAgents.length > 0 ? (
+        {agencyAgents.some((profile) => !profile.archived_at) ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            {agencyAgents.map((profile) => {
+            {agencyAgents.filter((profile) => !profile.archived_at).map((profile) => {
               const draft = listingAgentFromProfile(profile);
               const alreadyAttached = listingAgentAlreadyAttached(
                 draft,
@@ -108,7 +109,7 @@ export function AddListingAgentDialog({
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            No saved agents in your agency yet. You can add agents in Settings,
+            No saved agents in your agency yet. You can add agents in the Agents page,
             or enter someone new for this listing below.
           </p>
         )}
@@ -128,6 +129,7 @@ type EditorProps = {
   agents: ListingAgentDraft[];
   agencyAgents: AgentProfile[];
   onChange: (agents: ListingAgentDraft[]) => void;
+  description?: string;
 };
 
 function ListingAgentCard({
@@ -145,18 +147,6 @@ function ListingAgentCard({
     <div className="space-y-3 rounded-xl border border-border/70 bg-background/80 p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-3">
-          {agent.photo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={agent.photo_url}
-              alt=""
-              className="h-12 w-12 shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium">
-              {agent.name.trim().charAt(0) || "?"}
-            </div>
-          )}
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">
               {agent.name.trim() || `Agent ${index + 1}`}
@@ -178,6 +168,13 @@ function ListingAgentCard({
           <X className="h-4 w-4" />
         </Button>
       </div>
+
+      <AgentPhotoUploader
+        fieldId={`listing-agent-photo-${index}`}
+        value={agent.photo_url}
+        fallbackInitial={agent.name}
+        onChange={(photo_url) => onUpdate({ photo_url })}
+      />
 
       <div className="space-y-2">
         <div className="space-y-1.5">
@@ -225,23 +222,12 @@ function ListingAgentCard({
             placeholder="agent@agency.com.au"
           />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={`listing-agent-photo-${index}`} className="text-xs">
-            Photo URL
-          </Label>
-          <Input
-            id={`listing-agent-photo-${index}`}
-            value={agent.photo_url}
-            onChange={(event) => onUpdate({ photo_url: event.target.value })}
-            placeholder="https://..."
-          />
-        </div>
       </div>
     </div>
   );
 }
 
-export function ListingAgentsEditor({ agents, agencyAgents, onChange }: EditorProps) {
+export function ListingAgentsEditor({ agents, agencyAgents, onChange, description }: EditorProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   function updateAgent(index: number, patch: Partial<ListingAgentDraft>) {
@@ -290,8 +276,7 @@ export function ListingAgentsEditor({ agents, agencyAgents, onChange }: EditorPr
         <div>
           <p className="text-sm font-medium">Listing agents</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Add up to {MAX_LISTING_AGENTS} agents for this report. These appear on
-            the published buyer pack footer.
+            {description ?? `Add up to ${MAX_LISTING_AGENTS} agents for this report. These appear on the published buyer pack footer.`}
           </p>
         </div>
 

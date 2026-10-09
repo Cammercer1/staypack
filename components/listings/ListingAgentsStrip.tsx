@@ -1,342 +1,333 @@
 "use client";
-
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Loader2, UserPlus, X } from "lucide-react";
+import { Users, Search, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { AddListingAgentDialog } from "@/components/reports/ListingAgentsEditor";
+import { AgentAvatar } from "@/components/settings/AgentAvatar";
 import { MAX_LISTING_AGENTS } from "@/lib/reports/constants";
 import {
-  EMPTY_LISTING_AGENT,
   initialListingAgents,
   listingAgentAlreadyAttached,
+  listingAgentFromProfile,
   listingAgentsToParsed,
   type ListingAgentDraft,
 } from "@/lib/reports/listingAgents";
 import type { AgentProfile, Listing } from "@/lib/types";
 
-type Props = {
+export function ListingAgentsStrip({
+  listing,
+  onUpdated,
+}: {
   listing: Listing;
   onUpdated: (listing: Listing) => void;
-};
-
-function MinimalAgentCard({
-  agent,
-  onEdit,
-  onRemove,
-}: {
-  agent: ListingAgentDraft;
-  onEdit: () => void;
-  onRemove: () => void;
 }) {
-  const subtitle =
-    agent.role_title || agent.phone || agent.email || "Listing agent";
-
-  return (
-    <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/80 py-1.5 pr-1.5 pl-2">
-      <button
-        type="button"
-        onClick={onEdit}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left"
-      >
-        {agent.photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={agent.photo_url}
-            alt=""
-            className="h-8 w-8 shrink-0 rounded-full object-cover"
-          />
-        ) : (
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-            {agent.name.trim().charAt(0) || "?"}
-          </div>
-        )}
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium">
-            {agent.name.trim() || "Unnamed agent"}
-          </span>
-          <span className="block truncate text-xs text-muted-foreground">
-            {subtitle}
-          </span>
-        </span>
-      </button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        onClick={onRemove}
-        aria-label={`Remove ${agent.name || "agent"}`}
-      >
-        <X className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-}
-
-function ListingAgentEditDialog({
-  agent,
-  open,
-  onClose,
-  onSave,
-}: {
-  agent: ListingAgentDraft | null;
-  open: boolean;
-  onClose: () => void;
-  onSave: (agent: ListingAgentDraft) => void;
-}) {
-  const [draft, setDraft] = useState<ListingAgentDraft>(agent ?? EMPTY_LISTING_AGENT);
-  const [previous, setPrevious] = useState({ open, agent });
-  if (previous.open !== open || previous.agent !== agent) {
-    setPrevious({ open, agent });
-    if (open && agent) setDraft(agent);
-  }
-
-  function updateField(field: keyof ListingAgentDraft, value: string) {
-    setDraft((current) => ({ ...current, [field]: value }));
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          onClose();
-        }
-      }}
-    >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Edit listing agent</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="strip-agent-name">Name</Label>
-            <Input
-              id="strip-agent-name"
-              value={draft.name}
-              onChange={(event) => updateField("name", event.target.value)}
-              placeholder="Agent name"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="strip-agent-role">Role title</Label>
-            <Input
-              id="strip-agent-role"
-              value={draft.role_title}
-              onChange={(event) => updateField("role_title", event.target.value)}
-              placeholder="Sales Consultant"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="strip-agent-phone">Phone</Label>
-            <Input
-              id="strip-agent-phone"
-              value={draft.phone}
-              onChange={(event) => updateField("phone", event.target.value)}
-              placeholder="0400 000 000"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="strip-agent-email">Email</Label>
-            <Input
-              id="strip-agent-email"
-              type="email"
-              value={draft.email}
-              onChange={(event) => updateField("email", event.target.value)}
-              placeholder="agent@agency.com.au"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="strip-agent-photo">Photo URL</Label>
-            <Input
-              id="strip-agent-photo"
-              value={draft.photo_url}
-              onChange={(event) => updateField("photo_url", event.target.value)}
-              placeholder="https://..."
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={() => onSave(draft)}
-            disabled={!draft.name.trim()}
-          >
-            Save agent
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-export function ListingAgentsStrip({ listing, onUpdated }: Props) {
-  const [agents, setAgents] = useState<ListingAgentDraft[]>(() =>
-    initialListingAgents(listing.scraped_listing_json?.agents),
-  );
-  const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const assigned = initialListingAgents(listing.scraped_listing_json?.agents);
+  const [open, setOpen] = useState(false);
+  const [profiles, setProfiles] = useState<AgentProfile[]>([]);
+  const [draft, setDraft] = useState<ListingAgentDraft[]>([]);
+  const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const listingRevision = `${listing.id}:${listing.updated_at}`;
-  const [previousListingRevision, setPreviousListingRevision] = useState(listingRevision);
-  if (previousListingRevision !== listingRevision) {
-    setPreviousListingRevision(listingRevision);
-    setAgents(initialListingAgents(listing.scraped_listing_json?.agents));
-  }
-
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [removed, setRemoved] = useState<ListingAgentDraft[] | null>(null);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(assigned);
   useEffect(() => {
-    fetch("/api/agents")
-      .then((response) => response.json())
-      .then((payload) => setAgencyAgents(payload.agents ?? []))
-      .catch(() => {
-        // Non-blocking — manual agent entry still works.
-      });
-  }, []);
-
-  async function persistAgents(nextAgents: ListingAgentDraft[]) {
+    if (!open) return;
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const response = await fetch("/api/agents");
+        const payload = await response.json();
+        if (!response.ok)
+          throw new Error(payload.error || "Unable to load agents");
+        if (!cancelled) setProfiles(payload.agents || []);
+      } catch (problem) {
+        if (!cancelled)
+          setError(
+            problem instanceof Error
+              ? problem.message
+              : "Unable to load agents",
+          );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+  function launch() {
+    setDraft(assigned);
+    setQuery("");
+    setError("");
+    setRemoved(null);
+    setOpen(true);
+  }
+  function close() {
+    if (saving) return;
+    if (dirty) setDiscardOpen(true);
+    else setOpen(false);
+  }
+  async function save() {
     setSaving(true);
-
+    setError("");
     try {
       const response = await fetch(`/api/listings/${listing.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          listing_agents: listingAgentsToParsed(nextAgents),
-        }),
+        body: JSON.stringify({ listing_agents: listingAgentsToParsed(draft) }),
       });
       const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Unable to save agents");
-      }
-
-      const nextListing = payload.listing as Listing;
-      const savedAgents = initialListingAgents(
-        nextListing.scraped_listing_json?.agents,
-      );
-      setAgents(savedAgents);
-      onUpdated(nextListing);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Unable to save agents",
+      if (!response.ok)
+        throw new Error(payload.error || "Unable to save agents");
+      onUpdated(payload.listing);
+      setOpen(false);
+      toast.success("Listing agents updated");
+    } catch (problem) {
+      setError(
+        problem instanceof Error ? problem.message : "Unable to save agents",
       );
     } finally {
       setSaving(false);
     }
   }
-
-  function openPicker() {
-    if (agents.length >= MAX_LISTING_AGENTS) {
-      toast.error(`You can attach up to ${MAX_LISTING_AGENTS} agents per listing`);
-      return;
-    }
-
-    setPickerOpen(true);
-  }
-
-  function appendAgent(agent: ListingAgentDraft) {
-    if (agents.length >= MAX_LISTING_AGENTS) {
-      toast.error(`You can attach up to ${MAX_LISTING_AGENTS} agents per listing`);
-      return;
-    }
-
-    if (listingAgentAlreadyAttached(agent, agents)) {
-      toast.message("That agent is already on this listing");
-      return;
-    }
-
-    const nextAgents = [...agents, agent];
-    setAgents(nextAgents);
-    setPickerOpen(false);
-
-    if (!agent.name.trim()) {
-      setEditIndex(nextAgents.length - 1);
-      return;
-    }
-
-    void persistAgents(nextAgents);
-  }
-
-  function removeAgent(index: number) {
-    const nextAgents = agents.filter((_, agentIndex) => agentIndex !== index);
-    setAgents(nextAgents);
-    void persistAgents(nextAgents);
-  }
-
-  function saveEditedAgent(agent: ListingAgentDraft) {
-    if (editIndex == null) {
-      return;
-    }
-
-    const nextAgents = agents.map((item, index) =>
-      index === editIndex ? agent : item,
-    );
-    setAgents(nextAgents);
-    setEditIndex(null);
-    void persistAgents(nextAgents);
-  }
-
+  const filtered = profiles.filter(
+    (profile) =>
+      !profile.archived_at &&
+      [profile.name, profile.email, profile.phone].some((value) =>
+        value?.toLowerCase().includes(query.trim().toLowerCase()),
+      ),
+  );
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        {agents.map((agent, index) => (
-          <MinimalAgentCard
-            key={`listing-agent-${index}-${agent.name}`}
-            agent={agent}
-            onEdit={() => setEditIndex(index)}
-            onRemove={() => removeAgent(index)}
-          />
-        ))}
-
-        {agents.length < MAX_LISTING_AGENTS ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={openPicker}
-            disabled={saving}
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs text-base-content/60">Listing agents</span>
+        {assigned.map((agent, index) => (
+          <button
+            key={`${agent.name}-${index}`}
+            onClick={launch}
+            className="flex items-center gap-2 rounded-lg px-1 py-1 text-sm hover:bg-base-200"
           >
-            {saving ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <UserPlus className="h-4 w-4" />
-            )}
-            Add agent
-          </Button>
-        ) : null}
+            <AgentAvatar
+              name={agent.name}
+              src={agent.photo_url}
+              className="size-8"
+            />
+            {agent.name}
+          </button>
+        ))}
+        <button
+          onClick={launch}
+          className="du-btn du-btn-sm du-btn-ghost min-h-10"
+        >
+          <Users className="size-4" />
+          Manage agents
+        </button>
       </div>
-
-      <AddListingAgentDialog
-        open={pickerOpen}
-        agencyAgents={agencyAgents}
-        attachedAgents={agents}
-        onClose={() => setPickerOpen(false)}
-        onSelectProfile={appendAgent}
-        onAddManual={() => appendAgent({ ...EMPTY_LISTING_AGENT })}
-      />
-
-      <ListingAgentEditDialog
-        agent={editIndex != null ? agents[editIndex] : null}
-        open={editIndex != null}
-        onClose={() => setEditIndex(null)}
-        onSave={saveEditedAgent}
-      />
+      <Dialog
+        open={open}
+        onOpenChange={(value) => {
+          if (!value) close();
+        }}
+      >
+        <DialogContent
+          className="max-h-[90dvh] overflow-y-auto sm:max-w-xl"
+          data-theme="staypack-workspace"
+        >
+          <DialogHeader>
+            <DialogTitle>Manage listing agents</DialogTitle>
+            <DialogDescription>
+              Choose up to {MAX_LISTING_AGENTS} agents for this property. This
+              changes the listing assignment, not their agency profiles or
+              published documents.
+            </DialogDescription>
+          </DialogHeader>
+          <section aria-label="Assigned agents" className="space-y-2">
+            <h3 className="text-sm font-medium">
+              Assigned · {draft.length} of {MAX_LISTING_AGENTS}
+            </h3>
+            {draft.map((agent, index) => (
+              <div
+                key={`${agent.name}-${index}`}
+                className="flex items-center gap-3 rounded-xl border border-border p-3"
+              >
+                <AgentAvatar
+                  name={agent.name}
+                  src={agent.photo_url}
+                  className="size-10"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{agent.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {agent.email || agent.phone}
+                  </p>
+                </div>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  disabled={saving}
+                  aria-label={`Remove ${agent.name} from listing`}
+                  onClick={() => {
+                    setRemoved(draft);
+                    setDraft(draft.filter((_, i) => i !== index));
+                  }}
+                >
+                  <X />
+                </Button>
+              </div>
+            ))}
+            {!draft.length && (
+              <p className="text-sm text-muted-foreground">
+                No listing agents assigned. Reports may use the agency default.
+              </p>
+            )}
+            {removed && (
+              <button
+                className="text-sm underline"
+                disabled={saving}
+                onClick={() => {
+                  setDraft(removed);
+                  setRemoved(null);
+                }}
+              >
+                Undo removal
+              </button>
+            )}
+          </section>
+          <div className="border-t border-border pt-4">
+            <label
+              htmlFor="listing-agent-search"
+              className="text-sm font-medium"
+            >
+              Find an agency agent
+            </label>
+            <div className="relative mt-2">
+              <Search className="absolute left-3 top-3 size-4 text-muted-foreground" />
+              <input
+                id="listing-agent-search"
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search by name, email or phone"
+                className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm"
+              />
+            </div>
+            {draft.length === MAX_LISTING_AGENTS && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Both agent spaces are filled. Remove an assigned agent to choose
+                a replacement.
+              </p>
+            )}
+            <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto">
+              {filtered.map((profile) => {
+                const agent = listingAgentFromProfile(profile);
+                const attached = listingAgentAlreadyAttached(agent, draft);
+                return (
+                  <li key={profile.id}>
+                    <button
+                      disabled={
+                        saving || attached || draft.length >= MAX_LISTING_AGENTS
+                      }
+                      onClick={() => {
+                        setDraft([...draft, agent]);
+                        setRemoved(null);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg p-3 text-left hover:bg-muted disabled:opacity-50"
+                    >
+                      <AgentAvatar
+                        name={agent.name}
+                        src={agent.photo_url}
+                        className="size-9"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium">
+                          {agent.name}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {agent.email || agent.phone}
+                        </span>
+                      </span>
+                      {attached ? (
+                        <span className="text-xs">Assigned</span>
+                      ) : (
+                        <Plus className="size-4" />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {loading ? (
+              <p role="status" className="text-sm">
+                Loading agents…
+              </p>
+            ) : (
+              !filtered.length && (
+                <p className="py-4 text-sm text-muted-foreground">
+                  No matching agents.
+                </p>
+              )
+            )}
+            <p className="mt-3 text-xs text-muted-foreground">
+              Add people or edit profile details in{" "}
+              <Link
+                href="/settings/agents"
+                target="_blank"
+                className="underline"
+              >
+                Agents
+              </Link>
+              , then reopen this panel.
+            </p>
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={close} disabled={saving}>
+              Cancel
+            </Button>
+            <Button disabled={!dirty || saving} onClick={save}>
+              {saving ? "Saving…" : "Save agents"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <DialogContent>
+          <DialogTitle>Discard agent changes?</DialogTitle>
+          <DialogDescription>
+            Your listing assignments have not been saved.
+          </DialogDescription>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDiscardOpen(false)}>
+              Keep editing
+            </Button>
+            <Button
+              onClick={() => {
+                setDiscardOpen(false);
+                setOpen(false);
+              }}
+            >
+              Discard changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

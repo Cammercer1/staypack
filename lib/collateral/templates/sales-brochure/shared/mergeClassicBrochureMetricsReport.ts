@@ -11,18 +11,10 @@ export function mergeClassicBrochureMetricsReport(
   const strSource = options?.strReport ?? base;
   const leaseSource = options?.leaseReport ?? base;
 
-  const displayPrice =
-    base.property.display_price?.trim() ||
-    strSource.property.display_price?.trim() ||
-    leaseSource.property.display_price?.trim() ||
-    "";
-
   return {
     ...base,
-    property: {
-      ...base.property,
-      display_price: displayPrice,
-    },
+    // Advertising prices belong to this document, even when intentionally blank.
+    // An attached appraisal supplies metrics, never a replacement asking price.
     str: { ...base.str, ...strSource.str },
     ltr: { ...base.ltr, ...leaseSource.ltr },
     str_yield: base.str_yield ?? strSource.str_yield ?? null,

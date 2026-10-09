@@ -21,13 +21,6 @@ import type {
 
 export { DEFAULT_LEASE_APPRAISAL_TEMPLATE_ID as LEASE_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/templates/lease-appraisal/ids";
 
-function assertSaleListing(listing: Listing) {
-  if (listing.listing_purpose === "lease") {
-    throw new Error(
-      "Rental appraisals are only available for listings marked for sale",
-    );
-  }
-}
 
 
 export function resolveAgentProfile(
@@ -40,7 +33,7 @@ export function resolveAgentProfile(
     );
   }
 
-  return agencyAgents.find((agent) => agent.is_default) ?? agencyAgents[0] ?? null;
+  return agencyAgents.find((agent) => agent.is_default && !agent.archived_at) ?? agencyAgents.find((agent) => !agent.archived_at) ?? null;
 }
 
 export function hasLeaseAppraisalComps(parsed: ParsedListing | null | undefined) {
@@ -64,7 +57,6 @@ export async function createLeaseAppraisalDraft({
   listing: Listing;
   userId?: string;
 }): Promise<{ report: Report; listing: Listing }> {
-  assertSaleListing(listing);
 
   const { data: existingCollateral } = await supabase
     .from("collateral_items")
@@ -133,13 +125,12 @@ export async function generateLeaseAppraisalReportContent({
   agencyAgents?: AgentProfile[];
   templateId?: string;
 }): Promise<{ report: Report; listing: Listing; parsed: ParsedListing }> {
-  assertSaleListing(initialListing);
 
   let listing = initialListing;
 
   const appraisalInput = resolveAppraisalInput(listing);
 
-  const parsed = await ensureLeaseAppraisalPositioning(appraisalInput);
+  const parsed = listing.appraisal_overrides_json?.lease ? appraisalInput : await ensureLeaseAppraisalPositioning(appraisalInput);
 
   if (parsed !== appraisalInput) {
     listing = await saveAppraisalResults({ supabase, listing, kind: "lease", parsed });
@@ -217,7 +208,8 @@ export async function generateLeaseAppraisalReportContent({
       template_id: resolvedTemplateId,
     })
     .eq("listing_id", listing.id)
-    .eq("type", "lease_appraisal");
+    .eq("type", "lease_appraisal")
+    .eq("report_id", savedReport.id);
 
   return {
     report: savedReport as Report,

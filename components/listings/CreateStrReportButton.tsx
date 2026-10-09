@@ -14,9 +14,14 @@ import type { CollateralPhotoRequirement } from "@/lib/listings/collateralPhotoR
 type Props = {
   listingId: string;
   photoRequirement: CollateralPhotoRequirement;
+  label?: string;
 };
 
-export function CreateStrReportButton({ listingId, photoRequirement }: Props) {
+export function CreateStrReportButton({
+  listingId,
+  photoRequirement,
+  label = `Create ${STR_REPORT_LABEL}`,
+}: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -34,14 +39,18 @@ export function CreateStrReportButton({ listingId, photoRequirement }: Props) {
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error ?? `Unable to create ${STR_REPORT_LABEL}`);
+        throw new Error(
+          payload.error ?? `Unable to create ${STR_REPORT_LABEL}`,
+        );
       }
 
       router.push(reportEditorPath(listingId, payload.report.id));
       router.refresh();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : `Unable to create ${STR_REPORT_LABEL}`,
+        error instanceof Error
+          ? error.message
+          : `Unable to create ${STR_REPORT_LABEL}`,
       );
       setLoading(false);
     }
@@ -59,7 +68,7 @@ export function CreateStrReportButton({ listingId, photoRequirement }: Props) {
           Creating...
         </>
       ) : (
-        <>Create {STR_REPORT_LABEL}</>
+        <>{label}</>
       )}
     </Button>
   );

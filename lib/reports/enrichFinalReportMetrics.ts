@@ -18,7 +18,8 @@ export function enrichFinalReportMetrics(
   finalReport: FinalReportJson,
   options?: EnrichOptions,
 ): FinalReportJson {
-  const displayPrice = resolveReportDisplayPrice({
+  const isAppraisal = finalReport.version === "lease_appraisal_v1" || finalReport.version === "sales_appraisal_v1";
+  const displayPrice = isAppraisal ? finalReport.property.display_price : resolveReportDisplayPrice({
     display_price:
       sourceListing.display_price ?? finalReport.property.display_price ?? null,
     scraped_listing_json: sourceListing.scraped_listing_json,

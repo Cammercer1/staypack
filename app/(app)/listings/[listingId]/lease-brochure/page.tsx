@@ -25,14 +25,7 @@ export default async function ListingLeaseBrochurePage({
     notFound();
   }
 
-  if (listing.listing_purpose === "sale") {
-    redirect(`/listings/${listingId}`);
-  }
 
-  const photoError = collateralPhotoRequirementError(listing);
-  if (photoError) {
-    redirect(`/listings/${listingId}`);
-  }
 
   let { data: collateral } = await supabase
     .from("collateral_items")
@@ -43,6 +36,7 @@ export default async function ListingLeaseBrochurePage({
     .maybeSingle();
 
   if (!collateral) {
+    if (collateralPhotoRequirementError(listing)) redirect(`/listings/${listingId}`);
     const { data: created, error } = await supabase
       .from("collateral_items")
       .insert({
@@ -77,8 +71,7 @@ export default async function ListingLeaseBrochurePage({
       <div>
         <h1 className="heading-gradient text-3xl font-semibold">{meta.label}</h1>
         <p className="text-muted-foreground">
-          Choose a template, generate brochure copy, and publish for{" "}
-          {listing.property_address ?? "this listing"}.
+          {listing.property_address ?? "This property"}
         </p>
       </div>
 

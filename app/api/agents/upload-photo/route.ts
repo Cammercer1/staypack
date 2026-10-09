@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAgencyAdmin } from "@/lib/auth/requireUser";
 
-const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/avif"];
+import { validateAgentPhoto } from "@/lib/agents/photo";
 
 export async function POST(request: Request) {
   try {
@@ -14,22 +14,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        { error: "Photo must be PNG, JPG, WEBP or AVIF" },
-        { status: 400 },
-      );
-    }
-
-    const extension = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+    const validationError = validateAgentPhoto(file);
+    if (validationError)
+      return NextResponse.json({ error: validationError }, { status: 400 });
+    const extension = (
+      {
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/webp": "webp",
+        "image/avif": "avif",
+      } as Record<string, string>
+    )[file.type];
     const path = `${agency.id}/${crypto.randomUUID()}.${extension}`;
     const admin = createAdminClient();
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    const { error } = await admin.storage.from("agent-assets").upload(path, buffer, {
-      contentType: file.type || "image/jpeg",
-      upsert: false,
-    });
+    const { error } = await admin.storage
+      .from("agent-assets")
+      .upload(path, buffer, {
+        contentType: file.type || "image/jpeg",
+        upsert: false,
+      });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });

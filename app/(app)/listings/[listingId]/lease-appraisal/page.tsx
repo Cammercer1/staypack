@@ -55,10 +55,13 @@ async function clearLegacyAutoTemplate(
 
 export default async function ListingLeaseAppraisalPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ listingId: string }>;
+  searchParams: Promise<{ reportId?: string }>;
 }) {
   const { listingId } = await params;
+  const { reportId } = await searchParams;
 
   let agency;
   let listing;
@@ -70,14 +73,7 @@ export default async function ListingLeaseAppraisalPage({
     notFound();
   }
 
-  const photoError = collateralPhotoRequirementError(listing);
-  if (photoError) {
-    redirect(`/listings/${listingId}`);
-  }
 
-  if (listing.listing_purpose === "lease") {
-    redirect(`/listings/${listingId}`);
-  }
 
   const availableTemplates = await resolveAvailableTemplates(agency, "lease");
   const soleTemplateId =
@@ -95,7 +91,13 @@ export default async function ListingLeaseAppraisalPage({
 
   let report: Report | null = null;
 
-  if (collateral?.report_id) {
+  if (reportId) {
+    const { data } = await supabase.from("reports").select("*").eq("id", reportId).eq("listing_id", listing.id).neq("status", "archived").maybeSingle();
+    if (!data || !data.template_id?.includes("lease-appraisal")) notFound();
+    report = data as Report;
+  }
+
+  if (!report && collateral?.report_id) {
     const { data } = await supabase
       .from("reports")
       .select("*")
@@ -119,6 +121,7 @@ export default async function ListingLeaseAppraisalPage({
   }
 
   if (!report) {
+    if (collateralPhotoRequirementError(listing)) redirect(`/listings/${listingId}`);
     const { data: createdReport, error: reportError } = await supabase
       .from("reports")
       .insert({
@@ -179,6 +182,7 @@ export default async function ListingLeaseAppraisalPage({
   if (
     soleTemplateId &&
     report.status !== "published" &&
+    collateral.report_id === report.id &&
     collateral.template_id !== soleTemplateId
   ) {
     const { data: updatedCollateral, error: updateError } = await supabase
@@ -220,10 +224,7 @@ export default async function ListingLeaseAppraisalPage({
           {LEASE_APPRAISAL_LABEL}
         </h1>
         <p className="text-muted-foreground">
-          {soleTemplateId ? "Review" : "Choose a template, then review"} rent
-          comps and the weekly range, generate and edit
-          investor content, then publish a PDF for{" "}
-          {listing.property_address ?? "this property"}.
+          {listing.property_address ?? "This property"}
         </p>
       </div>
 

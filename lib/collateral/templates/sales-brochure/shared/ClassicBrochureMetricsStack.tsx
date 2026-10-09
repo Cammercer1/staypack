@@ -31,14 +31,13 @@ function resolveClassicBrochureMetric(
   const variant = resolveReportPageVariant(report, reportVariant);
 
   if (isSalePageVariant(variant)) {
-    const listingPrice =
-      report.property.display_price?.trim() || resolveBrochurePrice(document);
+    const listingPrice = resolveBrochurePrice(document);
     if (!listingPrice) {
       return null;
     }
     return {
       id: "listing_price",
-      label: "Price guide",
+      label: document.type === "rental_brochure" ? "Rent" : "Price guide",
       value: listingPrice,
     };
   }

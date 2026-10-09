@@ -13,7 +13,7 @@ import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages
 import { resolveListingImageMetaForPool } from "@/lib/listings/syncListingImageMeta";
 import { mockBlurbVariantsFromText } from "@/lib/copy/blurbVariantEnforce";
 import { coerceSalesBrochureCopy } from "@/lib/collateral/sales-brochure/propertyHighlights";
-import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
+import { resolveAdvertisedPrice } from "@/lib/listings/pricing";
 import {
   primaryReportAgent,
   resolveReportAgents,
@@ -89,7 +89,7 @@ export function buildBrochureDocument({
       agencyAgents,
     });
   const agent = primaryReportAgent(agents);
-  const displayPrice = resolveReportDisplayPrice(listing, scraped);
+  const displayPrice = resolveAdvertisedPrice(listing, collateralType === "rental_brochure" ? "lease" : "sale");
 
   const base = {
     ...preserveDocumentLink(collateral.document_json),
@@ -130,7 +130,7 @@ export function buildBrochureDocument({
       bathrooms: listing.bathrooms ?? scraped?.bathrooms ?? 0,
       car_spaces: listing.car_spaces ?? scraped?.carSpaces ?? 0,
       land_area_sqm: null,
-      display_price: displayPrice ?? listing.display_price ?? scraped?.displayPrice ?? "",
+      display_price: displayPrice ?? "",
       hero_image_url: images.hero_image_url,
       selected_image_urls: images.selected_image_urls,
       page_one_image_urls: images.page_one_image_urls,

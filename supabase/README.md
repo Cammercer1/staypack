@@ -20,3 +20,13 @@ Optional later (step numbers above assume full migration run):
 - Add `GOOGLE_MAPS_API_KEY`
 
 Without third-party keys, development mode returns mock estimate/copy/PDF data so the UI can be tested end-to-end.
+
+## Migration history
+
+The original numbered migrations were installed through the SQL editor. Do not
+blindly replay them on the existing production database with `db push`; its CLI
+history is not a baseline of those older installations.
+
+The 9 October 2026 agent directory and separate property price migrations are
+already applied and recorded in production. Their filenames match the recorded
+versions. Deploying the application does not run migrations automatically.

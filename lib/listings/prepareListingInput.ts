@@ -1,3 +1,4 @@
+import { normalizeAdvertisedPrice } from "./pricing";
 import { appraisalInputFingerprint, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
 import { geocodeReportAddress, hasGeocodableAddress } from "@/lib/geocoding";
 import {
@@ -23,6 +24,11 @@ function syncLegacyLandingImages(prepared: UpdateListingInput) {
 
 export async function prepareListingInput(body: UpdateListingInput) {
   const prepared = { ...body };
+  if (body.display_price !== undefined) {
+    const purpose = body.listing_purpose ?? "sale";
+    const key = purpose === "lease" ? "advertised_weekly_rent" : "advertised_sale_price";
+    if (body[key] === undefined) prepared[key] = normalizeAdvertisedPrice(body.display_price, purpose);
+  }
 
   if (prepared.listing_agents !== undefined) {
     const currentScraped = prepared.scraped_listing_json ?? parsedListingSchema.parse({
@@ -121,6 +127,11 @@ export async function prepareListingPatch(
   existing: Listing,
 ) {
   const prepared = { ...body };
+  if (body.display_price !== undefined) {
+    const purpose = body.listing_purpose ?? existing.listing_purpose;
+    const key = purpose === "lease" ? "advertised_weekly_rent" : "advertised_sale_price";
+    if (body[key] === undefined) prepared[key] = normalizeAdvertisedPrice(body.display_price, purpose);
+  }
 
   if (prepared.listing_agents !== undefined) {
     const currentScraped = existing.scraped_listing_json ?? parsedListingSchema.parse({
@@ -145,6 +156,9 @@ export async function prepareListingPatch(
     };
     delete prepared.listing_agents;
   }
+
+  const priceKey = existing.listing_purpose === "lease" ? "advertised_weekly_rent" : "advertised_sale_price";
+  if (body[priceKey] !== undefined) prepared.display_price = body[priceKey];
 
   // Undefined optional values are omitted by the database client, not saved as clears.
   const savedFields = Object.fromEntries(

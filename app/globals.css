@@ -3,6 +3,49 @@
 @import "shadcn/tailwind.css";
 @plugin "@tailwindcss/typography";
 
+/* Opt in per workspace view; omit daisyUI's global base/reset styles. */
+@plugin "daisyui" {
+  themes: false;
+  include: button, badge, input, select, list, stat, card, alert, menu;
+  prefix: "du-";
+  logs: false;
+}
+
+@plugin "daisyui/theme" {
+  name: "staypack-workspace";
+  default: false;
+  prefersdark: false;
+  color-scheme: light;
+  --color-base-100: #fffdf8;
+  --color-base-200: #f3ede0;
+  --color-base-300: #ebe4d4;
+  --color-base-content: #002e36;
+  --color-primary: #095b42;
+  --color-primary-content: #fffdf8;
+  --color-secondary: #f3ede0;
+  --color-secondary-content: #002e36;
+  --color-accent: #e8efe3;
+  --color-accent-content: #095b42;
+  --color-neutral: #002e36;
+  --color-neutral-content: #fffdf8;
+  --color-info: #dcebf1;
+  --color-info-content: #16485c;
+  --color-success: #e8efe3;
+  --color-success-content: #095b42;
+  --color-warning: #fbebc7;
+  --color-warning-content: #754a12;
+  --color-error: #f9dfda;
+  --color-error-content: #8d2f24;
+  --radius-selector: 0.5rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

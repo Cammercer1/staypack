@@ -55,9 +55,7 @@ export function BrandKitEditor({
               value={preview.logo_dark_url ?? preview.logo_url ?? ""}
               onChange={(value) => {
                 form.setValue("logo_dark_url", value, { shouldDirty: true });
-                if (!form.getValues("logo_light_url")) {
-                  form.setValue("logo_url", value, { shouldDirty: true });
-                }
+                form.setValue("logo_url", value, { shouldDirty: true });
               }}
               agencyId={agencyId}
             />

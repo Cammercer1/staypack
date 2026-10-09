@@ -7,7 +7,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 
-export function LogoutButton({ redirectTo = "/login" }: { redirectTo?: string }) {
+export function LogoutButton({
+  redirectTo = "/login",
+  className,
+}: {
+  redirectTo?: string;
+  className?: string;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -32,6 +38,7 @@ export function LogoutButton({ redirectTo = "/login" }: { redirectTo?: string })
       type="button"
       variant="ghost"
       size="sm"
+      className={className}
       disabled={loading}
       onClick={handleLogout}
     >

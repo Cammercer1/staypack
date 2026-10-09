@@ -40,7 +40,7 @@ const PREVIEW_SYNC_MIN_MS = 400;
 const steps = [
   { id: "template", label: "Choose template" },
   { id: "data", label: "Appraisal data" },
-  { id: "copy", label: "Content generation" },
+  { id: "copy", label: "Edit content" },
   { id: "preview", label: "Preview & publish" },
 ];
 
@@ -360,7 +360,7 @@ export function LeaseAppraisalWizard({
               className="font-medium text-foreground underline-offset-4 hover:underline"
               onClick={() => handleStepChange("copy")}
             >
-              Content generation
+              Edit content
             </button>{" "}
             tab.
           </p>
@@ -399,7 +399,7 @@ export function LeaseAppraisalWizard({
             )}
           </AsyncLoadingOverlay>
 
-          <div className="flex flex-wrap gap-3 no-print">
+          <div className="sticky bottom-3 z-10 flex flex-wrap gap-3 rounded-xl border border-border bg-background p-4 shadow-sm no-print">
             <DownloadPdfButton
               url={report.pdf_url}
               reportId={report.id}

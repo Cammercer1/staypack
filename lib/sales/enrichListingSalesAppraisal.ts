@@ -601,7 +601,7 @@ export async function enrichListingSalesAppraisal(
       band = guideResolution.band;
       pushUniqueWarning(
         warnings,
-        `Sales appraisal retained the agency's advertised guide (${formatSalePriceRange(agencyGuide.priceMin, agencyGuide.priceMax)}) as the appraisal range.`,
+        `Sales appraisal retained the agency's advertised guide (${formatSalePriceRange(agencyGuide.priceMin, agencyGuide.priceMax)}) as separate context for agent review.`,
       );
     }
 

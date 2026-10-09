@@ -21,11 +21,11 @@ export default async function BrandSettingsPage() {
             Ask an admin to update brand settings
           </h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            You can keep using the agency workspace with the current branding. Brand
-            changes are restricted to admins.
+            You can keep using the agency workspace with the current branding.
+            Brand changes are restricted to admins.
           </p>
-          <Link href="/settings" className="mt-5 inline-block">
-            <Button variant="outline">Back to settings</Button>
+          <Link href="/dashboard" className="mt-5 inline-block">
+            <Button variant="outline">Back to dashboard</Button>
           </Link>
         </div>
       </div>
@@ -37,8 +37,8 @@ export default async function BrandSettingsPage() {
       <PageHeader
         eyebrow="Brand"
         highlight="Shape"
-        title="how your reports look."
-        description="Set logo, colours, default copy and disclaimers used across every STR potential report."
+        title="your agency’s brand."
+        description="Make reports, brochures and listing pages feel like your agency. Preview your changes before saving."
       />
       <BrandSettingsForm agency={agency} />
     </div>
