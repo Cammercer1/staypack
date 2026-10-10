@@ -8,7 +8,7 @@ import { geocodeReportAddress } from "@/lib/geocoding";
 import { strEstimateSchema } from "@/lib/validation/schemas";
 import { fetchStrEstimate } from "@/lib/str/estimate";
 import { calculateAccommodates } from "@/lib/reports/formatters";
-import { applyStrEstimateAdjustments, readStrRateOverride, saveStrRateOverride } from "@/lib/reports/strEstimateAdjustments";
+import { applyStrEstimateAdjustments, initialStrManagementScenario, readStrRateOverride, saveStrRateOverride } from "@/lib/reports/strEstimateAdjustments";
 import { selectStrComps } from "@/lib/str/comparables";
 
 // One calculator request, followed by cached or freshly fetched market history.
@@ -48,7 +48,10 @@ export async function POST(request: Request) {
     const { estimate, enrichment: freshEnrichment } = await fetchStrEstimate(
       { latitude, longitude, bedrooms, bathrooms, accommodates }, listing, report.str_enrichment_json,
     );
-    const rates = readStrRateOverride(report);
+    const initialScenario = !report.original_estimate_json && !report.final_estimate_json && !report.final_report_json && !readStrRateOverride(report)
+      ? initialStrManagementScenario(estimate, agency.str_management_presets) : null;
+    const rates = readStrRateOverride(report) ?? initialScenario?.rates ?? null;
+    const overrides = saveStrRateOverride(report.user_overrides_json, rates, initialScenario?.assumptions ?? report.user_overrides_json?.strManagement);
     const finalEstimate = rates ? applyStrEstimateAdjustments(estimate, rates) : estimate;
     const retainedIds = report.str_enrichment_json?.selected_comp_ids?.filter((id) =>
       (freshEnrichment.comp_pool ?? freshEnrichment.comps).some((comp) => comp.listing_id === id),
@@ -77,7 +80,7 @@ export async function POST(request: Request) {
       agentProfile: await loadListingAgentProfile(supabase, listing),
       agencyAgents: await loadAgencyAgentProfiles(supabase, agency.id),
       listing: updatedProperty,
-      report: { ...report, str_enrichment_json: enrichment, raw_airbtics_json: null },
+      report: { ...report, original_estimate_json: estimate, user_overrides_json: overrides, str_enrichment_json: enrichment, raw_airbtics_json: null },
       estimate: finalEstimate,
       copy: savedCopy,
       propertyImages: preserveReportImages(report.final_report_json),
@@ -93,7 +96,7 @@ export async function POST(request: Request) {
         airbtics_fetched_at: null,
         original_estimate_json: estimate,
         final_estimate_json: finalEstimate,
-        user_overrides_json: { ...saveStrRateOverride(report.user_overrides_json, rates), estimateInputs: { bedrooms, bathrooms, accommodates } },
+        user_overrides_json: { ...overrides, estimateInputs: { bedrooms, bathrooms, accommodates } },
         pdf_url: null,
         final_report_json: finalDocument ? invalidateReportPdf(finalDocument) : null,
         raw_airbtics_json: null,

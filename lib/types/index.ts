@@ -405,8 +405,38 @@ export type StrEnrichmentJson = {
   comps: StrCompCard[];
 };
 
+export type StrManagementAssumptions = {
+  unavailableNights: number;
+  listingStage: "established" | "launch_year";
+  rationale: string;
+  presetName?: string;
+  presetAdjustment?: { adrPercent: number; occupancyPoints: number };
+  presetUpliftPercent?: number;
+};
+
+export type StrManagementPreset = {
+  id: string;
+  name: string;
+  assumptions: StrManagementAssumptions;
+} & ({
+  mode?: "absolute";
+  isDefault?: false;
+  nightlyRate: number;
+  occupancyRate: number;
+} | {
+  mode: "relative";
+  isDefault?: boolean;
+  adrPercent: number;
+  occupancyPoints: number;
+} | {
+  mode: "uplift";
+  isDefault?: boolean;
+  upliftPercent: number;
+});
+
 export type StrEstimateOverrides = Partial<StrEstimate> & {
   strAdjustment?: { nightlyRate: number; occupancyRate: number };
+  strManagement?: StrManagementAssumptions;
   estimateInputs?: { bedrooms: number; bathrooms: number; accommodates: number };
   recommendedAnnualRevenue?: number | null;
   recommendedOccupancyRate?: number | null;
@@ -590,6 +620,12 @@ export type FinalReportJson = import("@/lib/documents/documentLink").DocumentLin
     yield_max_percent: number;
     yield_midpoint_percent: number;
   } | null;
+  /** Frozen at report generation; never read live agency presets when rendering. */
+  str_scenario?: {
+    basis: "market" | "adjusted" | "management";
+    market_benchmark: { annual_revenue: number | null; nightly_rate: number | null; occupancy_rate: number | null };
+    management?: StrManagementAssumptions & { companyName: string };
+  };
   ltr: {
     weekly_min: number | null;
     weekly_max: number | null;
@@ -664,6 +700,7 @@ export type Agency = {
   default_disclaimer: string | null;
   report_template_id: string;
   collateral_template_defaults: Record<string, string>;
+  str_management_presets?: StrManagementPreset[] | null;
   brand_advanced_json?: import("@/lib/branding/advanced").AgencyBrandAdvanced | null;
   created_at: string;
   updated_at: string;

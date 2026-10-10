@@ -100,13 +100,14 @@ export async function PATCH(
       }
       const baseline = storedReport.original_estimate_json;
       if (!baseline) throw new Error("Get a market estimate before adjusting the figures.");
-      const rates = adjustment.mode === "rates"
+      const rates = adjustment.mode !== "baseline"
         ? { nightlyRate: adjustment.nightlyRate, occupancyRate: adjustment.occupancyRate }
         : null;
       body.final_estimate_json = rates
         ? applyStrEstimateAdjustments(baseline, rates)
         : reconcileStrEstimate(baseline);
-      body.user_overrides_json = saveStrRateOverride(storedReport.user_overrides_json, rates);
+      body.user_overrides_json = saveStrRateOverride(storedReport.user_overrides_json, rates,
+        adjustment.mode === "management" ? adjustment.assumptions : null);
     }
     const selectedIds = body.selected_comp_listing_ids;
     delete body.selected_comp_listing_ids;

@@ -144,7 +144,7 @@ export function OcRealEstateStrPageOne({
                 className="max-w-[220px] text-[11px] font-semibold uppercase leading-[1.2] tracking-[0.08em] text-[#6F5D57]"
                 style={{ fontFamily: fonts.headingFontFamily }}
               >
-                Estimated gross STR revenue
+                {report.str_scenario?.basis === "management" ? "Managed STR revenue estimate" : "Estimated gross STR revenue"}
               </p>
               <strong className="mt-2 block whitespace-nowrap text-[29px] font-extrabold leading-none tracking-[-0.035em] tabular-nums">
                 {formatCurrency(report.str.annual_revenue)}

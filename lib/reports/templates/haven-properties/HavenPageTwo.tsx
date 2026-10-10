@@ -23,6 +23,7 @@ export function HavenPageTwo({ report }: Props) {
   const enrichment = report.str_enrichment;
   const comps = enrichment?.comps ?? [];
   const seasonality = enrichment?.seasonality ?? [];
+  const hasScenarioSummary = report.str_scenario != null && report.str_scenario.basis !== "market";
 
   return (
     <section
@@ -63,20 +64,22 @@ export function HavenPageTwo({ report }: Props) {
           <section className="border-t border-neutral-200/80 pt-4">
             <ClassicCompsGrid
               comps={comps}
+              showManagement={report.str_scenario?.basis === "management"}
               suburb={report.property.suburb}
               featuredCount={enrichment?.selected_comp_ids ? comps.length : HAVEN_FEATURED_COMP_COUNT}
-              imageAspectClass={HAVEN_COMP_IMAGE_ASPECT}
+              imageAspectClass={hasScenarioSummary ? "aspect-[4/1]" : HAVEN_COMP_IMAGE_ASPECT}
               compact
               showPoolSubtitle={false}
             />
           </section>
 
-          <section className="border-t border-neutral-200/80 pt-4">
-            <ClassicMarketInsights report={report} compact />
+          <section className={`border-t border-neutral-200/80 pt-4 ${hasScenarioSummary ? "flex items-end gap-4" : ""}`}>
+            <div className="min-w-0 flex-1"><ClassicMarketInsights report={report} compact /></div>
+            {hasScenarioSummary && <DocumentQr document={report} />}
           </section>
         </div>
       </div>
-      {report.document_link && report.document_link.mode !== "none" && report.assets.qr_code_url ? <div className="flex shrink-0 justify-end px-10 pb-3"><DocumentQr document={report} /></div> : null}
+      {!hasScenarioSummary && report.document_link && report.document_link.mode !== "none" && report.assets.qr_code_url ? <div className="flex shrink-0 justify-end px-10 pb-3"><DocumentQr document={report} /></div> : null}
     </section>
   );
 }

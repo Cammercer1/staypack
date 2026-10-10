@@ -122,7 +122,7 @@ export async function GET() {
       return NextResponse.json({ agency: null });
     }
 
-    return NextResponse.json({ agency: membership.agency });
+    return NextResponse.json({ agency: membership.agency, can_manage_str_defaults: ["owner", "admin"].includes(membership.role) });
   } catch (error) {
     return NextResponse.json(
       {

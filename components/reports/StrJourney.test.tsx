@@ -154,10 +154,11 @@ function setup(draft = false) {
       };
     } else if (init?.method === "PATCH") {
       if (body.str_adjustment) {
-        const rates = body.str_adjustment.mode === "rates"
+        const rates = body.str_adjustment.mode !== "baseline"
           ? { nightlyRate: body.str_adjustment.nightlyRate, occupancyRate: body.str_adjustment.occupancyRate } : null;
         body.final_estimate_json = rates ? applyStrEstimateAdjustments(report.original_estimate_json!, rates) : reconcileStrEstimate(report.original_estimate_json!);
-        body.user_overrides_json = saveStrRateOverride(report.user_overrides_json, rates);
+        body.user_overrides_json = saveStrRateOverride(report.user_overrides_json, rates,
+          body.str_adjustment.mode === "management" ? body.str_adjustment.assumptions : null);
       }
       report = {
         ...report,

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Report, StrEnrichmentJson, StrEstimate, StrEstimateOverrides } from "@/lib/types";
+import type { Report, StrEnrichmentJson, StrEstimate, StrEstimateOverrides, StrManagementAssumptions, StrManagementPreset } from "@/lib/types";
 
 export type StrRevenueBand = {
   min: number;
@@ -17,11 +17,115 @@ export const strRateInputsSchema = z.object({
   occupancyRate: z.number().min(0).max(100),
 }).strict();
 
+const relativeAdjustmentSchema = z.object({
+  adrPercent: z.number().min(-99).max(300),
+  occupancyPoints: z.number().min(-100).max(100),
+}).strict();
+
+export const strUpliftPercentSchema = z.number().min(-100).max(300);
+
+export const strManagementAssumptionsSchema = z.object({
+  unavailableNights: z.number().int().min(0).max(365),
+  listingStage: z.enum(["established", "launch_year"]),
+  rationale: z.string().trim().min(1, "Explain the operating assumptions").max(300),
+  presetName: z.string().trim().min(1).max(80).optional(),
+  presetAdjustment: relativeAdjustmentSchema.optional(),
+  presetUpliftPercent: strUpliftPercentSchema.optional(),
+}).strict();
+
+const managementRatesSchema = strRateInputsSchema.extend({
+  assumptions: strManagementAssumptionsSchema,
+});
+
+function fitsAvailability(value: { occupancyRate: number; assumptions: StrManagementAssumptions }) {
+  return value.occupancyRate / 100 * 365 <= 365 - value.assumptions.unavailableNights + 0.000001;
+}
+const availabilityMessage = "Booked nights exceed the nights available. Reduce occupancy or unavailable nights.";
+
+const presetFields = {
+  id: z.string().uuid(),
+  name: z.string().trim().min(1).max(80),
+};
+export const strManagementPresetSchema = z.union([
+  managementRatesSchema.extend({ ...presetFields, mode: z.literal("absolute").optional(), isDefault: z.literal(false).optional() })
+    .strict().refine(fitsAvailability, { message: availabilityMessage, path: ["occupancyRate"] }),
+  relativeAdjustmentSchema.extend({ ...presetFields, mode: z.literal("relative"), isDefault: z.boolean().optional(), assumptions: strManagementAssumptionsSchema }).strict(),
+  z.object({ ...presetFields, mode: z.literal("uplift"), isDefault: z.boolean().optional(), upliftPercent: strUpliftPercentSchema, assumptions: strManagementAssumptionsSchema }).strict()
+    .refine((preset) => preset.assumptions.unavailableNights < 365 || preset.upliftPercent === -100, "A positive revenue estimate requires at least one available night"),
+]);
+export const strManagementPresetsSchema = z.array(strManagementPresetSchema).max(5)
+  .refine((presets) => new Set(presets.map((preset) => preset.id)).size === presets.length, "Preset IDs must be unique")
+  .refine((presets) => presets.filter((preset) => preset.isDefault).length <= 1, "Choose one company default");
+
 export const strAdjustmentSchema = z.discriminatedUnion("mode", [
   strRateInputsSchema.extend({ mode: z.literal("rates") }),
+  managementRatesSchema.extend({ mode: z.literal("management") }),
   z.object({ mode: z.literal("baseline") }).strict(),
-]);
+]).refine((value) => value.mode !== "management" || fitsAvailability(value), { message: availabilityMessage, path: ["occupancyRate"] });
 export type StrEstimateAdjustmentInput = z.infer<typeof strRateInputsSchema>;
+
+export const DEFAULT_STR_MANAGEMENT_ASSUMPTIONS: StrManagementAssumptions = {
+  unavailableNights: 0,
+  listingStage: "established",
+  rationale: "Assumes professional presentation and active pricing, with availability as stated.",
+};
+
+/** A transparent allocation rule, not a prediction of the effect of management.
+ * Split the revenue factor equally across ADR and relative occupancy. Once
+ * occupancy reaches available nights, ADR supplies the remaining increase.
+ */
+export function resolveStrUplift(baseline: StrEstimate, upliftPercent: number, unavailableNights = 0): StrEstimateAdjustmentInput | null {
+  if (!strUpliftPercentSchema.safeParse(upliftPercent).success || !Number.isInteger(unavailableNights) || unavailableNights < 0 || unavailableNights > 365) return null;
+  const reference = reconcileStrEstimate(baseline);
+  if (reference.annualRevenue == null || reference.annualRevenue <= 0 || reference.nightlyRate == null || reference.nightlyRate <= 0 || reference.occupancyRate == null || reference.occupancyRate <= 0) return null;
+  const factor = 1 + upliftPercent / 100;
+  const occupancyRate = Math.min((365 - unavailableNights) / 365 * 100, reference.occupancyRate * Math.sqrt(factor));
+  if (factor > 0 && occupancyRate <= 0) return null;
+  const nightlyRate = factor === 0 ? reference.nightlyRate : reference.annualRevenue * factor / (365 * occupancyRate / 100);
+  const rates = strRateInputsSchema.safeParse({ nightlyRate, occupancyRate });
+  return rates.success ? rates.data : null;
+}
+
+/** Resolve from the original property benchmark, never from an already adjusted estimate. */
+export function resolveStrManagementPreset(baseline: StrEstimate, preset: StrManagementPreset) {
+  const checked = strManagementPresetSchema.parse(preset);
+  const reference = reconcileStrEstimate(baseline);
+  let rates: StrEstimateAdjustmentInput;
+  if (checked.mode === "uplift") {
+    const resolved = resolveStrUplift(baseline, checked.upliftPercent, checked.assumptions.unavailableNights);
+    if (!resolved) return null;
+    rates = resolved;
+  } else if (checked.mode === "relative") {
+    const startingRates = strRateInputsSchema.safeParse({ nightlyRate: reference.nightlyRate, occupancyRate: reference.occupancyRate });
+    if (!startingRates.success) return null;
+    const maxOccupancy = (365 - checked.assumptions.unavailableNights) / 365 * 100;
+    rates = {
+      nightlyRate: Math.min(100_000, startingRates.data.nightlyRate * (1 + checked.adrPercent / 100)),
+      occupancyRate: Math.min(maxOccupancy, Math.max(0, startingRates.data.occupancyRate + checked.occupancyPoints)),
+    };
+  } else {
+    rates = { nightlyRate: checked.nightlyRate, occupancyRate: checked.occupancyRate };
+  }
+  return {
+    rates,
+    assumptions: {
+      ...checked.assumptions,
+      presetName: checked.name,
+      ...(checked.mode === "relative" ? { presetAdjustment: { adrPercent: checked.adrPercent, occupancyPoints: checked.occupancyPoints } } : {}),
+      ...(checked.mode === "uplift" ? { presetUpliftPercent: checked.upliftPercent } : {}),
+    },
+  };
+}
+
+/** Called only on the first estimate; reviewed reports never follow live company settings. */
+export function initialStrManagementScenario(baseline: StrEstimate, presets?: StrManagementPreset[] | null) {
+  const parsed = strManagementPresetsSchema.safeParse(presets ?? []);
+  const preset = parsed.success ? parsed.data.find((item) => item.isDefault) : undefined;
+  if (preset) return resolveStrManagementPreset(baseline, preset);
+  const reference = reconcileStrEstimate(baseline);
+  const rates = strRateInputsSchema.safeParse({ nightlyRate: reference.nightlyRate, occupancyRate: reference.occupancyRate });
+  return rates.success ? { rates: rates.data, assumptions: { ...DEFAULT_STR_MANAGEMENT_ASSUMPTIONS } } : null;
+}
 
 const MIN_FALLBACK_REVENUE_MULTIPLIER = 0.8;
 const MAX_FALLBACK_REVENUE_MULTIPLIER = 1.2;
@@ -73,10 +177,15 @@ export function readStrRateOverride(report: Pick<Report, "user_overrides_json" |
 }
 
 /** Discard legacy revenue overrides while retaining the property inputs. */
-export function saveStrRateOverride(overrides: StrEstimateOverrides | null, rates: StrEstimateAdjustmentInput | null): StrEstimateOverrides {
+export function saveStrRateOverride(
+  overrides: StrEstimateOverrides | null,
+  rates: StrEstimateAdjustmentInput | null,
+  management: StrManagementAssumptions | null | undefined = overrides?.strManagement,
+): StrEstimateOverrides {
   return {
     ...(overrides?.estimateInputs ? { estimateInputs: overrides.estimateInputs } : {}),
     ...(rates ? { strAdjustment: rates } : {}),
+    ...(rates && management ? { strManagement: strManagementAssumptionsSchema.parse(management) } : {}),
   };
 }
 

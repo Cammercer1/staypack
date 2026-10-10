@@ -12,11 +12,12 @@ import {
 import { ClassicMonthlyRevenueChart } from "@/lib/reports/templates/classic/ClassicMonthlyRevenueChart";
 import { ClassicSeasonalityChart } from "@/lib/reports/templates/classic/ClassicSeasonalityChart";
 import type { FinalReportJson, StrCompCard } from "@/lib/types";
+import { StrScenarioSummary } from "@/lib/reports/templates/shared/StrScenarioSummary";
 
 const OC_CREAM = "#F2E3CF";
 const OC_ORANGE = "#AB592A";
 
-function OcStrComparableCard({ comp }: { comp: StrCompCard }) {
+function OcStrComparableCard({ comp, showManagement }: { comp: StrCompCard; showManagement: boolean }) {
   return (
     <article className="flex h-[178px] min-w-0 flex-col overflow-hidden border-t border-[#C0A591] bg-[#F2E3CF] pt-2">
       <div className="relative h-[88px] shrink-0 overflow-hidden bg-[#D8CDC0]">
@@ -33,6 +34,7 @@ function OcStrComparableCard({ comp }: { comp: StrCompCard }) {
         {comp.distance_m != null ? (
           <span className="absolute left-2 top-2 bg-[#F2E3CF]/95 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.08em] text-[#413532]">
             {formatDistanceMeters(comp.distance_m)} away
+            {showManagement && comp.professional_management === true ? " · Professionally managed" : ""}
           </span>
         ) : null}
       </div>
@@ -120,6 +122,7 @@ function MarketSnapshot({ report }: { report: FinalReportJson }) {
       data-testid="oc-str-market-snapshot"
       className="mt-auto shrink-0 border-t border-[#C0A591] pt-[10px]"
     >
+      <StrScenarioSummary report={report} />
       <h3
         className="text-[13px] font-semibold leading-none text-[#AB592A]"
         style={{ fontFamily: "var(--report-heading-font, inherit)" }}
@@ -227,7 +230,7 @@ export function OcRealEstateStrPageTwo({
         </div>
         <div className="mt-3 grid grid-cols-3 gap-x-[14px] gap-y-[12px]">
           {comps.map((comp) => (
-            <OcStrComparableCard key={comp.listing_id || comp.name} comp={comp} />
+            <OcStrComparableCard key={comp.listing_id || comp.name} comp={comp} showManagement={report.str_scenario?.basis === "management"} />
           ))}
         </div>
       </section>

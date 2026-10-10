@@ -38,3 +38,10 @@ and removes its legacy default, preserving historical values and the summary/ful
 check. The production schema was verified with an AirROI metadata update on a
 temporary copy of a report, rolled back without changing live report data or
 calling the estimate provider.
+
+[`20261010083434_add_company_str_management_presets.sql`](migrations/20261010083434_add_company_str_management_presets.sql)
+is also applied and recorded in production. It adds the company preset JSON array
+to `agencies`; existing agencies start with no presets. A save was verified on a
+temporary table in a rolled-back transaction, with agency RLS confirmed enabled.
+The application writes presets through the existing agency-admin access check
+and scopes updates to that admin's agency. No existing report is modified.

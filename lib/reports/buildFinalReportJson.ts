@@ -25,6 +25,7 @@ import { ensureStrEnrichmentFeaturedComps } from "@/lib/airbtics/enrich";
 import { alignStrSeasonality } from "@/lib/str/comparables";
 import type { ReportPropertyImageSelection } from "@/lib/reports/editable/reportImageSlots";
 import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
+import { readStrRateOverride, reconcileStrEstimate, strManagementAssumptionsSchema } from "@/lib/reports/strEstimateAdjustments";
 
 type BuildFinalReportInput = {
   agency: Agency;
@@ -78,6 +79,9 @@ export function buildFinalReportJson({
     propertyImages ?? resolveCollateralImageSelection(listing, "str_report");
   const reportCopy = alignCopyWithEstimate(copy, estimate.annualRevenue);
   const savedEnrichment = ensureStrEnrichmentFeaturedComps(report.str_enrichment_json ?? null, report.raw_airbtics_json);
+  const baseline = report.original_estimate_json ? reconcileStrEstimate(report.original_estimate_json) : null;
+  const rates = readStrRateOverride(report);
+  const management = strManagementAssumptionsSchema.safeParse(report.user_overrides_json?.strManagement);
 
   return {
     ...preserveDocumentLink(report.final_report_json ?? { assets: { qr_code_url: report.qr_code_url ?? "" } }),
@@ -140,6 +144,11 @@ export function buildFinalReportJson({
       radius_m: estimate.radiusM,
     },
     str_yield: strYield,
+    ...(baseline ? { str_scenario: {
+      basis: rates && management.success ? "management" as const : rates ? "adjusted" as const : "market" as const,
+      market_benchmark: { annual_revenue: baseline.annualRevenue, nightly_rate: baseline.nightlyRate, occupancy_rate: baseline.occupancyRate },
+      ...(rates && management.success ? { management: { ...management.data, companyName: agency.name } } : {}),
+    } } : {}),
     ltr: {
       weekly_min: weeklyMin,
       weekly_max: weeklyMax,

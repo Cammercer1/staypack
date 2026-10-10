@@ -4,6 +4,7 @@ import { requireReportWithListing } from "@/lib/auth/requireUser";
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
 import type { Report } from "@/lib/types";
+vi.mock("@/lib/str/estimate", () => ({ fetchStrEstimate: vi.fn(() => { throw new Error("No paid estimate call allowed"); }) }));
 vi.mock("@/lib/auth/requireUser", () => ({ requireReportWithListing: vi.fn() }));
 vi.mock("@/lib/reports/loadReportAgent", () => ({ loadAgencyAgentProfiles: vi.fn(), loadListingAgentProfile: vi.fn() }));
 beforeEach(() => vi.clearAllMocks());
@@ -17,6 +18,25 @@ function setup(overrides: Partial<Report> = {}) {
   vi.mocked(loadListingAgentProfile).mockResolvedValue(f.agent);
   return { f, report, update };
 }
+it("saves a management scenario and immutable benchmark together without fetching an estimate", async () => {
+  const { report, f } = setup();
+  const assumptions = { unavailableNights: 30, listingStage: "launch_year", rationale: "Launch rates allow time to build reviews.", presetName: "Apartment launch" };
+  const response = await PATCH(new Request("https://example.test/report", { method: "PATCH", body: JSON.stringify({ str_adjustment: { mode: "management", nightlyRate: 330, occupancyRate: 68, assumptions } }) }), { params: Promise.resolve({ id: report.id }) });
+  expect(response.status).toBe(200);
+  const saved = (await response.json()).report;
+  expect(saved.final_estimate_json.annualRevenue).toBe(81906);
+  expect(saved.original_estimate_json).toEqual(report.original_estimate_json);
+  expect(saved.user_overrides_json.strManagement).toEqual(assumptions);
+  expect(saved.final_report_json.str_scenario).toMatchObject({ basis: "management", market_benchmark: { annual_revenue: report.original_estimate_json!.annualRevenue }, management: { ...assumptions, companyName: f.agency.name } });
+  expect(saved.pdf_url).toBeNull();
+});
+
+it("rejects management occupancy that exceeds available nights before writing", async () => {
+  const { report, update } = setup();
+  const response = await PATCH(new Request("https://example.test/report", { method: "PATCH", body: JSON.stringify({ str_adjustment: { mode: "management", nightlyRate: 330, occupancyRate: 90, assumptions: { unavailableNights: 100, listingStage: "established", rationale: "Owner use" } } }) }), { params: Promise.resolve({ id: report.id }) });
+  expect(response.status).toBe(400);
+  expect(update).not.toHaveBeenCalled();
+});
 it("persists selected IDs in order and the exact same cards in the final report without repricing", async () => {
   const { report, update } = setup();
   const ids = report.str_enrichment_json!.comps.slice(1, 4).reverse().map((c) => c.listing_id);

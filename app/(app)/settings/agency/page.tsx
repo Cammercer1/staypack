@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/app-shell/PageHeader";
 import { BrandSettingsForm } from "@/components/settings/BrandSettingsForm";
 import { requireAgency } from "@/lib/auth/requireUser";
+import { StrManagementPresetsForm } from "@/components/settings/StrManagementPresetsForm";
 
 export default async function AgencyDetailsPage() {
   const { agency, role } = await requireAgency();
@@ -30,6 +31,7 @@ export default async function AgencyDetailsPage() {
         description="Manage your agency’s name, contact details and public listing links."
       />
       <BrandSettingsForm agency={agency} mode="details" />
+      <StrManagementPresetsForm presets={agency.str_management_presets} />
     </div>
   );
 }

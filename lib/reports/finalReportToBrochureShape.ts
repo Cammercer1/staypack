@@ -140,7 +140,7 @@ export function finalReportToBrochureShape(
         : isSalesAppraisalPageVariant(variant)
           ? "Estimated sale price"
           : isStrPageVariant(variant)
-            ? resolveStrBrochurePriceLabel()
+            ? resolveStrBrochurePriceLabel(report)
             : "Price",
       price_value: isLeasePageVariant(variant)
         ? (resolveLeaseBrochurePriceValue(report) ?? "")

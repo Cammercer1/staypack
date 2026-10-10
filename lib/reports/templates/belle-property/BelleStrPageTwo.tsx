@@ -18,6 +18,7 @@ export function BelleStrPageTwo({ report }: Props) {
   const enrichment = report.str_enrichment;
   const comps = enrichment?.comps ?? [];
   const seasonality = enrichment?.seasonality ?? [];
+  const hasScenarioSummary = report.str_scenario != null && report.str_scenario.basis !== "market";
 
   return (
     <section
@@ -30,7 +31,7 @@ export function BelleStrPageTwo({ report }: Props) {
       <BelleReportPageHeader report={report} />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-10 py-4">
-        <div className="flex shrink-0 flex-col gap-5">
+        <div className={`flex shrink-0 flex-col ${hasScenarioSummary ? "gap-3" : "gap-5"}`}>
           <header>
             <h2
               className="text-xl font-semibold"
@@ -54,20 +55,25 @@ export function BelleStrPageTwo({ report }: Props) {
             </div>
           </section>
 
-          <section className="shrink-0 border-t border-neutral-200/80 pt-5">
+          <section className={`shrink-0 border-t border-neutral-200/80 ${hasScenarioSummary ? "pt-3" : "pt-5"}`}>
             <ClassicCompsGrid
               comps={comps}
+              showManagement={report.str_scenario?.basis === "management"}
+              imageAspectClass={hasScenarioSummary ? "aspect-[4/1]" : undefined}
               suburb={report.property.suburb}
               totalCompCount={enrichment?.comp_count}
               featuredCount={enrichment?.selected_comp_ids ? comps.length : undefined}
               compPoolDescription={enrichment?.selected_comp_ids ? `${comps.length} selected comparable listings` : undefined}
-              compact={enrichment?.provider === "airroi" && comps.length > 4}
+              compact={hasScenarioSummary || (enrichment?.provider === "airroi" && comps.length > 4)}
             />
           </section>
         </div>
 
-        <div className="mt-auto shrink-0 pt-5">
-          <ClassicMarketInsights report={report} />
+        <div className={`mt-auto shrink-0 ${hasScenarioSummary ? "pt-3" : "pt-5"}`}>
+          <div className={hasScenarioSummary ? "flex items-end gap-4" : undefined}>
+            <div className="min-w-0 flex-1"><ClassicMarketInsights report={report} compact={hasScenarioSummary} /></div>
+            {hasScenarioSummary && <DocumentQr document={report} />}
+          </div>
           {report.copy.disclaimer ? (
             <ReportCopyDisclaimer
               text={report.copy.disclaimer}
@@ -77,7 +83,7 @@ export function BelleStrPageTwo({ report }: Props) {
           ) : null}
         </div>
       </div>
-      {report.document_link && report.document_link.mode !== "none" && report.assets.qr_code_url ? <div className="flex shrink-0 justify-end px-10 pb-3"><DocumentQr document={report} /></div> : null}
+      {!hasScenarioSummary && report.document_link && report.document_link.mode !== "none" && report.assets.qr_code_url ? <div className="flex shrink-0 justify-end px-10 pb-3"><DocumentQr document={report} /></div> : null}
     </section>
   );
 }

@@ -1,5 +1,5 @@
 import { formatCurrency } from "@/lib/reports/formatters";
-import { STR_ANNUAL_REVENUE_LABEL } from "@/lib/reports/resolveStrBrochurePrice";
+import { resolveStrBrochurePriceLabel } from "@/lib/reports/resolveStrBrochurePrice";
 import { LtrRentBlock } from "@/lib/reports/templates/shared/LtrRentBlock";
 import { SalePriceBlock } from "@/lib/reports/templates/shared/SalePriceBlock";
 import {
@@ -68,7 +68,7 @@ export function StrRevenueBlock({
   }
 
   const { str, copy } = report;
-  if (!str.annual_revenue) return null;
+  if (str.annual_revenue == null) return null;
 
   const calloutMetrics = formatStrCalloutMetrics(report);
 
@@ -92,7 +92,7 @@ export function StrRevenueBlock({
       }}
     >
       <p className={labelClass} style={{ fontFamily: headingFont }}>
-        {STR_ANNUAL_REVENUE_LABEL}
+        {resolveStrBrochurePriceLabel(report)}
       </p>
       <p
         className="mt-1.5 font-semibold leading-none tracking-tight"

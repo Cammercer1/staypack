@@ -21,6 +21,7 @@ type Props = {
   showPoolSubtitle?: boolean;
   /** Tighter grid for single-page layouts (e.g. Haven page 2). */
   compact?: boolean;
+  showManagement?: boolean;
 };
 
 export function ClassicCompsGrid({
@@ -32,6 +33,7 @@ export function ClassicCompsGrid({
   compPoolDescription,
   showPoolSubtitle = true,
   compact = false,
+  showManagement = false,
 }: Props) {
   const featured = comps.slice(0, featuredCount);
 
@@ -151,6 +153,7 @@ export function ClassicCompsGrid({
                 </span>
               </p>
               {comp.reviews != null && <p className="mt-1 text-[0.55rem] text-neutral-600">{comp.rating != null ? `${comp.rating.toFixed(1)} / 5 · ` : ""}{comp.reviews} reviews</p>}
+              {showManagement && comp.professional_management === true && <p className="mt-1 text-[0.55rem] text-neutral-600">Professionally managed</p>}
             </div>
           </article>
         ))}

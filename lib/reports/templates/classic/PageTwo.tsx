@@ -16,6 +16,7 @@ export function ClassicPageTwo({ report }: Props) {
   const enrichment = report.str_enrichment;
   const comps = enrichment?.comps ?? [];
   const seasonality = enrichment?.seasonality ?? [];
+  const hasScenarioSummary = report.str_scenario != null && report.str_scenario.basis !== "market";
 
   return (
     <section
@@ -28,7 +29,7 @@ export function ClassicPageTwo({ report }: Props) {
       <ClassicPageHeader report={report} />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-10 py-4">
-        <div className="flex shrink-0 flex-col gap-5">
+        <div className={`flex shrink-0 flex-col ${hasScenarioSummary ? "gap-3" : "gap-5"}`}>
           <header>
             <h2
               className="text-xl font-semibold"
@@ -55,11 +56,13 @@ export function ClassicPageTwo({ report }: Props) {
           <section className="shrink-0 border-t border-neutral-200/80 pt-5">
             <ClassicCompsGrid
               comps={comps}
+              showManagement={report.str_scenario?.basis === "management"}
+              imageAspectClass={hasScenarioSummary ? "aspect-[4/1]" : undefined}
               suburb={report.property.suburb}
               totalCompCount={enrichment?.comp_count}
               featuredCount={enrichment?.selected_comp_ids ? comps.length : undefined}
               compPoolDescription={enrichment?.selected_comp_ids ? `${comps.length} selected comparable listings` : undefined}
-              compact={enrichment?.provider === "airroi" && comps.length > 4}
+              compact={hasScenarioSummary || (enrichment?.provider === "airroi" && comps.length > 4)}
             />
           </section>
         </div>

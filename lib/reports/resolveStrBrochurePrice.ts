@@ -16,6 +16,6 @@ export function resolveStrBrochurePriceValue(
   return formatted === "—" ? null : formatted;
 }
 
-export function resolveStrBrochurePriceLabel(): string {
-  return STR_ANNUAL_REVENUE_LABEL;
+export function resolveStrBrochurePriceLabel(report?: FinalReportJson): string {
+  return report?.str_scenario?.basis === "management" ? "Managed STR revenue estimate" : STR_ANNUAL_REVENUE_LABEL;
 }

@@ -1,4 +1,4 @@
-import { applyStrEstimateAdjustments, reconcileStrEstimate, readStrRateOverride, saveStrRateOverride } from "@/lib/reports/strEstimateAdjustments";
+import { initialStrManagementScenario, applyStrEstimateAdjustments, reconcileStrEstimate, readStrRateOverride, saveStrRateOverride, strAdjustmentSchema, strManagementPresetsSchema } from "@/lib/reports/strEstimateAdjustments";
 import { selectStrComps } from "@/lib/str/comparables";
 import { buildFinalReportJson, getMockAiCopy } from "@/lib/reports/buildFinalReportJson";
 import { finalReportCopyToAiCopy } from "@/lib/reports/editable/strReportCopyAdapter";
@@ -29,6 +29,7 @@ export function createLintRegressionFixtures() {
     default_report_title: "Mock report", default_cta: "Contact the mock agency",
     default_disclaimer: document.copy.disclaimer, report_template_id: "classic_detailed",
     collateral_template_defaults: {}, brand_advanced_json: null, created_at: timestamp, updated_at: timestamp,
+    str_management_presets: [{ id: "ea8eedcf-4618-4be4-9d34-a8d4f0c07f17", name: "Manly · established family homes", nightlyRate: 440, occupancyRate: 72, assumptions: { unavailableNights: 21, listingStage: "established", rationale: "Assumes professional photography, family-ready furnishings and active pricing. Owner use is limited to 21 nights." } }, { id: "da8eedcf-4618-4be4-9d34-a8d4f0c07f18", name: "Company defaults", mode: "relative", isDefault: true, adrPercent: 10, occupancyPoints: 5, assumptions: { unavailableNights: 21, listingStage: "established", rationale: "Assumes professional presentation and active pricing, with owner use limited to 21 nights." } }],
   };
   const agent: AgentProfile = {
     ...document.agent, id: "mock-agent", agency_id: agency.id, is_default: true,
@@ -75,6 +76,7 @@ export function createLintRegressionFixtures() {
   report.ai_copy_json = finalReportCopyToAiCopy(final.copy, null);
   report.str_enrichment_json = final.str_enrichment ? { ...final.str_enrichment, comps: Array.from({ length: 8 }, (_, i) => ({ listing_id: `str-comp-${i}`, name: `Coastal stay ${i + 1}`, thumbnail_url: document.property.hero_image_url, listing_url: "https://example.test/property", bedrooms: i % 2 ? 3 : 4, bathrooms: 2, accommodates: i % 2 ? 6 : 8, distance_m: (i + 1) * 200, annual_revenue: 85000 + i * 3000, occupancy_rate: 68 + i, nightly_rate: 340 + i * 10 })) } : null;
   report.airbtics_fetched_at = timestamp;
+  if (report.str_enrichment_json) report.str_enrichment_json.comps = report.str_enrichment_json.comps.map((comp, index) => ({ ...comp, property_type: "house", professional_management: index === 6 ? null : index % 2 === 0, reviews: 12 + index * 5, rating: 4.7 + (index % 3) / 10, blocked_nights: index * 12 }));
   const lease: Report = { ...report, id: "mock-lease", template_id: "classic-lease-appraisal", final_report_json: { ...final, version: "lease_appraisal_v1", template_id: "classic-lease-appraisal" } };
   const sales: Report = { ...report, id: "mock-sales", template_id: "classic-sales-appraisal", final_report_json: { ...final, version: "sales_appraisal_v1", template_id: "classic-sales-appraisal" } };
   lease.final_report_json = buildLeaseAppraisalTemplatePreview({ agency, listing, report: lease, templateId: lease.template_id!, agencyAgents: [agent] });
@@ -91,7 +93,7 @@ export type RegressionFixtures = ReturnType<typeof createLintRegressionFixtures>
 export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: (label: string) => void, draftAppraisal?: "lease" | "sales" | "sales_brochure" | "rental_brochure" | "str") {
   const original = window.fetch;
   const data = structuredClone(fixtures);
-  if (draftAppraisal === "str") data.report = { ...data.report, template_id: null, final_estimate_json: null, ai_copy_json: null, final_report_json: null, str_enrichment_json: null, status: "draft" };
+  if (draftAppraisal === "str") data.report = { ...data.report, template_id: null, original_estimate_json: null, user_overrides_json: null, final_estimate_json: null, ai_copy_json: null, final_report_json: null, str_enrichment_json: null, status: "draft" };
   if (draftAppraisal === "lease" || draftAppraisal === "sales") data[draftAppraisal] = { ...data[draftAppraisal], template_id: null, final_report_json: null, status: "draft" };
   if (draftAppraisal === "sales_brochure" || draftAppraisal === "rental_brochure") {
     data.document = draftAppraisal === "rental_brochure" ? { ...data.document, type: "rental_brochure", version: "rental_brochure_v1", template_id: data.document.template_id.replace(/^sales-brochure-/, "rental-brochure-") } : data.document;
@@ -113,8 +115,9 @@ export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: 
     }
     if (url.pathname === "/api/str/estimate" || url.pathname === "/api/airbtics/estimate") {
       data.listing = { ...data.listing, bedrooms: body.bedrooms, bathrooms: body.bathrooms, accommodates: body.accommodates };
-      const rates = readStrRateOverride(data.report);
-      data.report = { ...data.report, original_estimate_json: fixtures.report.original_estimate_json, final_estimate_json: rates ? applyStrEstimateAdjustments(fixtures.report.original_estimate_json!, rates) : fixtures.report.final_estimate_json, str_enrichment_json: fixtures.report.str_enrichment_json, user_overrides_json: { ...saveStrRateOverride(data.report.user_overrides_json, rates), estimateInputs: { bedrooms: body.bedrooms, bathrooms: body.bathrooms, accommodates: body.accommodates } }, airbtics_fetched_at: new Date().toISOString(), status: "estimated", pdf_url: null };
+      const initialScenario = !data.report.original_estimate_json && !data.report.final_estimate_json && !data.report.final_report_json && !readStrRateOverride(data.report) ? initialStrManagementScenario(fixtures.report.original_estimate_json!, data.agency.str_management_presets) : null;
+      const rates = readStrRateOverride(data.report) ?? initialScenario?.rates ?? null;
+      data.report = { ...data.report, original_estimate_json: fixtures.report.original_estimate_json, final_estimate_json: rates ? applyStrEstimateAdjustments(fixtures.report.original_estimate_json!, rates) : fixtures.report.final_estimate_json, str_enrichment_json: fixtures.report.str_enrichment_json, user_overrides_json: { ...saveStrRateOverride(data.report.user_overrides_json, rates, initialScenario?.assumptions ?? data.report.user_overrides_json?.strManagement), estimateInputs: { bedrooms: body.bedrooms, bathrooms: body.bathrooms, accommodates: body.accommodates } }, airbtics_fetched_at: new Date().toISOString(), status: "estimated", pdf_url: null };
       return Response.json({ report: data.report, listing: data.listing });
     }
     if (/^\/api\/reports\/mock-report(?:\/(generate-copy|str-report-copy))?$/.test(url.pathname)) {
@@ -122,9 +125,10 @@ export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: 
       const generation = url.pathname.endsWith("generate-copy");
       const report = { ...data.report, ...(!generation && !body.copy ? body : {}), template_id: body.template_id ?? data.report.template_id, pdf_url: null, updated_at: new Date().toISOString() };
       if (body.str_adjustment && report.original_estimate_json) {
-        const rates = body.str_adjustment.mode === "rates" ? { nightlyRate: body.str_adjustment.nightlyRate, occupancyRate: body.str_adjustment.occupancyRate } : null;
+        const adjustment = strAdjustmentSchema.parse(body.str_adjustment);
+        const rates = adjustment.mode !== "baseline" ? { nightlyRate: adjustment.nightlyRate, occupancyRate: adjustment.occupancyRate } : null;
         report.final_estimate_json = rates ? applyStrEstimateAdjustments(report.original_estimate_json, rates) : reconcileStrEstimate(report.original_estimate_json);
-        report.user_overrides_json = saveStrRateOverride(report.user_overrides_json, rates);
+        report.user_overrides_json = saveStrRateOverride(report.user_overrides_json, rates, adjustment.mode === "management" ? adjustment.assumptions : null);
       }
       if (body.selected_comp_listing_ids && report.str_enrichment_json) report.str_enrichment_json = selectStrComps(report.str_enrichment_json, body.selected_comp_listing_ids);
       report.ai_copy_json = body.copy ? finalReportCopyToAiCopy(body.copy, report.ai_copy_json) : generation ? getMockAiCopy(data.listing, data.agency) : report.ai_copy_json;
@@ -206,9 +210,15 @@ export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: 
     }
     if (url.pathname === "/api/analytics/overview") return Response.json({ views: 240, leads: 12 });
     if (url.pathname === "/api/google-fonts") return Response.json({ fonts: [{ family: "Mock Sans", category: "sans-serif" }] });
+    if (url.pathname === "/api/agencies/str-presets") {
+      data.agency.str_management_presets = strManagementPresetsSchema.parse(method === "POST" ? [...(data.agency.str_management_presets ?? []), {
+        id: "ba8eedcf-4618-4be4-9d34-a8d4f0c07f18", name: "Company management uplift", mode: "uplift", isDefault: true, upliftPercent: body.upliftPercent, assumptions: body.assumptions,
+      }] : body.presets);
+      return Response.json({ presets: data.agency.str_management_presets });
+    }
     if (url.pathname === "/api/agencies") {
       data.agency = { ...data.agency, ...body };
-      return Response.json({ agency: data.agency });
+      return Response.json({ agency: data.agency, can_manage_str_defaults: true });
     }
     if (url.pathname === "/api/listings/mock-listing") {
       data.listing = { ...data.listing, ...body, updated_at: new Date().toISOString(),

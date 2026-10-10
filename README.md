@@ -143,11 +143,53 @@ and percentile curves remain in the original payload for audit. Automatic visual
 percentile positioning is not used: the image assessment pilot has not validated
 revenue uplifts. Agents adjust ADR and occupancy; the server calculates annual
 estimated gross STR revenue as ADR × occupancy / 100 × 365, before operating costs.
-Rounded booked-night counts never enter the calculation. Reset restores the saved
-market baseline without a provider request. The estimate screen has no paid refresh
+Rounded booked-night counts never enter the calculation. Resetting assumptions
+uses the saved property benchmark without a provider request. The estimate screen has no paid refresh
 action. If changed property inputs require a new estimate, agent assumptions and
 selected comparables still present in the new pool are preserved. Comparable selection alone never reprices a report.
 No provider or model calls are made when adjusting or selecting comparables.
+
+The editor leads with **Your management estimate** and a single **Management uplift (%)**
+control. ADR, annual occupancy, availability, operating stage, rationale and alternate
+presets sit under **Fine-tune assumptions**. Changing either detailed rate recalculates
+the uplift. The market benchmark sits behind **View comparison**.
+
+Introduce company defaults during the first STR appraisal, after the property’s market
+estimate is available in **Estimate & evidence**, rather than during generic signup.
+Owners and admins can explicitly save the chosen uplift, availability and report wording
+as their company default. This action saves settings separately from report figures and
+never replaces an existing default. Members can adjust individual reports. Keeping 0%
+or continuing without saving a company default is allowed; no uplift is invented.
+
+An uplift of U% targets benchmark revenue × (1 + U/100). ADR and relative occupancy
+initially share the square root of that factor. Occupancy is capped by available nights;
+ADR supplies the remainder. This is an allocation rule, not an estimated management
+premium. Unavailable nights cap bookings rather than reducing revenue a second time.
+Impossible targets are rejected. Calculations retain full precision until display.
+
+Owners and admins can manage up to five named presets under **Settings → Agency →
+Management estimate defaults**. Uplift presets are the primary option; existing separate
+ADR/occupancy adjustments and fixed-rate presets remain supported. One uplift or relative
+preset may be the company default. New estimates automatically apply it and snapshot the
+actual rates and assumptions; fixed-rate property presets remain manual only.
+
+The existing migration
+[`20261010083434_add_company_str_management_presets.sql`](supabase/migrations/20261010083434_add_company_str_management_presets.sql)
+supports all three preset shapes in the same JSONB column; no additional migration is
+required. Changing company defaults never reprices a saved report. Explicitly
+applying or restoring a preset always starts from the original benchmark, so
+adjustments cannot compound. The final document snapshots the benchmark and
+management assumptions in `str_scenario`, with the management estimate as its
+headline and the benchmark in the methodology. Launch year is an operating
+assumption, not an automatic discount.
+
+The estimate screen summarises professionally managed comparables with matching
+bedrooms and recognised property type from the entire saved pool, independently
+of report selection. Unknown management/type data is not treated as a match.
+Fewer than three matches with revenue is labelled limited evidence. This is a
+comparison of observed property performance, not evidence of a causal management
+premium. Filters and presets do not fetch additional provider data.
+
 Monthly revenue uses labelled modelled seasonal weights. A separate market lookup
 and occupancy request adds the latest 12 completed months of occupancy medians and
 25th–75th percentile bands, filtered to the same bedroom count and property type

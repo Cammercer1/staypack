@@ -8,6 +8,7 @@ import {
   type ReportSnapshotStat,
 } from "@/lib/reports/templates/shared/ReportSnapshotStatsBar";
 import type { FinalReportJson } from "@/lib/types";
+import { StrScenarioSummary } from "@/lib/reports/templates/shared/StrScenarioSummary";
 
 type Props = {
   report: FinalReportJson;
@@ -33,7 +34,7 @@ function buildSnapshotStats(report: FinalReportJson): ReportSnapshotStat[] {
   if (str.annual_revenue != null) {
     stats.push({
       id: "median",
-      label: positioned ? "Est. gross revenue" : "Median gross revenue",
+      label: report.str_scenario ? (report.str_scenario.basis === "management" ? "Managed revenue est." : "Est. gross revenue") : positioned ? "Est. gross revenue" : "Median gross revenue",
       value: formatCurrency(str.annual_revenue),
       footnote: "per year before costs",
     });
@@ -93,6 +94,7 @@ export function ClassicMarketInsights({ report, compact = false }: Props) {
 
   return (
     <div>
+      <StrScenarioSummary report={report} />
       <h2
         className={`font-semibold ${compact ? "mb-2.5 text-base" : "mb-3 text-base"}`}
         style={{

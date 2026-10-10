@@ -2,6 +2,7 @@ import { applyDocumentLinkDraft, type DocumentLink } from "@/lib/documents/docum
 import { createDocumentLinkDraft } from "@/lib/documents/createDocumentLinkDraft";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchStrEstimate } from "@/lib/str/estimate";
+import { applyStrEstimateAdjustments, initialStrManagementScenario, saveStrRateOverride } from "@/lib/reports/strEstimateAdjustments";
 import { calculateAccommodates } from "@/lib/reports/formatters";
 import { geocodeReportAddress } from "@/lib/geocoding";
 import { getPrintRenderBaseUrl, getReportsUrl } from "@/lib/env";
@@ -154,6 +155,8 @@ export async function generateHeadlessStrReport({
   const { estimate, enrichment } = await fetchStrEstimate(
     { latitude: geocoded.latitude, longitude: geocoded.longitude, bedrooms, bathrooms, accommodates }, listing,
   );
+  const scenario = initialStrManagementScenario(estimate, agency.str_management_presets);
+  const finalEstimate = scenario ? applyStrEstimateAdjustments(estimate, scenario.rates) : estimate;
 
   const templateId =
     packTemplateId || resolveReportTemplateId(agency as Agency, report as Report);
@@ -179,7 +182,8 @@ export async function generateHeadlessStrReport({
       airbtics_cost_cents: null,
       airbtics_fetched_at: null,
       original_estimate_json: estimate,
-      final_estimate_json: estimate,
+      final_estimate_json: finalEstimate,
+      user_overrides_json: { ...saveStrRateOverride(null, scenario?.rates ?? null, scenario?.assumptions), estimateInputs: { bedrooms, bathrooms, accommodates } },
       raw_airbtics_json: null,
       str_enrichment_json: enrichment,
       status: "estimated",
@@ -211,7 +215,7 @@ export async function generateHeadlessStrReport({
     agency: agency as Agency,
     listing,
     report: reportForCopy,
-    estimate: estimate,
+    estimate: finalEstimate,
   });
 
   const finalReportJson = resolveFinalReportForDisplay(
@@ -221,7 +225,7 @@ export async function generateHeadlessStrReport({
       agencyAgents,
       listing,
       report: { ...reportForCopy, template_id: templateId },
-      estimate: estimate,
+      estimate: finalEstimate,
       copy,
       scraped: listing.scraped_listing_json,
       resolvedAgents,

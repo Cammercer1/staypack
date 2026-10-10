@@ -2,7 +2,7 @@ import { Bath, BedDouble, Car, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { FinalReportJson } from "@/lib/types";
 import { formatCurrency, formatNumber } from "@/lib/reports/formatters";
-import { STR_ANNUAL_REVENUE_LABEL } from "@/lib/reports/resolveStrBrochurePrice";
+import { resolveStrBrochurePriceLabel } from "@/lib/reports/resolveStrBrochurePrice";
 import {
   ReportCopyAppealPoint,
   ReportCopyBlurb,
@@ -145,7 +145,7 @@ export function ClassicPropertySection({
               className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600"
               style={{ fontFamily: "var(--report-heading-font, inherit)" }}
             >
-              {STR_ANNUAL_REVENUE_LABEL}
+              {resolveStrBrochurePriceLabel(report)}
             </p>
             <p
               className="mt-2 text-[2rem] font-semibold leading-none tracking-tight"

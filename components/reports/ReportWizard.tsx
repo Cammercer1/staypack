@@ -65,6 +65,7 @@ export function ReportWizard({
   const [error, setError] = useState<string | null>(null);
   const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
   const [previewAgency, setPreviewAgency] = useState(agency);
+  const [canManageStrDefaults, setCanManageStrDefaults] = useState(false);
   const designRef = useRef<StrDesignHandle>(null);
   const estimateRef = useRef<StrEstimateHandle>(null);
   const copyRef = useRef<StrCopyEditorHandle>(null);
@@ -83,11 +84,20 @@ export function ReportWizard({
     reportRequest<{ agents: AgentProfile[] }>("/api/agents")
       .then((payload) => setAgencyAgents(payload.agents ?? []))
       .catch(() => {});
-    reportRequest<{ agency: Agency }>("/api/agencies")
-      .then((payload) => {
-        if (payload.agency?.id === agency.id) setPreviewAgency(payload.agency);
-      })
-      .catch(() => {});
+    const reloadCompanySettings = () => {
+      void reportRequest<{ agency: Agency; can_manage_str_defaults?: boolean }>("/api/agencies")
+        .then((payload) => {
+          if (payload.agency?.id === agency.id) {
+            setPreviewAgency(payload.agency);
+            setCanManageStrDefaults(payload.can_manage_str_defaults === true);
+          }
+        })
+        .catch(() => {});
+    };
+    reloadCompanySettings();
+    // A preset may have been edited in the settings tab. Report inputs stay local.
+    window.addEventListener("focus", reloadCompanySettings);
+    return () => window.removeEventListener("focus", reloadCompanySettings);
   }, [agency.id]);
   const preview = useMemo(
     () =>
@@ -327,6 +337,10 @@ export function ReportWizard({
           <div hidden={Boolean(activity)}>
             <StrEstimateStep
               ref={estimateRef}
+              agency={previewAgency}
+              canManageDefaults={canManageStrDefaults}
+              onCompanyPresetsChange={(presets) => setPreviewAgency((current) => ({ ...current, str_management_presets: presets }))}
+              onBusyChange={setChildBusy}
               key={report.str_enrichment_json?.fetched_at ?? report.airbtics_fetched_at ?? "no-estimate"}
               listing={listing}
               report={report}

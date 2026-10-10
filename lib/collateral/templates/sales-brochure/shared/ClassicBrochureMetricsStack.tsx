@@ -75,7 +75,7 @@ function resolveClassicBrochureMetric(
     }
     return {
       id: "str_revenue",
-      label: resolveStrBrochurePriceLabel(),
+      label: resolveStrBrochurePriceLabel(report),
       value: strRevenue,
       subline: "per year before costs",
     };
