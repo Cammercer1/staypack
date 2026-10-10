@@ -103,7 +103,12 @@ async function mirrorImages(
     ),
   ];
 
-  let preparedHtml = html;
+  // A print job never scrolls lazy images into view. Request and decode every page's images.
+  let preparedHtml = html.replace(/<img\b[^>]*>/gi, (tag) =>
+    tag
+      .replace(/\s(?:loading|decoding)=(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+      .replace(/^<img\b/i, '<img loading="eager" decoding="sync"'),
+  );
   let mirroredCount = 0;
   let failedCount = 0;
   const sampleMirroredUrls: string[] = [];
@@ -363,6 +368,10 @@ function buildBrowserlessPdfBody(
     gotoOptions: {
       waitUntil: "networkidle0" as const,
       timeout: 90000,
+    },
+    waitForFunction: {
+      fn: "() => Array.from(document.images).every(image => image.complete)",
+      timeout: 20000,
     },
   };
 
