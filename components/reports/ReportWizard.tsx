@@ -1,331 +1,404 @@
 "use client";
-import { DocumentLinkEditor } from "@/components/documents/DocumentLinkEditor";
-import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { StrEstimateStep } from "@/components/reports/StrEstimateStep";
+import { DocumentGenerationStatus } from "@/components/documents/DocumentGenerationStatus";
+import {
+  StrDesignStep,
+  type StrDesignHandle,
+} from "@/components/reports/StrDesignStep";
+import {
+  StrEstimateStep,
+  type StrEstimateHandle,
+} from "@/components/reports/StrEstimateStep";
 import {
   GeneratedCopyEditor,
   type StrCopyEditorHandle,
 } from "@/components/reports/GeneratedCopyEditor";
-import { DownloadPdfButton } from "@/components/reports/DownloadPdfButton";
-import { CopyLinkButton } from "@/components/reports/CopyLinkButton";
-import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
+import { StrReportDeliveryStep } from "@/components/reports/StrReportDeliveryStep";
+import type { TemplatesResponse } from "@/components/templates/useAvailableTemplates";
+import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
-import type { Agency, AgentProfile, FinalReportJson, Listing, Report } from "@/lib/types";
-
-const PREVIEW_SYNC_MIN_MS = 400;
+import { resolveAdvertisedPrice } from "@/lib/listings/pricing";
+import { calculateAccommodates } from "@/lib/reports/formatters";
+import { jsonRequest, reportRequest } from "@/lib/reports/reportRequests";
+import type { Agency, AgentProfile, Listing, Report } from "@/lib/types";
 
 const steps = [
-  { id: "estimate", label: "STR estimate" },
-  { id: "copy", label: "Generate collateral" },
-  { id: "preview", label: "Preview & publish" },
+  { id: "design", label: "Design & property" },
+  { id: "estimate", label: "Estimate & evidence" },
+  { id: "copy", label: "Edit report" },
+  { id: "preview", label: "Download & share" },
 ];
 
 export function ReportWizard({
   initialListing,
   initialReport,
   agency,
+  availableTemplates,
   onListingChange,
   onReportChange,
 }: {
   initialListing: Listing;
   initialReport: Report;
   agency: Agency;
+  availableTemplates?: TemplatesResponse;
   onListingChange?: (listing: Listing) => void;
   onReportChange?: (report: Report) => void;
 }) {
-  const [linkPending, setLinkPending] = useState(false);
   const [listing, setListing] = useState(initialListing);
   const [report, setReport] = useState(initialReport);
-  const [previewAgency, setPreviewAgency] = useState<Agency | null>(null);
-  const [step, setStep] = useState(getInitialStep(initialReport));
-  const [loading, setLoading] = useState(false);
-  const [publishStage, setPublishStage] = useState<
-    "idle" | "publishing" | "generating-pdf"
-  >("idle");
+  const reportRef = useRef(initialReport);
+  const [step, setStep] = useState(
+    initialReport.final_report_json
+      ? "preview"
+      : initialReport.final_estimate_json
+        ? "estimate"
+        : "design",
+  );
+  const [busy, setBusy] = useState(false);
+  const navigating = useRef(false);
+  const [childBusy, setChildBusy] = useState(false);
+  const [activity, setActivity] = useState<"estimate" | "copy" | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
-  const copyEditorRef = useRef<StrCopyEditorHandle>(null);
-  const previewSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [previewSyncing, setPreviewSyncing] = useState(false);
-  const [previewDraftReport, setPreviewDraftReport] = useState<FinalReportJson | null>(
-    () => (initialReport.final_report_json as FinalReportJson | null) ?? null,
+  const [previewAgency, setPreviewAgency] = useState(agency);
+  const designRef = useRef<StrDesignHandle>(null);
+  const estimateRef = useRef<StrEstimateHandle>(null);
+  const copyRef = useRef<StrCopyEditorHandle>(null);
+  const disabled = busy || childBusy;
+
+  function updateReport(next: Report) {
+    reportRef.current = next;
+    setReport(next);
+    onReportChange?.(next);
+  }
+  function updateListing(next: Listing) {
+    setListing(next);
+    onListingChange?.(next);
+  }
+  useEffect(() => {
+    reportRequest<{ agents: AgentProfile[] }>("/api/agents")
+      .then((payload) => setAgencyAgents(payload.agents ?? []))
+      .catch(() => {});
+    reportRequest<{ agency: Agency }>("/api/agencies")
+      .then((payload) => {
+        if (payload.agency?.id === agency.id) setPreviewAgency(payload.agency);
+      })
+      .catch(() => {});
+  }, [agency.id]);
+  const preview = useMemo(
+    () =>
+      report.final_report_json
+        ? resolveFinalReportForDisplay(
+            enrichFinalReportMetrics(
+              listing,
+              mergeAgencyBrandIntoFinalReport(
+                previewAgency,
+                applyDocumentLinkDraft(report.final_report_json),
+              ),
+              { agencyAgents },
+            ),
+          )
+        : null,
+    [report.final_report_json, listing, previewAgency, agencyAgents],
   );
 
-  function updateListing(nextListing: Listing) {
-    setListing(nextListing);
-    onListingChange?.(nextListing);
-  }
-
-  function updateReport(nextReport: Report) {
-    setReport(nextReport);
-    const cached = nextReport.final_report_json as FinalReportJson | null;
-    if (cached) {
-      setPreviewDraftReport(cached);
+  async function saveDesign(): Promise<"saved" | "review" | false> {
+    const values = await designRef.current?.read();
+    if (!values) return false;
+    if (!listing.property_address?.trim())
+      throw new Error(
+        "Add a property address on the listing before getting an estimate.",
+      );
+    let current = reportRef.current;
+    let currentListing = listing;
+    const priceChanged =
+      values.display_price !== (resolveAdvertisedPrice(listing, "sale") ?? "");
+    if (priceChanged) {
+      const saved = await reportRequest<{ listing: Listing }>(
+        `/api/listings/${listing.id}`,
+        jsonRequest(
+          { advertised_sale_price: values.display_price || null },
+          "PATCH",
+        ),
+      );
+      currentListing = saved.listing;
+      updateListing(currentListing);
     }
-    onReportChange?.(nextReport);
-  }
-
-  useEffect(() => {
-    fetch("/api/agents")
-      .then((response) => response.json())
-      .then((payload) => setAgencyAgents(payload.agents ?? []))
-      .catch(() => {
-        // Non-blocking — agent enrichment falls back to scraped listing data.
-      });
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (previewSyncTimeoutRef.current) {
-        clearTimeout(previewSyncTimeoutRef.current);
-      }
+    if (values.templateId !== current.template_id || priceChanged) {
+      const saved = await reportRequest<{ report: Report }>(
+        `/api/reports/${current.id}`,
+        jsonRequest(
+          {
+            template_id: values.templateId,
+            ...(priceChanged && current.final_estimate_json
+              ? { final_estimate_json: current.final_estimate_json }
+              : {}),
+          },
+          "PATCH",
+        ),
+      );
+      current = saved.report;
+      updateReport(current);
+    }
+    const inputs = current.user_overrides_json?.estimateInputs ?? {
+      bedrooms: listing.bedrooms,
+      bathrooms: listing.bathrooms,
+      accommodates: calculateAccommodates(
+        listing.bedrooms,
+        listing.accommodates,
+      ),
     };
-  }, []);
-
-  useEffect(() => {
-    if (step !== "preview") {
-      return;
+    if (
+      !current.final_estimate_json ||
+      inputs.bedrooms !== values.bedrooms ||
+      inputs.bathrooms !== values.bathrooms ||
+      inputs.accommodates !== values.accommodates
+    ) {
+      setActivity("estimate");
+      const result = await reportRequest<{ listing: Listing; report: Report }>(
+        "/api/airbtics/estimate",
+        jsonRequest({
+          report_id: current.id,
+          address: currentListing.property_address,
+          latitude: currentListing.latitude,
+          longitude: currentListing.longitude,
+          bedrooms: values.bedrooms,
+          bathrooms: values.bathrooms,
+          accommodates: values.accommodates,
+        }),
+      );
+      updateListing(result.listing);
+      updateReport(result.report);
+      return "review";
     }
+    return "saved";
+  }
 
-    let cancelled = false;
+  async function refreshEstimate() {
+    if (disabled || navigating.current) return;
+    navigating.current = true;
+    setBusy(true);
+    setError(null);
+    setActivity("estimate");
+    try {
+      const result = await reportRequest<{ listing: Listing; report: Report }>(
+        "/api/airbtics/estimate",
+        jsonRequest({
+          report_id: report.id,
+          address: listing.property_address,
+          latitude: listing.latitude,
+          longitude: listing.longitude,
+          bedrooms: listing.bedrooms,
+          bathrooms: listing.bathrooms,
+          accommodates: calculateAccommodates(
+            listing.bedrooms,
+            listing.accommodates,
+          ),
+        }),
+      );
+      updateListing(result.listing);
+      updateReport(result.report);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to refresh the estimate. Please try again.",
+      );
+    } finally {
+      navigating.current = false;
+      setBusy(false);
+      setActivity(null);
+    }
+  }
 
-    fetch("/api/agencies")
-      .then((response) => response.json())
-      .then((payload) => {
-        if (!cancelled && payload.agency) {
-          setPreviewAgency(payload.agency);
+  async function handleStepChange(next: string) {
+    if (disabled || navigating.current || next === step) return;
+    navigating.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      if (step === "design") {
+        const result = await saveDesign();
+        if (!result) return;
+        if (result === "review") {
+          setStep("estimate");
+          window.scrollTo({ top: 0, behavior: "instant" });
+          return;
         }
-      })
-      .catch(() => {
-        // Keep the last known brand settings if refresh fails.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [step]);
-
-  const brandAgency = previewAgency?.id === agency.id ? previewAgency : agency;
-
-  const previewReport = useMemo(() => {
-    const rawCached =
-      previewDraftReport ?? (report.final_report_json as FinalReportJson | null);
-    const cached = rawCached ? applyDocumentLinkDraft(rawCached) : null;
-    if (!cached) {
-      return null;
-    }
-
-    const enriched = enrichFinalReportMetrics(
-      listing,
-      mergeAgencyBrandIntoFinalReport(brandAgency, cached),
-      { agencyAgents },
-    );
-    return resolveFinalReportForDisplay(enriched);
-  }, [brandAgency, listing, previewDraftReport, report.final_report_json, agencyAgents]);
-
-  function handleStepChange(next: string) {
-    if (next === "preview") {
-      if (step === "preview") {
+      }
+      if (
+        step === "estimate" &&
+        !(await estimateRef.current?.savePendingEdits())
+      )
         return;
+      if (step === "copy" && !(await copyRef.current?.savePendingEdits()))
+        return;
+      const current = reportRef.current;
+      if (next === "copy" && !current.final_report_json) {
+        if (!current.final_estimate_json)
+          throw new Error("Get an estimate before generating the report.");
+        setActivity("copy");
+        const result = await reportRequest<{ report: Report }>(
+          `/api/reports/${current.id}/generate-copy`,
+          jsonRequest({ template_id: current.template_id }),
+        );
+        if (!result.report?.final_report_json)
+          throw new Error("The report was not generated. Please try again.");
+        updateReport(result.report);
       }
-
-      copyEditorRef.current?.flushPendingEdits();
-      const live = copyEditorRef.current?.getPreviewReport();
-      if (live) {
-        setPreviewDraftReport(live);
-      }
-
-      if (previewSyncTimeoutRef.current) {
-        clearTimeout(previewSyncTimeoutRef.current);
-      }
-      setPreviewSyncing(true);
-      setStep("preview");
-      previewSyncTimeoutRef.current = setTimeout(() => {
-        previewSyncTimeoutRef.current = null;
-        setPreviewSyncing(false);
-      }, PREVIEW_SYNC_MIN_MS);
-      return;
+      setStep(next);
+      window.scrollTo({ top: 0, behavior: "instant" });
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to continue. Your changes are still here; please try again.",
+      );
+    } finally {
+      navigating.current = false;
+      setBusy(false);
+      setActivity(null);
     }
-
-    if (previewSyncTimeoutRef.current) {
-      clearTimeout(previewSyncTimeoutRef.current);
-      previewSyncTimeoutRef.current = null;
-    }
-    setPreviewSyncing(false);
-    setStep(next);
   }
 
-  async function publishReport() {
-    setLoading(true);
-    setPublishStage("publishing");
-
-    const publishResponse = await fetch(`/api/reports/${report.id}/publish`, {
-      method: "POST",
-    });
-    const publishPayload = await publishResponse.json();
-
-    if (!publishResponse.ok) {
-      toast.error(publishPayload.error ?? "Publish failed");
-      setLoading(false);
-      setPublishStage("idle");
-      return;
-    }
-
-    setPublishStage("generating-pdf");
-    const pdfResponse = await fetch(`/api/reports/${report.id}/generate-pdf`, {
-      method: "POST",
-    });
-    const pdfPayload = await pdfResponse.json();
-
-    if (!pdfResponse.ok) {
-      toast.error(pdfPayload.error ?? "PDF generation failed");
-      setLoading(false);
-      setPublishStage("idle");
-      return;
-    }
-
-    updateReport(pdfPayload.report);
-    toast.success("Report published");
-    setLoading(false);
-    setPublishStage("idle");
-  }
+  const progress = activity ? (
+    <DocumentGenerationStatus
+      title={
+        activity === "estimate"
+          ? "Getting your estimate"
+          : "Writing your report"
+      }
+      description={
+        activity === "estimate"
+          ? "Checking comparable short-term rentals around your property."
+          : "Your chosen design and reviewed figures are ready."
+      }
+      headline={
+        activity === "estimate"
+          ? "Building the market evidence"
+          : "Preparing your short-term rental appraisal"
+      }
+      body={
+        activity === "estimate"
+          ? "Finding comparable properties and assessing the estimated gross STR revenue. You can review and adjust the figures next."
+          : "Writing the property summary and supporting evidence, then applying your branding and photos."
+      }
+      savedLabel={
+        activity === "estimate"
+          ? "Property and design checked"
+          : "Property, design and estimate saved"
+      }
+      activeLabel={
+        activity === "estimate"
+          ? "Preparing estimated figures and comparable evidence"
+          : "Writing and laying out your report"
+      }
+    />
+  ) : null;
 
   return (
-    <div className="space-y-6">
-      <Tabs value={step} onValueChange={handleStepChange}>
-        <TabsList className="grid w-full grid-cols-3">
-          {steps.map((item) => (
-            <TabsTrigger key={item.id} value={item.id}>
+    <div className="min-w-0 space-y-4">
+      {error ? (
+        <p
+          role="alert"
+          data-theme="staypack-workspace"
+          className="du-alert du-alert-error du-alert-soft"
+        >
+          {error}
+        </p>
+      ) : null}
+      <Tabs
+        value={step}
+        onValueChange={(next) => void handleStepChange(String(next))}
+        className="gap-4"
+      >
+        <TabsList
+          aria-label="Report creation steps"
+          className="grid w-full grid-cols-2 gap-1 group-data-horizontal/tabs:h-auto sm:grid-cols-4"
+        >
+          {steps.map((item, index) => (
+            <TabsTrigger
+              key={item.id}
+              value={item.id}
+              disabled={
+                disabled ||
+                (item.id === "estimate" &&
+                  step !== "design" &&
+                  !report.final_estimate_json) ||
+                (item.id === "copy" && !report.final_report_json) ||
+                (item.id === "preview" && !report.final_report_json)
+              }
+              className="h-auto min-h-12 gap-2 whitespace-normal px-2 py-2 text-xs sm:text-sm"
+            >
+              <span
+                className="flex size-6 shrink-0 items-center justify-center rounded-full border border-current text-xs opacity-60"
+                aria-hidden="true"
+              >
+                {index + 1}
+              </span>
               {item.label}
             </TabsTrigger>
           ))}
         </TabsList>
-
-        <TabsContent value="estimate">
-          <StrEstimateStep
-            listing={listing}
-            report={report}
-            onComplete={({ listing: nextListing, report: nextReport }) => {
-              updateListing(nextListing);
-              updateReport(nextReport);
-            }}
-            onContinue={() => setStep("copy")}
-          />
+        <TabsContent value="design">
+          {progress}
+          <div hidden={Boolean(activity)}>
+            <StrDesignStep
+              ref={designRef}
+              agency={agency}
+              agencyAgents={agencyAgents}
+              listing={listing}
+              report={report}
+              availableTemplates={availableTemplates}
+              busy={disabled}
+              onContinue={() => void handleStepChange("estimate")}
+            />
+          </div>
         </TabsContent>
-
+        <TabsContent value="estimate">
+          {progress}
+          <div hidden={Boolean(activity)}>
+            <StrEstimateStep
+              ref={estimateRef}
+              key={report.airbtics_fetched_at ?? "no-estimate"}
+              listing={listing}
+              report={report}
+              busy={disabled}
+              onComplete={updateReport}
+              onContinue={() => void handleStepChange("copy")}
+              onBack={() => void handleStepChange("design")}
+              onRefresh={() => void refreshEstimate()}
+            />
+          </div>
+        </TabsContent>
         <TabsContent value="copy">
           <GeneratedCopyEditor
-            ref={copyEditorRef}
+            ref={copyRef}
             agency={agency}
             agencyAgents={agencyAgents}
             listing={listing}
             report={report}
-            onComplete={(nextReport) => {
-              updateReport(nextReport);
-            }}
-            onContinueToPreview={() => handleStepChange("preview")}
+            onComplete={updateReport}
+            onBusyChange={setChildBusy}
+            onContinueToPreview={() => void handleStepChange("preview")}
           />
         </TabsContent>
-
-        <TabsContent value="preview" className="space-y-6">
-          {report.final_report_json ? <DocumentLinkEditor
-            document={report.final_report_json}
-            endpoint={`/api/reports/${report.id}/link`}
-            allowReport
-            disabled={loading}
-            onPendingChange={setLinkPending}
-            onSaved={(payload) => {
-              const next = payload.report as Report;
-              setReport(next);
-              setPreviewDraftReport(next.final_report_json);
-            }}
-          /> : null}
-          <AsyncLoadingOverlay
-            active={loading || previewSyncing}
-            title={
-              previewSyncing
-                ? "Refreshing preview"
-                : publishStage === "generating-pdf"
-                  ? "Generating PDF"
-                  : "Publishing report"
-            }
-            description={
-              previewSyncing
-                ? "Applying your latest edits to the preview."
-                : publishStage === "generating-pdf"
-                  ? "Rendering the final buyer pack. This can take 15–30 seconds."
-                  : "Saving the published report."
-            }
-          >
-            {previewReport ? (
-              <FittedReportPreview
-                report={previewReport}
-                maxHeight="min(80vh, 900px)"
-                fitToWidth
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Generate collateral first to preview the report.
-              </p>
-            )}
-          </AsyncLoadingOverlay>
-          <div className="flex flex-wrap gap-3 no-print">
-            <DownloadPdfButton
-              url={report.pdf_url}
-              reportId={report.id}
-              cacheVersion={report.updated_at}
-              canGenerate={Boolean(previewReport) && !loading && !linkPending && !report.final_report_json?.document_link_draft}
-              preview={report.status !== "published"}
-              size="default"
-              generateLabel="Generate PDF preview"
-              regenerateLabel="Regenerate PDF preview"
-              onGenerated={({ report: nextReport, pdf_url }) => {
-                if (nextReport) {
-                  updateReport(nextReport);
-                  return;
-                }
-
-                if (pdf_url) {
-                  updateReport({ ...report, pdf_url });
-                }
-              }}
+        <TabsContent value="preview">
+          {preview ? (
+            <StrReportDeliveryStep
+              report={report}
+              preview={preview}
+              onReportChange={updateReport}
+              onEdit={() => void handleStepChange("copy")}
+              onBusyChange={setChildBusy}
             />
-            {report.public_url ? (
-              <CopyLinkButton url={report.public_url} />
-            ) : null}
-            <Button onClick={publishReport} disabled={loading || linkPending || !previewReport}>
-              {loading ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  {publishStage === "generating-pdf"
-                    ? "Generating PDF..."
-                    : "Publishing..."}
-                </>
-              ) : (
-                "Publish report"
-              )}
-            </Button>
-          </div>
+          ) : null}
         </TabsContent>
       </Tabs>
     </div>
   );
-}
-
-function getInitialStep(report: Report) {
-  if (report.status === "published" || report.status === "generated") {
-    return "preview";
-  }
-  if (report.status === "estimated") {
-    return "copy";
-  }
-  return "estimate";
 }

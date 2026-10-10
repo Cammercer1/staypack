@@ -351,6 +351,7 @@ export type StrEnrichmentJson = {
 };
 
 export type StrEstimateOverrides = Partial<StrEstimate> & {
+  estimateInputs?: { bedrooms: number; bathrooms: number; accommodates: number };
   recommendedAnnualRevenue?: number | null;
   recommendedOccupancyRate?: number | null;
   revenueBand?: {

@@ -1,3 +1,4 @@
+import { invalidateReportPdf } from "@/lib/reports/invalidateReportPdf";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireReportWithListing } from "@/lib/auth/requireUser";
@@ -121,7 +122,8 @@ export async function PATCH(
       .update({
         template_id: templateId,
         ai_copy_json: aiCopy,
-        final_report_json: finalReportJson,
+        final_report_json: invalidateReportPdf(finalReportJson),
+        pdf_url: null,
         status: report.status === "published" ? report.status : "generated",
         generated_at: new Date().toISOString(),
       })

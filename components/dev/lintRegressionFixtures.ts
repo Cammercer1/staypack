@@ -1,3 +1,5 @@
+import { buildFinalReportJson, getMockAiCopy } from "@/lib/reports/buildFinalReportJson";
+import { finalReportCopyToAiCopy } from "@/lib/reports/editable/strReportCopyAdapter";
 import { getTemplatesForProduct } from "@/lib/templates/catalog";
 import { serializeTemplateForApi } from "@/lib/templates/serializeForApi";
 import type { TemplateProduct } from "@/lib/templates/types";
@@ -66,6 +68,10 @@ export function createLintRegressionFixtures() {
   document.assets.qr_code_url = "";
   const final = { ...getStrPlaygroundReport(), document_link: { mode: "none" as const } };
   const report = createEmptyReportDraft({ id: "mock-report", agency_id: agency.id, listing_id: listing.id, status: "generated", template_id: final.template_id ?? null, final_report_json: final });
+  report.final_estimate_json = { annualRevenue: final.str.annual_revenue, monthlyRevenue: final.str.monthly_revenue, weeklyRevenue: final.str.weekly_revenue, nightlyRate: final.str.nightly_rate, occupancyRate: (final.str.occupancy_rate ?? 0) <= 1 ? (final.str.occupancy_rate ?? 0) * 100 : final.str.occupancy_rate, bookedNights: final.str.booked_nights, radiusM: final.str.radius_m, raw: {} };
+  report.ai_copy_json = finalReportCopyToAiCopy(final.copy, null);
+  report.str_enrichment_json = final.str_enrichment ? { ...final.str_enrichment, comps: Array.from({ length: 8 }, (_, i) => ({ listing_id: `str-comp-${i}`, name: `Coastal stay ${i + 1}`, thumbnail_url: document.property.hero_image_url, listing_url: "https://example.test/property", bedrooms: i % 2 ? 3 : 4, bathrooms: 2, accommodates: i % 2 ? 6 : 8, distance_m: (i + 1) * 200, annual_revenue: 85000 + i * 3000, occupancy_rate: 68 + i, nightly_rate: 340 + i * 10 })) } : null;
+  report.airbtics_fetched_at = timestamp;
   const lease: Report = { ...report, id: "mock-lease", template_id: "classic-lease-appraisal", final_report_json: { ...final, version: "lease_appraisal_v1", template_id: "classic-lease-appraisal" } };
   const sales: Report = { ...report, id: "mock-sales", template_id: "classic-sales-appraisal", final_report_json: { ...final, version: "sales_appraisal_v1", template_id: "classic-sales-appraisal" } };
   lease.final_report_json = buildLeaseAppraisalTemplatePreview({ agency, listing, report: lease, templateId: lease.template_id!, agencyAgents: [agent] });
@@ -79,9 +85,10 @@ export function createLintRegressionFixtures() {
 export type RegressionFixtures = ReturnType<typeof createLintRegressionFixtures>;
 
 /** Intercepts every app API request before the real components mount. No fall-through for APIs. */
-export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: (label: string) => void, draftAppraisal?: "lease" | "sales" | "sales_brochure" | "rental_brochure") {
+export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: (label: string) => void, draftAppraisal?: "lease" | "sales" | "sales_brochure" | "rental_brochure" | "str") {
   const original = window.fetch;
   const data = structuredClone(fixtures);
+  if (draftAppraisal === "str") data.report = { ...data.report, template_id: null, final_estimate_json: null, ai_copy_json: null, final_report_json: null, str_enrichment_json: null, status: "draft" };
   if (draftAppraisal === "lease" || draftAppraisal === "sales") data[draftAppraisal] = { ...data[draftAppraisal], template_id: null, final_report_json: null, status: "draft" };
   if (draftAppraisal === "sales_brochure" || draftAppraisal === "rental_brochure") {
     data.document = draftAppraisal === "rental_brochure" ? { ...data.document, type: "rental_brochure", version: "rental_brochure_v1", template_id: data.document.template_id.replace(/^sales-brochure-/, "rental-brochure-") } : data.document;
@@ -100,6 +107,20 @@ export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: 
     if (url.pathname === "/api/templates") {
       const templates = getTemplatesForProduct(url.searchParams.get("product") as TemplateProduct).filter((entry) => entry.scope === "platform").map(serializeTemplateForApi);
       return Response.json({ templates, default_template_id: templates[0]?.id });
+    }
+    if (url.pathname === "/api/airbtics/estimate") {
+      data.listing = { ...data.listing, bedrooms: body.bedrooms, bathrooms: body.bathrooms, accommodates: body.accommodates };
+      data.report = { ...data.report, final_estimate_json: fixtures.report.final_estimate_json, str_enrichment_json: fixtures.report.str_enrichment_json, user_overrides_json: { estimateInputs: { bedrooms: body.bedrooms, bathrooms: body.bathrooms, accommodates: body.accommodates } }, airbtics_fetched_at: new Date().toISOString(), status: "estimated", pdf_url: null };
+      return Response.json({ report: data.report, listing: data.listing });
+    }
+    if (/^\/api\/reports\/mock-report(?:\/(generate-copy|str-report-copy))?$/.test(url.pathname)) {
+      if (method === "GET") return Response.json({ report: data.report, listing: data.listing });
+      const generation = url.pathname.endsWith("generate-copy");
+      const report = { ...data.report, ...(!generation && !body.copy ? body : {}), template_id: body.template_id ?? data.report.template_id, pdf_url: null, updated_at: new Date().toISOString() };
+      report.ai_copy_json = body.copy ? finalReportCopyToAiCopy(body.copy, report.ai_copy_json) : generation ? getMockAiCopy(data.listing, data.agency) : report.ai_copy_json;
+      if (report.ai_copy_json && report.final_estimate_json) report.final_report_json = buildFinalReportJson({ agency: data.agency, agencyAgents: [data.agent], listing: data.listing, report, estimate: report.final_estimate_json, copy: report.ai_copy_json, propertyImages: body.property_images ?? (report.final_report_json ? { hero_image_url: report.final_report_json.property.hero_image_url, selected_image_urls: report.final_report_json.property.selected_image_urls } : null) });
+      data.report = report;
+      return Response.json({ report, listing: data.listing });
     }
     const appraisalMatch = url.pathname.match(/^\/api\/reports\/mock-(lease|sales)(?:\/(generate-(?:lease|sales)-appraisal|(?:lease|sales)-appraisal-copy))?$/);
     if (appraisalMatch) {

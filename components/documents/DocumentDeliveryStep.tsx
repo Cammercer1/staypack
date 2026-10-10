@@ -27,8 +27,10 @@ export function DocumentDeliveryStep({
   onPublish,
   onEdit,
   onBusyChange,
+  pdfProgressText,
 }: {
   name: "appraisal" | "brochure";
+  pdfProgressText?: string;
   preview: ReactNode;
   pdfReady: boolean;
   downloadUrl: string;
@@ -114,7 +116,7 @@ export function DocumentDeliveryStep({
                     className="size-4 shrink-0 animate-spin"
                     aria-hidden="true"
                   />
-                  Preparing your PDF. This can take 15–30 seconds…
+                  {pdfProgressText ?? "Preparing your PDF. This can take 15–30 seconds…"}
                 </p>
               ) : null}
               {pdfReady && !hasLinkDraft ? (

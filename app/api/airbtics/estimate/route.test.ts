@@ -1,0 +1,40 @@
+import { afterEach, expect, it, vi } from "vitest";
+import { POST } from "./route";
+import { requireReportWithListing } from "@/lib/auth/requireUser";
+import { fetchAirbticsEstimate } from "@/lib/airbtics/client";
+import { positionStrEstimate } from "@/lib/airbtics/positionEstimate";
+import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
+import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
+vi.mock("@/lib/auth/requireUser", () => ({ requireReportWithListing: vi.fn() }));
+vi.mock("@/lib/geocoding", () => ({ geocodeReportAddress: vi.fn(async () => ({ latitude: -33.91, longitude: 151.22, formattedAddress: "Test property" })) }));
+vi.mock("@/lib/airbtics/client", () => ({ fetchAirbticsEstimate: vi.fn() }));
+vi.mock("@/lib/airbtics/positionEstimate", () => ({ positionStrEstimate: vi.fn() }));
+vi.mock("@/lib/reports/loadReportAgent", () => ({ loadAgencyAgentProfiles: vi.fn(), loadListingAgentProfile: vi.fn() }));
+afterEach(() => vi.clearAllMocks());
+it("refreshes estimate inputs and figures without losing edited wording, photos or QR choices", async () => {
+  const fixtures = createLintRegressionFixtures();
+  let report = { ...fixtures.report, pdf_url: "old.pdf", status: "published" as typeof fixtures.report.status };
+  let listing = fixtures.listing;
+  report.final_report_json = { ...report.final_report_json!, document_link: { mode: "custom", url: "https://example.test/agent" } };
+  const nextEstimate = { ...report.final_estimate_json!, annualRevenue: 130000 };
+  function from(table: string) {
+    const query = { update: vi.fn((body: Record<string, unknown>) => { if (table === "reports") report = { ...report, ...body }; else listing = { ...listing, ...body }; return query; }), eq: vi.fn(() => query), select: vi.fn(() => query), single: vi.fn(async () => ({ data: table === "reports" ? report : listing, error: null })) };
+    return query;
+  }
+  vi.mocked(requireReportWithListing).mockResolvedValue({ report, listing, agency: fixtures.agency, supabase: { from } } as unknown as Awaited<ReturnType<typeof requireReportWithListing>>);
+  vi.mocked(fetchAirbticsEstimate).mockResolvedValue({ estimate: nextEstimate, tier: "full", reportId: "estimate-id", costCents: 0, enrichment: fixtures.report.str_enrichment_json } as Awaited<ReturnType<typeof fetchAirbticsEstimate>>);
+  vi.mocked(positionStrEstimate).mockResolvedValue({ estimate: nextEstimate, positioning: null });
+  vi.mocked(loadAgencyAgentProfiles).mockResolvedValue([fixtures.agent]);
+  vi.mocked(loadListingAgentProfile).mockResolvedValue(fixtures.agent);
+  const response = await POST(new Request("https://example.test/estimate", { method: "POST", body: JSON.stringify({ report_id: "b7067c85-6745-48c7-a9f8-e48cdb91d854", bedrooms: 3, bathrooms: 2, accommodates: 6 }) }));
+  expect(response.status).toBe(200);
+  const saved = (await response.json()).report;
+  expect(saved.pdf_url).toBeNull();
+  expect(saved.final_report_json.assets.pdf_url).toBe("");
+  expect(saved.final_report_json.str.annual_revenue).toBe(130000);
+  expect(saved.final_report_json.property.hero_image_url).toBe(fixtures.report.final_report_json?.property.hero_image_url);
+  expect(saved.final_report_json.copy.heading).toBe(fixtures.report.final_report_json?.copy.heading);
+  expect(saved.final_report_json.document_link).toEqual({ mode: "custom", url: "https://example.test/agent" });
+  expect(saved.user_overrides_json.estimateInputs).toEqual({ bedrooms: 3, bathrooms: 2, accommodates: 6 });
+  expect(saved.status).toBe("published");
+});

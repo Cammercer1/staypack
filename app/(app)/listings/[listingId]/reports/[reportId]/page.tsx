@@ -6,6 +6,7 @@ import { ReportEditor } from "@/components/reports/ReportEditor";
 import { Button } from "@/components/ui/button";
 import { STR_REPORT_LABEL } from "@/lib/listings/collateralTypes";
 import { refreshStrEnrichmentInFinalReport } from "@/lib/airbtics/enrich";
+import { serializeTemplateForApi } from "@/lib/templates/serializeForApi";
 import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
 import type { FinalReportJson, Listing, Report } from "@/lib/types";
 
@@ -67,7 +68,7 @@ export default async function ListingReportEditorPage({
           {STR_REPORT_LABEL}
         </h1>
         <p className="text-muted-foreground">
-          Run the STR estimate, generate collateral, and publish this report for{" "}
+          Create a branded report for{" "}
           {listing.property_address ?? "this listing"}.
         </p>
       </div>
@@ -76,6 +77,7 @@ export default async function ListingReportEditorPage({
         initialListing={listing}
         initialReport={editorReport}
         agency={agency}
+        availableTemplates={{ default_template_id: availableTemplates.defaultTemplateId, templates: availableTemplates.templates.map(serializeTemplateForApi) }}
       />
     </div>
   );

@@ -1,3 +1,7 @@
+import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
+import { invalidateReportPdf, preserveReportImages } from "@/lib/reports/invalidateReportPdf";
+import { finalReportCopyToAiCopy } from "@/lib/reports/editable/strReportCopyAdapter";
+import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import { NextResponse } from "next/server";
 import { requireReportWithListing } from "@/lib/auth/requireUser";
 import { geocodeReportAddress } from "@/lib/geocoding";
@@ -13,7 +17,7 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   try {
     const body = airbticsEstimateSchema.parse(await request.json());
-    const { supabase, report, listing } = await requireReportWithListing(body.report_id);
+    const { supabase, agency, report, listing } = await requireReportWithListing(body.report_id);
 
     let latitude =
       body.latitude != null ? Number(body.latitude) : listing.latitude;
@@ -80,44 +84,6 @@ export async function POST(request: Request) {
       ? { ...enrichment, positioning }
       : enrichment;
 
-    // #region agent log
-    fetch("http://127.0.0.1:7740/ingest/66655b5b-7303-4147-9dce-5926d720dd8f", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "a0cff1",
-      },
-      body: JSON.stringify({
-        sessionId: "a0cff1",
-        runId: "pre-fix",
-        hypothesisId: "C",
-        location: "app/api/airbtics/estimate/route.ts:POST",
-        message: "Estimate saved enrichment snapshot",
-        data: {
-          report_id: body.report_id,
-          tier,
-          airbtics_report_id: reportId,
-          enrichment_comp_count: enrichment?.comp_count ?? null,
-          enrichment_comps_len: enrichment?.comps?.length ?? null,
-          enrichment_seasonality_len: enrichment?.seasonality?.length ?? null,
-          raw_comps_status:
-            estimate.raw &&
-            typeof estimate.raw === "object" &&
-            "comps_status" in estimate.raw
-              ? String((estimate.raw as Record<string, unknown>).comps_status)
-              : null,
-          raw_comps_len:
-            estimate.raw &&
-            typeof estimate.raw === "object" &&
-            Array.isArray((estimate.raw as Record<string, unknown>).comps)
-              ? ((estimate.raw as Record<string, unknown>).comps as unknown[]).length
-              : null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
     const { error: listingError } = await supabase
       .from("listings")
       .update({
@@ -133,6 +99,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: listingError.message }, { status: 400 });
     }
 
+    const updatedProperty = { ...listing, latitude, longitude, bedrooms, bathrooms, accommodates };
+    const savedCopy = report.ai_copy_json ?? (report.final_report_json ? finalReportCopyToAiCopy(report.final_report_json.copy, null) : null);
+    const finalDocument = savedCopy ? buildFinalReportJson({
+      agency,
+      agentProfile: await loadListingAgentProfile(supabase, listing),
+      agencyAgents: await loadAgencyAgentProfiles(supabase, agency.id),
+      listing: updatedProperty,
+      report: { ...report, str_enrichment_json: enrichmentWithPositioning, raw_airbtics_json: estimate.raw },
+      estimate: positionedEstimate,
+      copy: savedCopy,
+      propertyImages: preserveReportImages(report.final_report_json),
+    }) : null;
+
     const { data, error } = await supabase
       .from("reports")
       .update({
@@ -142,10 +121,12 @@ export async function POST(request: Request) {
         airbtics_fetched_at: new Date().toISOString(),
         original_estimate_json: estimate,
         final_estimate_json: positionedEstimate,
-        user_overrides_json: null,
+        user_overrides_json: { estimateInputs: { bedrooms, bathrooms, accommodates } },
+        pdf_url: null,
+        final_report_json: finalDocument ? invalidateReportPdf(finalDocument) : null,
         raw_airbtics_json: estimate.raw,
         str_enrichment_json: enrichmentWithPositioning,
-        status: "estimated",
+        status: report.status === "published" ? "published" : "estimated",
       })
       .eq("id", report.id)
       .select("*")

@@ -1,3 +1,4 @@
+import { invalidateReportPdf, preserveReportImages } from "@/lib/reports/invalidateReportPdf";
 import { preserveDocumentLink } from "@/lib/documents/documentLink";
 import { NextResponse } from "next/server";
 import { requireReportWithListing } from "@/lib/auth/requireUser";
@@ -57,8 +58,9 @@ async function rebuildFinalReportJson({
     estimate,
     copy,
     scraped: listing.scraped_listing_json,
+    propertyImages: preserveReportImages(report.final_report_json),
   });
-  body.status = "generated";
+  body.status = report.status === "published" ? "published" : "generated";
 
   return { error: null };
 }
@@ -168,13 +170,23 @@ export async function PATCH(
       }
     }
 
+    if (body.template_id && body.template_id !== report.template_id && !body.final_report_json && report.final_report_json) {
+      body.final_report_json = { ...report.final_report_json, template_id: body.template_id };
+    }
+
     if (body.final_report_json) {
       body.final_report_json = { ...body.final_report_json, ...preserveDocumentLink(report.final_report_json) };
     }
 
     const { data, error } = await supabase
       .from("reports")
-      .update(body)
+      .update({
+        ...body,
+        ...(body.final_report_json ? {
+          final_report_json: invalidateReportPdf(body.final_report_json),
+          pdf_url: null,
+        } : {}),
+      })
       .eq("id", report.id)
       .select("*")
       .single();

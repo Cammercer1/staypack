@@ -123,7 +123,7 @@ export function FittedReportPreview({
       {paginated && pageLabels && !thumbnail ? (
         <nav aria-label="Report pages" className="flex shrink-0 items-center justify-center gap-2 border-b bg-muted/30 p-2">
           {Array.from({ length: pageCount }, (_, index) => (
-            <button key={index} type="button" aria-pressed={index === currentPage} onClick={() => setCurrentPage(index)} className={cn("du-btn du-btn-sm min-h-11 flex-1 sm:flex-none", index === currentPage ? "du-btn-primary" : "du-btn-ghost")}>
+            <button key={index} type="button" aria-pressed={index === currentPage} onClick={() => setCurrentPage(index)} className={cn("du-btn du-btn-sm h-auto min-h-11 min-w-0 flex-1 whitespace-normal px-2 py-2 text-xs sm:flex-none sm:text-sm", index === currentPage ? "du-btn-primary" : "du-btn-ghost")}>
               {index + 1}. {pageLabels[index] ?? `Page ${index + 1}`}
             </button>
           ))}

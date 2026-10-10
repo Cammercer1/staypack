@@ -1,3 +1,6 @@
+import { resolveCopyForTemplate } from "@/lib/copy/resolveCopyForTemplate";
+import { resolveBlurbLengthForTemplate } from "@/lib/copy/blurbTemplateDefaults";
+import { setReportCopyValueAtPath, type ReportCopyFieldPath } from "@/lib/reports/editable/reportCopyPaths";
 import type { AiCopyJson, FinalReportJson, Report } from "@/lib/types";
 import type { ReportPropertyImageSelection } from "@/lib/reports/editable/reportImageSlots";
 import { pickReportPropertyImages } from "@/lib/reports/editable/reportImageSlots";
@@ -67,4 +70,10 @@ export function strEditorSnapshot(
   propertyImages: ReportPropertyImageSelection | null,
 ) {
   return JSON.stringify({ copy, propertyImages });
+}
+
+/** Edit the variant actually displayed by this layout, without turning a no-op flush into a save. */
+export function setStrReportCopyValue(copy: StrReportEditorCopy, path: ReportCopyFieldPath, value: string, templateId: string): StrReportEditorCopy {
+  if (path === "copy.blurb" && value.trim() === resolveCopyForTemplate({ copy, templateId, collateral: "str" }).blurb.trim()) return copy;
+  return setReportCopyValueAtPath(copy, path, value, { activeBlurbLength: resolveBlurbLengthForTemplate(templateId, "str") });
 }

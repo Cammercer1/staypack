@@ -31,7 +31,7 @@ import { REPORT_TEMPLATES } from "@/lib/reports/templates/registry";
 import { Button } from "@/components/ui/button";
 import type { AgencyInput } from "@/lib/validation/schemas";
 
-const cases = ["brochure", "sales-brochure-new", "lease-brochure-new", "brochure-generation", "editor", "wizard", "report", "gallery", "landing", "agents", "unknown-agents", "branding", "analytics", "leads", "progress", "social", "report-wizard", "lease-wizard", "sales-wizard", "lease-new", "sales-new", "appraisal-generation", "workspace", "business-card"] as const;
+const cases = ["brochure", "sales-brochure-new", "lease-brochure-new", "brochure-generation", "editor", "wizard", "report", "gallery", "landing", "agents", "unknown-agents", "branding", "analytics", "leads", "progress", "social", "report-wizard", "str-new", "lease-wizard", "sales-wizard", "lease-new", "sales-new", "appraisal-generation", "workspace", "business-card"] as const;
 
 export function LintRegressionPlayground() {
   const [fixtures] = useState(createLintRegressionFixtures);
@@ -54,7 +54,7 @@ export function LintRegressionPlayground() {
         const name = e.target.value;
         restore.current?.();
         setRequests([]);
-        restore.current = installRegressionMocks(fixtures, (label) => setRequests((items) => [...items, label]), name === "lease-new" ? "lease" : name === "sales-new" ? "sales" : name === "sales-brochure-new" ? "sales_brochure" : name === "lease-brochure-new" ? "rental_brochure" : undefined);
+        restore.current = installRegressionMocks(fixtures, (label) => setRequests((items) => [...items, label]), name === "str-new" ? "str" : name === "lease-new" ? "lease" : name === "sales-new" ? "sales" : name === "sales-brochure-new" ? "sales_brochure" : name === "lease-brochure-new" ? "rental_brochure" : undefined);
         setSelected(name);
       }} className="ml-3 rounded border p-2">{cases.map((name) => <option key={name}>{name}</option>)}</select></label>}
     </header>
@@ -84,6 +84,7 @@ function RegressionCase({ name, fixtures }: { name: string; fixtures: Regression
 
   if (name === "sales-brochure-new" || name === "lease-brochure-new") return <SalesBrochureWizard agency={agency} initialListing={listing} initialCollateral={brochureDraft} collateralType={brochureDraft.type} initialAgencyAgents={[fixtures.agent]} />;
   if (name === "brochure-generation") return <BrochureGenerationStatus />;
+  if (name === "str-new") return <ReportWizard agency={agency} initialListing={listing} initialReport={{ ...fixtures.report, template_id: null, final_estimate_json: null, final_report_json: null, ai_copy_json: null, str_enrichment_json: null, status: "draft" }} />;
   if (name === "report-wizard") return <ReportWizard agency={agency} initialListing={listing} initialReport={fixtures.report} />;
   if (name === "lease-wizard") return <LeaseAppraisalWizard agency={agency} initialListing={listing} initialReport={fixtures.lease} initialCollateral={fixtures.leaseCollateral} initialAgencyAgents={[fixtures.agent]} />;
   if (name === "sales-wizard") return <SalesAppraisalWizard agency={agency} initialListing={listing} initialReport={fixtures.sales} initialCollateral={fixtures.salesCollateral} initialAgencyAgents={[fixtures.agent]} />;

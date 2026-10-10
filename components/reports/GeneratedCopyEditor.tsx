@@ -9,18 +9,16 @@ import {
   useRef,
   useState,
 } from "react";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { DocumentStepHeader } from "@/components/documents/DocumentStepHeader";
+import { DocumentGenerationStatus } from "@/components/documents/DocumentGenerationStatus";
+import { reportRequest, jsonRequest } from "@/lib/reports/reportRequests";
 import { toast } from "sonner";
-import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
 import { Button } from "@/components/ui/button";
-import {
-  CopyEditorContextMetric,
-  CopyEditorField,
-} from "@/components/copy-editor/primitives";
+import { CopyEditorField } from "@/components/copy-editor/primitives";
 import { BlurbVariantsEditor } from "@/components/collateral/sales-brochure/BlurbVariantsEditor";
 import { FittedReportPreview } from "@/components/reports/FittedReportPreview";
 import { ReportImagePickerDialog } from "@/components/reports/inline/ReportImagePickerDialog";
-import { ReportTemplatePicker } from "@/components/reports/ReportTemplatePicker";
 import {
   getReportImageUrlAtSlot,
   pickReportPropertyImages,
@@ -28,25 +26,30 @@ import {
   type ReportImageSlot,
   type ReportPropertyImageSelection,
 } from "@/lib/reports/editable/reportImageSlots";
-import {
-  setReportCopyValueAtPath,
-  type ReportCopyFieldPath,
-} from "@/lib/reports/editable/reportCopyPaths";
+import { type ReportCopyFieldPath } from "@/lib/reports/editable/reportCopyPaths";
 import {
   copyFromStrReport,
+  setStrReportCopyValue,
   propertyImagesFromStrReport,
   strEditorSnapshot,
   type StrReportEditorCopy,
 } from "@/lib/reports/editable/strReportCopyAdapter";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
-import { formatCurrency, formatPercent } from "@/lib/reports/formatters";
+import { formatCurrency } from "@/lib/reports/formatters";
+import { resolveBlurbLengthForTemplate } from "@/lib/copy/blurbTemplateDefaults";
 import { resolveReportDisplayPrice } from "@/lib/reports/resolveReportDisplayPrice";
 import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { getTemplateCopyFieldLimit } from "@/lib/reports/getTemplateCopyLimits";
 import { resolveReportTemplateIdForReport } from "@/lib/reports/templateFromEstimateTier";
 import { cn } from "@/lib/utils";
-import type { Agency, AgentProfile, FinalReportJson, Listing, Report } from "@/lib/types";
+import type {
+  Agency,
+  AgentProfile,
+  FinalReportJson,
+  Listing,
+  Report,
+} from "@/lib/types";
 
 type Props = {
   agency: Agency;
@@ -55,14 +58,11 @@ type Props = {
   report: Report;
   onComplete: (report: Report) => void;
   onContinueToPreview?: () => void;
-};
-
-type ApiError = {
-  error?: string;
-  code?: string;
+  onBusyChange?: (busy: boolean) => void;
 };
 
 export type StrCopyEditorHandle = {
+  savePendingEdits: () => Promise<boolean>;
   flushPendingEdits: () => void;
   getPreviewReport: () => FinalReportJson | null;
 };
@@ -76,6 +76,7 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
       report,
       onComplete,
       onContinueToPreview,
+      onBusyChange,
     }: Props,
     ref,
   ) {
@@ -83,7 +84,8 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
       () => resolveReportTemplateIdForReport(agency, report),
       [agency, report],
     );
-    const [selectedTemplateId, setSelectedTemplateId] = useState(resolvedTemplateId);
+    const [selectedTemplateId, setSelectedTemplateId] =
+      useState(resolvedTemplateId);
 
     useEffect(() => {
       setSelectedTemplateId(resolvedTemplateId);
@@ -99,19 +101,21 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
         propertyImagesFromStrReport(report),
       );
     const propertyImagesRef = useRef(propertyImages);
-    const [imagePickerSlot, setImagePickerSlot] = useState<ReportImageSlot | null>(
-      null,
-    );
+    const [imagePickerSlot, setImagePickerSlot] =
+      useState<ReportImageSlot | null>(null);
     const [generating, setGenerating] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [view, setView] = useState<"fields" | "layout">("fields");
     const [confirmRegenerate, setConfirmRegenerate] = useState(false);
     const [saveFailed, setSaveFailed] = useState(false);
-    const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(() => {
-      const initialCopy = copyFromStrReport(report);
-      return initialCopy
-        ? strEditorSnapshot(initialCopy, propertyImagesFromStrReport(report))
-        : null;
-    });
+    const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(
+      () => {
+        const initialCopy = copyFromStrReport(report);
+        return initialCopy
+          ? strEditorSnapshot(initialCopy, propertyImagesFromStrReport(report))
+          : null;
+      },
+    );
 
     useEffect(() => {
       const next = copyFromStrReport(report);
@@ -120,10 +124,8 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
       propertyImagesRef.current = nextImages;
       setCopy(next);
       setPropertyImages(nextImages);
-      setLastSavedSnapshot(
-        next ? strEditorSnapshot(next, nextImages) : null,
-      );
-    }, [report.final_report_json, report.ai_copy_json, report.updated_at]);
+      setLastSavedSnapshot(next ? strEditorSnapshot(next, nextImages) : null);
+    }, [report]);
 
     const estimate = useMemo(() => resolveReportEstimate(report), [report]);
     const displayPrice = useMemo(
@@ -131,7 +133,9 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
       [listing],
     );
 
-    const currentSnapshot = copy ? strEditorSnapshot(copy, propertyImages) : null;
+    const currentSnapshot = copy
+      ? strEditorSnapshot(copy, propertyImages)
+      : null;
     const isDirty =
       currentSnapshot != null &&
       lastSavedSnapshot != null &&
@@ -188,7 +192,11 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
         if (!previewReport || !imagePickerSlot) {
           return;
         }
-        const next = replaceReportImageAtSlot(previewReport, imagePickerSlot, url);
+        const next = replaceReportImageAtSlot(
+          previewReport,
+          imagePickerSlot,
+          url,
+        );
         const images = pickReportPropertyImages(next.property);
         propertyImagesRef.current = images;
         setPropertyImages(images);
@@ -199,14 +207,10 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
 
     const commitCopy = useCallback(
       (updater: (current: StrReportEditorCopy) => StrReportEditorCopy) => {
-        setCopy((current) => {
-          if (!current) {
-            return current;
-          }
-          const next = updater(current);
-          copyRef.current = next;
-          return next;
-        });
+        if (!copyRef.current) return;
+        const next = updater(copyRef.current);
+        copyRef.current = next;
+        setCopy(next);
       },
       [],
     );
@@ -217,63 +221,63 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
       }
       const flushedBlurb = blurbFlushRef.current?.();
       if (flushedBlurb != null && copyRef.current) {
-        const next = setReportCopyValueAtPath(
+        const next = setStrReportCopyValue(
           copyRef.current,
           "copy.blurb",
           flushedBlurb,
+          selectedTemplateId,
         ) as StrReportEditorCopy;
         copyRef.current = next;
         setCopy(next);
       }
-    }, []);
+    }, [selectedTemplateId]);
 
-    useImperativeHandle(
-      ref,
-      () => ({
-        flushPendingEdits,
-        getPreviewReport: () => previewReport,
-      }),
-      [flushPendingEdits, previewReport],
-    );
+    useImperativeHandle(ref, () => ({
+      savePendingEdits: () => persistCopy({ silent: true }),
+      flushPendingEdits,
+      getPreviewReport: () => previewReport,
+    }));
 
     async function persistCopy(options?: { silent?: boolean }) {
       flushPendingEdits();
       const copyToSave = copyRef.current;
       const imagesToSave = propertyImagesRef.current;
-      if (!copyToSave) {
+      if (
+        !copyToSave ||
+        strEditorSnapshot(copyToSave, imagesToSave) === lastSavedSnapshot
+      )
         return true;
-      }
-
       setSaving(true);
+      onBusyChange?.(true);
       setSaveFailed(false);
-      const response = await fetch(`/api/reports/${report.id}/str-report-copy`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          copy: copyToSave,
-          template_id: selectedTemplateId,
-          property_images: imagesToSave ?? undefined,
-        }),
-      });
-      const payload = (await response.json()) as ApiError & { report?: Report };
-
-      if (!response.ok) {
-        toast.error(getErrorMessage(payload));
-        setSaveFailed(true);
-        setSaving(false);
-        return false;
-      }
-
-      if (payload.report) {
+      try {
+        const payload = await reportRequest<{ report: Report }>(
+          `/api/reports/${report.id}/str-report-copy`,
+          jsonRequest(
+            {
+              copy: copyToSave,
+              template_id: selectedTemplateId,
+              property_images: imagesToSave ?? undefined,
+            },
+            "PATCH",
+          ),
+        );
+        if (!payload.report)
+          throw new Error("The report was not saved. Please try again.");
         onComplete(payload.report);
+        setLastSavedSnapshot(strEditorSnapshot(copyToSave, imagesToSave));
+        if (!options?.silent) toast.success("Report saved");
+        return true;
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Unable to save report",
+        );
+        setSaveFailed(true);
+        return false;
+      } finally {
+        setSaving(false);
+        onBusyChange?.(false);
       }
-
-      setLastSavedSnapshot(strEditorSnapshot(copyToSave, imagesToSave));
-      if (!options?.silent) {
-        toast.success("Collateral saved");
-      }
-      setSaving(false);
-      return true;
     }
 
     async function generateCopy() {
@@ -281,89 +285,32 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
         setConfirmRegenerate(true);
         return;
       }
-
+      if (!estimate) return;
       setConfirmRegenerate(false);
-
-      if (!estimate) {
-        toast.error("Run an STR estimate before generating collateral");
-        return;
-      }
-
+      if (!(await persistCopy({ silent: true }))) return;
       setGenerating(true);
-      const response = await fetch(`/api/reports/${report.id}/generate-copy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ template_id: selectedTemplateId }),
-      });
-      const payload = (await response.json()) as ApiError & {
-        copy?: unknown;
-        report?: Report;
-      };
-
-      if (!response.ok) {
-        toast.error(getErrorMessage(payload));
+      onBusyChange?.(true);
+      try {
+        const payload = await reportRequest<{ report: Report }>(
+          `/api/reports/${report.id}/generate-copy`,
+          jsonRequest({ template_id: selectedTemplateId }),
+        );
+        if (!payload.report)
+          throw new Error("The report was not generated. Please try again.");
+        onComplete(payload.report);
+        toast.success("Report wording generated");
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Unable to generate report",
+        );
+      } finally {
         setGenerating(false);
-        return;
+        onBusyChange?.(false);
       }
-
-      if (payload.report) {
-        onComplete(payload.report);
-        const nextCopy = copyFromStrReport(payload.report);
-        copyRef.current = nextCopy;
-        setCopy(nextCopy);
-        if (nextCopy) {
-          const nextImages = propertyImagesFromStrReport(payload.report);
-          propertyImagesRef.current = nextImages;
-          setPropertyImages(nextImages);
-          setLastSavedSnapshot(strEditorSnapshot(nextCopy, nextImages));
-        }
-      }
-
-      toast.success("Collateral generated");
-      setGenerating(false);
     }
 
-    async function continueToPreview() {
-      if (isDirty) {
-        return;
-      }
-      if (copy) {
-        const saved = await persistCopy({ silent: true });
-        if (!saved) {
-          return;
-        }
-      }
+    function continueToPreview() {
       onContinueToPreview?.();
-    }
-
-    async function handleTemplateChange(templateId: string) {
-      setSelectedTemplateId(templateId);
-
-      if (!copy) {
-        return;
-      }
-
-      setSaving(true);
-      const response = await fetch(`/api/reports/${report.id}/str-report-copy`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          copy,
-          template_id: templateId,
-          property_images: propertyImages ?? undefined,
-        }),
-      });
-      const payload = (await response.json()) as ApiError & { report?: Report };
-      setSaving(false);
-
-      if (!response.ok) {
-        toast.error(getErrorMessage(payload));
-        return;
-      }
-
-      if (payload.report) {
-        onComplete(payload.report);
-      }
     }
 
     function updateField<K extends keyof StrReportEditorCopy>(
@@ -375,11 +322,17 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
 
     const handleInlineSetField = useCallback(
       (path: ReportCopyFieldPath, value: string) => {
-        commitCopy((current) =>
-          setReportCopyValueAtPath(current, path, value) as StrReportEditorCopy,
+        commitCopy(
+          (current) =>
+            setStrReportCopyValue(
+              current,
+              path,
+              value,
+              selectedTemplateId,
+            ) as StrReportEditorCopy,
         );
       },
-      [commitCopy],
+      [commitCopy, selectedTemplateId],
     );
 
     const headingLimit = getTemplateCopyFieldLimit(
@@ -396,201 +349,160 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
       .filter(Boolean)
       .join(", ");
 
-    const contextSummary = strListingContextSummary(listing, displayPrice, estimate);
+    const contextSummary = strListingContextSummary(
+      listing,
+      displayPrice,
+      estimate,
+    );
+
+    if (generating)
+      return (
+        <DocumentGenerationStatus
+          title="Writing your report"
+          description="Your saved property details and estimate are ready."
+          headline="Preparing your short-term rental appraisal"
+          body="Writing the property summary and supporting evidence, and applying your chosen design."
+          savedLabel="Design, property and estimate saved"
+          activeLabel="Writing and laying out your report"
+        />
+      );
 
     return (
-      <AsyncLoadingOverlay
-        active={generating}
-        title="Preparing appraisal"
-        description="Writing buyer-ready short-term rental appraisal copy from the property details and revenue estimate. This usually takes 10–20 seconds."
-      >
-        <div
-          className={cn(
-            "mx-auto flex w-full max-w-5xl flex-col gap-4",
-            copy && isDirty && "pb-24",
-          )}
+      <section data-theme="staypack-workspace" className="space-y-5">
+        <DocumentStepHeader
+          title="Edit your short-term rental report"
+          description="Edit wording in the fields or on the preview. Changes are saved before you change steps."
+          status={
+            <span className="du-badge du-badge-sm">
+              {saving ? "Saving…" : isDirty ? "Unsaved changes" : "Saved"}
+            </span>
+          }
         >
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <h2 className="flex items-center gap-2 text-lg font-semibold">
-                {copy && isDirty ? (
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full bg-amber-500"
-                    aria-hidden
-                  />
-                ) : null}
-                {copy ? "Edit short-term rental appraisal" : "Appraisal content"}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {copy
-                  ? "Hover photos on the preview and click Change photo to pick another image or floor plan. Click text to edit copy inline."
-                  : "Generate buyer-ready copy from the property details and short-term rental estimate, then edit it directly on the appraisal."}
-              </p>
-              {addressLine ? (
-                <p className="mt-1 truncate text-sm font-medium text-foreground">
-                  {addressLine}
-                </p>
-              ) : null}
-              {copy && contextSummary ? (
-                <p className="mt-0.5 text-xs text-muted-foreground">{contextSummary}</p>
-              ) : null}
-              {saveFailed ? (
-                <p className="mt-1 text-xs text-destructive">
-                  Save failed — try again below.
-                </p>
-              ) : null}
-              {!estimate && !copy ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Run an STR estimate before generating collateral.
-                </p>
-              ) : null}
-            </div>
-
-            <div className="flex shrink-0 flex-wrap gap-2">
-              {copy && isDirty ? (
-                <Button
-                  disabled={generating || saving}
-                  onClick={() => void persistCopy()}
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="animate-spin" />
-                      Saving…
-                    </>
-                  ) : (
-                    "Save changes"
-                  )}
-                </Button>
-              ) : null}
-              <Button
-                onClick={generateCopy}
-                disabled={generating || saving || !estimate}
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="animate-spin" />
-                    Generating…
-                  </>
-                ) : copy && confirmRegenerate ? (
-                  "Confirm regenerate"
-                ) : copy ? (
-                  "Regenerate copy"
-                ) : (
-                    "Generate appraisal"
-                )}
-              </Button>
-              {copy ? (
-                <Button
-                  variant="outline"
-                  onClick={continueToPreview}
-                  disabled={generating || saving || isDirty}
-                  title={
-                    isDirty
-                      ? "Save your changes before continuing to preview"
-                      : undefined
-                  }
-                >
-                  Continue to preview
-                </Button>
-              ) : null}
-            </div>
+          <button
+            type="button"
+            className="du-btn du-btn-primary min-h-11"
+            onClick={continueToPreview}
+            disabled={saving || !copy}
+          >
+            {saving ? "Saving…" : "Review & download"}
+          </button>
+        </DocumentStepHeader>
+        {saveFailed ? (
+          <p role="alert" className="du-alert du-alert-error du-alert-soft">
+            Your changes could not be saved. They are still here. Try Save
+            changes or Review & download again.
+          </p>
+        ) : null}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">{addressLine}</p>
+            <p className="text-xs text-muted-foreground">{contextSummary}</p>
           </div>
-
-          {!copy ? (
-            <div className="rounded-xl border border-border/70 bg-muted/20 p-6 text-sm">
-              <p className="font-medium">Report context</p>
-              <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-                <CopyEditorContextMetric
-                  label="Bedrooms"
-                  value={listing.bedrooms != null ? String(listing.bedrooms) : "—"}
-                />
-                <CopyEditorContextMetric
-                  label="Bathrooms"
-                  value={listing.bathrooms != null ? String(listing.bathrooms) : "—"}
-                />
-                <CopyEditorContextMetric
-                  label="Listing price"
-                  value={displayPrice ?? "—"}
-                />
-                {estimate ? (
-                  <>
-                    <CopyEditorContextMetric
-                      label="Annual revenue"
-                      value={formatCurrency(estimate.annualRevenue)}
-                    />
-                    <CopyEditorContextMetric
-                      label="Occupancy"
-                      value={formatPercent(estimate.occupancyRate)}
-                    />
-                    <CopyEditorContextMetric
-                      label="Nightly rate"
-                      value={formatCurrency(estimate.nightlyRate)}
-                    />
-                  </>
-                ) : null}
-              </div>
-              {!displayPrice ? (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Add a numeric listing price on the Review listing step to show
-                  estimated gross STR yield on the report.
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-
-          {previewReport && copy ? (
-            <>
-              <FittedReportPreview
-                report={previewReport}
-                maxHeight="min(85vh, 960px)"
-                fitToWidth
-                editable={{
-                  setField: handleInlineSetField,
-                  openImagePicker: handleOpenImagePicker,
-                  brandPrimaryColour: previewReport.agency.primary_colour,
-                  blurbFlushRef,
-                }}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="du-btn du-btn-sm du-btn-outline min-h-11"
+              aria-pressed={view === "fields"}
+              onClick={() => {
+                flushPendingEdits();
+                setView("fields");
+              }}
+              disabled={saving}
+            >
+              Edit text
+            </button>
+            <button
+              type="button"
+              className="du-btn du-btn-sm du-btn-outline min-h-11"
+              aria-pressed={view === "layout"}
+              onClick={() => {
+                flushPendingEdits();
+                setView("layout");
+              }}
+              disabled={saving}
+            >
+              Preview layout
+            </button>
+            <button
+              type="button"
+              className="du-btn du-btn-sm du-btn-outline min-h-11"
+              onClick={() => handleOpenImagePicker("hero")}
+              disabled={saving || !copy}
+            >
+              Change cover photo
+            </button>
+            {isDirty ? (
+              <Button
+                variant="outline"
+                disabled={saving}
+                onClick={() => void persistCopy()}
+              >
+                {saving ? <Loader2 className="animate-spin" /> : null}Save
+                changes
+              </Button>
+            ) : null}
+            <button
+              type="button"
+              className="du-btn du-btn-sm du-btn-ghost min-h-11"
+              onClick={() => void generateCopy()}
+              disabled={saving || !estimate}
+            >
+              {confirmRegenerate ? "Replace wording" : "Rewrite wording"}
+            </button>
+          </div>
+        </div>
+        {confirmRegenerate ? (
+          <div role="alert" className="du-alert du-alert-warning du-alert-soft">
+            <p>
+              Rewriting replaces your current wording, including unsaved text.
+              Your chosen photos and design are kept.
+            </p>
+            <button
+              type="button"
+              className="du-btn du-btn-sm min-h-11"
+              onClick={() => setConfirmRegenerate(false)}
+            >
+              Keep current wording
+            </button>
+          </div>
+        ) : null}
+        {previewReport && copy ? (
+          <fieldset
+            disabled={saving}
+            className={cn(
+              "grid min-w-0 items-start gap-6",
+              view === "fields" &&
+                "lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]",
+            )}
+          >
+            <div
+              className={cn(
+                "min-w-0 space-y-4 rounded-xl border border-base-300 bg-base-100 p-4 sm:p-5",
+                view === "layout" && "hidden",
+              )}
+            >
+              <CopyEditorField
+                label="Heading"
+                value={copy.heading}
+                onChange={(value) => updateField("heading", value)}
+                limit={headingLimit}
               />
-
-              <ReportImagePickerDialog
-                open={imagePickerSlot != null}
-                onOpenChange={(open) => {
-                  if (!open) {
-                    setImagePickerSlot(null);
-                  }
-                }}
-                listing={listing}
-                slot={imagePickerSlot}
-                currentUrl={
-                  previewReport && imagePickerSlot
-                    ? getReportImageUrlAtSlot(previewReport.property, imagePickerSlot)
-                    : undefined
+              <CopyEditorField
+                label="Property description"
+                value={
+                  copy.blurb_variants?.[
+                    resolveBlurbLengthForTemplate(selectedTemplateId, "str")
+                  ] ?? copy.blurb
                 }
-                onSelect={handleImageSelect}
+                onChange={(value) => handleInlineSetField("copy.blurb", value)}
+                textarea
+                hint="This wording is used by your selected design. You can review alternative lengths below."
               />
-
-              <details className="group rounded-xl border border-border/70 bg-muted/10">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
-                  <span>More options</span>
-                  <span className="text-xs font-normal text-muted-foreground">
-                    Template, headings, blurb variants, appeal points, legal
-                  </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+              <details className="rounded-lg border border-base-300 p-3">
+                <summary className="cursor-pointer text-sm font-medium">
+                  Alternative wording lengths
                 </summary>
-                <div className="space-y-4 border-t border-border/70 px-4 py-4">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Report template</p>
-                    <ReportTemplatePicker
-                      value={selectedTemplateId}
-                      onChange={handleTemplateChange}
-                    />
-                  </div>
-                  <CopyEditorField
-                    label="Heading"
-                    value={copy.heading}
-                    onChange={(value) => updateField("heading", value)}
-                    limit={headingLimit}
-                  />
+                <div className="mt-4">
                   <BlurbVariantsEditor
                     copy={{
                       heading: copy.heading,
@@ -608,21 +520,28 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
                       }))
                     }
                   />
-                  <CopyEditorField
-                    label="Appeal points"
-                    value={copy.appeal_points.join("\n")}
-                    onChange={(value) =>
-                      updateField(
-                        "appeal_points",
-                        value
-                          .split("\n")
-                          .map((line) => line.trim())
-                          .filter(Boolean),
-                      )
-                    }
-                    textarea
-                    hint="One point per line."
-                  />
+                </div>
+              </details>
+              <CopyEditorField
+                label="Appeal points"
+                value={copy.appeal_points.join("\n")}
+                onChange={(value) =>
+                  updateField(
+                    "appeal_points",
+                    value
+                      .split("\n")
+                      .map((line) => line.trim())
+                      .filter(Boolean),
+                  )
+                }
+                textarea
+                hint="One point per line."
+              />
+              <details className="rounded-lg border border-base-300 p-3">
+                <summary className="cursor-pointer text-sm font-medium">
+                  Supporting wording & disclaimer
+                </summary>
+                <div className="mt-4 space-y-4">
                   <CopyEditorField
                     label="Key metrics line"
                     value={copy.key_metrics_line}
@@ -673,63 +592,75 @@ export const GeneratedCopyEditor = forwardRef<StrCopyEditorHandle, Props>(
                   />
                 </div>
               </details>
-            </>
-          ) : (
-            <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-dashed bg-muted/20 p-8 text-center text-sm text-muted-foreground">
-              {estimate
-                ? "Generate the appraisal to preview and edit it here."
-                : "Run the short-term rental estimate first, then generate the appraisal here."}
             </div>
-          )}
-        </div>
+            <div
+              className={cn(
+                "min-w-0 space-y-4",
+                view === "fields" && "hidden lg:block",
+              )}
+            >
+              <FittedReportPreview
+                pageLabels={["Overview", "Market evidence"]}
+                report={previewReport}
+                maxHeight="min(85vh, 960px)"
+                fitToWidth
+                editable={{
+                  setField: handleInlineSetField,
+                  openImagePicker: handleOpenImagePicker,
+                  brandPrimaryColour: previewReport.agency.primary_colour,
+                  blurbFlushRef,
+                }}
+              />
 
-        {copy && isDirty ? (
-          <div
-            role="status"
-            aria-live="polite"
-            className="fixed inset-x-0 bottom-0 z-50 border-t border-amber-200/90 bg-amber-50/95 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm dark:border-amber-800/60 dark:bg-amber-950/95"
-          >
-            <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap">
-              <div className="min-w-0 space-y-0.5">
-                <p className="text-sm font-semibold text-foreground">Unsaved changes</p>
-                <p className="text-xs text-muted-foreground">
-                  Save your report before continuing to preview.
-                </p>
-              </div>
-              <Button
-                size="lg"
-                className="shrink-0 shadow-md"
-                disabled={saving || generating}
-                onClick={() => void persistCopy()}
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="animate-spin" />
-                    Saving…
-                  </>
-                ) : (
-                  "Save report"
-                )}
-              </Button>
+              <ReportImagePickerDialog
+                open={imagePickerSlot != null}
+                onOpenChange={(open) => {
+                  if (!open) {
+                    setImagePickerSlot(null);
+                  }
+                }}
+                listing={listing}
+                slot={imagePickerSlot}
+                currentUrl={
+                  previewReport && imagePickerSlot
+                    ? getReportImageUrlAtSlot(
+                        previewReport.property,
+                        imagePickerSlot,
+                      )
+                    : undefined
+                }
+                onSelect={handleImageSelect}
+              />
             </div>
+          </fieldset>
+        ) : (
+          <div className="rounded-xl border border-base-300 bg-base-100 p-6">
+            <p>Review your estimate before generating the report.</p>
+            <Button
+              className="mt-4"
+              onClick={() => void generateCopy()}
+              disabled={!estimate}
+            >
+              Generate report
+            </Button>
+          </div>
+        )}
+        {copy ? (
+          <div className="flex justify-end border-t border-base-300 pt-4 lg:hidden">
+            <button
+              type="button"
+              className="du-btn du-btn-primary min-h-11"
+              disabled={saving}
+              onClick={continueToPreview}
+            >
+              Continue to download
+            </button>
           </div>
         ) : null}
-      </AsyncLoadingOverlay>
+      </section>
     );
   },
 );
-
-function getErrorMessage(payload: ApiError) {
-  if (payload.code === "missing_estimate") {
-    return "Run an STR estimate before generating collateral.";
-  }
-
-  if (payload.code === "validation_failed") {
-    return "Generated collateral did not pass validation. Try again.";
-  }
-
-  return payload.error ?? "Collateral generation failed";
-}
 
 function strListingContextSummary(
   listing: Listing,

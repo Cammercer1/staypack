@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { VariantProps } from "class-variance-authority";
+import { prepareReportPdf } from "@/lib/reports/reportRequests";
 import { cacheBustedPdfUrl } from "@/lib/reports/cacheBustedPdfUrl";
 import type { Report } from "@/lib/types";
 
@@ -59,23 +60,24 @@ export function DownloadPdfButton({
   async function generatePdf() {
     setLoading(true);
 
-    const response = await fetch(`/api/reports/${reportId}/generate-pdf`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ preview }),
-    });
-    const payload = await response.json();
-
-    if (!response.ok) {
-      toast.error(payload.error ?? "PDF generation failed");
+    try {
+      const report = await prepareReportPdf({
+        id: reportId,
+        pdf_url: pdfUrl ?? null,
+        status: preview ? "generated" : "published",
+      });
+      if (!report.pdf_url)
+        throw new Error("PDF generation did not finish. Please try again.");
+      setGeneratedPdf({ reportId, url: report.pdf_url });
+      onGenerated?.({ pdf_url: report.pdf_url, report });
+      toast.success("PDF ready");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "PDF generation failed",
+      );
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setGeneratedPdf({ reportId, url: payload.pdf_url });
-    onGenerated?.({ pdf_url: payload.pdf_url, report: payload.report });
-    toast.success("PDF ready");
-    setLoading(false);
   }
 
   if (downloadUrl) {

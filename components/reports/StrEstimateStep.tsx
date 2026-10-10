@@ -1,603 +1,422 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { AsyncLoadingOverlay } from "@/components/ui/async-loading-overlay";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { calculateAccommodates, formatCurrency, formatPercent } from "@/lib/reports/formatters";
+import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
+import { DocumentStepHeader } from "@/components/documents/DocumentStepHeader";
 import {
   applyStrEstimateAdjustments,
   resolveStrRevenueBand,
-  type StrRevenueBand,
 } from "@/lib/reports/strEstimateAdjustments";
-import type {
-  Listing,
-  Report,
-  StrEstimate,
-  StrEnrichmentJson,
-  StrEstimatePositioning,
-} from "@/lib/types";
+import { formatCurrency, formatPercent } from "@/lib/reports/formatters";
+import { jsonRequest, reportRequest } from "@/lib/reports/reportRequests";
+import { DEFAULT_DISCLAIMER, type Listing, type Report } from "@/lib/types";
 
-type Props = {
-  listing: Listing;
-  report: Report;
-  onComplete: (state: { listing: Listing; report: Report }) => void;
-  onContinue?: () => void;
+export type StrEstimateHandle = {
+  savePendingEdits: () => Promise<Report | null>;
 };
-
-export function StrEstimateStep({ listing, report, onComplete, onContinue }: Props) {
-  const [estimate, setEstimate] = useState<StrEstimate | null>(
-    report.final_estimate_json,
+export const StrEstimateStep = forwardRef<
+  StrEstimateHandle,
+  {
+    listing: Listing;
+    report: Report;
+    busy: boolean;
+    onComplete: (report: Report) => void;
+    onContinue: () => void;
+    onBack: () => void;
+    onRefresh: () => void;
+  }
+>(function StrEstimateStep(
+  { listing, report, busy, onComplete, onContinue, onBack, onRefresh },
+  ref,
+) {
+  const estimate = report.final_estimate_json;
+  const enrichment = report.str_enrichment_json;
+  const [annual, setAnnual] = useState(String(estimate?.annualRevenue ?? ""));
+  const [occupancy, setOccupancy] = useState(
+    String(estimate?.occupancyRate ?? ""),
   );
-  const [enrichment, setEnrichment] = useState<StrEnrichmentJson | null>(
-    report.str_enrichment_json ?? null,
-  );
-  const [positioning, setPositioning] = useState<StrEstimatePositioning | null>(
-    report.str_enrichment_json?.positioning ?? null,
-  );
-  const [overrideAnnual, setOverrideAnnual] = useState(
-    String(report.final_estimate_json?.annualRevenue ?? ""),
-  );
-  const [overrideOccupancy, setOverrideOccupancy] = useState(
-    String(report.final_estimate_json?.occupancyRate ?? ""),
-  );
-  const [recommendedAnnualRevenue, setRecommendedAnnualRevenue] = useState<
-    number | null
-  >(
-    report.user_overrides_json?.recommendedAnnualRevenue ??
-      report.str_enrichment_json?.positioning?.annual_revenue ??
-      report.final_estimate_json?.annualRevenue ??
-      null,
-  );
-  const [recommendedOccupancyRate, setRecommendedOccupancyRate] = useState<
-    number | null
-  >(
-    report.user_overrides_json?.recommendedOccupancyRate ??
-      report.final_estimate_json?.occupancyRate ??
-      null,
-  );
-  const defaultAccommodates = useMemo(
-    () => calculateAccommodates(listing.bedrooms, listing.accommodates),
-    [listing.bedrooms, listing.accommodates],
-  );
-  const [accommodates, setAccommodates] = useState(String(defaultAccommodates));
-  const [estimating, setEstimating] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const loading = estimating || saving;
-  const revenueBand = useMemo(
+  const [error, setError] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const band = useMemo(
     () => resolveStrRevenueBand(enrichment, estimate),
     [enrichment, estimate],
   );
-  const annualSliderValue = clampToRange(
-    Number(overrideAnnual || estimate?.annualRevenue || 0),
-    revenueBand?.min ?? 0,
-    revenueBand?.max ?? 0,
-  );
-  const occupancySliderValue = clampToRange(
-    Number(overrideOccupancy || estimate?.occupancyRate || 70),
-    1,
-    100,
-  );
-  const revenueStep = revenueBand
-    ? Math.max(250, Math.round((revenueBand.max - revenueBand.min) / 100 / 250) * 250)
-    : 500;
-  const isEstimateDirty =
-    estimate != null &&
-    !sameEstimateValues(estimate, report.final_estimate_json);
-
-  async function runEstimate() {
-    if (!listing.property_address?.trim()) {
-      toast.error("Add a property address before running the STR estimate");
-      return;
-    }
-
-    const resolvedAccommodates = calculateAccommodates(
-      listing.bedrooms,
-      accommodates === "" ? null : Number(accommodates),
-    );
-
-    setEstimating(true);
-    const response = await fetch("/api/airbtics/estimate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        report_id: report.id,
-        address: listing.property_address,
-        latitude: listing.latitude,
-        longitude: listing.longitude,
-        bedrooms: listing.bedrooms,
-        bathrooms: listing.bathrooms,
-        accommodates: resolvedAccommodates,
-      }),
-    });
-    const payload = await response.json();
-
-    if (!response.ok) {
-      toast.error(payload.error ?? "Estimate failed");
-      setEstimating(false);
-      return;
-    }
-
-    const nextEstimate = payload.estimate as StrEstimate;
-    const nextPositioning =
-      (payload.positioning as StrEstimatePositioning | null) ?? null;
-
-    setEstimate(nextEstimate);
-    setEnrichment((payload.enrichment as StrEnrichmentJson | null) ?? null);
-    setPositioning(nextPositioning);
-    setOverrideAnnual(String(nextEstimate.annualRevenue ?? ""));
-    setOverrideOccupancy(String(nextEstimate.occupancyRate ?? ""));
-    setRecommendedAnnualRevenue(
-      nextPositioning?.annual_revenue ?? nextEstimate.annualRevenue ?? null,
-    );
-    setRecommendedOccupancyRate(nextEstimate.occupancyRate ?? null);
-    setAccommodates(String(payload.accommodates ?? resolvedAccommodates));
-    onComplete({
-      listing: (payload.listing as Listing) ?? listing,
-      report: payload.report as Report,
-    });
-    toast.success("STR estimate generated");
-    setEstimating(false);
-  }
-
-  function applyAnnualRevenue(value: number) {
-    if (!estimate) {
-      return;
-    }
-
-    const annualRevenue = revenueBand
-      ? clampToRange(value, revenueBand.min, revenueBand.max)
-      : value;
-    const nextEstimate = applyStrEstimateAdjustments(estimate, {
-      annualRevenue,
-      occupancyRate: Number(overrideOccupancy || estimate.occupancyRate || 70),
-    });
-    setEstimate(nextEstimate);
-    setOverrideAnnual(String(nextEstimate.annualRevenue ?? ""));
-    setOverrideOccupancy(String(nextEstimate.occupancyRate ?? ""));
-  }
-
-  function applyOccupancyRate(value: number) {
-    if (!estimate) {
-      return;
-    }
-
-    const nextEstimate = applyStrEstimateAdjustments(estimate, {
-      annualRevenue: Number(overrideAnnual || estimate.annualRevenue || 0),
-      occupancyRate: value,
-    });
-    setEstimate(nextEstimate);
-    setOverrideAnnual(String(nextEstimate.annualRevenue ?? ""));
-    setOverrideOccupancy(String(nextEstimate.occupancyRate ?? ""));
-  }
-
-  async function saveOverride({ continueAfter = false } = {}) {
-    if (!estimate) {
-      toast.error("Run an STR estimate before saving adjustments");
-      return;
-    }
-
-    const annualRevenue = Number(overrideAnnual);
-    const occupancyRate = Number(overrideOccupancy);
-
-    if (!Number.isFinite(annualRevenue) || annualRevenue <= 0) {
-      toast.error("Enter a valid annual revenue");
-      return;
-    }
-
-    if (!Number.isFinite(occupancyRate) || occupancyRate <= 0) {
-      toast.error("Enter a valid occupancy rate");
-      return;
-    }
-
-    const adjustedEstimate = applyStrEstimateAdjustments(estimate, {
-      annualRevenue,
-      occupancyRate,
-    });
-
-    setSaving(true);
-    const response = await fetch(`/api/reports/${report.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_overrides_json: {
-          annualRevenue: adjustedEstimate.annualRevenue,
-          occupancyRate: adjustedEstimate.occupancyRate,
-          recommendedAnnualRevenue,
-          recommendedOccupancyRate,
-          revenueBand: revenueBand
-            ? {
-                min: revenueBand.min,
-                max: revenueBand.max,
-                source: revenueBand.source,
-              }
-            : null,
-        },
-        final_estimate_json: adjustedEstimate,
-      }),
-    });
-    const payload = await response.json();
-
-    if (!response.ok) {
-      toast.error(payload.error ?? "Failed to save override");
-      setSaving(false);
-      return;
-    }
-
-    const nextReport = payload.report as Report;
-    setEstimate(adjustedEstimate);
-    onComplete({ listing, report: nextReport });
-    toast.success("Estimate saved");
-    setSaving(false);
-    if (continueAfter) {
-      onContinue?.();
-    }
-  }
-
-  function continueToCopy() {
-    if (isEstimateDirty) {
-      void saveOverride({ continueAfter: true });
-      return;
-    }
-
-    onContinue?.();
-  }
-
-  const estimateLoadingMessage =
-    "Pulling comparable listings and seasonality data. This can take up to 30 seconds.";
-
+  const valid =
+    annual.trim() !== "" &&
+    Number.isFinite(Number(annual)) &&
+    Number(annual) > 0 &&
+    Number(occupancy) >= 1 &&
+    Number(occupancy) <= 100;
+  const dirty =
+    estimate?.annualRevenue !== Number(annual) ||
+    estimate?.occupancyRate !== Number(occupancy);
+  const adjusted =
+    estimate && valid && dirty
+      ? applyStrEstimateAdjustments(estimate, {
+          annualRevenue: Number(annual),
+          occupancyRate: Number(occupancy),
+        })
+      : estimate;
+  useImperativeHandle(ref, () => ({
+    savePendingEdits: async () => {
+      setError(null);
+      if (!adjusted || !valid) {
+        setError(
+          "Enter positive estimated annual revenue and occupancy between 1% and 100%.",
+        );
+        return null;
+      }
+      if (!dirty) return report;
+      try {
+        const payload = await reportRequest<{ report: Report }>(
+          `/api/reports/${report.id}`,
+          jsonRequest(
+            {
+              final_estimate_json: adjusted,
+              user_overrides_json: {
+                ...report.user_overrides_json,
+                annualRevenue: adjusted.annualRevenue,
+                occupancyRate: adjusted.occupancyRate,
+                recommendedAnnualRevenue:
+                  report.user_overrides_json?.recommendedAnnualRevenue ??
+                  enrichment?.positioning?.annual_revenue ??
+                  estimate?.annualRevenue,
+                recommendedOccupancyRate:
+                  report.user_overrides_json?.recommendedOccupancyRate ??
+                  estimate?.occupancyRate,
+                revenueBand: band,
+              },
+            },
+            "PATCH",
+          ),
+        );
+        onComplete(payload.report);
+        return payload.report;
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to save your figures. Try again.",
+        );
+        return null;
+      }
+    },
+  }));
+  if (!adjusted) return null;
+  const comps = enrichment?.comps ?? [];
+  const shownComps = showAll ? comps : comps.slice(0, 6);
   return (
-    <AsyncLoadingOverlay
-      active={estimating}
-      title="Running STR estimate"
-      description={estimateLoadingMessage}
-    >
-    <div className="space-y-6">
-      <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm">
-        <p className="font-medium">Property location</p>
-        <p className="mt-1 text-muted-foreground">
-          {listing.property_address || "No address saved yet"}
-          {listing.suburb ? `, ${listing.suburb}` : ""}
-          {listing.state ? ` ${listing.state}` : ""}
-          {listing.postcode ? ` ${listing.postcode}` : ""}
+    <section data-theme="staypack-workspace" className="space-y-5">
+      <DocumentStepHeader
+        title="Review the estimate & evidence"
+        description="Check the market evidence and figures before writing your report."
+        status={
+          <span className="du-badge du-badge-sm">
+            {dirty ? "Unsaved figures" : "Saved figures"}
+          </span>
+        }
+      >
+        <button
+          type="button"
+          className="du-btn du-btn-outline min-h-11"
+          disabled={busy}
+          onClick={onBack}
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Property & design
+        </button>
+        <button
+          type="button"
+          className="du-btn du-btn-primary min-h-11 h-auto py-3 whitespace-normal"
+          disabled={busy || !valid}
+          onClick={onContinue}
+        >
+          {report.final_report_json
+            ? "Use figures & edit report"
+            : "Use estimate & generate report"}
+          <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+        </button>
+      </DocumentStepHeader>
+      {error ? (
+        <p role="alert" className="du-alert du-alert-error du-alert-soft">
+          {error}
         </p>
-        {listing.latitude != null && listing.longitude != null ? (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Geocoded coordinates: {listing.latitude.toFixed(5)},{" "}
-            {listing.longitude.toFixed(5)}
-          </p>
-        ) : (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Coordinates will be resolved from the address when you run the estimate.
-          </p>
-        )}
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-2">
-          <Label htmlFor="estimateBedrooms">Bedrooms</Label>
-          <Input id="estimateBedrooms" value={String(listing.bedrooms ?? "—")} disabled />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="estimateBathrooms">Bathrooms</Label>
-          <Input id="estimateBathrooms" value={String(listing.bathrooms ?? "—")} disabled />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="estimateAccommodates">Accommodates</Label>
-          <Input
-            id="estimateAccommodates"
-            value={accommodates}
-            onChange={(event) => setAccommodates(event.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            Defaults to 2× bedrooms ({defaultAccommodates}). Change if needed for
-            the estimate.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={runEstimate} disabled={loading}>
-          {estimating ? (
-            <>
-              <Loader2 className="animate-spin" />
-              Estimating...
-            </>
-          ) : (
-            "Run STR estimate"
-          )}
-        </Button>
-        {report.airbtics_fetched_at ? (
-          <p className="text-sm text-muted-foreground">
-            Last STR estimate saved.
-          </p>
-        ) : null}
-      </div>
-
-      {estimate ? (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Metric label="Annual revenue" value={formatCurrency(estimate.annualRevenue)} />
-          <Metric label="Monthly revenue" value={formatCurrency(estimate.monthlyRevenue)} />
-          <Metric label="Weekly revenue" value={formatCurrency(estimate.weeklyRevenue)} />
-          <Metric label="Average nightly rate" value={formatCurrency(estimate.nightlyRate)} />
-          <Metric label="Occupancy" value={formatPercent(estimate.occupancyRate)} />
-          <Metric label="Booked nights" value={String(estimate.bookedNights ?? "—")} />
-        </div>
       ) : null}
-
-      {estimate && positioning ? (
-        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium">Comp-aware positioning applied</p>
-            <Badge variant="secondary" className="capitalize">
-              {positioning.confidence} confidence
-            </Badge>
-          </div>
-          {positioning.median_annual_revenue != null &&
-          positioning.median_annual_revenue !== estimate.annualRevenue ? (
-            <p className="mt-2 text-muted-foreground">
-              Market median {formatCurrency(positioning.median_annual_revenue)}{" "}
-              adjusted to {formatCurrency(estimate.annualRevenue)} based on
-              comparable evidence.
+      <div className="du-card du-card-border bg-base-100">
+        <div className="du-card-body gap-5 p-5 sm:p-6">
+          <div className="flex flex-wrap justify-between gap-2 text-sm text-muted-foreground">
+            <p>
+              {listing.property_address} · {listing.bedrooms} bed ·{" "}
+              {listing.bathrooms} bath · {listing.accommodates} guests
             </p>
-          ) : null}
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            {positioning.rationale}
-          </p>
-        </div>
-      ) : null}
-
-      {estimate ? (
-        <div className="space-y-5 rounded-xl border border-border/70 bg-background p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="font-medium">STR figure adjustments</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {revenueBand?.source === "airbtics"
-                  ? "Airbtics percentile band with StayPacks recommendation marked."
-                  : "Estimate adjustment band with StayPacks recommendation marked."}
-              </p>
-            </div>
-            {isEstimateDirty ? (
-              <Badge variant="secondary">Unsaved changes</Badge>
-            ) : (
-              <Badge variant="outline">Saved figures</Badge>
-            )}
-          </div>
-
-          {revenueBand ? (
-            <div className="space-y-3">
-              <SliderHeader
-                label="Annual revenue"
-                value={formatCurrency(estimate.annualRevenue)}
-                recommendation={
-                  recommendedAnnualRevenue != null
-                    ? formatCurrency(recommendedAnnualRevenue)
-                    : null
-                }
-              />
-              <div className="relative pt-3">
-                <RecommendationTick
-                  value={recommendedAnnualRevenue}
-                  min={revenueBand.min}
-                  max={revenueBand.max}
-                />
-                <input
-                  id="annualRevenueScale"
-                  type="range"
-                  min={revenueBand.min}
-                  max={revenueBand.max}
-                  step={revenueStep}
-                  value={annualSliderValue}
-                  onChange={(event) => applyAnnualRevenue(Number(event.target.value))}
-                  disabled={loading}
-                  className="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </div>
-              <ScaleLabels band={revenueBand} />
-              <div className="grid gap-3 sm:max-w-xs">
-                <Label htmlFor="overrideAnnual">Exact annual revenue</Label>
-                <Input
-                  id="overrideAnnual"
-                  type="number"
-                  inputMode="numeric"
-                  min={revenueBand.min}
-                  max={revenueBand.max}
-                  step={revenueStep}
-                  value={overrideAnnual}
-                  onChange={(event) => {
-                    const next = event.target.value;
-                    setOverrideAnnual(next);
-                    const parsed = Number(next);
-                    if (next && Number.isFinite(parsed) && parsed > 0) {
-                      applyAnnualRevenue(parsed);
-                    }
-                  }}
-                  disabled={loading}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          <div className="space-y-3">
-            <SliderHeader
-              label="Occupancy"
-              value={formatPercent(estimate.occupancyRate)}
-              recommendation={
-                recommendedOccupancyRate != null
-                  ? formatPercent(recommendedOccupancyRate)
-                  : null
-              }
-            />
-            <div className="relative pt-3">
-              <RecommendationTick
-                value={recommendedOccupancyRate}
-                min={1}
-                max={100}
-              />
-              <input
-                id="occupancyScale"
-                type="range"
-                min={1}
-                max={100}
-                step={1}
-                value={occupancySliderValue}
-                onChange={(event) => applyOccupancyRate(Number(event.target.value))}
-                disabled={loading}
-                className="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
-              />
-            </div>
-            <div className="flex items-center justify-between text-xs tabular-nums text-muted-foreground">
-              <span>1%</span>
-              <span>100%</span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Button
-              variant="outline"
-              onClick={() => saveOverride()}
-              disabled={loading || !overrideAnnual || !overrideOccupancy}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save adjusted figures"
-              )}
-            </Button>
-            {onContinue ? (
-              <Button
-                onClick={continueToCopy}
-                disabled={loading || !overrideAnnual || !overrideOccupancy}
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Continue to collateral"
+            {report.airbtics_fetched_at ? (
+              <p>
+                Updated{" "}
+                {new Date(report.airbtics_fetched_at).toLocaleDateString(
+                  "en-AU",
                 )}
-              </Button>
+              </p>
             ) : null}
           </div>
+          <button
+            type="button"
+            className="du-btn du-btn-sm du-btn-ghost min-h-11 self-start"
+            disabled={busy}
+            onClick={onRefresh}
+          >
+            Refresh estimate (resets adjustments)
+          </button>
+          <div className="grid gap-6 sm:grid-cols-[1.3fr_1fr]">
+            <div>
+              <p className="text-sm font-medium">Estimated gross STR revenue</p>
+              <p className="mt-2 text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
+                {formatCurrency(adjusted.annualRevenue)}
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  / year
+                </span>
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Before management fees, cleaning, furnishing and other operating
+                costs.
+              </p>
+            </div>
+            <dl className="grid grid-cols-2 gap-4">
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Estimated occupancy
+                </dt>
+                <dd className="mt-1 text-2xl font-semibold">
+                  {formatPercent(adjusted.occupancyRate)}
+                </dd>
+                <p className="text-xs text-muted-foreground">
+                  About {adjusted.bookedNights} nights / year
+                </p>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Average nightly rate
+                </dt>
+                <dd className="mt-1 text-2xl font-semibold">
+                  {formatCurrency(adjusted.nightlyRate)}
+                </dd>
+                <p className="text-xs text-muted-foreground">
+                  Per booked night
+                </p>
+              </div>
+            </dl>
+          </div>
+          {enrichment?.positioning ? (
+            <div className="border-t border-base-300 pt-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-medium">Why this estimate?</h3>
+                <span className="du-badge du-badge-sm capitalize">
+                  {enrichment.positioning.confidence} confidence
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                {enrichment.positioning.rationale}
+              </p>
+            </div>
+          ) : null}
         </div>
-      ) : null}
-    </div>
-    </AsyncLoadingOverlay>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border p-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-2 text-xl font-semibold">{value}</p>
-    </div>
-  );
-}
-
-function SliderHeader({
-  label,
-  value,
-  recommendation,
-}: {
-  label: string;
-  value: string;
-  recommendation: string | null;
-}) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <Label>{label}</Label>
-        <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
       </div>
-      {recommendation ? (
-        <Badge variant="secondary">Recommended {recommendation}</Badge>
-      ) : null}
-    </div>
+      <details className="rounded-xl border border-base-300 bg-base-100 p-5">
+        <summary className="cursor-pointer font-medium">
+          Adjust the figures{dirty ? " · Unsaved changes" : " (optional)"}
+        </summary>
+        <fieldset disabled={busy} className="mt-5 min-w-0 space-y-5">
+          <p className="text-sm text-muted-foreground">
+            Changing annual revenue recalculates the nightly rate. Changing
+            occupancy holds annual revenue steady and recalculates booked nights
+            and the nightly rate. Your figures are saved when you continue or
+            change steps.
+          </p>
+          {band ? (
+            <p className="text-sm">
+              {band.source === "airbtics"
+                ? "Comparable revenue range"
+                : "Indicative adjustment range"}
+              : {formatCurrency(band.min)}–{formatCurrency(band.max)} per year.{" "}
+              {band.source === "fallback"
+                ? "This is a guide around the estimate, not a measured market range."
+                : "Based on the 25th–90th percentiles."}
+            </p>
+          ) : null}
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label htmlFor="str-annual" className="text-sm font-medium">
+                Estimated annual revenue ($)
+              </label>
+              <input
+                id="str-annual"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                className="du-input w-full"
+                value={annual}
+                onChange={(event) => setAnnual(event.target.value)}
+              />
+              {band ? (
+                <input
+                  type="range"
+                  aria-label="Adjust estimated annual revenue"
+                  min={band.min}
+                  max={band.max}
+                  step="250"
+                  value={Math.min(
+                    band.max,
+                    Math.max(band.min, Number(annual) || band.min),
+                  )}
+                  onChange={(event) => setAnnual(event.target.value)}
+                  className="h-6 w-full accent-primary"
+                />
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="str-occupancy" className="text-sm font-medium">
+                Estimated occupancy (%)
+              </label>
+              <input
+                id="str-occupancy"
+                type="number"
+                inputMode="decimal"
+                min="1"
+                max="100"
+                className="du-input w-full"
+                value={occupancy}
+                onChange={(event) => setOccupancy(event.target.value)}
+              />
+              <input
+                type="range"
+                aria-label="Adjust estimated occupancy"
+                min="1"
+                max="100"
+                value={Number(occupancy) || 1}
+                onChange={(event) => setOccupancy(event.target.value)}
+                className="h-6 w-full accent-primary"
+              />
+            </div>
+          </div>
+          {!valid ? (
+            <p role="alert" className="text-sm text-destructive">
+              Enter positive estimated annual revenue and occupancy between 1%
+              and 100%.
+            </p>
+          ) : null}
+          <button
+            type="button"
+            className="du-btn du-btn-sm du-btn-outline min-h-11"
+            onClick={() => {
+              setAnnual(
+                String(
+                  report.user_overrides_json?.recommendedAnnualRevenue ??
+                    enrichment?.positioning?.annual_revenue ??
+                    estimate?.annualRevenue ??
+                    "",
+                ),
+              );
+              setOccupancy(
+                String(
+                  report.user_overrides_json?.recommendedOccupancyRate ??
+                    estimate?.occupancyRate ??
+                    "",
+                ),
+              );
+            }}
+          >
+            Reset to recommended figures
+          </button>
+        </fieldset>
+      </details>
+      <section className="space-y-4" aria-label="Comparable evidence">
+        <div>
+          <h3 className="text-lg font-semibold">
+            Comparable short-term rentals
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {enrichment?.comp_count ?? comps.length} properties inform this
+            estimate.{" "}
+            {enrichment?.radius_m
+              ? `Search area: ${(enrichment.radius_m / 1000).toLocaleString("en-AU", { maximumFractionDigits: 1 })} km.`
+              : ""}{" "}
+            Compare size, guest capacity and performance.
+          </p>
+        </div>
+        {comps.length ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {shownComps.map((comp) => (
+              <article
+                key={comp.listing_id}
+                className="du-card du-card-border min-w-0 overflow-hidden bg-base-100"
+              >
+                {comp.thumbnail_url ? (
+                  <figure className="aspect-[16/9] bg-base-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={comp.thumbnail_url}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  </figure>
+                ) : null}
+                <div className="du-card-body gap-2 p-4">
+                  <h4 className="du-card-title text-base break-words">
+                    {comp.name || "Comparable property"}
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    {comp.bedrooms ?? "—"} bed · {comp.bathrooms ?? "—"} bath ·{" "}
+                    {comp.accommodates ?? "—"} guests
+                    {comp.distance_m != null
+                      ? ` · ${(comp.distance_m / 1000).toFixed(1)} km away`
+                      : ""}
+                  </p>
+                  <p className="mt-1 text-lg font-semibold">
+                    {formatCurrency(comp.annual_revenue)}
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">
+                      est. gross / year
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatPercent(comp.occupancy_rate)} occupancy ·{" "}
+                    {formatCurrency(comp.nightly_rate)} / night
+                  </p>
+                  {/^https?:\/\//i.test(comp.listing_url) ? (
+                    <a
+                      className="du-btn du-btn-sm du-btn-ghost mt-2 min-h-11 self-start"
+                      href={comp.listing_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View property
+                      <ExternalLink className="size-3.5" aria-hidden="true" />
+                    </a>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="du-alert text-sm">
+            Individual comparable listings are unavailable. Review the estimate
+            carefully before using it in a report.
+          </p>
+        )}
+        {comps.length > 6 ? (
+          <button
+            type="button"
+            className="du-btn du-btn-outline min-h-11"
+            onClick={() => setShowAll(!showAll)}
+          >
+            {showAll
+              ? "Show fewer properties"
+              : `Show all ${comps.length} properties`}
+          </button>
+        ) : null}
+      </section>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        {DEFAULT_DISCLAIMER}
+      </p>
+    </section>
   );
-}
-
-function ScaleLabels({ band }: { band: StrRevenueBand }) {
-  const middle = band.p50 ?? (band.min + band.max) / 2;
-
-  return (
-    <div className="flex items-center justify-between text-xs tabular-nums text-muted-foreground">
-      <span>{formatCurrency(band.min)}</span>
-      <span>{formatCurrency(middle)}</span>
-      <span>{formatCurrency(band.max)}</span>
-    </div>
-  );
-}
-
-function RecommendationTick({
-  value,
-  min,
-  max,
-}: {
-  value: number | null;
-  min: number;
-  max: number;
-}) {
-  if (value == null || max <= min) {
-    return null;
-  }
-
-  const left = scalePositionPercent(value, min, max);
-
-  return (
-    <span
-      aria-hidden
-      className="pointer-events-none absolute top-0 h-6 w-px bg-primary"
-      style={{ left: `${left}%` }}
-    >
-      <span className="absolute -left-1 top-0 h-2 w-2 rounded-full bg-primary" />
-    </span>
-  );
-}
-
-function scalePositionPercent(value: number, min: number, max: number) {
-  if (max <= min) {
-    return 0;
-  }
-
-  return Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
-}
-
-function clampToRange(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
-
-  if (max <= min) {
-    return value;
-  }
-
-  return Math.min(max, Math.max(min, value));
-}
-
-function sameEstimateValues(
-  left: StrEstimate | null,
-  right: StrEstimate | null,
-) {
-  if (!left || !right) {
-    return left === right;
-  }
-
-  return (
-    left.annualRevenue === right.annualRevenue &&
-    left.monthlyRevenue === right.monthlyRevenue &&
-    left.weeklyRevenue === right.weeklyRevenue &&
-    left.nightlyRate === right.nightlyRate &&
-    left.occupancyRate === right.occupancyRate &&
-    left.bookedNights === right.bookedNights
-  );
-}
+});

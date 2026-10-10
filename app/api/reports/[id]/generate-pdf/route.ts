@@ -87,7 +87,8 @@ export async function POST(
           .publicUrl;
       },
     });
-    const pdfPath = `${agency.id}/${report.id}/report.pdf`;
+    const cacheVersion = Date.now();
+    const pdfPath = `${agency.id}/${report.id}/report-${crypto.randomUUID()}.pdf`;
 
     const { error: uploadError } = await admin.storage
       .from("report-pdfs")
@@ -104,7 +105,6 @@ export async function POST(
       data: { publicUrl },
     } = admin.storage.from("report-pdfs").getPublicUrl(pdfPath);
 
-    const cacheVersion = Date.now();
     const pdfUrl = cacheBustedPdfUrl(publicUrl, cacheVersion);
 
     const finalReportJson = {
@@ -123,13 +123,18 @@ export async function POST(
         final_report_json: finalReportJson,
       })
       .eq("id", report.id)
+      .eq("updated_at", report.updated_at)
       .select("*")
-      .single();
+      .maybeSingle();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    if (!data) {
+      await admin.storage.from("report-pdfs").remove([pdfPath]);
+      return NextResponse.json({ error: "The report changed while the PDF was preparing. Prepare it again to include your latest changes." }, { status: 409 });
+    }
     return NextResponse.json({ pdf_url: pdfUrl, report: data });
   } catch (error) {
     return NextResponse.json(

@@ -1,3 +1,4 @@
+import { invalidateReportPdf } from "@/lib/reports/invalidateReportPdf";
 import { NextResponse } from "next/server";
 import { requireReportWithListing } from "@/lib/auth/requireUser";
 import {
@@ -88,8 +89,9 @@ export async function POST(
       .update({
         template_id: templateId,
         ai_copy_json: copy,
-        final_report_json: finalReportJson,
-        status: "generated",
+        final_report_json: invalidateReportPdf(finalReportJson),
+        pdf_url: null,
+        status: report.status === "published" ? "published" : "generated",
         generated_at: new Date().toISOString(),
       })
       .eq("id", report.id)

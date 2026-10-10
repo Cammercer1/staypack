@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,12 +40,13 @@ export function CopyEditorField({
     hint: string;
   } | null;
 }) {
+  const fieldId = useId();
   const atLimit = limit ? value.length >= limit.max : false;
 
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <Label>{label}</Label>
+        <Label htmlFor={fieldId}>{label}</Label>
         {limit ? (
           <span
             className={
@@ -59,6 +61,7 @@ export function CopyEditorField({
       </div>
       {textarea ? (
         <Textarea
+          id={fieldId}
           rows={4}
           value={value}
           maxLength={limit?.max}
@@ -66,6 +69,7 @@ export function CopyEditorField({
         />
       ) : (
         <Input
+          id={fieldId}
           value={value}
           maxLength={limit?.max}
           onChange={(event) => onChange(event.target.value)}
