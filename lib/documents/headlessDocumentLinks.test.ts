@@ -24,18 +24,21 @@ let uploads: string[];
 
 beforeEach(() => {
   vi.clearAllMocks();
-  rows = { listings: { ...fixture.listing }, reports: { ...createEmptyReportDraft({ id: "headless-report" }) }, collateral_items: { ...fixture.collateral, id: "headless-collateral", document_json: null } };
+  rows = { listings: { ...fixture.listing }, reports: { ...createEmptyReportDraft({ id: "headless-report" }), airbtics_tier: "summary" }, collateral_items: { ...fixture.collateral, id: "headless-collateral", document_json: null } };
   writes = [];
   uploads = [];
   mocks.pdf.mockResolvedValue(Buffer.from("mock-pdf"));
   const estimate = { annualRevenue: 90000, monthlyRevenue: 7500, weeklyRevenue: 1730, nightlyRate: 300, occupancyRate: 70, bookedNights: 255, radiusM: 2000, raw: {} };
-  mocks.estimate.mockResolvedValue({ enrichment: null, estimate });
+  mocks.estimate.mockResolvedValue({ enrichment: { ...fixture.report.str_enrichment_json, provider: "airroi" }, estimate });
   mocks.copy.mockResolvedValue({ sales_pack_heading: "Mock heading", sales_pack_blurb: "Mock report description", key_metrics_line: "Estimate only", property_appeal_points: [], performance_supporting_factors: [], buyer_checks: [], methodology_note: "", disclaimer: "Estimate only", confidence_notes: "" });
   mocks.brochureCopy.mockResolvedValue(getMockSalesBrochureCopy(fixture.listing, fixture.agency));
   mocks.admin.mockReturnValue({
     from: (table: string) => {
       let body: Record<string, unknown> | null = null;
       const finish = async () => {
+        if (table === "reports" && body?.airbtics_tier === null) {
+          return { data: null, error: { message: 'null value in column "airbtics_tier" of relation "reports" violates not-null constraint' } };
+        }
         if (body) { writes.push({ table, body }); rows[table] = { ...rows[table], ...body }; }
         return { data: rows[table], error: null };
       };
@@ -68,6 +71,11 @@ describe("headless report and brochure publication", () => {
         expect(uploads.filter((path) => path.startsWith("report-assets/"))).toHaveLength(link?.mode === "custom" ? 1 : 0);
         expect(writes.filter((write) => write.table === "listings").every((write) => !["public_url", "landing_published_at", "landing_qr_code_url"].some((field) => field in write.body))).toBe(true);
         expect(mocks.pdf).toHaveBeenCalledOnce();
+        if (name === "str") {
+          expect(rows.reports.airbtics_tier).toBe("summary");
+          expect(rows.reports.str_enrichment_json).toMatchObject({ provider: "airroi" });
+          expect(mocks.estimate).toHaveBeenCalledOnce();
+        }
       });
     }
   }

@@ -161,7 +161,8 @@ console.log("   Annual revenue:", estimate.annualRevenue);
 const { data: estimatedReport, error: estimateDbError } = await admin
   .from("reports")
   .update({
-    airbtics_tier: null,
+    // Leave the historical tier untouched for databases that still require it.
+    // str_enrichment_json.provider identifies the current estimate provider.
     airbtics_report_id: null,
     airbtics_cost_cents: null,
     airbtics_fetched_at: null,

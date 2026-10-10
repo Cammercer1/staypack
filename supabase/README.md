@@ -30,3 +30,11 @@ history is not a baseline of those older installations.
 The 9 October 2026 agent directory and separate property price migrations are
 already applied and recorded in production. Their filenames match the recorded
 versions. Deploying the application does not run migrations automatically.
+
+The 10 October 2026 AirROI compatibility migration
+[`20261010080940_allow_airroi_estimates_without_airbtics_tier.sql`](migrations/20261010080940_allow_airroi_estimates_without_airbtics_tier.sql)
+is applied and recorded in production. It makes `reports.airbtics_tier` nullable
+and removes its legacy default, preserving historical values and the summary/full
+check. The production schema was verified with an AirROI metadata update on a
+temporary copy of a report, rolled back without changing live report data or
+calling the estimate provider.

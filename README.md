@@ -130,7 +130,11 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Add `AIRROI_API_KEY` to the server environment for new estimates. Both the dashboard
 and managed delivery use `/lib/str/estimate.ts`; the former Airbtics endpoint remains
-an alias of `/api/str/estimate`. No database migration is required. Existing reports
+an alias of `/api/str/estimate`. Apply
+[`20261010080940_allow_airroi_estimates_without_airbtics_tier.sql`](supabase/migrations/20261010080940_allow_airroi_estimates_without_airbtics_tier.sql)
+to make the legacy Airbtics tier optional and remove its default. AirROI saves also
+leave that historical field untouched for compatibility with older schemas; the
+current provider is stored in `str_enrichment_json.provider`. Existing reports
 keep their saved estimates until edited or re-estimated after property input changes.
 
 The calculator's headline revenue is the baseline (not its p50 percentile). The
