@@ -140,7 +140,7 @@ export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: 
       return Response.json({ report, pdf_url: report.pdf_url, public_url: report.public_url });
     }
     if (url.pathname === "/api/collateral/mock-collateral/generate-copy") {
-      data.document = { ...data.document, template_id: data.collateral.template_id ?? data.document.template_id, content_saved_at: new Date().toISOString() };
+      data.document = { ...data.document, copy: { ...data.document.copy, price_value: body.price_value ?? data.document.copy.price_value }, template_id: data.collateral.template_id ?? data.document.template_id, content_saved_at: new Date().toISOString() };
       data.collateral = { ...data.collateral, document_json: data.document, pdf_url: null, status: "generated" };
       return Response.json({ collateral: data.collateral, copy: data.document.copy });
     }

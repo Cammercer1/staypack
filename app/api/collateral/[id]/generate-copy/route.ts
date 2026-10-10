@@ -6,6 +6,12 @@ import {
 } from "@/lib/collateral/buildSalesBrochureDocument";
 import { withBrochureContentSaved } from "@/lib/collateral/sales-brochure/brochurePublishSync";
 import { isBrochureDocument } from "@/lib/collateral/templates/types";
+import {
+  brochurePriceFormSchema,
+  generateBrochurePriceSchema,
+  formatBrochurePrice,
+  initialBrochurePrice,
+} from "@/lib/collateral/sales-brochure/brochurePrice";
 import { provisionCollateralQr } from "@/lib/collateral/provisionCollateralQr";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
 import { assertTemplateGranted } from "@/lib/templates/grants/assertTemplateGranted";
@@ -24,7 +30,7 @@ import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/
 import type { Listing } from "@/lib/types";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -38,6 +44,38 @@ export async function POST(
         { status: 400 },
       );
     }
+
+    let input: unknown;
+    try {
+      const text = await request.text();
+      input = text.trim() ? JSON.parse(text) : {};
+    } catch {
+      return NextResponse.json(
+        { error: "Unable to read brochure details", code: "invalid_brochure_details" },
+        { status: 400 },
+      );
+    }
+    const parsed = generateBrochurePriceSchema.safeParse(input);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0].message, code: "brochure_price_required" },
+        { status: 400 },
+      );
+    }
+    const price = brochurePriceFormSchema.safeParse({
+      price_value: formatBrochurePrice(
+        parsed.data.price_value ??
+          initialBrochurePrice(listing as Listing, collateral),
+        collateral.type === "rental_brochure",
+      ),
+    });
+    if (!price.success) {
+      return NextResponse.json(
+        { error: price.error.issues[0].message, code: "brochure_price_required" },
+        { status: 400 },
+      );
+    }
+    const priceValue = price.data.price_value;
 
     const agentProfile = await loadListingAgentProfile(supabase, listing as Listing);
     const agencyAgents = await loadAgencyAgentProfiles(supabase, agency.id);
@@ -100,7 +138,7 @@ export async function POST(
             ...built,
             copy: {
               ...built.copy,
-              price_value: existing.copy.price_value,
+              price_value: priceValue,
               price_label: existing.copy.price_label ?? built.copy.price_label,
             },
             property: {
@@ -111,7 +149,7 @@ export async function POST(
               page_two_image_urls: existing.property.page_two_image_urls,
             },
           }
-        : built,
+        : { ...built, copy: { ...built.copy, price_value: priceValue } },
     );
 
     const generatedAt = new Date().toISOString();

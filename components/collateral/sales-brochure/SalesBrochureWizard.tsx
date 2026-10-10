@@ -9,7 +9,10 @@ import {
 import { SalesBrochureTemplateStep } from "@/components/collateral/sales-brochure/SalesBrochureTemplateStep";
 import { BrochureDeliveryStep } from "@/components/collateral/sales-brochure/BrochureDeliveryStep";
 import { BrochureGenerationStatus } from "@/components/collateral/sales-brochure/BrochureGenerationStatus";
-import { isBrochureDocument } from "@/lib/collateral/templates/types";
+import {
+  isBrochureDocument,
+  resolveBrochurePrice,
+} from "@/lib/collateral/templates/types";
 import type { TemplatesResponse } from "@/components/templates/useAvailableTemplates";
 import type {
   Agency,
@@ -44,8 +47,13 @@ export function SalesBrochureWizard({
     initialAgencyAgents ?? [],
   );
   const [step, setStep] = useState(
-    initialCollateral.document_json ? "preview" : "template",
+    initialCollateral.document_json &&
+      isBrochureDocument(initialCollateral.document_json) &&
+      resolveBrochurePrice(initialCollateral.document_json).trim()
+      ? "preview"
+      : "template",
   );
+  const [priceDraft, setPriceDraft] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
@@ -97,7 +105,8 @@ export function SalesBrochureWizard({
     }
   }
 
-  async function handleDesignSelected(next: CollateralItem) {
+  async function handleDesignSelected(next: CollateralItem, priceValue: string) {
+    setPriceDraft(priceValue);
     setCollateral(next);
     setStep("copy");
     setGenerationError(null);
@@ -107,6 +116,8 @@ export function SalesBrochureWizard({
     try {
       const response = await fetch(`/api/collateral/${next.id}/generate-copy`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ price_value: priceValue }),
       });
       const payload = await response.json();
       if (
@@ -124,6 +135,7 @@ export function SalesBrochureWizard({
           ? err.message
           : "Unable to write your brochure. Try again below.",
       );
+      setStep("template");
     } finally {
       setGenerating(false);
       setBusy(false);
@@ -144,7 +156,7 @@ export function SalesBrochureWizard({
               value={item.id}
               disabled={
                 busy ||
-                (item.id === "copy" && !collateral.template_id) ||
+                (item.id === "copy" && !document) ||
                 (item.id === "preview" && !document)
               }
               className="h-auto min-h-12 whitespace-normal px-2 py-2 text-xs sm:text-sm"
@@ -160,6 +172,12 @@ export function SalesBrochureWizard({
           ))}
         </TabsList>
         <TabsContent value="template">
+          {generationError ? (
+            <p role="alert" className="du-alert du-alert-error du-alert-soft mb-4">
+              {generationError} Your design and price are kept below. Try again
+              when you’re ready.
+            </p>
+          ) : null}
           <SalesBrochureTemplateStep
             agency={agency}
             listing={listing}
@@ -167,8 +185,9 @@ export function SalesBrochureWizard({
             collateralType={collateralType}
             agencyAgents={agencyAgents}
             availableTemplates={availableTemplates}
+            initialPriceValue={document ? undefined : priceDraft}
             onBusyChange={setBusy}
-            onContinue={(next) => void handleDesignSelected(next)}
+            onContinue={(next, priceValue) => void handleDesignSelected(next, priceValue)}
           />
         </TabsContent>
         <TabsContent value="copy" className="space-y-4">

@@ -1,13 +1,23 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useId, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { DocumentStepHeader } from "@/components/documents/DocumentStepHeader";
 import { DocumentTemplateGallery } from "@/components/documents/DocumentTemplateGallery";
 import { FittedBrochurePreview } from "@/components/collateral/sales-brochure/FittedBrochurePreview";
 import { buildBrochureTemplatePreview } from "@/lib/collateral/sales-brochure/templatePreviewDocument";
 import { resolveCollateralTemplateId } from "@/lib/collateral/templates/resolveTemplateId";
-import { isBrochureDocument } from "@/lib/collateral/templates/types";
+import {
+  isBrochureDocument,
+  resolveBrochurePrice,
+} from "@/lib/collateral/templates/types";
+import {
+  brochurePriceFormSchema,
+  formatBrochurePrice,
+  initialBrochurePrice,
+} from "@/lib/collateral/sales-brochure/brochurePrice";
 import type { TemplatesResponse } from "@/components/templates/useAvailableTemplates";
 import type {
   Agency,
@@ -23,6 +33,7 @@ export function SalesBrochureTemplateStep({
   collateralType = "sales_brochure",
   agencyAgents = [],
   availableTemplates,
+  initialPriceValue,
   onContinue,
   onBusyChange,
 }: {
@@ -32,7 +43,8 @@ export function SalesBrochureTemplateStep({
   collateralType?: "sales_brochure" | "rental_brochure";
   agencyAgents?: AgentProfile[];
   availableTemplates?: TemplatesResponse;
-  onContinue: (collateral: CollateralItem) => void;
+  initialPriceValue?: string;
+  onContinue: (collateral: CollateralItem, priceValue: string) => void;
   onBusyChange: (busy: boolean) => void;
 }) {
   const [selectedTemplateId, setSelectedTemplateId] = useState(
@@ -47,10 +59,29 @@ export function SalesBrochureTemplateStep({
   const hasContent = Boolean(
     collateral.document_json && isBrochureDocument(collateral.document_json),
   );
+  const rental = collateralType === "rental_brochure";
+  const priceId = useId();
+  const savedPrice = initialBrochurePrice(listing, collateral);
+  const documentPrice =
+    collateral.document_json && isBrochureDocument(collateral.document_json)
+      ? resolveBrochurePrice(collateral.document_json).trim()
+      : "";
+  const {
+    register,
+    control,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(brochurePriceFormSchema),
+    defaultValues: { price_value: initialPriceValue ?? savedPrice },
+  });
+  const priceValue = useWatch({ control, name: "price_value" });
+  const previewPrice = formatBrochurePrice(priceValue, rental);
   const buildPreview = useCallback(
     (templateId: string) => {
       const existing = collateral.document_json;
-      return existing && isBrochureDocument(existing)
+      const preview = existing && isBrochureDocument(existing)
         ? { ...existing, template_id: templateId }
         : buildBrochureTemplatePreview({
             agency,
@@ -59,22 +90,36 @@ export function SalesBrochureTemplateStep({
             templateId,
             collateralType,
           });
+      return {
+        ...preview,
+        copy: {
+          ...preview.copy,
+          price_value:
+            previewPrice || (rental ? "Add weekly rent" : "Add sale price"),
+        },
+      };
     },
-    [agency, listing, collateral, collateralType],
+    [agency, listing, collateral, collateralType, previewPrice, rental],
   );
 
-  async function proceed() {
+  async function proceed(priceValue: string) {
     if (saving || !ready) return;
     setSaving(true);
     onBusyChange(true);
     setError(null);
     let next = collateral;
     try {
-      if (selectedTemplateId !== collateral.template_id) {
+      if (
+        selectedTemplateId !== collateral.template_id ||
+        (hasContent && priceValue !== documentPrice)
+      ) {
         const response = await fetch(`/api/collateral/${collateral.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ template_id: selectedTemplateId }),
+          body: JSON.stringify({
+            template_id: selectedTemplateId,
+            ...(hasContent ? { copy: { price_value: priceValue } } : {}),
+          }),
         });
         const payload = await response.json();
         if (!response.ok || !payload.collateral)
@@ -93,20 +138,26 @@ export function SalesBrochureTemplateStep({
     }
     setSaving(false);
     onBusyChange(false);
-    onContinue(next);
+    onContinue(next, priceValue);
   }
 
   return (
-    <section data-theme="staypack-workspace" className="space-y-5">
+    <form
+      data-theme="staypack-workspace"
+      className="space-y-5"
+      noValidate
+      onSubmit={handleSubmit(({ price_value }) =>
+        proceed(formatBrochurePrice(price_value, rental)),
+      )}
+    >
       <DocumentStepHeader
         title="Choose your brochure design"
         description="See your property in each layout. Choose one or two pages, then make it yours."
       >
         <button
-          type="button"
-          className="du-btn du-btn-sm du-btn-primary min-h-11"
+          type="submit"
+          className="du-btn du-btn-sm du-btn-primary h-auto min-h-11 whitespace-normal py-2"
           disabled={!ready || saving}
-          onClick={() => void proceed()}
         >
           {saving ? (
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -121,6 +172,66 @@ export function SalesBrochureTemplateStep({
           ) : null}
         </button>
       </DocumentStepHeader>
+      <section
+        aria-labelledby={`${priceId}-heading`}
+        className="rounded-xl border border-base-300 bg-base-100 p-4 sm:p-5"
+      >
+        <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+          <div className="space-y-1">
+            <h3 id={`${priceId}-heading`} className="text-base font-semibold">
+              {rental ? "Set the weekly rent" : "Set the brochure price"}
+            </h3>
+            <p id={`${priceId}-help`} className="text-sm text-muted-foreground">
+              {savedPrice
+                ? "Check the price shown on your brochure. Changes here apply to this brochure only."
+                : `No ${rental ? "weekly rent" : "sale price"} has been added. Enter it now so your brochure is ready to share.`}
+            </p>
+          </div>
+          <div className="min-w-0 space-y-2">
+            <label htmlFor={priceId} className="block text-sm font-medium">
+              {rental ? "Weekly rent" : "Sale price or guide"}
+            </label>
+            <input
+              {...register("price_value")}
+              id={priceId}
+              type="text"
+              maxLength={60}
+              disabled={saving}
+              aria-label={rental ? "Weekly rent" : "Sale price or guide"}
+              aria-required="true"
+              aria-invalid={Boolean(errors.price_value)}
+              aria-describedby={`${priceId}-help${errors.price_value ? ` ${priceId}-error` : ""}`}
+              placeholder={rental ? "e.g. $850 per week" : "e.g. $1,200,000 or Auction"}
+              className={errors.price_value
+                ? "du-input du-input-sm du-input-error min-h-11 w-full"
+                : "du-input du-input-sm min-h-11 w-full"}
+            />
+            {errors.price_value ? (
+              <p id={`${priceId}-error`} role="alert" className="text-sm text-error">
+                {errors.price_value.message}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-xs text-muted-foreground">
+                Prefer not to show an amount?
+              </span>
+              <button
+                type="button"
+                className="du-btn du-btn-sm du-btn-ghost min-h-11"
+                disabled={saving}
+                onClick={() =>
+                  setValue("price_value", "Contact agent", {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+              >
+                Use “Contact agent”
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
       {error ? (
         <p role="alert" className="du-alert du-alert-error du-alert-soft">
           {error}
@@ -164,6 +275,6 @@ export function SalesBrochureTemplateStep({
           />
         </div>
       </div>
-    </section>
+    </form>
   );
 }

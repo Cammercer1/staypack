@@ -21,7 +21,7 @@ vi.mock("./FittedBrochurePreview", () => ({
     document,
     editable,
   }: ComponentProps<typeof FittedBrochurePreview>) => {
-    if (!editable) return <p>{document.copy.heading}</p>;
+    if (!editable) return <><p>{document.copy.heading}</p><p>{document.copy.price_value || document.property.display_price}</p></>;
     if (editable.blurbFlushRef)
       editable.blurbFlushRef.current ??= () => editable.blurbBlocks;
     return (
@@ -74,8 +74,10 @@ afterEach(() => {
 });
 
 for (const type of ["sales_brochure", "rental_brochure"] as const) {
-  function setup(draft = false) {
+  function setup(draft = false, missingPrice = false, blankDocumentPrice = false) {
     const fixtures = createLintRegressionFixtures();
+    fixtures.listing.advertised_sale_price = missingPrice ? null : "$2,450,000";
+    fixtures.listing.advertised_weekly_rent = missingPrice ? null : "$850";
     const templates = getTemplatesForProduct(type)
       .filter((template) => template.scope === "platform")
       .map(serializeTemplateForApi);
@@ -93,6 +95,10 @@ for (const type of ["sales_brochure", "rental_brochure"] as const) {
             version: "sales_brochure_v1",
             template_id: templates[0].id,
           };
+    if (blankDocumentPrice) {
+      document.copy.price_value = "";
+      document.property.display_price = "";
+    }
     let collateral: Omit<CollateralItem, "document_json"> & {
       document_json: BrochureDocumentJson | null;
     } = {
@@ -132,7 +138,7 @@ for (const type of ["sales_brochure", "rental_brochure"] as const) {
           return Response.json({ error: "Writing failed" }, { status: 500 });
         collateral = {
           ...collateral,
-          document_json: { ...document, template_id: collateral.template_id! },
+          document_json: { ...document, copy: { ...document.copy, price_value: body.price_value ?? document.copy.price_value }, template_id: collateral.template_id! },
         };
       } else if (url.endsWith("generate-pdf")) {
         if (failures.pdf) throw new Error("PDF service unavailable");
@@ -265,11 +271,10 @@ for (const type of ["sales_brochure", "rental_brochure"] as const) {
       fireEvent.click(
         screen.getByRole("button", { name: "Use design & generate brochure" }),
       );
-      await screen.findByText("Writing failed");
+      await screen.findByText(/Writing failed/);
       failures.generation = false;
-      fireEvent.click(
-        screen.getByRole("button", { name: "Generate brochure" }),
-      );
+      expect((screen.getByRole("textbox", { name: type === "rental_brochure" ? "Weekly rent" : "Sale price or guide" }) as HTMLInputElement).value).toBe(type === "rental_brochure" ? "$850 per week" : "$2,450,000");
+      fireEvent.click(screen.getByRole("button", { name: "Use design & generate brochure" }));
       await screen.findByRole("button", { name: "Review & download" });
       expect(
         fetcher.mock.calls.filter(([, init]) => init?.method === "PATCH"),
@@ -288,6 +293,50 @@ for (const type of ["sales_brochure", "rental_brochure"] as const) {
         expect(screen.queryByRole("link", { name: "Download PDF" })).toBeNull(),
       );
       expect(screen.getByRole("button", { name: "Prepare PDF" })).toBeTruthy();
+    });
+    it("prompts for a missing price before generation and passes it through to the document", async () => {
+      const { fetcher, getCollateral } = setup(true, true);
+      expect(screen.getByRole("tab", { name: "Edit brochure" }).getAttribute("aria-disabled")).toBe("true");
+      fireEvent.click(screen.getByRole("button", { name: "Use design & generate brochure" }));
+      await screen.findByText("Enter a price or choose Contact agent before continuing.");
+      expect(fetcher).not.toHaveBeenCalled();
+      const input = screen.getByRole("textbox", { name: type === "rental_brochure" ? "Weekly rent" : "Sale price or guide" });
+      fireEvent.change(input, { target: { value: type === "rental_brochure" ? "975" : "$1,250,000" } });
+      const expected = type === "rental_brochure" ? "$975 per week" : "$1,250,000";
+      expect(screen.getAllByText(expected).length).toBeGreaterThan(0);
+      fireEvent.click(screen.getByRole("button", { name: "Use design & generate brochure" }));
+      await screen.findByRole("button", { name: "Review & download" });
+      expect(getCollateral().document_json?.copy.price_value).toBe(expected);
+    });
+    it("lets the user explicitly choose Contact agent without inventing an amount", async () => {
+      const { getCollateral } = setup(true, true);
+      fireEvent.click(screen.getByRole("button", { name: "Use “Contact agent”" }));
+      fireEvent.click(screen.getByRole("button", { name: "Use design & generate brochure" }));
+      await screen.findByRole("button", { name: "Review & download" });
+      expect(getCollateral().document_json?.copy.price_value).toBe("Contact Agent");
+    });
+    it("opens old blank-price brochures on Design and saves the advertised price without rewriting", async () => {
+      const { getCollateral, fetcher } = setup(false, false, true);
+      expect(
+        screen.getByRole("tab", { name: "Design" }).getAttribute("aria-selected"),
+      ).toBe("true");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Use design & edit brochure" }),
+      );
+      await screen.findByRole("button", { name: "Review & download" });
+      expect(getCollateral().document_json?.copy.price_value).toBe(
+        type === "rental_brochure" ? "$850 per week" : "$2,450,000",
+      );
+      expect(fetcher.mock.calls.some(([url]) => url.endsWith("generate-copy"))).toBe(false);
+    });
+    it("saves price changes to an existing brochure without rewriting its content", async () => {
+      const { getCollateral, fetcher } = setup();
+      fireEvent.click(screen.getByRole("tab", { name: "Design" }));
+      fireEvent.change(screen.getByRole("textbox", { name: type === "rental_brochure" ? "Weekly rent" : "Sale price or guide" }), { target: { value: type === "rental_brochure" ? "$995 per week" : "$1,300,000" } });
+      fireEvent.click(screen.getByRole("button", { name: "Use design & edit brochure" }));
+      await screen.findByRole("button", { name: "Review & download" });
+      expect(getCollateral().document_json?.copy.price_value).toBe(type === "rental_brochure" ? "$995 per week" : "$1,300,000");
+      expect(fetcher.mock.calls.some(([url]) => url.endsWith("generate-copy"))).toBe(false);
     });
   });
 }
