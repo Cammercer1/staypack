@@ -22,6 +22,7 @@ import {
 } from "@/lib/reports/resolveReportAgents";
 import { resolveCollateralImageSelection } from "@/lib/listings/collateralImages";
 import { ensureStrEnrichmentFeaturedComps } from "@/lib/airbtics/enrich";
+import { alignStrSeasonality } from "@/lib/str/comparables";
 import type { ReportPropertyImageSelection } from "@/lib/reports/editable/reportImageSlots";
 import { resolveReportTemplateId } from "@/lib/reports/templates/resolveTemplateId";
 
@@ -76,6 +77,7 @@ export function buildFinalReportJson({
   const strImages =
     propertyImages ?? resolveCollateralImageSelection(listing, "str_report");
   const reportCopy = alignCopyWithEstimate(copy, estimate.annualRevenue);
+  const savedEnrichment = ensureStrEnrichmentFeaturedComps(report.str_enrichment_json ?? null, report.raw_airbtics_json);
 
   return {
     ...preserveDocumentLink(report.final_report_json ?? { assets: { qr_code_url: report.qr_code_url ?? "" } }),
@@ -163,10 +165,7 @@ export function buildFinalReportJson({
       qr_code_url: report.qr_code_url ?? "",
       pdf_url: report.pdf_url ?? "",
     },
-    str_enrichment: ensureStrEnrichmentFeaturedComps(
-      report.str_enrichment_json ?? null,
-      report.raw_airbtics_json,
-    ),
+    str_enrichment: savedEnrichment ? alignStrSeasonality(savedEnrichment, estimate.annualRevenue) : null,
   };
 }
 
@@ -204,6 +203,10 @@ function alignCopyWithEstimate(
       copy.key_metrics_line,
       annualRevenue,
     ),
+    property_appeal_points: copy.property_appeal_points.map((point) => /\brevenue\b/i.test(point)
+      ? enforceCanonicalStrRevenueInText(point, annualRevenue) : point),
+    performance_supporting_factors: copy.performance_supporting_factors.map((point) => /\brevenue\b/i.test(point)
+      ? enforceCanonicalStrRevenueInText(point, annualRevenue) : point),
   };
 }
 

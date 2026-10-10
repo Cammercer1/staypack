@@ -13,6 +13,9 @@ import { templateGrantErrorResponse } from "@/lib/templates/grants/apiErrors";
 import { aiCopySchema, updateReportSchema, type UpdateReportInput } from "@/lib/validation/schemas";
 import type { Agency, AiCopyJson, Listing, Report } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { selectStrComps } from "@/lib/str/comparables";
+import { applyStrEstimateAdjustments, reconcileStrEstimate, saveStrRateOverride } from "@/lib/reports/strEstimateAdjustments";
+import { finalReportCopyToAiCopy } from "@/lib/reports/editable/strReportCopyAdapter";
 
 async function rebuildFinalReportJson({
   supabase,
@@ -87,8 +90,31 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { supabase, agency, report, listing } = await requireReportWithListing(id);
+    const { supabase, agency, report: storedReport, listing } = await requireReportWithListing(id);
     const body = updateReportSchema.parse(await request.json());
+    const adjustment = body.str_adjustment;
+    delete body.str_adjustment;
+    if (adjustment) {
+      if (body.final_estimate_json || body.user_overrides_json || body.final_report_json) {
+        throw new Error("Send ADR and occupancy only; report figures are calculated on the server.");
+      }
+      const baseline = storedReport.original_estimate_json;
+      if (!baseline) throw new Error("Get a market estimate before adjusting the figures.");
+      const rates = adjustment.mode === "rates"
+        ? { nightlyRate: adjustment.nightlyRate, occupancyRate: adjustment.occupancyRate }
+        : null;
+      body.final_estimate_json = rates
+        ? applyStrEstimateAdjustments(baseline, rates)
+        : reconcileStrEstimate(baseline);
+      body.user_overrides_json = saveStrRateOverride(storedReport.user_overrides_json, rates);
+    }
+    const selectedIds = body.selected_comp_listing_ids;
+    delete body.selected_comp_listing_ids;
+    if (selectedIds && !storedReport.str_enrichment_json) throw new Error("Fetch comparable evidence before selecting listings");
+    const selectedEnrichment = selectedIds ? selectStrComps(storedReport.str_enrichment_json!, selectedIds) : null;
+    const report = selectedEnrichment ? { ...storedReport, str_enrichment_json: selectedEnrichment } : storedReport;
+    const savedCopy = report.ai_copy_json ?? (report.final_report_json
+      ? finalReportCopyToAiCopy(report.final_report_json.copy, null) : null);
 
     if (body.template_id) {
       try {
@@ -155,19 +181,23 @@ export async function PATCH(
       if (rebuildResult.error) {
         return rebuildResult.error;
       }
-    } else if (body.final_estimate_json !== undefined && report.ai_copy_json) {
+    } else if ((body.final_estimate_json !== undefined || selectedEnrichment) && savedCopy) {
       const rebuildResult = await rebuildFinalReportJson({
         supabase,
         agency,
         listing,
         report,
         body,
-        copy: report.ai_copy_json,
+        copy: savedCopy,
       });
 
       if (rebuildResult.error) {
         return rebuildResult.error;
       }
+    }
+
+    if (selectedEnrichment && !body.final_report_json && report.final_report_json) {
+      body.final_report_json = { ...report.final_report_json, str_enrichment: selectedEnrichment };
     }
 
     if (body.template_id && body.template_id !== report.template_id && !body.final_report_json && report.final_report_json) {
@@ -182,6 +212,8 @@ export async function PATCH(
       .from("reports")
       .update({
         ...body,
+        ...(selectedEnrichment ? { str_enrichment_json: selectedEnrichment } : {}),
+        ...(adjustment ? { pdf_url: null } : {}),
         ...(body.final_report_json ? {
           final_report_json: invalidateReportPdf(body.final_report_json),
           pdf_url: null,

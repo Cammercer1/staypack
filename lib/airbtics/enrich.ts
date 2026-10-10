@@ -206,6 +206,9 @@ export function ensureStrEnrichmentFeaturedComps(
     return null;
   }
 
+  // Frozen selections and other providers must not be replaced by legacy ranking.
+  if (enrichment.provider === "airroi" || enrichment.selected_comp_ids) return enrichment;
+
   if (!rawAirbticsJson || typeof rawAirbticsJson !== "object") {
     return enrichment;
   }

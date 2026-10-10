@@ -160,7 +160,7 @@ export function ReportWizard({
     ) {
       setActivity("estimate");
       const result = await reportRequest<{ listing: Listing; report: Report }>(
-        "/api/airbtics/estimate",
+        "/api/str/estimate",
         jsonRequest({
           report_id: current.id,
           address: currentListing.property_address,
@@ -176,43 +176,6 @@ export function ReportWizard({
       return "review";
     }
     return "saved";
-  }
-
-  async function refreshEstimate() {
-    if (disabled || navigating.current) return;
-    navigating.current = true;
-    setBusy(true);
-    setError(null);
-    setActivity("estimate");
-    try {
-      const result = await reportRequest<{ listing: Listing; report: Report }>(
-        "/api/airbtics/estimate",
-        jsonRequest({
-          report_id: report.id,
-          address: listing.property_address,
-          latitude: listing.latitude,
-          longitude: listing.longitude,
-          bedrooms: listing.bedrooms,
-          bathrooms: listing.bathrooms,
-          accommodates: calculateAccommodates(
-            listing.bedrooms,
-            listing.accommodates,
-          ),
-        }),
-      );
-      updateListing(result.listing);
-      updateReport(result.report);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to refresh the estimate. Please try again.",
-      );
-    } finally {
-      navigating.current = false;
-      setBusy(false);
-      setActivity(null);
-    }
   }
 
   async function handleStepChange(next: string) {
@@ -364,14 +327,13 @@ export function ReportWizard({
           <div hidden={Boolean(activity)}>
             <StrEstimateStep
               ref={estimateRef}
-              key={report.airbtics_fetched_at ?? "no-estimate"}
+              key={report.str_enrichment_json?.fetched_at ?? report.airbtics_fetched_at ?? "no-estimate"}
               listing={listing}
               report={report}
               busy={disabled}
               onComplete={updateReport}
               onContinue={() => void handleStepChange("copy")}
               onBack={() => void handleStepChange("design")}
-              onRefresh={() => void refreshEstimate()}
             />
           </div>
         </TabsContent>

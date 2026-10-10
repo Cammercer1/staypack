@@ -109,6 +109,8 @@ export function ClassicCompsGrid({
                 {comp.name}
               </p>
 
+              {comp.property_type && <p className="mt-1 truncate text-[0.58rem] text-neutral-600">{comp.property_type.replace(/^Entire /, "")} · {comp.bathrooms ?? "—"} bath · {comp.accommodates ?? "—"} guests</p>}
+
               <div
                 className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 text-neutral-800 ${
                   compact ? "mt-1 text-[0.58rem]" : "mt-2 gap-x-3 text-[0.62rem]"
@@ -145,9 +147,10 @@ export function ClassicCompsGrid({
                     compact ? "text-[0.55rem]" : "text-[0.6rem]"
                   }`}
                 >
-                  /yr gross
+                  est. gross /yr
                 </span>
               </p>
+              {comp.reviews != null && <p className="mt-1 text-[0.55rem] text-neutral-600">{comp.rating != null ? `${comp.rating.toFixed(1)} / 5 · ` : ""}{comp.reviews} reviews</p>}
             </div>
           </article>
         ))}

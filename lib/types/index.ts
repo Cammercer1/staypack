@@ -256,20 +256,45 @@ export type StrCompCard = {
   annual_revenue: number | null;
   occupancy_rate: number | null;
   nightly_rate: number | null;
+  property_type?: string | null;
+  suburb?: string | null;
+  room_type?: string | null;
+  photo_urls?: string[];
+  reviews?: number | null;
+  rating?: number | null;
+  blocked_nights?: number | null;
+  reserved_nights?: number | null;
+  amenities?: string[];
+  minimum_nights?: number | null;
+  average_length_of_stay?: number | null;
+  recent_occupancy_rate?: number | null;
+  recent_revenue?: number | null;
+  superhost?: boolean | null;
+  professional_management?: boolean | null;
+  guest_favorite?: boolean | null;
+  match_notes?: string[];
 };
 
-/** LLM positioning of the subject within the Airbtics revenue distribution. */
+/** LLM positioning of the subject within the provider's revenue distribution. */
 export type StrEstimatePositioning = {
   percentile: number;
   confidence: "low" | "medium" | "high";
   rationale: string;
-  /** Airbtics p50 before positioning, for auditability. */
+  /** Provider p50 before positioning, for auditability. */
   median_annual_revenue: number | null;
   /** LLM-suggested annual revenue before comp-aware clamping. */
   llm_annual_revenue?: number | null;
   /** Final annual revenue after comp-aware clamping. */
   annual_revenue?: number | null;
   was_clamped?: boolean;
+  photo_review?: {
+    status: "reviewed" | "unavailable";
+    image_count: number;
+    comp_image_count: number;
+    observations: string[];
+    limitations: string[];
+    model?: string;
+  };
   comp_anchors?: {
     same_bed_count: number;
     same_bed_median: number | null;
@@ -328,8 +353,37 @@ export type SaleAppraisalPositioning = {
   };
 };
 
+export type StrMarketOccupancy = {
+  status: "available" | "unavailable";
+  /** A confirmed empty market can be reused; transient failures must remain retryable. */
+  unavailable_reason?: "insufficient_data";
+  market: { country: string; region: string; locality: string; district?: string | null } | null;
+  label: string;
+  filters: Record<string, { eq: string | number }>;
+  fetched_at: string;
+  request_key: string;
+  cost_cents: number;
+  /** The endpoint does not report the number of listings contributing each month. */
+  sample_count: number | null;
+  months: { month: string; average: number; p25: number; p50: number; p75: number; p90: number }[];
+  warnings: string[];
+  raw?: unknown;
+};
+
 export type StrEnrichmentJson = {
   tier: "full";
+  provider?: "airbtics" | "airroi";
+  fetched_at?: string;
+  cost_cents?: number;
+  request_id?: string | null;
+  currency?: "AUD";
+  estimate_basis?: "p50" | "provider";
+  seasonality_basis?: "modelled";
+  market_occupancy?: StrMarketOccupancy;
+  occupancy_range?: { p25: number; p50: number; p75: number; p90: number };
+  nightly_rate_range?: { p25: number; p50: number; p75: number; p90: number };
+  comp_pool?: StrCompCard[];
+  selected_comp_ids?: string[];
   comp_count: number;
   radius_m: number | null;
   revenue_range: {
@@ -346,18 +400,20 @@ export type StrEnrichmentJson = {
     revenue_high: number | null;
     occupancy: number | null;
     adr: number | null;
+    modelled?: boolean;
   }[];
   comps: StrCompCard[];
 };
 
 export type StrEstimateOverrides = Partial<StrEstimate> & {
+  strAdjustment?: { nightlyRate: number; occupancyRate: number };
   estimateInputs?: { bedrooms: number; bathrooms: number; accommodates: number };
   recommendedAnnualRevenue?: number | null;
   recommendedOccupancyRate?: number | null;
   revenueBand?: {
     min: number;
     max: number;
-    source: "airbtics" | "fallback";
+    source: "airbtics" | "airroi" | "fallback";
   } | null;
 };
 

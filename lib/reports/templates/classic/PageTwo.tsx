@@ -40,7 +40,7 @@ export function ClassicPageTwo({ report }: Props) {
               Market evidence
             </h2>
             <p className="mt-1.5 text-sm leading-snug text-neutral-600">
-              Revenue and occupancy trends from comparable short-term rentals near{" "}
+              {enrichment?.provider === "airroi" ? "Estimated revenue and comparable short-term rentals near" : "Revenue and occupancy trends from comparable short-term rentals near"}{" "}
               {report.property.suburb || "the subject property"}.
             </p>
           </header>
@@ -48,7 +48,7 @@ export function ClassicPageTwo({ report }: Props) {
           <section className="shrink-0">
             <div className="grid grid-cols-2 items-stretch gap-x-8">
               <ClassicMonthlyRevenueChart report={report} compact />
-              <ClassicSeasonalityChart seasonality={seasonality} compact />
+              <ClassicSeasonalityChart seasonality={seasonality} marketOccupancy={enrichment?.market_occupancy} revenueRange={enrichment?.provider === "airroi" ? enrichment.revenue_range : null} compact />
             </div>
           </section>
 
@@ -57,6 +57,9 @@ export function ClassicPageTwo({ report }: Props) {
               comps={comps}
               suburb={report.property.suburb}
               totalCompCount={enrichment?.comp_count}
+              featuredCount={enrichment?.selected_comp_ids ? comps.length : undefined}
+              compPoolDescription={enrichment?.selected_comp_ids ? `${comps.length} selected comparable listings` : undefined}
+              compact={enrichment?.provider === "airroi" && comps.length > 4}
             />
           </section>
         </div>

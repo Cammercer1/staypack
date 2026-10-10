@@ -77,6 +77,7 @@ export function ClassicMonthlyRevenueChart({
   const headline = chartColour;
   const enrichment = report.str_enrichment;
   const rows = enrichment?.seasonality?.slice(-12) ?? [];
+  const modelled = enrichment?.seasonality_basis === "modelled";
 
   const chartRows = rows.filter((row) => row.revenue != null);
 
@@ -110,22 +111,18 @@ export function ClassicMonthlyRevenueChart({
             className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600"
             style={{ fontFamily: "var(--report-heading-font, inherit)" }}
           >
-            Monthly revenue
+            {modelled ? "Modelled monthly revenue" : "Monthly revenue"}
           </p>
           {!compact ? (
             <p className="mt-1 text-xs text-neutral-600">
-              Low, median and high from {enrichment?.comp_count ?? "nearby"} comps
-              {enrichment?.radius_m
-                ? ` within ${Math.round(enrichment.radius_m / 1000)} km`
-                : ""}
-              .
+              {modelled ? "Annual estimate allocated using modelled seasonal weights." : `Low, median and high from ${enrichment?.comp_count ?? "nearby"} comps.`}
             </p>
           ) : null}
         </div>
         {report.str.annual_revenue != null ? (
           <div className="shrink-0 text-right">
             <p className="text-[0.58rem] font-medium uppercase tracking-wide text-neutral-500">
-              {enrichment?.positioning != null &&
+              {modelled || enrichment?.positioning != null &&
               enrichment.positioning.percentile !== 50
                 ? "Est. annual"
                 : "Median annual"}
@@ -176,11 +173,11 @@ export function ClassicMonthlyRevenueChart({
             );
           })}
 
-          <path
+          {!modelled && <path
             d={bandPath}
             fill={`color-mix(in srgb, ${headline} 22%, white)`}
             stroke="none"
-          />
+          />}
           <path
             d={midPath}
             fill="none"
@@ -216,7 +213,7 @@ export function ClassicMonthlyRevenueChart({
       </div>
 
       <p className="mt-1.5 min-h-[1.25rem] text-[0.55rem] leading-snug text-neutral-500">
-        <span className="inline-flex items-center gap-1">
+        {modelled ? "Modelled seasonal allocation of estimated gross STR revenue; not historical monthly results." : <><span className="inline-flex items-center gap-1">
           <span
             className="inline-block h-1.5 w-2.5"
             style={{ backgroundColor: `color-mix(in srgb, ${headline} 22%, white)` }}
@@ -228,7 +225,7 @@ export function ClassicMonthlyRevenueChart({
         <span className="inline-flex items-center gap-1">
           <span className="inline-block h-px w-2.5" style={{ backgroundColor: headline }} aria-hidden />
           Median
-        </span>
+        </span></>}
       </p>
     </div>
   );

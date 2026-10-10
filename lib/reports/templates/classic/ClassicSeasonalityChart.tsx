@@ -1,9 +1,12 @@
 import type { StrEnrichmentJson } from "@/lib/types";
 import { formatCurrency, formatMonthLabel, formatPercent } from "@/lib/reports/formatters";
+import { ClassicMarketOccupancyChart } from "./ClassicMarketOccupancyChart";
 
 type Props = {
   seasonality: StrEnrichmentJson["seasonality"];
   compact?: boolean;
+  revenueRange?: StrEnrichmentJson["revenue_range"];
+  marketOccupancy?: StrEnrichmentJson["market_occupancy"];
 };
 
 const DEFAULT_CHART_COLOUR = "var(--report-headline-colour, #009eca)";
@@ -16,7 +19,27 @@ export function ClassicSeasonalityChart({
   seasonality,
   compact = false,
   chartColour = DEFAULT_CHART_COLOUR,
+  revenueRange,
+  marketOccupancy,
 }: ChartProps) {
+  if (marketOccupancy?.status === "available" && marketOccupancy.months.length) {
+    return <ClassicMarketOccupancyChart history={marketOccupancy} chartColour={chartColour} />;
+  }
+  if (revenueRange) {
+    const points = [["25th", revenueRange.p25], ["Median", revenueRange.p50], ["75th", revenueRange.p75], ["90th", revenueRange.p90]] as const;
+    const max = Math.max(...points.map(([, value]) => value ?? 0), 1);
+    return <div className="flex h-full flex-col">
+      <p className="mb-2 h-10 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600">Annual estimated range</p>
+      <div className="grid h-[7.25rem] grid-cols-4 items-end gap-3 border-y border-neutral-200 py-2" role="img" aria-label="Annual estimated gross STR revenue percentiles">
+        {points.map(([label, value]) => <div key={label} className="flex h-full flex-col justify-end text-center text-[0.58rem]">
+          <span>{formatCurrency(value)}</span>
+          <div className="mx-auto mt-1 w-8 max-w-full" style={{ height: `${Math.max(3, (value ?? 0) / max * 65)}%`, backgroundColor: chartColour, opacity: label === "Median" ? 1 : 0.55 }} />
+          <span className="mt-1">{label}</span>
+        </div>)}
+      </div>
+      <p className="mt-1.5 text-[0.55rem] leading-snug text-neutral-500">{marketOccupancy ? "Monthly occupancy unavailable. " : ""}Market percentiles show a range of estimated gross STR revenue.</p>
+    </div>;
+  }
   const headline = chartColour;
   const rows = seasonality.slice(-12).filter((row) => row.occupancy != null);
 

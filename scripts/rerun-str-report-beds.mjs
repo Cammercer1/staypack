@@ -48,7 +48,8 @@ if (process.env.PRINT_BASE_URL?.trim()) {
 }
 
 const { createAdminClient } = await import("../lib/supabase/admin.ts");
-const { fetchAirbticsEstimate } = await import("../lib/airbtics/client.ts");
+const { fetchStrEstimate } = await import("../lib/str/estimate.ts");
+const { applyStrEstimateAdjustments, readStrRateOverride, saveStrRateOverride } = await import("../lib/reports/strEstimateAdjustments.ts");
 const { calculateAccommodates } = await import("../lib/reports/formatters.ts");
 const { generateReportCopy } = await import("../lib/openai/generateReportCopy.ts");
 const { buildFinalReportJson } = await import("../lib/reports/buildFinalReportJson.ts");
@@ -138,8 +139,8 @@ await admin
 
 const listingForEstimate = { ...listing, bedrooms, accommodates, scraped_listing_json: scraped };
 
-console.log("1. Re-running Airbtics estimate (full tier)...");
-const estimateResult = await fetchAirbticsEstimate(
+console.log("1. Re-running AirROI estimate...");
+const estimateResult = await fetchStrEstimate(
   {
     latitude: listing.latitude,
     longitude: listing.longitude,
@@ -147,25 +148,27 @@ const estimateResult = await fetchAirbticsEstimate(
     bathrooms,
     accommodates,
   },
-  "full",
+  listingForEstimate,
+  report.str_enrichment_json,
 );
 
-const { estimate, tier, reportId: airbticsReportId, costCents, enrichment } =
-  estimateResult;
+const { estimate: baseline, enrichment } = estimateResult;
+const rates = readStrRateOverride(report);
+const estimate = rates ? applyStrEstimateAdjustments(baseline, rates) : baseline;
 
 console.log("   Annual revenue:", estimate.annualRevenue);
 
 const { data: estimatedReport, error: estimateDbError } = await admin
   .from("reports")
   .update({
-    airbtics_tier: tier,
-    airbtics_report_id: airbticsReportId,
-    airbtics_cost_cents: costCents,
-    airbtics_fetched_at: new Date().toISOString(),
-    original_estimate_json: estimate,
+    airbtics_tier: null,
+    airbtics_report_id: null,
+    airbtics_cost_cents: null,
+    airbtics_fetched_at: null,
+    original_estimate_json: baseline,
     final_estimate_json: estimate,
-    user_overrides_json: null,
-    raw_airbtics_json: estimate.raw,
+    user_overrides_json: { ...saveStrRateOverride(report.user_overrides_json, rates), estimateInputs: { bedrooms, bathrooms, accommodates } },
+    raw_airbtics_json: null,
     str_enrichment_json: enrichment,
     status: "estimated",
   })

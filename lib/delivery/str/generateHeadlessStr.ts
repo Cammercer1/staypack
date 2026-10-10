@@ -1,8 +1,8 @@
 import { applyDocumentLinkDraft, type DocumentLink } from "@/lib/documents/documentLink";
 import { createDocumentLinkDraft } from "@/lib/documents/createDocumentLinkDraft";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchAirbticsEstimate } from "@/lib/airbtics/client";
-import { positionStrEstimate } from "@/lib/airbtics/positionEstimate";
+import { fetchStrEstimate } from "@/lib/str/estimate";
+import { calculateAccommodates } from "@/lib/reports/formatters";
 import { geocodeReportAddress } from "@/lib/geocoding";
 import { getPrintRenderBaseUrl, getReportsUrl } from "@/lib/env";
 import { renderPdfFromUrl, buildPdfImagePath, buildPdfStylesheetPath } from "@/lib/browserless/pdf";
@@ -149,44 +149,11 @@ export async function generateHeadlessStrReport({
 
   const bedrooms = Number(listing.bedrooms ?? 2);
   const bathrooms = Number(listing.bathrooms ?? 1);
-  const accommodates = Math.max(bedrooms * 2, 2);
+  const accommodates = calculateAccommodates(bedrooms, listing.accommodates);
 
-  const estimateResult = await fetchAirbticsEstimate(
-    {
-      latitude: geocoded.latitude,
-      longitude: geocoded.longitude,
-      bedrooms,
-      bathrooms,
-      accommodates,
-    },
-    "full",
+  const { estimate, enrichment } = await fetchStrEstimate(
+    { latitude: geocoded.latitude, longitude: geocoded.longitude, bedrooms, bathrooms, accommodates }, listing,
   );
-
-  const { estimate, tier, reportId: airbticsReportId, costCents, enrichment } =
-    estimateResult;
-
-  // Position the subject within the comp distribution (falls back to median).
-  const scrapedListing = listing.scraped_listing_json;
-  const { estimate: positionedEstimate, positioning } =
-    await positionStrEstimate({
-      subject: {
-        property_address: listing.property_address ?? scrapedListing?.address ?? null,
-        suburb: listing.suburb,
-        state: listing.state,
-        property_type: listing.property_type ?? scrapedListing?.propertyType ?? null,
-        bedrooms: listing.bedrooms,
-        bathrooms: listing.bathrooms,
-        listing_title: listing.listing_title ?? scrapedListing?.title ?? null,
-        listing_description:
-          listing.listing_description ?? scrapedListing?.description ?? null,
-        display_price: listing.display_price,
-      },
-      estimate,
-    });
-
-  const enrichmentWithPositioning = enrichment
-    ? { ...enrichment, positioning }
-    : enrichment;
 
   const templateId =
     packTemplateId || resolveReportTemplateId(agency as Agency, report as Report);
@@ -205,15 +172,15 @@ export async function generateHeadlessStrReport({
   const { data: estimatedReport, error: estimateDbError } = await admin
     .from("reports")
     .update({
-      airbtics_tier: tier,
+      airbtics_tier: null,
       template_id: templateId,
-      airbtics_report_id: airbticsReportId,
-      airbtics_cost_cents: costCents,
-      airbtics_fetched_at: new Date().toISOString(),
+      airbtics_report_id: null,
+      airbtics_cost_cents: null,
+      airbtics_fetched_at: null,
       original_estimate_json: estimate,
-      final_estimate_json: positionedEstimate,
-      raw_airbtics_json: estimate.raw,
-      str_enrichment_json: enrichmentWithPositioning,
+      final_estimate_json: estimate,
+      raw_airbtics_json: null,
+      str_enrichment_json: enrichment,
       status: "estimated",
     })
     .eq("id", report.id)
@@ -243,7 +210,7 @@ export async function generateHeadlessStrReport({
     agency: agency as Agency,
     listing,
     report: reportForCopy,
-    estimate: positionedEstimate,
+    estimate: estimate,
   });
 
   const finalReportJson = resolveFinalReportForDisplay(
@@ -253,7 +220,7 @@ export async function generateHeadlessStrReport({
       agencyAgents,
       listing,
       report: { ...reportForCopy, template_id: templateId },
-      estimate: positionedEstimate,
+      estimate: estimate,
       copy,
       scraped: listing.scraped_listing_json,
       resolvedAgents,

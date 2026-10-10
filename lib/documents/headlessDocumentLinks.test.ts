@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ admin: vi.fn(), estimate: vi.fn(), copy: vi.fn(), brochureCopy: vi.fn(), pdf: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.admin }));
-vi.mock("@/lib/airbtics/client", () => ({ fetchAirbticsEstimate: mocks.estimate }));
-vi.mock("@/lib/airbtics/positionEstimate", () => ({ positionStrEstimate: async ({ estimate }: { estimate: unknown }) => ({ estimate, positioning: null }) }));
+vi.mock("@/lib/str/estimate", () => ({ fetchStrEstimate: mocks.estimate }));
 vi.mock("@/lib/geocoding", () => ({ geocodeReportAddress: async () => ({ latitude: -33.8, longitude: 151.2 }) }));
 vi.mock("@/lib/openai/generateReportCopy", () => ({ generateReportCopy: mocks.copy }));
 vi.mock("@/lib/openai/generateLeaseAppraisalCopy", () => ({ generateLeaseAppraisalCopy: async () => undefined }));
@@ -29,7 +28,8 @@ beforeEach(() => {
   writes = [];
   uploads = [];
   mocks.pdf.mockResolvedValue(Buffer.from("mock-pdf"));
-  mocks.estimate.mockResolvedValue({ tier: "full", reportId: "mock-estimate", costCents: 0, enrichment: null, estimate: { annualRevenue: 90000, monthlyRevenue: 7500, weeklyRevenue: 1730, nightlyRate: 300, occupancyRate: 0.7, bookedNights: 255, radiusM: 2000, raw: {} } });
+  const estimate = { annualRevenue: 90000, monthlyRevenue: 7500, weeklyRevenue: 1730, nightlyRate: 300, occupancyRate: 70, bookedNights: 255, radiusM: 2000, raw: {} };
+  mocks.estimate.mockResolvedValue({ enrichment: null, estimate });
   mocks.copy.mockResolvedValue({ sales_pack_heading: "Mock heading", sales_pack_blurb: "Mock report description", key_metrics_line: "Estimate only", property_appeal_points: [], performance_supporting_factors: [], buyer_checks: [], methodology_note: "", disclaimer: "Estimate only", confidence_notes: "" });
   mocks.brochureCopy.mockResolvedValue(getMockSalesBrochureCopy(fixture.listing, fixture.agency));
   mocks.admin.mockReturnValue({

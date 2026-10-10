@@ -1,3 +1,4 @@
+import { strAdjustmentSchema } from "@/lib/reports/strEstimateAdjustments";
 import { normalizeAdvertisedPrice } from "@/lib/listings/pricing";
 import { z } from "zod";
 import { domainAvmSchema } from "@/lib/domain-avm/schema";
@@ -232,6 +233,8 @@ export const createListingSchema = updateListingSchema.extend({
 });
 
 export const updateReportSchema = z.object({
+  str_adjustment: strAdjustmentSchema.optional(),
+  selected_comp_listing_ids: z.array(z.string().min(1)).min(1).max(6).optional(),
   status: reportStatusSchema.optional(),
   user_overrides_json: z.record(z.string(), z.unknown()).optional(),
   final_estimate_json: z.record(z.string(), z.unknown()).optional(),
@@ -257,16 +260,19 @@ export const scrapeListingSchema = z.object({
   listing_url: z.string().url(),
 });
 
-export const airbticsEstimateSchema = z.object({
+export const strEstimateSchema = z.object({
   report_id: z.string().uuid(),
   tier: z.enum(["summary", "full"]).default(DEFAULT_AIRBTICS_TIER),
   address: z.string().optional(),
-  latitude: z.coerce.number().nullable().optional(),
-  longitude: z.coerce.number().nullable().optional(),
-  bedrooms: z.coerce.number().optional(),
-  bathrooms: z.coerce.number().optional(),
-  accommodates: z.coerce.number().optional(),
+  latitude: z.coerce.number().min(-90).max(90).nullable().optional(),
+  longitude: z.coerce.number().min(-180).max(180).nullable().optional(),
+  bedrooms: z.coerce.number().int().min(0).max(20).optional(),
+  bathrooms: z.coerce.number().min(0.5).max(20).optional(),
+  accommodates: z.coerce.number().int().min(1).max(30).optional(),
 });
+
+/** Compatibility for legacy tooling. */
+export const airbticsEstimateSchema = strEstimateSchema;
 
 const blurbVariantsSchema = z.object({
   short: z.string(),

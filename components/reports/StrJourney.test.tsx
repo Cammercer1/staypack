@@ -18,6 +18,7 @@ import {
 import { finalReportCopyToAiCopy } from "@/lib/reports/editable/strReportCopyAdapter";
 import { getTemplatesForProduct } from "@/lib/templates/catalog";
 import { serializeTemplateForApi } from "@/lib/templates/serializeForApi";
+import { applyStrEstimateAdjustments, reconcileStrEstimate, readStrRateOverride, saveStrRateOverride } from "@/lib/reports/strEstimateAdjustments";
 import type { Report } from "@/lib/types";
 
 vi.mock("./FittedReportPreview", () => ({
@@ -102,7 +103,7 @@ function setup(draft = false) {
       listing = { ...listing, ...body };
       return Response.json({ listing });
     }
-    if (url === "/api/airbtics/estimate") {
+    if (url === "/api/str/estimate") {
       if (failures.estimate)
         return Response.json(
           { error: "Estimate unavailable" },
@@ -114,11 +115,14 @@ function setup(draft = false) {
         bathrooms: body.bathrooms,
         accommodates: body.accommodates,
       };
+      const rates = readStrRateOverride(report);
       report = {
         ...report,
-        final_estimate_json: fixtures.report.final_estimate_json,
+        original_estimate_json: fixtures.report.original_estimate_json,
+        final_estimate_json: rates ? applyStrEstimateAdjustments(fixtures.report.original_estimate_json!, rates) : fixtures.report.final_estimate_json,
         str_enrichment_json: fixtures.report.str_enrichment_json,
         user_overrides_json: {
+          ...saveStrRateOverride(report.user_overrides_json, rates),
           estimateInputs: {
             bedrooms: body.bedrooms,
             bathrooms: body.bathrooms,
@@ -149,6 +153,12 @@ function setup(draft = false) {
         status: "published",
       };
     } else if (init?.method === "PATCH") {
+      if (body.str_adjustment) {
+        const rates = body.str_adjustment.mode === "rates"
+          ? { nightlyRate: body.str_adjustment.nightlyRate, occupancyRate: body.str_adjustment.occupancyRate } : null;
+        body.final_estimate_json = rates ? applyStrEstimateAdjustments(report.original_estimate_json!, rates) : reconcileStrEstimate(report.original_estimate_json!);
+        body.user_overrides_json = saveStrRateOverride(report.user_overrides_json, rates);
+      }
       report = {
         ...report,
         ...body,
@@ -240,7 +250,7 @@ describe("short-term rental report journey", () => {
       fetcher.mock.calls.filter(([url]) => url.endsWith("generate-copy")),
     ).toHaveLength(1);
     expect(
-      fetcher.mock.calls.filter(([url]) => url === "/api/airbtics/estimate"),
+      fetcher.mock.calls.filter(([url]) => url === "/api/str/estimate"),
     ).toHaveLength(1);
   });
   it("validates property inputs before starting the estimate", async () => {
@@ -262,7 +272,7 @@ describe("short-term rental report journey", () => {
     );
     expect(await screen.findByText("Enter the guest capacity")).toBeTruthy();
     expect(
-      fetcher.mock.calls.some(([url]) => url === "/api/airbtics/estimate"),
+      fetcher.mock.calls.some(([url]) => url === "/api/str/estimate"),
     ).toBe(false);
   });
   it("retains property edits and unlocks retry when estimating fails", async () => {
@@ -354,26 +364,26 @@ describe("short-term rental report journey", () => {
     await waitTab("Download & share");
     expect(getReport().final_report_json?.copy.heading).toBe("Keep my edits");
   });
-  it("saves adjusted figures before navigating back and does not clamp partially typed amounts", async () => {
-    const { getReport } = setup();
+  it("saves adjusted figures without another estimate request and does not clamp partially typed amounts", async () => {
+    const { getReport, fetcher } = setup();
     clickTab("Estimate & evidence");
     await waitTab("Estimate & evidence");
-    fireEvent.click(screen.getByText("Adjust the figures (optional)"));
-    fireEvent.change(screen.getByLabelText("Estimated annual revenue ($)"), {
+    fireEvent.change(screen.getByLabelText("Average daily rate · ADR ($)"), {
       target: { value: "1" },
     });
     expect(
-      screen.getByLabelText("Estimated annual revenue ($)"),
+      screen.getByLabelText("Average daily rate · ADR ($)"),
     ).toHaveProperty("value", "1");
-    fireEvent.change(screen.getByLabelText("Estimated annual revenue ($)"), {
-      target: { value: "123456" },
+    fireEvent.change(screen.getByLabelText("Average daily rate · ADR ($)"), {
+      target: { value: "400" },
     });
     fireEvent.change(screen.getByLabelText("Estimated occupancy (%)"), {
       target: { value: "75" },
     });
     clickTab("Design & property");
     await waitTab("Design & property");
-    expect(getReport().final_estimate_json?.annualRevenue).toBe(123456);
+    expect(fetcher.mock.calls.some(([url]) => url === "/api/str/estimate")).toBe(false);
+    expect(getReport().final_estimate_json?.annualRevenue).toBe(109500);
     expect(getReport().final_estimate_json?.bookedNights).toBe(274);
     expect(getReport().pdf_url).toBeNull();
   });
@@ -442,17 +452,16 @@ describe("short-term rental report journey", () => {
     const { failures } = setup();
     clickTab("Estimate & evidence");
     await waitTab("Estimate & evidence");
-    fireEvent.click(screen.getByText("Adjust the figures (optional)"));
-    fireEvent.change(screen.getByLabelText("Estimated annual revenue ($)"), {
-      target: { value: "123456" },
+    fireEvent.change(screen.getByLabelText("Average daily rate · ADR ($)"), {
+      target: { value: "400" },
     });
     failures.save = true;
     clickTab("Download & share");
     await screen.findByRole("alert");
     await waitTab("Estimate & evidence");
     expect(
-      screen.getByLabelText("Estimated annual revenue ($)"),
-    ).toHaveProperty("value", "123456");
+      screen.getByLabelText("Average daily rate · ADR ($)"),
+    ).toHaveProperty("value", "400");
     failures.save = false;
     clickTab("Download & share");
     await waitTab("Download & share");
@@ -487,7 +496,7 @@ describe("short-term rental report journey", () => {
     expect(
       fetcher.mock.calls.some(
         ([url]) =>
-          url === "/api/airbtics/estimate" || url.endsWith("generate-copy"),
+          url === "/api/str/estimate" || url.endsWith("generate-copy"),
       ),
     ).toBe(false);
   });
@@ -514,7 +523,7 @@ describe("short-term rental report journey", () => {
     await waitTab("Estimate & evidence");
     expect(getListing().accommodates).toBe(6);
     expect(
-      fetcher.mock.calls.filter(([url]) => url === "/api/airbtics/estimate"),
+      fetcher.mock.calls.filter(([url]) => url === "/api/str/estimate"),
     ).toHaveLength(1);
   });
 });

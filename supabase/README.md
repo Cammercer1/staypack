@@ -15,11 +15,11 @@ Run these steps after creating your Supabase project.
 Optional later (step numbers above assume full migration run):
 
 - Add `OPENAI_API_KEY`
-- Add `AIRBTICS_API_KEY` and `AIRBTICS_BASE_URL`
+- Add `AIRROI_API_KEY` for new STR estimates. Existing Airbtics reports remain readable.
 - Add `BROWSERLESS_API_KEY` and `BROWSERLESS_BASE_URL`
 - Add `GOOGLE_MAPS_API_KEY`
 
-Without third-party keys, development mode returns mock estimate/copy/PDF data so the UI can be tested end-to-end.
+New STR estimates require `AIRROI_API_KEY` in the server environment. Without copy/PDF keys, development mode returns mock copy/PDF data. The development regression preview supplies synthetic estimates for UI testing.
 
 ## Migration history
 

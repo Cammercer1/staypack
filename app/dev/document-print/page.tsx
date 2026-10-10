@@ -9,9 +9,9 @@ import type { FinalReportJson } from "@/lib/types";
 export const metadata = { title: "Synthetic document print check", robots: { index: false, follow: false } };
 
 /** Synthetic records only. This route never reads or writes an account or property. */
-export default async function DocumentPrintCheck({ searchParams }: { searchParams: Promise<{ kind?: string; template?: string; qr?: string }> }) {
+export default async function DocumentPrintCheck({ searchParams }: { searchParams: Promise<{ kind?: string; template?: string; qr?: string; provider?: string }> }) {
   if (process.env.NODE_ENV !== "development" && process.env.STAYPACK_REGRESSION_PREVIEW !== "1") notFound();
-  const { kind = "str", template, qr } = await searchParams;
+  const { kind = "str", template, qr, provider } = await searchParams;
   const fixture = createLintRegressionFixtures();
   const link = qr === "on" ? { mode: "custom" as const, url: `https://example.test/${kind}` } : { mode: "none" as const };
   const asset = link.mode === "custom" ? await generateQrCodeDataUrl(link.url) : "";
@@ -25,5 +25,16 @@ export default async function DocumentPrintCheck({ searchParams }: { searchParam
   }
   const base = kind === "lease" ? fixture.lease : kind === "sales" ? fixture.sales : fixture.report;
   const document: FinalReportJson = { ...base.final_report_json!, template_id: template ?? base.template_id ?? "classic-detailed", document_link: link, assets: { qr_code_url: asset, pdf_url: "" } };
+  if (kind === "str" && provider === "airroi" && fixture.report.str_enrichment_json) {
+    const annual = document.str.annual_revenue ?? 60000;
+    document.str = { ...document.str, occupancy_rate: fixture.report.final_estimate_json?.occupancyRate ?? 72 };
+    const pool = fixture.report.str_enrichment_json.comps;
+    document.str_enrichment = {
+      ...fixture.report.str_enrichment_json, provider: "airroi", seasonality_basis: "modelled",
+      revenue_range: { p25: annual * 0.6, p50: annual, p75: annual * 1.4, p90: annual * 1.8 },
+      comp_pool: pool, comps: pool.slice(0, 6), selected_comp_ids: pool.slice(0, 6).map((c) => c.listing_id),
+      seasonality: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month) => ({ month, revenue: annual / 12, revenue_low: null, revenue_high: null, occupancy: null, adr: null, modelled: true })),
+    };
+  }
   return <ReportPreview report={document} printMode />;
 }

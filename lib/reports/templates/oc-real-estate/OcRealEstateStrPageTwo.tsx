@@ -43,6 +43,7 @@ function OcStrComparableCard({ comp }: { comp: StrCompCard }) {
         </p>
         <div className="mt-1 flex flex-wrap gap-x-2 text-[8px] leading-none text-[#6F5D57]">
           <span>{comp.bedrooms ?? "—"} bed</span>
+          <span>{comp.bathrooms ?? "—"} bath</span>
           <span>{comp.accommodates ?? "—"} guests</span>
           <span>{formatPercent(comp.occupancy_rate)} occupancy</span>
         </div>
@@ -50,13 +51,14 @@ function OcStrComparableCard({ comp }: { comp: StrCompCard }) {
           <p className="text-[13px] font-extrabold leading-none">
             {formatCurrency(comp.annual_revenue)}
             <span className="ml-1 text-[7px] font-medium text-[#6F5D57]">
-              gross /yr
+              est. gross /yr
             </span>
           </p>
           <p className="shrink-0 text-[8px] font-semibold text-[#413532]">
             {formatCurrency(comp.nightly_rate)}/night
           </p>
         </div>
+        {comp.reviews != null && <p className="mt-1 text-[7px] text-[#6F5D57]">{comp.property_type?.replace(/^Entire /, "")}{comp.rating != null ? ` · ${comp.rating.toFixed(1)} / 5` : ""} · {comp.reviews} reviews</p>}
       </div>
     </article>
   );
@@ -179,7 +181,7 @@ export function OcRealEstateStrPageTwo({
             Short-term rental market.
           </h2>
           <p className="mt-2 text-[11px] text-[#6F5D57]">
-            Revenue and occupancy patterns near {report.property.suburb}.
+            {report.str_enrichment?.provider === "airroi" ? "Estimated revenue and comparable short stays near" : "Revenue and occupancy patterns near"} {report.property.suburb}.
           </p>
         </div>
         {logo ? (
@@ -204,6 +206,8 @@ export function OcRealEstateStrPageTwo({
         />
         <ClassicSeasonalityChart
           seasonality={seasonality}
+          marketOccupancy={report.str_enrichment?.market_occupancy}
+          revenueRange={report.str_enrichment?.provider === "airroi" ? report.str_enrichment.revenue_range : null}
           compact
           chartColour={OC_ORANGE}
         />
