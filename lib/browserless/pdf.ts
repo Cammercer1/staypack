@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { browserlessRequest } from "@/lib/browserless/client";
 import { isDevelopment } from "@/lib/env";
+import { restorePrintEmails } from "@/lib/browserless/restorePrintEmails";
 import {
   getCollateralPageFormat,
   getPdfOptionsForCollateralFormat,
@@ -292,7 +293,7 @@ async function preparePrintHtml(
     options?.mirrorStylesheet,
   );
   const withImages = await mirrorImages(
-    printRootHtml,
+    restorePrintEmails(printRootHtml),
     pageOrigin,
     options?.mirrorImage,
   );
