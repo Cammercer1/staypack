@@ -1,0 +1,31 @@
+{
+  "id": "/",
+  "name": "StayPack",
+  "short_name": "StayPack",
+  "description": "Branded property reports and marketing collateral.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fffdf8",
+  "theme_color": "#002e36",
+  "icons": [
+    {
+      "src": "/icons/staypack-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/staypack-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/staypack-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Staypack">
+  <rect width="128" height="128" rx="31" fill="#002e36"/>
+  <path d="M102 0H39C17 0 0 16 0 37S17 72 39 72H69C77 72 83 77 83 84S77 96 69 96H5V120H69C92 120 107 104 107 84S92 48 69 48H39C31 48 24 44 24 37S31 24 39 24H102Z" transform="translate(26.55 22) scale(.7)" fill="#fffdf8"/>
+</svg>
