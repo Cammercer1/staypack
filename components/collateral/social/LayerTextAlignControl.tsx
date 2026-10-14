@@ -38,7 +38,8 @@ export function LayerTextAlignControl({ id, label, value, onChange }: Props) {
             type="button"
             size="sm"
             variant={value === option ? "default" : "outline"}
-            className="flex-1"
+            className="min-h-11 flex-1"
+            aria-pressed={value === option}
             onClick={() => onChange(option)}
             title={optionLabel}
           >

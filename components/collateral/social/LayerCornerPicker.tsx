@@ -14,10 +14,10 @@ type CornerProps = {
 };
 
 const CORNERS: { id: SocialPostCorner; label: string }[] = [
-  { id: "top_left", label: "TL" },
-  { id: "top_right", label: "TR" },
-  { id: "bottom_left", label: "BL" },
-  { id: "bottom_right", label: "BR" },
+  { id: "top_left", label: "Top left" },
+  { id: "top_right", label: "Top right" },
+  { id: "bottom_left", label: "Bottom left" },
+  { id: "bottom_right", label: "Bottom right" },
 ];
 
 export function LayerCornerPicker({ value, onChange, label }: CornerProps) {
@@ -36,9 +36,10 @@ export function LayerCornerPicker({ value, onChange, label }: CornerProps) {
             key={corner.id}
             type="button"
             title={corner.id.replace("_", " ")}
+            aria-pressed={value === corner.id}
             onClick={() => onChange(corner.id)}
             className={cn(
-              "rounded-md px-2 py-2 text-xs font-medium transition-colors",
+              "min-h-11 rounded-md px-2 py-2 text-xs font-medium transition-colors",
               value === corner.id
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
@@ -53,8 +54,8 @@ export function LayerCornerPicker({ value, onChange, label }: CornerProps) {
 }
 
 const TOP_CORNERS: { id: SocialPostTopCorner; label: string }[] = [
-  { id: "top_left", label: "TL" },
-  { id: "top_right", label: "TR" },
+  { id: "top_left", label: "Top left" },
+  { id: "top_right", label: "Top right" },
 ];
 
 /** Top-left / top-right only (logo). */
@@ -78,9 +79,10 @@ export function LayerTopCornerPicker({
           <button
             key={corner.id}
             type="button"
+            aria-pressed={value === corner.id}
             onClick={() => onChange(corner.id)}
             className={cn(
-              "flex-1 rounded-md px-2 py-2 text-xs font-medium transition-colors",
+              "flex-1 min-h-11 rounded-md px-2 py-2 text-xs font-medium transition-colors",
               value === corner.id
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
@@ -123,9 +125,10 @@ export function LayerBottomCornerPicker({
           <button
             key={option.id}
             type="button"
+            aria-pressed={value === option.id}
             onClick={() => onChange(option.id)}
             className={cn(
-              "flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+              "flex-1 min-h-11 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
               value === option.id
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",

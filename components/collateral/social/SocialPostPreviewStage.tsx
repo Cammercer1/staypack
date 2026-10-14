@@ -94,7 +94,7 @@ export function SocialPostPreviewStage({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-border/50 px-4 py-3">
+      <div className="shrink-0 border-b border-base-300 px-4 py-3 sm:px-6">
         <SocialPostFormatPicker
           activeVariantId={activeVariantId}
           onVariantChange={onVariantChange}
@@ -103,17 +103,17 @@ export function SocialPostPreviewStage({
 
       <div
         ref={viewportRef}
-        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-muted/25 p-4 sm:p-6"
+        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-base-200 p-4 sm:p-6"
         style={previewStyle}
       >
         <BrandFontLoader fonts={fonts} />
 
         <div
-          className="relative shrink-0"
+          className="relative shrink-0 shadow-lg"
           style={{ width: layoutWidth, height: layoutHeight }}
         >
           <div
-            className="absolute left-0 top-0 origin-top-left transition-transform duration-200 ease-out"
+            className="absolute left-0 top-0 origin-top-left transition-transform duration-200 ease-out motion-reduce:transition-none"
             style={{
               width: frameSize.width,
               height: frameSize.height,

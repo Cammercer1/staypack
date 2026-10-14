@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff, Plus, Trash2, Users } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  Check,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  ImagePlus,
+  Plus,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SocialPostAgentPickerDialog } from "@/components/collateral/social/SocialPostAgentPickerDialog";
 import { LayerSection } from "@/components/collateral/social/LayerSection";
@@ -59,7 +68,6 @@ import {
   normalizeLogoScale,
   normalizeTextLineGapScale,
   normalizeTextAlign,
-  normalizeTextBoxHeightScale,
   normalizeTextBoxWidthScale,
   normalizeTextScale,
   normalizeTextZoneInset,
@@ -95,6 +103,7 @@ type Props = {
   listing: Listing;
   backgroundOptions: string[];
   onChange: (next: DocumentUpdater) => void;
+  section?: "photos" | "wording" | "branding";
 };
 
 type LayerSectionId =
@@ -124,7 +133,7 @@ function LayerToggle({
   label: string;
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-base-content/65">
       <input
         type="checkbox"
         className="h-4 w-4 rounded border-border accent-primary"
@@ -163,12 +172,12 @@ function LayerVisibilityToggle({
         onToggle(!enabled);
       }}
       className={cn(
-        "flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition",
+        "flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary",
         disabled
-          ? "cursor-not-allowed border-border/50 text-muted-foreground/50"
+          ? "cursor-not-allowed border-base-300 text-base-content/50"
           : enabled
             ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15"
-            : "border-border/70 text-muted-foreground hover:bg-muted",
+            : "border-base-300 text-base-content/65 hover:bg-base-200",
       )}
     >
       {enabled ? (
@@ -186,6 +195,7 @@ export function SocialPostLayerPanel({
   listing,
   backgroundOptions,
   onChange,
+  section,
 }: Props) {
   const variant = document.variants[document.active_variant_id];
   const { agency, agent } = document;
@@ -209,7 +219,9 @@ export function SocialPostLayerPanel({
     [backgroundOptions, document.listing.hero_image_url, document.variants],
   );
 
-  const backgroundLayout = normalizeBackgroundLayout(variant?.background_layout);
+  const backgroundLayout = normalizeBackgroundLayout(
+    variant?.background_layout,
+  );
   const backgroundSpec = getBackgroundLayoutSpec(backgroundLayout);
   const backgroundUrls =
     variant?.background_image_urls ??
@@ -247,9 +259,7 @@ export function SocialPostLayerPanel({
       .finally(() => setAgentsLoading(false));
   }, [pickerOpen]);
 
-  function updateLayers(
-    patch: Partial<SocialPostsDocumentJson["layers"]>,
-  ) {
+  function updateLayers(patch: Partial<SocialPostsDocumentJson["layers"]>) {
     onChange((prev) => applyDocumentLayerUpdate(prev, patch));
   }
 
@@ -273,9 +283,7 @@ export function SocialPostLayerPanel({
   );
   const listingHasStats = listingHasFeatureStats(document.listing);
   const hasTextLayout =
-    layers.title.enabled ||
-    layers.subcopy.enabled ||
-    layers.features.enabled;
+    layers.title.enabled || layers.subcopy.enabled || layers.features.enabled;
 
   function loadAgentFromOrg(nextAgent: CollateralAgentSlice) {
     onChange((prev) => {
@@ -318,10 +326,12 @@ export function SocialPostLayerPanel({
   }
 
   return (
-    <div className="space-y-2">
+    <div data-theme="staypack-workspace" className="space-y-5">
       <LayerSection
-        title="Background"
-        description="Collage layouts — per format (switch preview to edit each)"
+        hidden={!!section && section !== "photos"}
+        collapsible={!section}
+        title="Property photos"
+        description={section ? undefined : "Choose a photo or create a collage"}
         open={isSectionOpen("background")}
         onOpenChange={(open) => setSectionOpen("background", open)}
       >
@@ -335,63 +345,114 @@ export function SocialPostLayerPanel({
 
         {backgroundSpec.cellCount > 1 ? (
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">
-              Grid slots — select a slot, then tap a photo below
+            <Label className="text-xs text-base-content/65">
+              Choose which photo to replace, then pick one below
             </Label>
             <div
-              className="grid gap-1.5"
-              style={{
-                gridTemplateColumns: `repeat(${Math.min(backgroundSpec.cellCount, 4)}, minmax(0, 1fr))`,
-              }}
+              className={cn(
+                "grid gap-2",
+                backgroundSpec.cellCount === 2
+                  ? "grid-cols-2"
+                  : backgroundSpec.cellCount === 3
+                    ? "grid-cols-3"
+                    : "grid-cols-4",
+              )}
             >
-              {Array.from({ length: backgroundSpec.cellCount }).map((_, index) => {
-                const url = resolvedBackground?.background_image_urls?.[index];
-                const isActive = activeBackgroundSlot === index;
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => setActiveBackgroundSlot(index)}
-                    className={`relative aspect-square overflow-hidden rounded-md ring-2 transition ${
-                      isActive ? "ring-primary" : "ring-border/60 hover:ring-border"
-                    }`}
-                  >
-                    {url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={url} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+              {Array.from({ length: backgroundSpec.cellCount }).map(
+                (_, index) => {
+                  const url =
+                    resolvedBackground?.background_image_urls?.[index];
+                  const isActive =
+                    Math.min(
+                      activeBackgroundSlot,
+                      backgroundSpec.cellCount - 1,
+                    ) === index;
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      aria-label={`Replace photo ${index + 1}`}
+                      aria-pressed={isActive}
+                      onClick={() => setActiveBackgroundSlot(index)}
+                      className={cn("relative aspect-square overflow-hidden rounded-md ring-2 transition-colors",
+                        isActive
+                          ? "ring-primary"
+                          : "ring-base-300 hover:ring-base-content/40",
+                      )}
+                    >
+                      {url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-muted text-xs text-base-content/65">
+                          {index + 1}
+                        </div>
+                      )}
+                      <span className="absolute bottom-0.5 right-0.5 rounded bg-neutral px-1.5 py-0.5 text-xs font-medium text-neutral-content">
                         {index + 1}
-                      </div>
-                    )}
-                    <span className="absolute bottom-0.5 right-0.5 rounded bg-black/60 px-1 text-[9px] font-medium text-white">
-                      {index + 1}
-                    </span>
-                  </button>
-                );
-              })}
+                      </span>
+                    </button>
+                  );
+                },
+              )}
             </div>
           </div>
         ) : null}
 
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Listing photos</Label>
-          <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
-            {backgroundOptions.map((url) => {
-              const usedInCollage = backgroundUrls.includes(url);
+          <p className="text-sm font-medium">
+            {backgroundSpec.cellCount > 1
+              ? `Choose photo ${Math.min(activeBackgroundSlot, backgroundSpec.cellCount - 1) + 1}`
+              : "Choose a photo"}
+          </p>
+          {!imagePool.length ? (
+            <div className="rounded-xl border border-dashed border-base-300 p-5 text-sm text-base-content/65">
+              <ImagePlus className="mb-2 size-5" aria-hidden="true" />
+              <p>
+                No property photos yet. Add photos to your listing, then return
+                here to choose one.
+              </p>
+            </div>
+          ) : null}
+          <div className="grid grid-cols-3 gap-2">
+            {imagePool.map((url, index) => {
+              const usedInCollage = (
+                resolvedBackground?.background_image_urls ?? backgroundUrls
+              ).includes(url);
+              const selected =
+                resolvedBackground?.background_image_urls?.[
+                  Math.min(activeBackgroundSlot, backgroundSpec.cellCount - 1)
+                ] === url;
               return (
                 <button
                   key={url}
                   type="button"
-                  className={`relative aspect-square overflow-hidden rounded-md ring-2 transition ${
+                  aria-label={`Use listing photo ${index + 1}`}
+                  aria-pressed={selected}
+                  className={cn("relative aspect-square overflow-hidden rounded-md ring-2 transition-colors",
                     usedInCollage
                       ? "ring-primary/70"
-                      : "ring-transparent hover:ring-border"
-                  }`}
+                      : "ring-transparent hover:ring-base-content/40",
+                  )}
                   onClick={() => assignBackgroundPhoto(url)}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={url}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                  {usedInCollage ? (
+                    <span className="absolute right-1.5 top-1.5 rounded-full bg-primary p-1 text-primary-content">
+                      <Check className="size-3" aria-hidden="true" />
+                      <span className="sr-only">Used in this post</span>
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
@@ -400,7 +461,9 @@ export function SocialPostLayerPanel({
       </LayerSection>
 
       <LayerSection
-        title="Logo"
+        hidden={!!section && section !== "branding"}
+        collapsible={!section}
+        title="Agency logo"
         description={
           agency.logo_url
             ? "Always at the top of the post"
@@ -422,41 +485,47 @@ export function SocialPostLayerPanel({
       >
         {layers.logo.enabled && agency.logo_url ? (
           <>
-            <LayerTopCornerPicker
-              label="Top position"
-              value={normalizeLogoPlacement(layers.logo.placement)}
-              onChange={(placement) =>
-                updateLayers({ logo: { ...layers.logo, placement } })
-              }
-            />
-            <LayerScaleControl
-              id="social-logo-scale"
-              label="Logo size"
-              value={normalizeLogoScale(layers.logo.scale)}
-              min={LOGO_SCALE_MIN}
-              max={LOGO_SCALE_MAX}
-              onChange={(scale) =>
-                updateLayers({ logo: { ...layers.logo, scale } })
-              }
-            />
-            <LayerChoiceControl
-              id="social-logo-colour"
-              label="Logo colour"
-              value={normalizeLogoColour(layers.logo.colour)}
-              options={SOCIAL_POST_LOGO_COLOUR_OPTIONS}
-              onChange={(colour) =>
-                updateLayers({ logo: { ...layers.logo, colour } })
-              }
-            />
+            <FineTune label="Logo appearance">
+              <LayerTopCornerPicker
+                label="Top position"
+                value={normalizeLogoPlacement(layers.logo.placement)}
+                onChange={(placement) =>
+                  updateLayers({ logo: { ...layers.logo, placement } })
+                }
+              />
+              <LayerScaleControl
+                id="social-logo-scale"
+                label="Logo size"
+                value={normalizeLogoScale(layers.logo.scale)}
+                min={LOGO_SCALE_MIN}
+                max={LOGO_SCALE_MAX}
+                onChange={(scale) =>
+                  updateLayers({ logo: { ...layers.logo, scale } })
+                }
+              />
+              <LayerChoiceControl
+                id="social-logo-colour"
+                label="Logo colour"
+                value={normalizeLogoColour(layers.logo.colour)}
+                options={SOCIAL_POST_LOGO_COLOUR_OPTIONS}
+                onChange={(colour) =>
+                  updateLayers({ logo: { ...layers.logo, colour } })
+                }
+              />
+            </FineTune>
           </>
         ) : null}
       </LayerSection>
 
       <LayerSection
+        hidden={!!section && section !== "wording"}
+        collapsible={!section}
         title="Headline"
-        description={layerPreview(
-          layers.title.enabled ? layers.title.text : "",
-        )}
+        description={
+          section
+            ? undefined
+            : layerPreview(layers.title.enabled ? layers.title.text : "")
+        }
         open={isSectionOpen("headline")}
         onOpenChange={(open) => setSectionOpen("headline", open)}
         trailing={
@@ -472,59 +541,71 @@ export function SocialPostLayerPanel({
         {layers.title.enabled ? (
           <>
             <div className="space-y-1.5">
-              <Label htmlFor="social-headline" className="text-xs text-muted-foreground">
-                Text
+              <Label
+                htmlFor="social-headline"
+                className="text-xs text-base-content/65"
+              >
+                Headline text
               </Label>
               <Input
+                className="min-h-11 text-base md:text-sm"
                 id="social-headline"
                 value={layers.title.text}
                 onChange={(e) =>
-                  updateLayers({ title: { ...layers.title, text: e.target.value } })
+                  updateLayers({
+                    title: { ...layers.title, text: e.target.value },
+                  })
                 }
               />
               {layers.title.text.trim() ? null : (
-                <p className="text-xs text-amber-600 dark:text-amber-500">
+                <p className="text-xs text-error-content">
                   Add text — the headline won&apos;t appear on the post while
                   it&apos;s empty.
                 </p>
               )}
             </div>
-            <LayerScaleControl
-              id="social-title-scale"
-              label="Size"
-              value={normalizeTextScale(layers.title.scale)}
-              min={TEXT_SCALE_MIN}
-              max={TEXT_SCALE_MAX}
-              onChange={(scale) =>
-                updateLayers({ title: { ...layers.title, scale } })
-              }
-            />
-            <p className="text-xs text-muted-foreground">
-              {formatTextScaleHint(
-                document.active_variant_id,
-                "title",
-                layers.title.scale,
-              )}{" "}
-              for this format
-            </p>
+            <FineTune label="Text size">
+              <LayerScaleControl
+                id="social-title-scale"
+                label="Size"
+                value={normalizeTextScale(layers.title.scale)}
+                min={TEXT_SCALE_MIN}
+                max={TEXT_SCALE_MAX}
+                onChange={(scale) =>
+                  updateLayers({ title: { ...layers.title, scale } })
+                }
+              />
+              <p className="text-xs text-base-content/65">
+                {formatTextScaleHint(
+                  document.active_variant_id,
+                  "title",
+                  layers.title.scale,
+                )}{" "}
+                for this format
+              </p>
+            </FineTune>
           </>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            Turn on Show to display the headline on the post.
+          <p className="text-xs text-base-content/65">
+            Turn on the headline to add it to your post.
           </p>
         )}
       </LayerSection>
 
       <LayerSection
-        title="Subcopy"
-        description={layerPreview(
-          layers.subcopy.enabled ? layers.subcopy.text : "",
-        )}
+        hidden={!!section && section !== "wording"}
+        collapsible={!section}
+        title="Supporting line"
+        description={
+          section
+            ? undefined
+            : layerPreview(layers.subcopy.enabled ? layers.subcopy.text : "")
+        }
         open={isSectionOpen("subcopy")}
         onOpenChange={(open) => setSectionOpen("subcopy", open)}
         trailing={
           <LayerVisibilityToggle
-            label="Subcopy"
+            label="Supporting line"
             enabled={layers.subcopy.enabled}
             onToggle={(enabled) =>
               updateLayers({
@@ -546,10 +627,14 @@ export function SocialPostLayerPanel({
         {layers.subcopy.enabled ? (
           <>
             <div className="space-y-1.5">
-              <Label htmlFor="social-subcopy" className="text-xs text-muted-foreground">
-                Text
+              <Label
+                htmlFor="social-subcopy"
+                className="text-xs text-base-content/65"
+              >
+                Supporting text
               </Label>
               <Input
+                className="min-h-11 text-base md:text-sm"
                 id="social-subcopy"
                 value={layers.subcopy.text}
                 placeholder="Supporting line under headline"
@@ -560,44 +645,45 @@ export function SocialPostLayerPanel({
                 }
               />
               {layers.subcopy.text.trim() ? null : (
-                <p className="text-xs text-amber-600 dark:text-amber-500">
-                  Add text — the subcopy won&apos;t appear on the post while
-                  it&apos;s empty.
+                <p className="text-xs text-error-content">
+                  Add text — the supporting line won&apos;t appear on the post
+                  while it&apos;s empty.
                 </p>
               )}
             </div>
-            <LayerScaleControl
-              id="social-subcopy-scale"
-              label="Size"
-              value={normalizeTextScale(layers.subcopy.scale)}
-              min={TEXT_SCALE_MIN}
-              max={TEXT_SCALE_MAX}
-              onChange={(scale) =>
-                updateLayers({ subcopy: { ...layers.subcopy, scale } })
-              }
-            />
-            <p className="text-xs text-muted-foreground">
-              {formatTextScaleHint(
-                document.active_variant_id,
-                "subcopy",
-                layers.subcopy.scale,
-              )}{" "}
-              for this format
-            </p>
+            <FineTune label="Text size">
+              <LayerScaleControl
+                id="social-subcopy-scale"
+                label="Size"
+                value={normalizeTextScale(layers.subcopy.scale)}
+                min={TEXT_SCALE_MIN}
+                max={TEXT_SCALE_MAX}
+                onChange={(scale) =>
+                  updateLayers({ subcopy: { ...layers.subcopy, scale } })
+                }
+              />
+              <p className="text-xs text-base-content/65">
+                {formatTextScaleHint(
+                  document.active_variant_id,
+                  "subcopy",
+                  layers.subcopy.scale,
+                )}{" "}
+                for this format
+              </p>
+            </FineTune>
           </>
         ) : (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-base-content/65">
             Optional line between the headline and property details.
           </p>
         )}
       </LayerSection>
 
       <LayerSection
+        hidden={!!section && section !== "wording"}
         title="Property details"
         description={
-          layers.features.enabled && featuresPreview
-            ? featuresPreview
-            : "Off"
+          layers.features.enabled && featuresPreview ? featuresPreview : "Off"
         }
         open={isSectionOpen("features")}
         onOpenChange={(open) => setSectionOpen("features", open)}
@@ -617,7 +703,7 @@ export function SocialPostLayerPanel({
           type="button"
           variant="outline"
           size="sm"
-          className="h-7 w-full text-xs"
+          className="min-h-11 w-full text-sm"
           onClick={refreshListingStats}
         >
           Refresh from listing
@@ -672,11 +758,12 @@ export function SocialPostLayerPanel({
             <div className="space-y-1.5">
               <Label
                 htmlFor="social-land-area"
-                className="text-xs text-muted-foreground"
+                className="text-xs text-base-content/65"
               >
                 Land area (m²)
               </Label>
               <Input
+                className="min-h-11 text-base md:text-sm"
                 id="social-land-area"
                 type="number"
                 min={0}
@@ -694,43 +781,47 @@ export function SocialPostLayerPanel({
                 }}
               />
             </div>
-            <LayerScaleControl
-              id="social-features-scale"
-              label="Size"
-              value={normalizeTextScale(layers.features.scale)}
-              min={TEXT_SCALE_MIN}
-              max={TEXT_SCALE_MAX}
-              onChange={(scale) =>
-                updateLayers({ features: { ...layers.features, scale } })
-              }
-            />
-            <p className="text-xs text-muted-foreground">
-              {formatTextScaleHint(
-                document.active_variant_id,
-                "features",
-                layers.features.scale,
-              )}{" "}
-              for this format
-            </p>
+            <FineTune label="Text size">
+              <LayerScaleControl
+                id="social-features-scale"
+                label="Size"
+                value={normalizeTextScale(layers.features.scale)}
+                min={TEXT_SCALE_MIN}
+                max={TEXT_SCALE_MAX}
+                onChange={(scale) =>
+                  updateLayers({ features: { ...layers.features, scale } })
+                }
+              />
+              <p className="text-xs text-base-content/65">
+                {formatTextScaleHint(
+                  document.active_variant_id,
+                  "features",
+                  layers.features.scale,
+                )}{" "}
+                for this format
+              </p>
+            </FineTune>
             {featuresPreview ? (
-              <p className="rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
+              <p className="rounded-md bg-muted/40 px-2 py-1.5 text-xs text-base-content/65">
                 Preview: {featuresPreview}
               </p>
             ) : (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-base-content/65">
                 No stats to show. Refresh from listing or add land area.
               </p>
             )}
           </>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            Beds, baths, parking and land size appear below subcopy when enabled.
+          <p className="text-xs text-base-content/65">
+            Beds, baths, parking and land size appear below the supporting line
+            when enabled.
           </p>
         )}
       </LayerSection>
 
       <LayerSection
-        title="Text layout"
+        hidden={!!section && section !== "wording"}
+        title="Fine-tune text layout"
         description="Position, spacing and alignment"
         open={isSectionOpen("textLayout")}
         onOpenChange={(open) => setSectionOpen("textLayout", open)}
@@ -739,7 +830,10 @@ export function SocialPostLayerPanel({
           <>
             <LayerCornerPicker
               label="Position"
-              value={normalizeCorner(layers.title.block_placement, "bottom_left")}
+              value={normalizeCorner(
+                layers.title.block_placement,
+                "bottom_left",
+              )}
               onChange={(block_placement) => {
                 const align = alignForTextCorner(block_placement);
                 updateLayers({
@@ -748,9 +842,9 @@ export function SocialPostLayerPanel({
                 });
               }}
             />
-            <p className="text-xs text-muted-foreground">
-              Middle band between logo and agent. Corner sets where the text block
-              sits.
+            <p className="text-xs text-base-content/65">
+              Middle band between logo and agent. Corner sets where the text
+              block sits.
             </p>
             <LayerScaleControl
               id="social-title-width"
@@ -792,9 +886,9 @@ export function SocialPostLayerPanel({
                 })
               }
             />
-            <p className="text-xs text-muted-foreground">
-              Gap between headline, subcopy, and property details. 100% is the
-              default spacing.
+            <p className="text-xs text-base-content/65">
+              Gap between headline, supporting line, and property details. 100%
+              is the default spacing.
             </p>
             <LayerScaleControl
               id="social-title-inset-top"
@@ -824,13 +918,16 @@ export function SocialPostLayerPanel({
             />
           </>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            Turn on headline, subcopy, or property details to adjust layout.
+          <p className="text-xs text-base-content/65">
+            Turn on headline, supporting line, or property details to adjust
+            layout.
           </p>
         )}
       </LayerSection>
 
       <LayerSection
+        hidden={!!section && section !== "branding"}
+        collapsible={!section}
         title="Agent"
         description="Avatar, phone and email"
         open={isSectionOpen("agent")}
@@ -841,7 +938,7 @@ export function SocialPostLayerPanel({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs text-muted-foreground"
+              className="min-h-11 px-2 text-xs text-base-content/65"
               onClick={() =>
                 updateLayers({
                   agent: { ...agentLayer, enabled: false },
@@ -856,7 +953,7 @@ export function SocialPostLayerPanel({
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 px-2 text-xs"
+              className="min-h-11 px-2 text-xs"
               onClick={() =>
                 updateLayers({
                   agent: { ...agentLayer, enabled: true },
@@ -876,173 +973,196 @@ export function SocialPostLayerPanel({
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => { setAgentsLoading(true); setPickerOpen(true); }}
+              onClick={() => {
+                setAgentsLoading(true);
+                setPickerOpen(true);
+              }}
             >
               <Users className="h-4 w-4" />
               Load from team
             </Button>
 
             <div className="space-y-1.5">
-              <Label htmlFor="social-agent-name" className="text-xs text-muted-foreground">
+              <Label
+                htmlFor="social-agent-name"
+                className="text-xs text-base-content/65"
+              >
                 Name
               </Label>
               <Input
+                className="min-h-11 text-base md:text-sm"
                 id="social-agent-name"
                 value={agent.name}
                 onChange={(e) => updateAgent({ name: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="social-agent-phone" className="text-xs text-muted-foreground">
+              <Label
+                htmlFor="social-agent-phone"
+                className="text-xs text-base-content/65"
+              >
                 Phone
               </Label>
               <Input
+                className="min-h-11 text-base md:text-sm"
                 id="social-agent-phone"
+                type="tel"
                 value={agent.phone}
                 onChange={(e) => updateAgent({ phone: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="social-agent-email" className="text-xs text-muted-foreground">
+              <Label
+                htmlFor="social-agent-email"
+                className="text-xs text-base-content/65"
+              >
                 Email
               </Label>
               <Input
+                className="min-h-11 text-base md:text-sm"
                 id="social-agent-email"
+                type="email"
                 value={agent.email}
                 onChange={(e) => updateAgent({ email: e.target.value })}
               />
             </div>
-            <LayerBottomCornerPicker
-              label="Position"
-              value={normalizeAgentPlacement(agentLayer.placement)}
-              onChange={(placement) =>
-                updateLayers({ agent: { ...agentLayer, placement } })
-              }
-            />
-            <p className="text-xs text-muted-foreground">
-              Bottom of the post. With vertical layout, left / center / right also
-              aligns the photo and text.
-            </p>
-            <LayerScaleControl
-              id="social-agent-scale"
-              label="Agent block size"
-              value={normalizeAgentScale(agentLayer.scale)}
-              min={AGENT_SCALE_MIN}
-              max={AGENT_SCALE_MAX}
-              onChange={(scale) =>
-                updateLayers({ agent: { ...agentLayer, scale } })
-              }
-            />
-            <LayerChoiceControl
-              id="social-agent-layout"
-              label="Layout"
-              value={normalizeAgentLayout(agentLayer.layout)}
-              options={[
-                { value: "vertical", label: "Vertical" },
-                { value: "horizontal", label: "Horizontal" },
-              ]}
-              onChange={(layout) =>
-                updateLayers({ agent: { ...agentLayer, layout } })
-              }
-            />
-            <LayerScaleControl
-              id="social-agent-inner-gap"
-              label="Space between photo & text"
-              value={normalizeAgentInnerGapScale(agentLayer.inner_gap_scale)}
-              min={AGENT_INNER_GAP_SCALE_MIN}
-              max={AGENT_INNER_GAP_SCALE_MAX}
-              step={0.05}
-              onChange={(inner_gap_scale) =>
-                updateLayers({ agent: { ...agentLayer, inner_gap_scale } })
-              }
-            />
-            <LayerChoiceControl
-              id="social-agent-avatar"
-              label="Avatar shape"
-              value={normalizeAvatarShape(agentLayer.avatar_shape)}
-              options={[
-                { value: "circle", label: "Circle" },
-                { value: "square", label: "Square" },
-              ]}
-              onChange={(avatar_shape) =>
-                updateLayers({ agent: { ...agentLayer, avatar_shape } })
-              }
-            />
-
-            <LayerChoiceControl
-              id="social-agent-background"
-              label="Background"
-              value={normalizeAgentBackgroundStyle(agentLayer.background_style)}
-              options={[
-                { value: "none", label: "None" },
-                { value: "glass", label: "Frosted" },
-                { value: "brand", label: "Brand" },
-                { value: "custom", label: "Custom" },
-              ]}
-              onChange={(background_style) =>
-                updateLayers({ agent: { ...agentLayer, background_style } })
-              }
-            />
-
-            {normalizeAgentBackgroundStyle(agentLayer.background_style) ===
-            "brand" ? (
-              <LayerChoiceControl
-                id="social-agent-brand-colour"
-                label="Brand colour"
-                value={normalizeAgentBrandColour(agentLayer.brand_colour)}
-                options={[
-                  { value: "primary", label: "Primary" },
-                  { value: "secondary", label: "Secondary" },
-                  { value: "accent", label: "Accent" },
-                ]}
-                onChange={(brand_colour) =>
-                  updateLayers({ agent: { ...agentLayer, brand_colour } })
+            <FineTune label="Agent appearance">
+              <LayerBottomCornerPicker
+                label="Position"
+                value={normalizeAgentPlacement(agentLayer.placement)}
+                onChange={(placement) =>
+                  updateLayers({ agent: { ...agentLayer, placement } })
                 }
               />
-            ) : null}
-
-            {normalizeAgentBackgroundStyle(agentLayer.background_style) ===
-            "custom" ? (
-              <LayerColourInput
-                id="social-agent-bg-colour"
-                label="Background colour"
-                value={agentLayer.background_colour}
-                fallback={agency.primary_colour}
-                onChange={(background_colour) =>
-                  updateLayers({ agent: { ...agentLayer, background_colour } })
-                }
-              />
-            ) : null}
-
-            <LayerColourInput
-              id="social-agent-text-colour"
-              label="Text colour"
-              value={agentLayer.text_colour}
-              fallback={
-                agency.text_colour?.trim() ? agency.text_colour : "#ffffff"
-              }
-              onChange={(text_colour) =>
-                updateLayers({ agent: { ...agentLayer, text_colour } })
-              }
-            />
-
-            {normalizeAgentBackgroundStyle(agentLayer.background_style) ===
-            "brand" ? (
-              <p className="text-xs text-muted-foreground">
-                Background uses{" "}
-                <span
-                  className="inline-block h-3 w-3 align-middle rounded-sm ring-1 ring-border"
-                  style={{
-                    backgroundColor: resolveBrandColourKey(
-                      agency,
-                      normalizeAgentBrandColour(agentLayer.brand_colour),
-                    ),
-                  }}
-                />{" "}
-                {normalizeAgentBrandColour(agentLayer.brand_colour)} brand
-                colour.
+              <p className="text-xs text-base-content/65">
+                Bottom of the post. With vertical layout, left / center / right
+                also aligns the photo and text.
               </p>
-            ) : null}
+              <LayerScaleControl
+                id="social-agent-scale"
+                label="Agent block size"
+                value={normalizeAgentScale(agentLayer.scale)}
+                min={AGENT_SCALE_MIN}
+                max={AGENT_SCALE_MAX}
+                onChange={(scale) =>
+                  updateLayers({ agent: { ...agentLayer, scale } })
+                }
+              />
+              <LayerChoiceControl
+                id="social-agent-layout"
+                label="Layout"
+                value={normalizeAgentLayout(agentLayer.layout)}
+                options={[
+                  { value: "vertical", label: "Vertical" },
+                  { value: "horizontal", label: "Horizontal" },
+                ]}
+                onChange={(layout) =>
+                  updateLayers({ agent: { ...agentLayer, layout } })
+                }
+              />
+              <LayerScaleControl
+                id="social-agent-inner-gap"
+                label="Space between photo & text"
+                value={normalizeAgentInnerGapScale(agentLayer.inner_gap_scale)}
+                min={AGENT_INNER_GAP_SCALE_MIN}
+                max={AGENT_INNER_GAP_SCALE_MAX}
+                step={0.05}
+                onChange={(inner_gap_scale) =>
+                  updateLayers({ agent: { ...agentLayer, inner_gap_scale } })
+                }
+              />
+              <LayerChoiceControl
+                id="social-agent-avatar"
+                label="Avatar shape"
+                value={normalizeAvatarShape(agentLayer.avatar_shape)}
+                options={[
+                  { value: "circle", label: "Circle" },
+                  { value: "square", label: "Square" },
+                ]}
+                onChange={(avatar_shape) =>
+                  updateLayers({ agent: { ...agentLayer, avatar_shape } })
+                }
+              />
+
+              <LayerChoiceControl
+                id="social-agent-background"
+                label="Background"
+                value={normalizeAgentBackgroundStyle(
+                  agentLayer.background_style,
+                )}
+                options={[
+                  { value: "none", label: "None" },
+                  { value: "glass", label: "Frosted" },
+                  { value: "brand", label: "Brand" },
+                  { value: "custom", label: "Custom" },
+                ]}
+                onChange={(background_style) =>
+                  updateLayers({ agent: { ...agentLayer, background_style } })
+                }
+              />
+
+              {normalizeAgentBackgroundStyle(agentLayer.background_style) ===
+              "brand" ? (
+                <LayerChoiceControl
+                  id="social-agent-brand-colour"
+                  label="Brand colour"
+                  value={normalizeAgentBrandColour(agentLayer.brand_colour)}
+                  options={[
+                    { value: "primary", label: "Primary" },
+                    { value: "secondary", label: "Secondary" },
+                    { value: "accent", label: "Accent" },
+                  ]}
+                  onChange={(brand_colour) =>
+                    updateLayers({ agent: { ...agentLayer, brand_colour } })
+                  }
+                />
+              ) : null}
+
+              {normalizeAgentBackgroundStyle(agentLayer.background_style) ===
+              "custom" ? (
+                <LayerColourInput
+                  id="social-agent-bg-colour"
+                  label="Background colour"
+                  value={agentLayer.background_colour}
+                  fallback={agency.primary_colour}
+                  onChange={(background_colour) =>
+                    updateLayers({
+                      agent: { ...agentLayer, background_colour },
+                    })
+                  }
+                />
+              ) : null}
+
+              <LayerColourInput
+                id="social-agent-text-colour"
+                label="Text colour"
+                value={agentLayer.text_colour}
+                fallback={
+                  agency.text_colour?.trim() ? agency.text_colour : "#ffffff"
+                }
+                onChange={(text_colour) =>
+                  updateLayers({ agent: { ...agentLayer, text_colour } })
+                }
+              />
+
+              {normalizeAgentBackgroundStyle(agentLayer.background_style) ===
+              "brand" ? (
+                <p className="text-xs text-base-content/65">
+                  Background uses{" "}
+                  <span
+                    className="inline-block h-3 w-3 align-middle rounded-sm ring-1 ring-border"
+                    style={{
+                      backgroundColor: resolveBrandColourKey(
+                        agency,
+                        normalizeAgentBrandColour(agentLayer.brand_colour),
+                      ),
+                    }}
+                  />{" "}
+                  {normalizeAgentBrandColour(agentLayer.brand_colour)} brand
+                  colour.
+                </p>
+              ) : null}
+            </FineTune>
           </>
         ) : (
           <Button
@@ -1050,7 +1170,10 @@ export function SocialPostLayerPanel({
             variant="outline"
             size="sm"
             className="w-full"
-            onClick={() => { setAgentsLoading(true); setPickerOpen(true); }}
+            onClick={() => {
+              setAgentsLoading(true);
+              setPickerOpen(true);
+            }}
           >
             <Users className="h-4 w-4" />
             Load from team
@@ -1067,5 +1190,20 @@ export function SocialPostLayerPanel({
         onSelect={loadAgentFromOrg}
       />
     </div>
+  );
+}
+
+function FineTune({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <details className="group/fine border-t border-base-300 pt-1">
+      <summary className="flex min-h-11 cursor-pointer [list-style:none] items-center justify-between gap-2 rounded text-sm font-medium text-base-content/70 focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
+        {label}
+        <ChevronDown
+          className="size-4 transition-transform group-open/fine:rotate-180"
+          aria-hidden="true"
+        />
+      </summary>
+      <div className="space-y-4 pb-2 pt-2">{children}</div>
+    </details>
   );
 }

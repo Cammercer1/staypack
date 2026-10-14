@@ -42,7 +42,7 @@ export function LayerScaleControl({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="h-2 w-full cursor-pointer accent-primary"
+        className="du-range du-range-sm w-full"
       />
     </div>
   );

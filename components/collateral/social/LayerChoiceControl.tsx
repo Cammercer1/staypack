@@ -33,7 +33,8 @@ export function LayerChoiceControl<T extends string>({
             type="button"
             size="sm"
             variant={value === option.value ? "default" : "outline"}
-            className="flex-1 text-xs"
+            className="min-h-11 flex-1 text-xs"
+            aria-pressed={value === option.value}
             onClick={() => onChange(option.value)}
           >
             {option.label}
