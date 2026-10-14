@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { randomUUID } from "node:crypto";
+import { load } from "cheerio";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
 import { applyStrEstimateAdjustments, saveStrRateOverride } from "@/lib/reports/strEstimateAdjustments";
@@ -123,7 +124,15 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
     expect((await api(`/api/proposals/${token}/attachments/${randomUUID()}`, "GET", undefined, 2)).status).toBe(404);
     const contactsHtml = await (await api(`${first.path}?page=next-steps`, "GET", undefined, 2)).text();
     expect(contactsHtml).toContain("Alex Adviser"); expect(contactsHtml).toContain("Taylor Agent");
-    expect(contactsHtml).toContain("alex%40example.com"); expect(contactsHtml).not.toContain("Other agency contact");
+    // Production Cloudflare email protection rewrites mailto URLs in the HTML;
+    // compare the underlying address rather than requiring one wire encoding.
+    const contactLinks = load(contactsHtml)("a[href^='mailto:'], a[href^='/cdn-cgi/l/email-protection#']").toArray().map(node => {
+      const href = node.attribs.href;
+      if (!href.startsWith("/cdn-cgi/l/email-protection#")) return decodeURIComponent(href);
+      const bytes = Buffer.from(href.split("#")[1], "hex");
+      return `mailto:${decodeURIComponent(Buffer.from(bytes.subarray(1).map(byte => byte ^ bytes[0])).toString("utf8"))}`;
+    });
+    expect(contactLinks).toContain("mailto:alex@example.com"); expect(contactsHtml).not.toContain("Other agency contact");
     const session = randomUUID();
     const event = { id: randomUUID(), session, kind: "open", target: "proposal" };
     expect((await api(`/api/proposals/${token}/events`, "POST", event, 2)).status).toBe(204);
