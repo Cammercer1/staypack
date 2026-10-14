@@ -4,6 +4,7 @@ import { buildFinalReportJson, getMockAiCopy } from "@/lib/reports/buildFinalRep
 import { finalReportCopyToAiCopy } from "@/lib/reports/editable/strReportCopyAdapter";
 import { getTemplatesForProduct } from "@/lib/templates/catalog";
 import { serializeTemplateForApi } from "@/lib/templates/serializeForApi";
+import type { StrAppraisal } from "@/lib/str-appraisals/types";
 import type { TemplateProduct } from "@/lib/templates/types";
 import { mergeAppraisalResults, resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import { buildLeaseAppraisalTemplatePreview } from "@/lib/lease-appraisal/templatePreviewDocument";
@@ -84,7 +85,8 @@ export function createLintRegressionFixtures() {
   const card: CollateralItem = { ...collateral, id: "mock-card", type: "agent_business_card", listing_id: null, document_json: buildBusinessCardDocument({ agency, agentProfile: agent, listing: null, collateral: { ...collateral, type: "agent_business_card", template_id: null } }) };
   const leaseCollateral: CollateralItem = { ...collateral, type: "lease_appraisal", report_id: lease.id };
   const salesCollateral: CollateralItem = { ...collateral, type: "sales_appraisal", report_id: sales.id };
-  return { document, agency, agent, listing, collateral, lead, report, lease, sales, card, leaseCollateral, salesCollateral };
+  const appraisal: StrAppraisal = { report_id: report.id, agency_id: agency.id, contact_id: null, recipient_mode: "general", recipient_name: null, recipient_email: null, recipient_phone: null, recipient_phone_e164: null, source: "manual", created_at: timestamp, updated_at: timestamp };
+  return { document, agency, agent, listing, collateral, lead, report, appraisal, lease, sales, card, leaseCollateral, salesCollateral };
 }
 
 export type RegressionFixtures = ReturnType<typeof createLintRegressionFixtures>;

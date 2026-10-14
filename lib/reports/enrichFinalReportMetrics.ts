@@ -1,4 +1,4 @@
-import { calculateStrGrossYield } from "@/lib/reports/calculateStrYield";
+import { resolveStrGrossYield } from "@/lib/reports/calculateStrYield";
 import {
   primaryReportAgent,
   resolveReportAgents,
@@ -25,9 +25,12 @@ export function enrichFinalReportMetrics(
     scraped_listing_json: sourceListing.scraped_listing_json,
   });
 
-  const strYield =
-    finalReport.str_yield ??
-    calculateStrGrossYield(displayPrice, finalReport.str.annual_revenue);
+  const strYield = resolveStrGrossYield({
+    estimated_value: finalReport.property.estimated_value,
+    display_price: displayPrice,
+    annual_revenue: finalReport.str.annual_revenue,
+    str_yield: finalReport.str_yield,
+  });
 
   const agents = resolveReportAgents({
     scraped: sourceListing.scraped_listing_json,

@@ -1,0 +1,169 @@
+{
+  "slug": "aus-vision-realty",
+  "name": "Aus Vision Realty",
+  "brand": {
+    "displayName": "Aus Vision Realty",
+    "website_url": "https://ausvisionrealty.com.au/",
+    "phone": "08 6595 3399",
+    "email": "info@ausvisionrealty.com.au",
+    "logo_url": "https://ausvisionrealty.com.au/wp-content/uploads/2025/11/New-Aus-Logo-5.png",
+    "logo_dark_url": "https://ausvisionrealty.com.au/wp-content/uploads/2025/11/New-Aus-Logo-5.png",
+    "primary_colour": "#be2531",
+    "secondary_colour": "#ffffff",
+    "accent_colour": "#be2531",
+    "text_colour": "#202020",
+    "background_colour": "#ffffff",
+    "heading_font_family": "Roboto",
+    "body_font_family": "Roboto"
+  },
+  "upliftPercent": 25,
+  "assumptions": {
+    "unavailableNights": 0,
+    "listingStage": "established",
+    "rationale": "Example established-listing scenario with professional presentation and active pricing. Estimate inputs use four bedrooms, two bathrooms and capacity for eight guests. The annual model assumes availability across the year, subject to existing tenancies, permitted letting use and owner availability."
+  },
+  "assignment": {
+    "name": "Aus Vision Realty",
+    "version": 1,
+    "defaults": {
+      "version": 1,
+      "templateId": "agency-proposal",
+      "templateVersion": 1,
+      "presetId": "studio",
+      "brandOverrides": {
+        "background": "#ffffff",
+        "surface": "#f8f3f3",
+        "text": "#202020",
+        "muted": "#686060",
+        "primary": "#be2531",
+        "primaryText": "#ffffff",
+        "chartLtr": "#9b9b9b",
+        "chartMarket": "#d79198",
+        "chartManaged": "#be2531",
+        "headingFont": "Roboto, Arial, sans-serif",
+        "bodyFont": "Roboto, Arial, sans-serif",
+        "radius": 2
+      },
+      "content": {
+        "title": "{{property.address}}",
+        "introduction": "Property management proposal",
+        "recipientLine": "prepared for {{recipient.displayName}}",
+        "comparisonTitle": "Your rental income potential"
+      },
+      "heroLayout": "overlay",
+      "initialComparisonMode": "annual",
+      "motion": true,
+      "pages": [
+        {
+          "id": "property",
+          "kind": "hero",
+          "title": "Your property",
+          "body": "",
+          "enabled": true
+        },
+        {
+          "id": "appraisal",
+          "kind": "comparison",
+          "title": "Rental appraisal",
+          "body": "",
+          "enabled": true
+        },
+        {
+          "id": "forecast",
+          "kind": "forecast",
+          "title": "Revenue & occupancy",
+          "body": "",
+          "enabled": true
+        },
+        {
+          "id": "evidence",
+          "kind": "evidence",
+          "title": "Comparable listings",
+          "body": "",
+          "enabled": true
+        },
+        {
+          "id": "service",
+          "kind": "service",
+          "title": "Our management service",
+          "body": "",
+          "enabled": true,
+          "service": {
+            "eyebrow": "Aus Vision Realty · Perth",
+            "headline": "Short stays,\nfully managed.",
+            "introduction": "From preparing your home to looking after each stay, our Perth team manages the details with local knowledge and hands-on hosting experience.",
+            "imageUrl": "https://ausvisionrealty.com.au/wp-content/uploads/2025/09/ausvision-team.webp",
+            "imageAlt": "The Aus Vision Realty team in Perth",
+            "imageCaption": "Your local Aus Vision Realty team",
+            "highlights": [
+              {
+                "icon": "strategy",
+                "title": "Prepare your property",
+                "body": "Styling advice, furnishing support and professional photography to present your home at its best."
+              },
+              {
+                "icon": "communication",
+                "title": "Keep your listing competitive",
+                "body": "Listing creation, distribution across booking platforms and pricing adjusted to market demand."
+              },
+              {
+                "icon": "hospitality",
+                "title": "Support every stay",
+                "body": "Guest screening, prompt communication and round-the-clock support from booking through to checkout."
+              },
+              {
+                "icon": "care",
+                "title": "Take care of the details",
+                "body": "Cleaning, fresh linen, maintenance coordination and clear payment reporting between stays."
+              }
+            ],
+            "platforms": [
+              {
+                "name": "Airbnb",
+                "imageUrl": "/brands/platforms/airbnb.svg"
+              },
+              {
+                "name": "Booking.com",
+                "imageUrl": "/brands/platforms/booking.svg"
+              },
+              {
+                "name": "Vrbo",
+                "imageUrl": "/brands/platforms/vrbo.svg"
+              }
+            ]
+          }
+        },
+        {
+          "id": "next-steps",
+          "kind": "next_steps",
+          "title": "Let’s get started",
+          "body": "",
+          "enabled": true
+        }
+      ],
+      "links": [],
+      "attachmentIds": [],
+      "agentIds": [],
+      "presentation": {
+        "tagline": "Perth, Western Australia",
+        "coverCaption": "Airbnb management · Property management · Local expertise"
+      }
+    }
+  },
+  "sources": [
+    "https://ausvisionrealty.com.au/",
+    "https://ausvisionrealty.com.au/airbnb-management/",
+    "https://ausvisionrealty.com.au/property-management/",
+    "https://ausvisionrealty.com.au/lucy-deng/",
+    "https://www.domain.com.au/57-garling-street-kardinya-wa-6163-2021120474"
+  ],
+  "contacts": [
+    {
+      "name": "Lucy Deng",
+      "role": "Director / Licensee",
+      "phone": "0435 961 829",
+      "email": "lucy@ausvisionrealty.com.au",
+      "photoUrl": "https://ausvisionrealty.com.au/wp-content/uploads/2026/09/Lucy-Ausvision-1.webp"
+    }
+  ]
+}

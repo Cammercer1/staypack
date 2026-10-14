@@ -125,3 +125,11 @@ describe("single management uplift", () => {
     expect(resolveStrManagementPreset({ ...baseline, annualRevenue: 365 * .5 * 100000, occupancyRate: 50 }, { ...preset, upliftPercent: 300 })).toBeNull();
   });
 });
+
+it("preserves reviewed rent and amenities when applying or clearing rate overrides", () => {
+  const strProperty = { weeklyRent: 925, amenities: ["pool" as const], additionalAmenities: ["Private tennis court"] };
+  const saved = saveStrRateOverride({ strProperty, annualRevenue: 999999 }, { nightlyRate: 400, occupancyRate: 70 });
+  expect(saved.strProperty).toEqual(strProperty);
+  expect(saved.annualRevenue).toBeUndefined();
+  expect(saveStrRateOverride(saved, null).strProperty).toEqual(strProperty);
+});

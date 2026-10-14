@@ -1,0 +1,24 @@
+/* Page headings receive focus for screen readers after navigation; they are not controls. */
+.proposal :is(h1, h2)[tabindex="-1"]:focus {
+  outline: none;
+}
+
+.proposal { position: relative; isolation: isolate; }
+.page { min-width: 0; width: 100%; }
+.current { display: flex; flex: 1; flex-direction: column; }
+.prepared {
+  position: absolute;
+  inset: 0 0 auto;
+  visibility: hidden;
+  opacity: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  /* Preserve layout for charts without creating a scrollable offscreen area. */
+  max-height: 100dvh;
+  contain: layout paint;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .reveal { animation: proposal-reveal 180ms ease-out both; }
+  @keyframes proposal-reveal { from { opacity: 0; } to { opacity: 1; } }
+}

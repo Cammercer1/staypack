@@ -45,9 +45,15 @@ export function calculateStrGrossYield(
 
 export function resolveStrGrossYield(input: {
   display_price?: string | null;
+  estimated_value?: number | null;
   annual_revenue?: number | null;
   str_yield?: StrGrossYield | null;
 }): StrGrossYield | null {
+  // New appraisal snapshots explicitly record a value or null. Older published
+  // reports keep their original asking-price-based calculation unchanged.
+  if (input.estimated_value !== undefined) {
+    return calculateStrGrossYield(input.estimated_value === null ? null : String(input.estimated_value), input.annual_revenue);
+  }
   if (input.str_yield) {
     return input.str_yield;
   }

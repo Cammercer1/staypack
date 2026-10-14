@@ -356,9 +356,11 @@ export type SaleAppraisalPositioning = {
 export type StrMarketOccupancy = {
   status: "available" | "unavailable";
   /** A confirmed empty market can be reused; transient failures must remain retryable. */
-  unavailable_reason?: "insufficient_data";
+  unavailable_reason?: "insufficient_data" | "market_resolution_failed" | "request_failed" | "invalid_data" | "not_configured";
   market: { country: string; region: string; locality: string; district?: string | null } | null;
   label: string;
+  /** The actual cohort used by the chart; broader history never reprices a report. */
+  benchmark_scope?: "property_type" | "all_property_types";
   filters: Record<string, { eq: string | number }>;
   fetched_at: string;
   request_key: string;
@@ -435,6 +437,7 @@ export type StrManagementPreset = {
 });
 
 export type StrEstimateOverrides = Partial<StrEstimate> & {
+  strProperty?: import("@/lib/str/propertyInputs").StrPropertyContext;
   strAdjustment?: { nightlyRate: number; occupancyRate: number };
   strManagement?: StrManagementAssumptions;
   estimateInputs?: { bedrooms: number; bathrooms: number; accommodates: number };
@@ -544,6 +547,8 @@ export type AiCopyJson = {
 export type { AgencyBrandAdvanced } from "@/lib/branding/advanced";
 
 export type FinalReportJson = import("@/lib/documents/documentLink").DocumentLinkFields & {
+  /** An explicit proposal selection (including zero agents) overrides legacy brand defaults. */
+  agent_selection?: "explicit";
   version: string;
   template_id: string;
   generated_at: string;
@@ -599,8 +604,11 @@ export type FinalReportJson = import("@/lib/documents/documentLink").DocumentLin
     hero_image_url: string;
     selected_image_urls: string[];
     display_price?: string | null;
+    /** Frozen value used for STR yields. Null means unavailable; never use the asking price. */
+    estimated_value?: number | null;
     land_area_sqm?: number | null;
     floor_area_sqm?: number | null;
+    amenities?: string[];
   };
   str: {
     annual_revenue: number | null;

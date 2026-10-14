@@ -1,0 +1,162 @@
+{
+  "slug": "property-providers",
+  "name": "Property Providers",
+  "brand": {
+    "displayName": "Property Providers",
+    "website_url": "https://www.propertyproviders.com.au/",
+    "phone": "+61 2 9969 7599",
+    "logo_url": "https://qmtfugaeujeikyegoxwi.supabase.co/storage/v1/object/public/report-assets/prospect-brands/property-providers/logo-dark.svg",
+    "logo_light_url": "https://qmtfugaeujeikyegoxwi.supabase.co/storage/v1/object/public/report-assets/prospect-brands/property-providers/logo-light.svg",
+    "logo_dark_url": "https://qmtfugaeujeikyegoxwi.supabase.co/storage/v1/object/public/report-assets/prospect-brands/property-providers/logo-dark.svg",
+    "primary_colour": "#1277a0",
+    "secondary_colour": "#ffffff",
+    "accent_colour": "#00acc1",
+    "text_colour": "#263238",
+    "background_colour": "#ffffff",
+    "heading_font_family": "montserrat",
+    "body_font_family": "montserrat"
+  },
+  "upliftPercent": 25,
+  "assumptions": {
+    "unavailableNights": 0,
+    "listingStage": "established",
+    "rationale": "Illustrative established-listing scenario with professional presentation and active pricing. The annual model assumes availability across the year, subject to permitted letting use and owner availability."
+  },
+  "assignment": {
+    "name": "Property Providers",
+    "version": 2,
+    "defaults": {
+      "version": 1,
+      "templateId": "property-providers",
+      "templateVersion": 1,
+      "presetId": "studio",
+      "brandOverrides": {
+        "background": "#ffffff",
+        "surface": "#edf5f7",
+        "text": "#263238",
+        "muted": "#51666b",
+        "primary": "#1277a0",
+        "primaryText": "#ffffff",
+        "chartLtr": "#9aa8ad",
+        "chartMarket": "#00acc1",
+        "chartManaged": "#1277a0",
+        "headingFont": "Montserrat, Arial, sans-serif",
+        "bodyFont": "Montserrat, Arial, sans-serif",
+        "radius": 2
+      },
+      "content": {
+        "title": "{{property.address}}",
+        "introduction": "Your property. More possibilities.",
+        "recipientLine": "prepared for {{recipient.displayName}}",
+        "comparisonTitle": "The potential of your property."
+      },
+      "heroLayout": "overlay",
+      "initialComparisonMode": "annual",
+      "motion": true,
+      "pages": [
+        {
+          "id": "property",
+          "kind": "hero",
+          "title": "Your property",
+          "body": "",
+          "enabled": true
+        },
+        {
+          "id": "appraisal",
+          "kind": "comparison",
+          "title": "Rental appraisal",
+          "body": "",
+          "enabled": true
+        },
+        {
+          "id": "forecast",
+          "kind": "forecast",
+          "title": "Revenue & occupancy",
+          "body": "",
+          "enabled": true
+        },
+        {
+          "id": "evidence",
+          "kind": "evidence",
+          "title": "Comparable listings",
+          "body": "",
+          "enabled": true
+        },
+        {
+          "id": "service",
+          "kind": "service",
+          "title": "Our management service",
+          "body": "",
+          "enabled": true,
+          "service": {
+            "eyebrow": "Property Providers · Sydney",
+            "headline": "Live better.\nWe’ll take care of the details.",
+            "introduction": "From a weekend by the water to an extended executive stay, we bring local knowledge and considered hospitality to your property.",
+            "imageUrl": "https://media.lmpm.website/uploads/sites/4/2024/07/Two-surfers-at-Manly-Beach-1.jpg",
+            "imageAlt": "Surfers at Manly Beach",
+            "imageCaption": "At home on Sydney’s Northern Beaches",
+            "proof": {
+              "value": "4.6",
+              "label": "Average rating out of 5",
+              "body": "1,000+ reviews across trusted platforms"
+            },
+            "highlights": [
+              {
+                "icon": "strategy",
+                "title": "A flexible letting strategy",
+                "body": "Short stays, extended stays and long-term leasing options, with a mix tailored to your plans."
+              },
+              {
+                "icon": "care",
+                "title": "Property care and coordination",
+                "body": "Housekeeping, condition checks and maintenance coordination help keep the property ready between stays."
+              },
+              {
+                "icon": "hospitality",
+                "title": "Support for every stay",
+                "body": "Guest enquiries, booking management, linen and arrival support bring property management and hospitality together."
+              },
+              {
+                "icon": "communication",
+                "title": "Marketing with purpose",
+                "body": "Professional presentation, multiple booking channels and active pricing put your property in front of suitable guests."
+              }
+            ]
+          }
+        },
+        {
+          "id": "next-steps",
+          "kind": "next_steps",
+          "title": "Let’s get started",
+          "body": "",
+          "enabled": true
+        }
+      ],
+      "links": [
+        {
+          "id": "fe8373f5-e6ed-41b6-bde7-bf16890b1ac7",
+          "label": "Explore Property Providers",
+          "kind": "link",
+          "url": "https://www.propertyproviders.com.au/"
+        }
+      ],
+      "attachmentIds": [],
+      "agentIds": []
+    }
+  },
+  "sources": [
+    "https://www.propertyproviders.com.au/",
+    "https://www.propertyproviders.com.au/what-we-do/",
+    "https://www.propertyproviders.com.au/our-team-don-binkley/",
+    "https://www.propertyproviders.com.au/list-your-property/"
+  ],
+  "contacts": [
+    {
+      "name": "Don Binkley",
+      "role": "Founder & Agency Principal",
+      "phone": "+61 2 9969 7599",
+      "email": "don@propertyproviders.com.au",
+      "photoUrl": "https://media.lmpm.website/uploads/sites/4/2024/03/Don-Binkley-Our_Team-715x1024.jpg"
+    }
+  ]
+}

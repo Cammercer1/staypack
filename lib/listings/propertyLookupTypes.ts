@@ -32,6 +32,8 @@ export const propertyLookupSourceSchema = z.object({
   activeListingId: z.number().optional(),
   agencyName: z.string().optional(),
   features: z.array(z.string()).optional(),
+  advertisedSalePrice: z.string().nullable().optional(),
+  advertisedWeeklyRent: z.string().nullable().optional(),
   media: z.array(lookupMediaSchema),
   originalAgents: z
     .array(

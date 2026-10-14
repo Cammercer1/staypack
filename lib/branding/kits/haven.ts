@@ -85,8 +85,8 @@ export function applyHavenBrandKitToReport(
       ...report.assets,
       qr_code_url: report.document_link && report.document_link.mode !== "none" ? report.assets.qr_code_url : "",
     },
-    agent: havenAgent(),
-    agents: havenAgents(),
+    agent: report.agent_selection === "explicit" ? report.agent : havenAgent(),
+    agents: report.agent_selection === "explicit" ? report.agents : havenAgents(),
     copy: {
       ...report.copy,
       heading: leaseAppraisal

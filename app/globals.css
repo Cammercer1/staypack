@@ -6,7 +6,7 @@
 /* Opt in per workspace view; omit daisyUI's global base/reset styles. */
 @plugin "daisyui" {
   themes: false;
-  include: skeleton, button, badge, input, select, list, stat, card, alert, menu;
+  include: skeleton, button, badge, input, select, list, stat, card, alert, menu, hero, table, carousel;
   prefix: "du-";
   logs: false;
 }
@@ -47,6 +47,78 @@
 }
 
 @custom-variant dark (&:is(.dark *));
+
+@plugin "daisyui/theme" {
+  name: "property-providers";
+  default: false;
+  prefersdark: false;
+  color-scheme: light;
+  --color-base-100: #ffffff;
+  --color-base-200: #f2f7f8;
+  --color-base-300: #dbe5e8;
+  --color-base-content: #263238;
+  --color-primary: #1277a0;
+  --color-primary-content: #ffffff;
+  --color-secondary: #8ac1ce;
+  --color-secondary-content: #263238;
+  --color-accent: #00acc1;
+  --color-accent-content: #263238;
+  --color-neutral: #263238;
+  --color-neutral-content: #ffffff;
+  --color-info: #1277a0;
+  --color-info-content: #ffffff;
+  --color-success: #236b55;
+  --color-success-content: #ffffff;
+  --color-warning: #f2cd76;
+  --color-warning-content: #263238;
+  --color-error: #b23b45;
+  --color-error-content: #ffffff;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.25rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+
+/* Reusable prospect theme. Brand values come from the frozen proposal profile. */
+@plugin "daisyui/theme" {
+  name: "agency-proposal";
+  default: false;
+  prefersdark: false;
+  color-scheme: light;
+  --color-base-100: var(--proposal-bg);
+  --color-base-200: var(--proposal-surface);
+  --color-base-300: color-mix(in srgb, var(--proposal-text) 12%, var(--proposal-bg));
+  --color-base-content: var(--proposal-text);
+  --color-primary: var(--proposal-primary);
+  --color-primary-content: var(--proposal-on-primary);
+  --color-secondary: var(--proposal-surface);
+  --color-secondary-content: var(--proposal-text);
+  --color-accent: var(--proposal-primary);
+  --color-accent-content: var(--proposal-on-primary);
+  --color-neutral: var(--proposal-text);
+  --color-neutral-content: var(--proposal-bg);
+  --color-info: #245b85;
+  --color-info-content: #ffffff;
+  --color-success: #236b55;
+  --color-success-content: #ffffff;
+  --color-warning: #f2cd76;
+  --color-warning-content: #222222;
+  --color-error: #b23b45;
+  --color-error-content: #ffffff;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.25rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
 
 @theme inline {
   --color-background: var(--background);

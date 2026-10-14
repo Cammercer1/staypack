@@ -16,6 +16,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
+  // Public examples use frozen snapshots and never depend on a visitor's session.
+  const examplePath = request.nextUrl.pathname;
+  if (["/example", "/examples"].some(prefix => examplePath === prefix || examplePath.startsWith(`${prefix}/`))) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

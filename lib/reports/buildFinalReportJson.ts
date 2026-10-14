@@ -10,6 +10,7 @@ import type {
   StrEstimate,
 } from "@/lib/types";
 import { DEFAULT_DISCLAIMER } from "@/lib/types";
+import { STR_AMENITIES, readStrPropertyContext, strPropertyContextSchema } from "@/lib/str/propertyInputs";
 import { enforceCanonicalStrRevenueInText } from "@/lib/copy/pageOneMarketingCopy";
 import { mockBlurbVariantsFromText } from "@/lib/copy/blurbVariantEnforce";
 import { calculateAccommodates } from "@/lib/reports/formatters";
@@ -53,9 +54,10 @@ export function buildFinalReportJson({
   propertyImages,
 }: BuildFinalReportInput): FinalReportJson {
   const scrapedListing = scraped ?? listing.scraped_listing_json;
-  const weeklyMin = scrapedListing?.rentalAppraisal?.weeklyMin ?? null;
-  const weeklyMax = scrapedListing?.rentalAppraisal?.weeklyMax ?? null;
-  const weeklyMidpoint =
+  const propertyContext = strPropertyContextSchema.safeParse(report.user_overrides_json?.strProperty);
+  const weeklyMin = propertyContext.success ? null : scrapedListing?.rentalAppraisal?.weeklyMin ?? null;
+  const weeklyMax = propertyContext.success ? null : scrapedListing?.rentalAppraisal?.weeklyMax ?? null;
+  const weeklyMidpoint = propertyContext.success ? propertyContext.data.weeklyRent :
     scrapedListing?.rentalAppraisal?.weeklyMidpoint ??
     (weeklyMin != null && weeklyMax != null
       ? (weeklyMin + weeklyMax) / 2
@@ -74,7 +76,8 @@ export function buildFinalReportJson({
       agencyAgents,
     });
   const displayPrice = resolveReportDisplayPrice(listing, scrapedListing);
-  const strYield = calculateStrGrossYield(displayPrice, estimate.annualRevenue);
+  const propertyValue = readStrPropertyContext({ ...listing, scraped_listing_json: scrapedListing }, report).propertyValue ?? null;
+  const strYield = calculateStrGrossYield(propertyValue === null ? null : String(propertyValue), estimate.annualRevenue);
   const strImages =
     propertyImages ?? resolveCollateralImageSelection(listing, "str_report");
   const reportCopy = alignCopyWithEstimate(copy, estimate.annualRevenue);
@@ -131,8 +134,13 @@ export function buildFinalReportJson({
       hero_image_url: strImages.hero_image_url ?? "",
       selected_image_urls: strImages.selected_image_urls,
       display_price: displayPrice,
+      estimated_value: propertyValue,
       land_area_sqm: scrapedListing?.landAreaSqm ?? null,
       floor_area_sqm: scrapedListing?.floorAreaSqm ?? null,
+      ...(propertyContext.success ? { amenities: [
+        ...STR_AMENITIES.filter((item) => propertyContext.data.amenities.includes(item.id)).map((item) => item.label),
+        ...propertyContext.data.additionalAmenities,
+      ] } : {}),
     },
     str: {
       annual_revenue: estimate.annualRevenue,

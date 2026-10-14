@@ -1,0 +1,96 @@
+/* Only the published, standalone evidence page fills the viewport. Custom copy
+   and a final-page disclaimer retain natural document flow instead of clipping. */
+.viewport {
+  height: calc(100dvh - 5rem - env(safe-area-inset-bottom));
+  min-height: 0;
+  flex: none;
+}
+
+.viewport > article {
+  min-height: 0;
+}
+
+.viewport > article > div {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  padding-block: clamp(0.75rem, 2dvh, 1.5rem);
+}
+
+.viewport header {
+  flex-shrink: 0;
+  margin-bottom: clamp(0.5rem, 2dvh, 1.5rem);
+  padding-bottom: clamp(0.5rem, 1.5dvh, 1rem);
+}
+
+.viewport header img { height: 2rem; width: auto; }
+
+.viewport [data-proposal-evidence],
+.viewport [data-proposal-carousel] {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.viewport [data-proposal-evidence] > h1 {
+  flex-shrink: 0;
+  font-size: clamp(1.5rem, 4dvh, 3rem);
+}
+
+.viewport [data-proposal-carousel] { margin-top: clamp(0.5rem, 1.5dvh, 1rem); }
+
+.viewport [aria-roledescription="carousel"] {
+  min-height: 14rem;
+  flex: 1;
+}
+
+.viewport [data-proposal-comparable] {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.viewport [data-comparable-media] {
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+  /* The crop owns the grid row. An intrinsic image with height:100% can paint
+     beyond that row in iOS Safari; the absolutely positioned image cannot. */
+}
+
+.viewport [data-comparable-details] { padding-top: 0.75rem; }
+.viewport [data-comparable-details] h2 {
+  display: -webkit-box;
+  min-height: 2.75em;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.viewport [data-comparable-details] > p { margin-top: 0.25rem; }
+.viewport [data-comparable-details] > div { padding-top: 0.5rem; }
+.viewport [data-comparable-controls] { flex-shrink: 0; margin-top: 0.75rem; }
+
+/* A landscape phone has room beside the photo, rather than beneath it. */
+@media (max-height: 540px) {
+  .viewport { height: calc(100dvh - 3.5rem - env(safe-area-inset-bottom)); }
+  .viewport > article > div { padding-block: 0.5rem; }
+  .viewport header { margin-bottom: 0.5rem; padding-bottom: 0.5rem; }
+  .viewport header img { height: 1.75rem; }
+  .viewport [data-proposal-evidence] > h1 { font-size: 1.5rem; }
+  .viewport [aria-roledescription="carousel"] { min-height: 8.5rem; }
+  .viewport [data-proposal-comparable] {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 1rem;
+  }
+  .viewport [data-comparable-details] { min-width: 0; padding-top: 0; }
+  .viewport [data-comparable-details] h2 { min-height: 0; font-size: 1rem; }
+  .viewport [data-comparable-details] > p { font-size: 0.75rem; }
+  .viewport [data-comparable-details] > div > p:first-child { font-size: 1.5rem; }
+  .viewport [data-comparable-controls] { margin-top: 0.5rem; }
+  .navigation { min-height: calc(3.5rem + env(safe-area-inset-bottom)); padding-block: 0.375rem; padding-bottom: max(0.375rem, env(safe-area-inset-bottom)); }
+}
+
+@media (max-height: 540px) and (max-width: 1100px) {
+  .viewport [data-proposal-comparable] { width: 100%; }
+}

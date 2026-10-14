@@ -1,0 +1,65 @@
+{
+  "name": "Havenly Property proposal",
+  "version": 2,
+  "defaults": {
+    "version": 1,
+    "templateId": "editorial-base",
+    "templateVersion": 1,
+    "presetId": "studio",
+    "brandOverrides": {
+      "background": "#ffffff",
+      "surface": "#f0f7fa",
+      "text": "#212121",
+      "muted": "#56636a",
+      "primary": "#009eca",
+      "primaryText": "#111111",
+      "chartLtr": "#79868c",
+      "chartMarket": "#007aa3",
+      "chartManaged": "#009eca",
+      "headingFont": "Manrope, Arial, sans-serif",
+      "bodyFont": "Manrope, Arial, sans-serif",
+      "radius": 0
+    },
+    "content": {
+      "title": "{{property.address}}",
+      "introduction": "Short-term rental proposal",
+      "recipientLine": "prepared for {{recipient.displayName}}",
+      "comparisonTitle": "Your rental income potential"
+    },
+    "heroLayout": "overlay",
+    "initialComparisonMode": "annual",
+    "motion": true,
+    "pages": [
+      { "id": "property", "kind": "hero", "title": "Your property", "body": "", "enabled": true },
+      { "id": "appraisal", "kind": "comparison", "title": "Rental appraisal", "body": "", "enabled": true },
+      { "id": "forecast", "kind": "forecast", "title": "Yearly forecast", "body": "", "enabled": true },
+      { "id": "evidence", "kind": "evidence", "title": "Comparable listings", "body": "", "enabled": true },
+      {
+        "id": "service", "kind": "service", "title": "Our management service", "body": "", "enabled": true,
+        "service": {
+          "eyebrow": "Short-term rental management",
+          "headline": "Great stays.\nThoughtfully managed.",
+          "introduction": "From the first booking to the next arrival, Havenly brings local knowledge and personal care to your short-term rental.",
+          "imageUrl": "https://images.zenu.com.au/k4nub6oqpxvgtgr726emy57ox5fx7pom.png",
+          "imageAlt": "Light-filled bedroom overlooking Brisbane",
+          "imageCaption": "At home on the Gold Coast & in Brisbane",
+          "highlights": [
+            { "icon": "strategy", "title": "A strategy for your property", "body": "Short stays, longer stays or a blend, shaped around your goals and how you want to use your home." },
+            { "icon": "care", "title": "The details taken care of", "body": "Bookings, turnovers, cleaning and maintenance coordinated so your property is ready for its next guest." },
+            { "icon": "hospitality", "title": "Hospitality that feels personal", "body": "Thoughtful check-ins, responsive communication and the small touches that help guests feel at home." },
+            { "icon": "communication", "title": "Local people. Clear communication.", "body": "Gold Coast and Brisbane locals who keep you informed and take a proactive approach to caring for your property." }
+          ],
+          "proof": {
+            "value": "15+ years",
+            "label": "of property experience",
+            "body": "Founder Shannyn Laird combines hands-on property management with senior leadership experience in international short-term rentals."
+          }
+        }
+      },
+      { "id": "next-steps", "kind": "next_steps", "title": "Next steps", "body": "", "enabled": true }
+    ],
+    "links": [],
+    "attachmentIds": [],
+    "agentIds": []
+  }
+}

@@ -184,6 +184,7 @@ export function saveStrRateOverride(
 ): StrEstimateOverrides {
   return {
     ...(overrides?.estimateInputs ? { estimateInputs: overrides.estimateInputs } : {}),
+    ...(overrides?.strProperty ? { strProperty: overrides.strProperty } : {}),
     ...(rates ? { strAdjustment: rates } : {}),
     ...(rates && management ? { strManagement: strManagementAssumptionsSchema.parse(management) } : {}),
   };
