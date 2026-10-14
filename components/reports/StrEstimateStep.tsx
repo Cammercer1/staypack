@@ -1,12 +1,15 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight, ExternalLink, Info, SlidersHorizontal, X } from "lucide-react";
+import { Popover } from "@base-ui/react/popover";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import Link from "next/link";
-import { managementEvidenceSummary, matchingManagedComps } from "@/lib/str/managementEvidence";
+import { matchingManagedComps } from "@/lib/str/managementEvidence";
 import { ComparableFilters } from "@/components/appraisals/ComparableFilters";
-import { MAX_STR_FEATURED_COMPS } from "@/lib/str/comparables";
+import { MAX_STR_FEATURED_COMPS, rankStrComps } from "@/lib/str/comparables";
+import { matchingStrAmenities, readStrPropertyContext } from "@/lib/str/propertyInputs";
 import { DocumentStepHeader } from "@/components/documents/DocumentStepHeader";
 import {
   applyStrEstimateAdjustments,
@@ -56,16 +59,17 @@ export const StrEstimateStep = forwardRef<
     onBusyChange?: (busy: boolean) => void;
     onComplete: (report: Report) => void;
     onContinue: () => void;
+    continueLabel?: string;
     onBack: () => void;
   }
 >(function StrEstimateStep(
-  { listing, agency, report, busy, canManageDefaults = false, onCompanyPresetsChange, onBusyChange, onComplete, onContinue, onBack },
+  { listing, agency, report, busy, canManageDefaults = false, onCompanyPresetsChange, onBusyChange, onComplete, onContinue, onBack, continueLabel },
   ref,
 ) {
   const estimate = report.final_estimate_json;
   const enrichment = report.str_enrichment_json;
   const initialValues = controlValues(report);
-  const { register, control, setValue, reset } = useForm({ defaultValues: initialValues });
+  const { register, control, setValue, reset, getValues } = useForm({ defaultValues: initialValues });
   const nightlyRate = useWatch({ control, name: "nightlyRate" });
   const occupancy = useWatch({ control, name: "occupancyRate" });
   const values = useWatch({ control });
@@ -79,10 +83,38 @@ export const StrEstimateStep = forwardRef<
   } | null>(null);
   const baseline = report.original_estimate_json ? reconcileStrEstimate(report.original_estimate_json) : null;
   const [error, setError] = useState<string | null>(null);
+  const [assumptionsOpen, setAssumptionsOpen] = useState(false);
+  const assumptionsSnapshot = useRef<{
+    values: ReturnType<typeof controlValues>;
+    precision: typeof presetPrecision;
+    uplift: typeof upliftDraft;
+    presetId: string;
+    error: string | null;
+  } | null>(null);
+  function changeAssumptionsOpen(open: boolean) {
+    if (open) {
+      assumptionsSnapshot.current = { values: getValues(), precision: presetPrecision, uplift: upliftDraft, presetId, error };
+      setError(null);
+    } else if (assumptionsSnapshot.current) {
+      const previous = assumptionsSnapshot.current;
+      reset(previous.values);
+      setPresetPrecision(previous.precision);
+      setUpliftDraft(previous.uplift);
+      setPresetId(previous.presetId);
+      setError(previous.error);
+      assumptionsSnapshot.current = null;
+    }
+    setAssumptionsOpen(open);
+  }
   const [query, setQuery] = useState("");
   const [selectedOnly, setSelectedOnly] = useState(false);
   const [managedOnly, setManagedOnly] = useState(false);
-  const comps = enrichment?.comp_pool ?? enrichment?.comps ?? [];
+  const propertyContext = readStrPropertyContext(listing, report);
+  const savedComps = enrichment?.comp_pool ?? enrichment?.comps ?? [];
+  const comps = propertyContext.amenities.length ? rankStrComps(savedComps, {
+    bedrooms: listing.bedrooms ?? 0, bathrooms: listing.bathrooms ?? 0, accommodates: listing.accommodates ?? 0,
+    property_type: listing.property_type, suburb: listing.suburb, amenities: propertyContext.amenities,
+  }) : savedComps;
   const savedIds = (enrichment?.selected_comp_ids ?? enrichment?.comps.map((comp) => comp.listing_id) ?? []).slice(0, MAX_STR_FEATURED_COMPS);
   const [selectedIds, setSelectedIds] = useState(() => savedIds.slice(0, MAX_STR_FEATURED_COMPS));
   const selectionDirty = JSON.stringify(savedIds) !== JSON.stringify(selectedIds);
@@ -125,7 +157,6 @@ export const StrEstimateStep = forwardRef<
   const adjusted = estimate && parsed.success && dirty ? applyStrEstimateAdjustments(estimate, parsed.data) : estimate;
   const delta = adjusted?.annualRevenue != null && baseline?.annualRevenue != null
     ? adjusted.annualRevenue - baseline.annualRevenue : null;
-  const evidence = managementEvidenceSummary(comps, listing, valid ? adjusted?.annualRevenue ?? null : null);
   const managedIds = new Set(matchingManagedComps(comps, listing).map((comp) => comp.listing_id));
   const companyDefault = agency?.str_management_presets?.find((preset) => preset.isDefault);
   const inferredUplift = baseline?.annualRevenue != null && baseline.annualRevenue > 0 && parsed.success
@@ -167,6 +198,8 @@ export const StrEstimateStep = forwardRef<
   }
   useImperativeHandle(ref, () => ({
     savePendingEdits: async () => {
+      // Modal drafts must be applied before navigation can persist them.
+      if (assumptionsOpen) return null;
       setError(null);
       if (savingDefault) return null;
       if (!valid && upliftIssue) { setError(upliftIssue); return null; }
@@ -225,7 +258,7 @@ export const StrEstimateStep = forwardRef<
           onClick={onBack}
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
-          Property & design
+          Back to property
         </button>
         <button
           type="button"
@@ -233,9 +266,9 @@ export const StrEstimateStep = forwardRef<
           disabled={busy || savingDefault || !valid || (comps.length > 0 && selectedIds.length === 0)}
           onClick={onContinue}
         >
-          {report.final_report_json
-            ? "Use figures & edit report"
-            : "Use estimate & generate report"}
+          {continueLabel ?? (report.final_report_json
+            ? "Continue to design & content"
+            : "Use estimate & choose design")}
           <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
         </button>
       </DocumentStepHeader>
@@ -255,7 +288,7 @@ export const StrEstimateStep = forwardRef<
               <p>
                 Updated{" "}
                 {new Date(fetchedAt).toLocaleDateString(
-                  "en-AU",
+                  "en-AU", { timeZone: "Australia/Sydney" },
                 )}
               </p>
             ) : null}
@@ -265,7 +298,31 @@ export const StrEstimateStep = forwardRef<
               <span className="du-badge du-badge-sm du-badge-outline mb-4">
                 Your management estimate
               </span>
-              <p className="text-sm font-medium">Estimated gross STR revenue</p>
+              <div className="flex items-center gap-1">
+                <p className="text-sm font-medium">Estimated gross STR revenue</p>
+                <Popover.Root>
+                  <Popover.Trigger openOnHover aria-label="How these figures work" className="du-btn du-btn-sm du-btn-ghost du-btn-circle size-11 shrink-0 text-muted-foreground">
+                    <Info className="size-4" aria-hidden="true" />
+                  </Popover.Trigger>
+                  <Popover.Portal>
+                    <Popover.Positioner side="bottom" align="start" sideOffset={8} className="z-50">
+                      <Popover.Popup data-theme="staypack-workspace" className="w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-base-300 bg-base-100 p-4 text-sm text-base-content shadow-lg outline-none">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <Popover.Title className="font-semibold">How these figures work</Popover.Title>
+                          <Popover.Close aria-label="Close explanation" className="du-btn du-btn-sm du-btn-ghost du-btn-circle size-11 shrink-0">
+                            <X className="size-4" aria-hidden="true" />
+                          </Popover.Close>
+                        </div>
+                        <div className="space-y-3 leading-relaxed text-muted-foreground">
+                          <p>Estimated annual gross revenue = ADR × occupancy × 365, before operating costs. ADR is the effective revenue per booked night; figures are rounded.</p>
+                          <p>Comparables support your report without changing the estimate. Management uplift reflects your operating assumptions, not a measured management premium.</p>
+                          {band && band.source !== "fallback" ? <p>Market reference: {formatCurrency(band.min)}–{formatCurrency(band.max)} / year (25th–90th percentiles). Context, not a limit on your assumptions.</p> : null}
+                        </div>
+                      </Popover.Popup>
+                    </Popover.Positioner>
+                  </Popover.Portal>
+                </Popover.Root>
+              </div>
               {agency?.name && <p className="mt-1 text-xs text-muted-foreground">Under {agency.name} management</p>}
               <p className="mt-2 text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
                 {valid ? formatCurrency(adjusted.annualRevenue) : "—"}
@@ -307,33 +364,43 @@ export const StrEstimateStep = forwardRef<
                 {defaultSaved && <p role="status" className="text-sm">Company default saved for future appraisals. These report figures save when you continue.</p>}
                 {!canManageDefaults && !companyDefault && <p className="text-xs text-muted-foreground">This uplift applies to this report. A company owner or admin can set the default for future appraisals.</p>}
               </div>
-              <details className="rounded-xl border border-base-300 p-4">
-                <summary className="cursor-pointer text-sm font-medium">Fine-tune assumptions</summary>
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <h3 className="font-semibold">ADR & occupancy</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">Set the nightly rate and share of nights booked. Annual revenue updates as you adjust either one.</p>
+              <Dialog open={assumptionsOpen} onOpenChange={changeAssumptionsOpen}>
+                <DialogTrigger disabled={busy || savingDefault || !baseline} className="du-btn du-btn-sm du-btn-outline min-h-11 w-full sm:w-auto">
+                  <SlidersHorizontal className="size-4" aria-hidden="true" />
+                  Fine-tune assumptions
+                </DialogTrigger>
+                <DialogContent data-theme="staypack-workspace" showCloseButton={false} className="inset-x-0 top-auto bottom-0 flex max-h-[94dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-b-none rounded-t-2xl bg-base-100 p-0 text-base-content sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-h-[90dvh] sm:w-[calc(100%-3rem)] sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl">
+                  <div className="flex shrink-0 items-start justify-between gap-3 border-b border-base-300 p-5 sm:px-6">
+                    <div>
+                      <DialogTitle className="text-xl leading-tight">Fine-tune assumptions</DialogTitle>
+                      <DialogDescription className="mt-1">Adjust rates, availability and report wording.</DialogDescription>
+                    </div>
+                    <DialogClose aria-label="Cancel assumption changes" className="du-btn du-btn-sm du-btn-ghost du-btn-circle min-h-11 min-w-11">
+                      <X className="size-4" aria-hidden="true" />
+                    </DialogClose>
                   </div>
+                  <div className="min-h-0 overflow-y-auto overscroll-contain">
+                  <fieldset disabled={busy || savingDefault || !baseline} className="min-w-0 space-y-5 p-5 sm:p-6">
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div className="space-y-2">
                       <label htmlFor="str-adr" className="text-sm font-medium">Average daily rate · ADR ($)</label>
                       <input id="str-adr" type="number" inputMode="decimal" min="0.01" max="100000" step="0.01"
-                        className="du-input w-full tabular-nums" aria-describedby="str-adr-help"
+                        className="du-input du-input-sm min-h-11 w-full tabular-nums" aria-describedby="str-adr-help"
                         {...register("nightlyRate", { onChange: () => setUpliftDraft(null) })} />
                       <input type="range" aria-label="Adjust ADR" min="1"
                         max={Math.max(1000, Math.ceil((baseline?.nightlyRate ?? 500) * 2 / 100) * 100, Number(nightlyRate) || 0)} step="1"
                         value={Number(nightlyRate) || 1} onChange={(event) => { setUpliftDraft(null); setValue("nightlyRate", event.target.value); }}
-                        className="h-6 w-full accent-primary" />
+                        className="du-range du-range-sm w-full" />
                       <p id="str-adr-help" className="text-xs text-muted-foreground">Gross revenue per booked night.</p>
                     </div>
                     <div className="space-y-2">
                       <label htmlFor="str-occupancy" className="text-sm font-medium">Estimated occupancy (%)</label>
                       <input id="str-occupancy" type="number" inputMode="decimal" min="0" max="100" step="0.01"
-                        className="du-input w-full tabular-nums" aria-describedby="str-occupancy-help"
+                        className="du-input du-input-sm min-h-11 w-full tabular-nums" aria-describedby="str-occupancy-help"
                         {...register("occupancyRate", { onChange: () => setUpliftDraft(null) })} />
                       <input type="range" aria-label="Adjust estimated occupancy" min="0" max="100" step="0.5"
                         value={Number(occupancy) || 0} onChange={(event) => { setUpliftDraft(null); setValue("occupancyRate", event.target.value); }}
-                        className="h-6 w-full accent-primary" />
+                        className="du-range du-range-sm w-full" />
                       <p id="str-occupancy-help" className="text-xs text-muted-foreground">Percentage of all 365 nights booked.</p>
                     </div>
                   </div>
@@ -342,11 +409,11 @@ export const StrEstimateStep = forwardRef<
                   {!!agency?.str_management_presets?.length && <div className="space-y-2">
                     <label htmlFor="str-preset" className="text-sm font-medium">Use a different preset</label>
                     <div className="flex flex-wrap gap-2">
-                      <select id="str-preset" className="du-select min-w-0 flex-1" value={presetId} onChange={(event) => setPresetId(event.target.value)}>
+                      <select id="str-preset" className="du-select du-select-sm min-h-11 min-w-0 flex-1 basis-48" value={presetId} onChange={(event) => setPresetId(event.target.value)}>
                         <option value="">Choose assumptions for this property</option>
                         {agency.str_management_presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
                       </select>
-                      <button type="button" className="du-btn du-btn-outline" disabled={!presetId} onClick={() => {
+                      <button type="button" className="du-btn du-btn-sm du-btn-outline min-h-11" disabled={!presetId} onClick={() => {
                         const preset = agency.str_management_presets?.find((item) => item.id === presetId);
                         if (preset && baseline) applyScenario(resolveStrManagementPreset(baseline, preset));
                       }}>Apply preset</button>
@@ -354,18 +421,18 @@ export const StrEstimateStep = forwardRef<
                   </div>}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-medium">Unavailable nights / year
-                    <input type="number" min="0" max="365" step="1" className="du-input mt-1 w-full" {...register("unavailableNights", { onChange: (event) => {
+                    <input type="number" min="0" max="365" step="1" className="du-input du-input-sm min-h-11 mt-1 w-full" {...register("unavailableNights", { onChange: (event) => {
                       if (upliftDraft !== null) changeUplift(upliftDraft, event.target.value.trim() ? Number(event.target.value) : NaN);
                     } })} />
                     <span className="mt-1 block text-xs font-normal text-muted-foreground">Owner stays, maintenance and time before launch. Leaves {Number.isFinite(assumptions.unavailableNights) ? 365 - assumptions.unavailableNights : "—"} nights available.</span>
                   </label>
                   <label className="text-sm font-medium">Operating stage
-                    <select className="du-select mt-1 w-full" {...register("listingStage")}><option value="established">Established listing</option><option value="launch_year">Launch year</option></select>
+                    <select className="du-select du-select-sm min-h-11 mt-1 w-full" {...register("listingStage")}><option value="established">Established listing</option><option value="launch_year">Launch year</option></select>
                     <span className="mt-1 block text-xs font-normal text-muted-foreground">Allow for time to build reviews in launch-year rates and occupancy.</span>
                   </label>
                 </div>
                 <label className="block text-sm font-medium">Basis for your management estimate
-                  <textarea className="du-textarea mt-1 w-full" rows={3} maxLength={300} {...register("rationale")} />
+                  <textarea className="du-textarea du-textarea-sm mt-1 w-full resize-y" rows={3} maxLength={300} {...register("rationale")} />
                   <span className="mt-1 block text-xs font-normal text-muted-foreground">Included in the report. Explain the presentation, pricing and availability the estimate depends on.</span>
                 </label>
                 {values.presetName && <p className="text-xs text-muted-foreground">Started from {values.presetName}; these report assumptions can be edited independently.</p>}
@@ -376,57 +443,54 @@ export const StrEstimateStep = forwardRef<
                     }}>{companyDefault ? "Restore company defaults" : "Reset assumptions"}</button>
                     <Link href="/settings/agency#str-management-presets" target="_blank" className="text-xs underline">Manage company defaults</Link>
                   </div>
-                </div>
-              </details>
-              <p className="text-xs text-muted-foreground">
-                ADR × occupancy × 365 = estimated annual gross revenue
-              </p>
-              {!valid ? <p role="alert" className="text-sm text-destructive">{upliftIssue ?? (!managementInput.success ? managementInput.error.issues[0]?.message : "Enter ADR above $0 and up to $100,000, and occupancy between 0% and 100%.")}</p> : null}
-              <p className="text-xs text-muted-foreground">Saved when you continue or change steps.</p>
+                  </fieldset>
+                  </div>
+                  <div className="shrink-0 space-y-3 border-t border-base-300 bg-base-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
+                    {!valid && <p role="alert" className="text-sm text-destructive">{upliftIssue ?? (!managementInput.success ? managementInput.error.issues[0]?.message : "Enter a valid nightly rate and occupancy.")}</p>}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div aria-live="polite">
+                        <p className="text-xs text-muted-foreground">Estimated gross STR revenue</p>
+                        <p className="text-lg font-semibold tabular-nums">{valid ? `${formatCurrency(adjusted.annualRevenue)} / year` : "—"}</p>
+                      </div>
+                      <div className="flex w-full gap-2 sm:w-auto">
+                        <DialogClose className="du-btn du-btn-sm du-btn-ghost min-h-11 flex-1 sm:flex-none">Cancel</DialogClose>
+                        <button type="button" className="du-btn du-btn-sm du-btn-primary min-h-11 flex-1 sm:flex-none" disabled={!valid || busy || savingDefault} onClick={() => {
+                          assumptionsSnapshot.current = null;
+                          setAssumptionsOpen(false);
+                        }}>Apply changes</button>
+                      </div>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              {!valid && !assumptionsOpen ? <p role="alert" className="text-sm text-destructive">{upliftIssue ?? (!managementInput.success ? managementInput.error.issues[0]?.message : "Enter ADR above $0 and up to $100,000, and occupancy between 0% and 100%.")}</p> : null}
               {!baseline ? <p className="text-sm text-muted-foreground">This older report has no saved market baseline for adjustments.</p> : null}
             </fieldset>
           </div>
-          <details className="border-t border-base-300 pt-4 text-sm">
-            <summary className="cursor-pointer font-medium">How these figures work</summary>
-            <div className="mt-3 space-y-2 leading-relaxed text-muted-foreground">
-              <p>The starting ADR is reconciled to the market annual estimate and occupancy. It is an effective gross rate per booked night and may differ from an advertised nightly price. Displayed figures are rounded.</p>
-              <p>Changing ADR holds occupancy steady; changing occupancy holds ADR steady. The calculation assumes a full 365-day year, before operating costs. Seasonal charts follow your annual estimate; historical market occupancy stays unchanged.</p>
-              {band && band.source !== "fallback" ? <p>Market revenue reference: {formatCurrency(band.min)}–{formatCurrency(band.max)} per year (25th–90th percentiles). This is context, not a limit on your assumptions.</p> : null}
-              <p>Choosing comparables changes the evidence featured in your report; it does not automatically change these assumptions.</p>
-              <p>Management estimates are your operating scenario, not a measured management premium. The market benchmark may already include professional operators. Unavailable nights constrain occupancy and are not deducted again.</p>
-            </div>
-          </details>
         </div>
       </div>
-      {enrichment?.market_occupancy ? (
-        <details className="rounded-xl border border-base-300 bg-base-100 p-5 text-sm">
-          <summary className="cursor-pointer font-medium">Monthly occupancy evidence · {enrichment.market_occupancy.status === "available" ? enrichment.market_occupancy.label : "unavailable"}</summary>
-          <p className="mt-3">The report pairs a modelled monthly revenue estimate with historical occupancy for matching bedrooms and property type in the named market. This benchmark covers a broader area than the nearby report comparables.</p>
-          {enrichment.market_occupancy.status === "available" && <p className="mt-2">{enrichment.market_occupancy.months.length} completed months, {enrichment.market_occupancy.months[0]?.month} to {enrichment.market_occupancy.months.at(-1)?.month}. Monthly median occupancy and the 25th–75th percentile range are shown.</p>}
-          <ul className="mt-2 list-disc space-y-1 pl-5">{enrichment.market_occupancy.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
-        </details>
-      ) : null}
       <section className="space-y-4" aria-label="Comparable evidence">
         <div>
           <h3 className="text-lg font-semibold">
-            Choose supporting comparables
+            Supporting comparables
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            {comps.length} nearby properties available for review.{" "}
             {enrichment?.radius_m
-              ? `Search area: ${(enrichment.radius_m / 1000).toLocaleString("en-AU", { maximumFractionDigits: 1 })} km.`
-              : ""}{" "}
-            Choose up to six to feature, in selection order. Choosing report comparables keeps your estimate unchanged.
+              ? `Within ${(enrichment.radius_m / 1000).toLocaleString("en-AU", { maximumFractionDigits: 1 })} km · `
+              : ""}
+            Select up to six for your report.
           </p>
         </div>
-        <div className="rounded-xl border border-base-300 bg-base-100 p-5 text-sm" aria-label="Professional management evidence">
-          <h4 className="font-semibold">Professionally managed properties with matching bedrooms and property type</h4>
-          <p className="mt-2">{evidence.revenueCount} with saved annual revenue evidence{evidence.median != null ? ` · Median estimated gross revenue ${formatCurrency(evidence.median)} / year` : ""}.</p>
-          {evidence.atOrAbove != null && evidence.revenueCount > 0 && <p className="mt-1">{evidence.atOrAbove} of {evidence.revenueCount} reach or exceed {formatCurrency(adjusted.annualRevenue)} / year in the saved evidence.</p>}
-          <p className="mt-2 text-xs text-muted-foreground">{evidence.limited ? "Limited evidence: fewer than three matching professionally managed listings have annual revenue figures. " : ""}This uses the whole saved pool, independent of your report selection. Differences in amenities, reviews and blocked nights still matter; it does not measure the effect of management alone.</p>
-          <label className="mt-3 flex min-h-11 items-center gap-2"><input type="checkbox" className="du-checkbox du-checkbox-sm" checked={managedOnly} onChange={(event) => setManagedOnly(event.target.checked)} />Show matching professionally managed properties only</label>
-        </div>
-        {comps.length > 0 && <ComparableFilters query={query} onQueryChange={setQuery} selectedOnly={selectedOnly} onSelectedOnlyChange={setSelectedOnly} totalCount={comps.length} selectedCount={selectedIds.length} visibleCount={shownComps.length} />}
+        {comps.length > 0 && <ComparableFilters compact query={query} onQueryChange={setQuery} selectedOnly={selectedOnly} onSelectedOnlyChange={setSelectedOnly} totalCount={comps.length} selectedCount={selectedIds.length} visibleCount={shownComps.length}>
+          <button
+            type="button"
+            aria-pressed={managedOnly}
+            className="du-btn du-btn-sm min-h-11 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-content"
+            onClick={() => setManagedOnly(!managedOnly)}
+          >
+            Professionally managed ({managedIds.size})
+          </button>
+        </ComparableFilters>}
         {comps.length > 0 && shownComps.length === 0 && <p className="rounded-xl border border-base-300 p-5 text-sm">No saved comparables match these filters. Clear a filter to review the remaining evidence.</p>}
         {comps.length ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -462,6 +526,7 @@ export const StrEstimateStep = forwardRef<
                       : ""}
                   </p>
                   {comp.property_type && <p className="text-xs text-muted-foreground">{comp.property_type}{comp.suburb ? ` · ${comp.suburb}` : ""}</p>}
+                  {propertyContext.amenities.length > 0 && <p className="text-xs text-base-content/70">{matchingStrAmenities(propertyContext.amenities, comp.amenities).length ? `Shared amenities: ${matchingStrAmenities(propertyContext.amenities, comp.amenities).map((item) => item.label).join(", ")}` : "No matching amenities recorded"}</p>}
                   <p className="text-xs text-muted-foreground">{comp.professional_management === true ? "Professionally managed" : comp.professional_management === false ? "Not flagged as professionally managed" : "Management status unknown"}{comp.superhost ? " · Superhost" : ""}</p>
                   {comp.match_notes?.length ? <p className="text-xs text-amber-700">{comp.match_notes.join(" · ")}</p> : null}
                   <p className="mt-1 text-lg font-semibold">

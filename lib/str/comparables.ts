@@ -1,17 +1,19 @@
 import type { StrCompCard, StrEnrichmentJson } from "@/lib/types";
+import { matchingStrAmenities } from "./propertyInputs";
 
 export const MAX_STR_FEATURED_COMPS = 6;
 
 export function propertyCategory(value: string | null | undefined) {
   if (!value) return null;
   if (/apartment|unit|condo|flat/i.test(value)) return "apartment";
-  if (/house|home|villa|townhouse/i.test(value)) return "house";
+  if (/house|home|villa|townhouse|duplex|semi[- ]?detached|terrace/i.test(value)) return "house";
   return null;
 }
 
 export function rankStrComps(comps: StrCompCard[], subject: {
   bedrooms: number; bathrooms: number; accommodates: number;
   property_type?: string | null; suburb?: string | null;
+  amenities?: readonly string[];
 }) {
   const category = propertyCategory(subject.property_type);
   const score = (comp: StrCompCard) =>
@@ -23,7 +25,9 @@ export function rankStrComps(comps: StrCompCard[], subject: {
     (comp.distance_m ?? 10000) / 300 -
     ((comp.reviews ?? 0) < 10 ? 8 : 0) -
     (comp.occupancy_rate != null && comp.occupancy_rate < 20 ? 40 : 0) -
-    (comp.blocked_nights != null && comp.blocked_nights > 90 ? 15 : 0);
+    (comp.blocked_nights != null && comp.blocked_nights > 90 ? 15 : 0) +
+    // Amenities refine peer relevance; they never reprice the provider estimate.
+    (subject.amenities?.length ? 24 * matchingStrAmenities(subject.amenities, comp.amenities).length / subject.amenities.length : 0);
   return comps.filter((c) => !c.room_type || c.room_type === "entire_home")
     .map((comp) => ({ ...comp, match_notes: [
       ...(comp.bedrooms !== subject.bedrooms ? ["Different bedroom count"] : []),

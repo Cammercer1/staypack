@@ -63,11 +63,11 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-async function lookup() {
+async function lookup(includeAgents = true) {
   request
     .mockResolvedValueOnce(reply({ candidates: [candidate] }))
     .mockResolvedValueOnce(reply({ draft }));
-  render(<NewListingFlow storageKey="draft-test" />);
+  render(<NewListingFlow storageKey="draft-test" includeAgents={includeAgents} />);
   fireEvent.change(await screen.findByLabelText("Property address"), {
     target: { value: candidate.address },
   });
@@ -79,6 +79,22 @@ async function lookup() {
   );
   await screen.findByLabelText("Street address");
 }
+it("automatically looks up the completed unit/range address after choosing a suggestion", async () => {
+  const address = "21/8-12 Ascot Street, Kensington NSW 2033";
+  request.mockResolvedValueOnce(reply({ suggestions: [{ placeId: "building", address: "21/8-12 Ascot Street, Kensington NSW", mainText: "21/8-12 Ascot Street", secondaryText: "Kensington NSW" }] }))
+    .mockResolvedValueOnce(reply({ address }))
+    .mockResolvedValueOnce(reply({ candidates: [{ ...candidate, address, streetAddress: "21/8-12 Ascot Street" }] }));
+  render(<NewListingFlow storageKey="draft-test" />);
+  const input = await screen.findByLabelText("Property address");
+  fireEvent.focus(input);
+  fireEvent.change(input, { target: { value: "21/8-12 ascot st" } });
+  fireEvent.click(await screen.findByRole("option"));
+  await screen.findByRole("button", { name: /21\/8-12 Ascot Street.*Property profile available/ });
+  const lookups = request.mock.calls.filter(([url]) => url === "/api/listings/lookup");
+  expect(lookups).toHaveLength(1);
+  expect(JSON.parse(lookups[0][1].body)).toEqual({ action: "search", query: address });
+  expect((input as HTMLInputElement).value).toBe(address);
+});
 it("previews an active property without creating records, then saves reviewed data and the agent portrait", async () => {
   await lookup();
   expect(
@@ -132,6 +148,22 @@ it("retains edits across Back, a failed save, and remounting", async () => {
   expect(screen.queryByLabelText("Photo URL")).toBeNull();
   expect(screen.getByRole("region", { name: "Agent photo" }).querySelector("img")?.getAttribute("src")).toBe(portrait);
   expect(navigation.push).not.toHaveBeenCalled();
+});
+it.each(["imported", "restored"])("omits agent selection and attachment for %s properties when agents belong to the proposal", async (source) => {
+  await lookup(source === "restored");
+  if (source === "restored") {
+    cleanup();
+    render(<NewListingFlow storageKey="draft-test" includeAgents={false} />);
+    await screen.findByText(/unfinished listing has been restored/);
+  }
+  expect(screen.queryByText("Listing agents")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Add agent" })).toBeNull();
+  request.mockResolvedValueOnce(reply({ listing: { id: "saved" } }));
+  fireEvent.click(screen.getByRole("button", { name: "Create listing" }));
+  await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/listings/saved"));
+  const saved = JSON.parse(request.mock.calls.find(([url]) => url === "/api/listings")![1].body);
+  expect(saved.listing_agents).toEqual([]);
+  expect(saved.scraped_listing_json.agents[0].name).toBe("Listing Agent");
 });
 it("keeps manual entry available after lookup failure and validates unknown counts", async () => {
   request.mockRejectedValueOnce(new Error("Lookup unavailable"));

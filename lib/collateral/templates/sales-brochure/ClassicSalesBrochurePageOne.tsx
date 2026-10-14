@@ -26,7 +26,7 @@ export function ClassicSalesBrochurePageOne({ document }: Props) {
       <div className="min-h-0 flex-1">
         <BrochurePageOneHeroGallery document={document} />
       </div>
-      <SalesBrochurePropertySection document={document} />
+      <SalesBrochurePropertySection document={document} report={report} reportVariant="sale" />
     </section>
   );
 }

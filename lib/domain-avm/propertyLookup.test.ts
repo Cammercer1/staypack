@@ -106,7 +106,7 @@ const candidate = {
   state: "NSW",
   postcode: "2026",
 };
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => vi.resetAllMocks());
 it("uses current listing media, copy and agent portraits, keeping unknown parking blank", () => {
   const result = normalizePropertyLookup(profile, candidate.slug, active);
   expect(result).toMatchObject({
@@ -218,6 +218,49 @@ it("rejects a provider profile mismatch before fetching listing details", async 
   );
   expect(fetchDomainJson).toHaveBeenCalledTimes(1);
 });
+it("accepts the Glenelg profile with provider whitespace before the comma", async () => {
+  // Address shape returned by the provider for this off-market property.
+  vi.mocked(fetchDomainJson).mockResolvedValueOnce({
+    data: {
+      propertyDetails: {
+        ...profile,
+        address: {
+          unitNumber: null,
+          streetNumber: "24",
+          streetName: "South Esplanade",
+          streetType: null,
+          streetTypeLong: null,
+          street: null,
+          suburbName: "Glenelg",
+          state: "SA",
+          postcode: "5045",
+          displayAddress: "24 South Esplanade , Glenelg SA 5045",
+          geolocation: { latitude: -34.98516, longitude: 138.51086 },
+        },
+        listings: [],
+      },
+    },
+  });
+  const result = await lookupDomainProperty({
+    source: "domain",
+    slug: "24-south-esplanade-glenelg-sa-5045",
+    address: "24 South Esplanade, Glenelg SA 5045",
+    streetAddress: "24 South Esplanade",
+    suburb: "Glenelg",
+    state: "SA",
+    postcode: "5045",
+  });
+  expect(result).toMatchObject({
+    property_address: "24 South Esplanade",
+    suburb: "Glenelg",
+    state: "SA",
+    postcode: "5045",
+    latitude: -34.98516,
+    longitude: 138.51086,
+    selected_image_urls: [],
+  });
+  expect(fetchDomainJson).toHaveBeenCalledTimes(1);
+});
 it("preserves property facts when the live listing endpoint fails", async () => {
   vi.mocked(fetchDomainJson)
     .mockResolvedValueOnce({ data: { propertyDetails: profile } })
@@ -228,4 +271,55 @@ it("preserves property facts when the live listing endpoint fails", async () => 
   expect(result.scraped_listing_json?.warnings.join(" ")).toContain(
     "could not be loaded",
   );
+});
+
+const rangeProfile = {
+  ...profile,
+  address: { ...profile.address, unitNumber: "14A", streetNumber: "18", street: "Aubrey Street", suburbName: "Surfers Paradise", state: "QLD", postcode: "4217", displayAddress: "14A/18 Aubrey Street, Surfers Paradise QLD 4217" },
+  features: ["Air Conditioning", "Pool"],
+  listings: [{ status: "LIVE", type: "BUY", listingId: active.id, address: { displayAddress: "14A/18-24 Aubrey Street, Surfers Paradise QLD 4217" } }],
+};
+const rangeCandidate = { ...candidate, slug: "14a-18-aubrey-street-surfers-paradise-qld-4217", streetAddress: "14A/18-24 Aubrey Street", address: rangeProfile.listings[0].address.displayAddress, suburb: "Surfers Paradise", state: "QLD", postcode: "4217" };
+const rangeActive = { ...active, metadata: { address_components: { unit_number: "14A", street_number: "18-24", street: "Aubrey Street", suburb: "Surfers Paradise", state_short: "QLD", postcode: "4217" } }, features: ["Balcony"], car_space_count: 1 };
+
+it("imports a range alias only when the profile explicitly links the requested address", async () => {
+  vi.mocked(fetchDomainJson)
+    .mockResolvedValueOnce({ data: { propertyDetails: rangeProfile } })
+    .mockResolvedValueOnce({ data: rangeActive });
+  const result = await lookupDomainProperty(rangeCandidate);
+  expect(result).toMatchObject({ property_address: "14A/18-24 Aubrey Street", car_spaces: 1 });
+  expect(result.scraped_listing_json?.propertyLookup).toMatchObject({ activeListingId: active.id, features: ["Air Conditioning", "Pool", "Balcony"] });
+  expect(result.selected_image_urls).toEqual(["https://example.com/current.jpg"]);
+  expect(result.scraped_listing_json?.domainAvm?.valuation?.midPrice).toBe(1100000);
+});
+
+it.each([
+  { listings: [] },
+  { listings: [{ ...rangeProfile.listings[0], address: { displayAddress: "14B/18-24 Aubrey Street, Surfers Paradise QLD 4217" } }] },
+  { listings: [{ ...rangeProfile.listings[0], address: { displayAddress: "14A/18-24 Aubrey Street, Surfers Paradise QLD 4000" } }] },
+])("rejects range aliases without matching linked evidence", async ({ listings }) => {
+  vi.mocked(fetchDomainJson).mockResolvedValueOnce({ data: { propertyDetails: { ...rangeProfile, listings } } });
+  await expect(lookupDomainProperty(rangeCandidate)).rejects.toThrow("did not match");
+  expect(fetchDomainJson).toHaveBeenCalledTimes(1);
+});
+
+it("rejects the wrong unit even if the profile links its address", async () => {
+  const wrong = { ...rangeCandidate, streetAddress: "14B/18-24 Aubrey Street" };
+  vi.mocked(fetchDomainJson).mockResolvedValueOnce({ data: { propertyDetails: { ...rangeProfile, listings: [{ ...rangeProfile.listings[0], address: { displayAddress: "14B/18-24 Aubrey Street, Surfers Paradise QLD 4217" } }] } } });
+  await expect(lookupDomainProperty(wrong)).rejects.toThrow("did not match");
+});
+
+it("keeps the verified alias and profile amenities when the live endpoint fails", async () => {
+  vi.mocked(fetchDomainJson)
+    .mockResolvedValueOnce({ data: { propertyDetails: rangeProfile } })
+    .mockRejectedValueOnce(new Error("Provider unavailable"));
+  const result = await lookupDomainProperty(rangeCandidate);
+  expect(result.property_address).toBe(rangeCandidate.streetAddress);
+  expect(result.scraped_listing_json?.propertyLookup?.features).toEqual(["Air Conditioning", "Pool"]);
+});
+
+it("does not accept a live range alias using evidence from a different listing ID", () => {
+  const result = normalizePropertyLookup({ ...rangeProfile, listings: [profile.listings[0], { ...rangeProfile.listings[0], listingId: active.id + 1 }] }, rangeCandidate.slug, rangeActive);
+  expect(result.scraped_listing_json?.propertyLookup?.activeListingId).toBeUndefined();
+  expect(result.selected_image_urls).toEqual([]);
 });

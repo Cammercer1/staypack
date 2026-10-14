@@ -29,7 +29,7 @@ export function ClassicSeasonalityChart({
     const points = [["25th", revenueRange.p25], ["Median", revenueRange.p50], ["75th", revenueRange.p75], ["90th", revenueRange.p90]] as const;
     const max = Math.max(...points.map(([, value]) => value ?? 0), 1);
     return <div className="flex h-full flex-col">
-      <p className="mb-2 h-10 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600">Annual estimated range</p>
+      <p className="mb-2 h-10 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600">Annual revenue benchmarks</p>
       <div className="grid h-[7.25rem] grid-cols-4 items-end gap-3 border-y border-neutral-200 py-2" role="img" aria-label="Annual estimated gross STR revenue percentiles">
         {points.map(([label, value]) => <div key={label} className="flex h-full flex-col justify-end text-center text-[0.58rem]">
           <span>{formatCurrency(value)}</span>
@@ -37,7 +37,7 @@ export function ClassicSeasonalityChart({
           <span className="mt-1">{label}</span>
         </div>)}
       </div>
-      <p className="mt-1.5 text-[0.55rem] leading-snug text-neutral-500">{marketOccupancy ? "Monthly occupancy unavailable. " : ""}Market percentiles show a range of estimated gross STR revenue.</p>
+      <p className="mt-1.5 text-[0.55rem] leading-snug text-neutral-500">Market percentiles show a range of estimated annual gross STR revenue, before costs.</p>
     </div>;
   }
   const headline = chartColour;

@@ -23,7 +23,7 @@ export function ClassicSalesBrochureOnePage({
       document={document}
       report={report}
       metricsReport={metricsReport}
-      reportVariant={reportVariant}
+      reportVariant={reportVariant ?? "sale"}
       pageFormat={a4PageFormat}
     />
   );

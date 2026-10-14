@@ -23,6 +23,18 @@ it("completes the postcode without losing the selected unit or street range", as
   expect(await completePlaceAddress("building", session, "18/8-12 Ascot Street, Kensington NSW")).toBe("18/8-12 Ascot Street, Kensington NSW 2033");
   expect(request.mock.calls[0][0]).toContain(`sessionToken=${session}`);
 });
+it.each(["21/8-12 ascot st", "21 / 8 – 12 ascot st", "Unit 21/8—12 ascot st", "Apartment 21, 8-12 ascot st"])("preserves the unit and building range for %s", async (input) => {
+  request.mockResolvedValue({ ok: true, json: async () => ({ suggestions: [
+    "8 12/21 Ascot Street", "8–12 Ascot Street", "8-14 Ascot Street", "22/8-12 Ascot Street", "21/8-12 Ascot Street",
+  ].map((text, index) => ({ placePrediction: { placeId: String(index), text: { text: `${text}, Kensington NSW, Australia` }, structuredFormat: { mainText: { text }, secondaryText: { text: "Kensington NSW" } } } })) }) });
+  const result = await autocompleteAddresses(input, session);
+  expect(JSON.parse(request.mock.calls[0][1].body).input).toBe("8-12 ascot st");
+  expect(result).toEqual([{ placeId: "1", mainText: "21/8-12 Ascot Street", address: "21/8-12 Ascot Street, Kensington NSW, Australia", secondaryText: "Kensington NSW" }]);
+});
+it("does not invent a range or attach a unit to a reversed address when no building matches", async () => {
+  request.mockResolvedValue({ ok: true, json: async () => ({ suggestions: ["8 Ascot Street", "12/21 Ascot Street", "8-10 Ascot Street"].map((text) => ({ placePrediction: { placeId: text, text: { text: `${text}, Kensington NSW` } } })) }) });
+  expect(await autocompleteAddresses("21/8-12 Ascot Street Kensington", session)).toEqual([]);
+});
 it("fails cleanly without a key or when Google rejects the request", async () => {
   vi.stubEnv("GOOGLE_MAPS_API_KEY", "");
   await expect(autocompleteAddresses("Ascot", session)).rejects.toThrow("still type");

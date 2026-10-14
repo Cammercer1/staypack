@@ -90,7 +90,8 @@ export function collateralEditorPath(
 }
 
 export function reportEditorPath(listingId: string, reportId: string): string {
-  return `/listings/${listingId}/reports/${reportId}`;
+  void listingId;
+  return `/short-term-rentals/appraisals/${reportId}`;
 }
 
 export function leaseAppraisalEditorPath(listingId: string): string {

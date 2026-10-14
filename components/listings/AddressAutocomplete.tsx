@@ -12,9 +12,10 @@ type Props = {
   disabled?: boolean;
   onChange: (value: string) => void;
   onResolvingChange: (resolving: boolean) => void;
+  onSelect?: (address: string) => void;
 };
 
-export function AddressAutocomplete({ id, value, disabled, onChange, onResolvingChange }: Props) {
+export function AddressAutocomplete({ id, value, disabled, onChange, onResolvingChange, onSelect }: Props) {
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
@@ -25,6 +26,7 @@ export function AddressAutocomplete({ id, value, disabled, onChange, onResolving
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const session = useRef<string | null>(null);
   const focused = useRef(false);
+  const selecting = useRef(false);
 
   function cancel() {
     if (timer.current) clearTimeout(timer.current);
@@ -77,6 +79,8 @@ export function AddressAutocomplete({ id, value, disabled, onChange, onResolving
   }
 
   async function select(suggestion: AddressSuggestion) {
+    if (disabled || selecting.current) return;
+    selecting.current = true;
     cancel();
     setOpen(false);
     setSuggestions([]);
@@ -89,6 +93,7 @@ export function AddressAutocomplete({ id, value, disabled, onChange, onResolving
     pending.current = controller;
     const token = session.current ?? crypto.randomUUID();
     session.current = null;
+    let selectedAddress: string | undefined;
     try {
       const response = await fetch("/api/listings/address-suggestions", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -96,15 +101,21 @@ export function AddressAutocomplete({ id, value, disabled, onChange, onResolving
       });
       if (!response.ok || response.redirected) throw new Error("Address unavailable");
       const result = await response.json();
-      if (!controller.signal.aborted && result.address) onChange(result.address);
+      if (!controller.signal.aborted && typeof result.address === "string" && result.address.trim()) {
+        selectedAddress = result.address;
+        onChange(result.address);
+      } else if (!controller.signal.aborted) {
+        throw new Error("Address unavailable");
+      }
     } catch {
       if (!controller.signal.aborted) setMessage("Check the selected address and add a unit number if needed, then choose Find property.");
     } finally {
-      if (!controller.signal.aborted) {
-        setResolving(false);
-      }
+      selecting.current = false;
+      setResolving(false);
       onResolvingChange(false);
     }
+    // Use the completed address directly, not the parent's previous input state.
+    if (!controller.signal.aborted && selectedAddress) onSelect?.(selectedAddress);
   }
 
   const expanded = open && !disabled && suggestions.length > 0;

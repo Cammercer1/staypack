@@ -15,7 +15,7 @@ import { finalReportToBrochureShape } from "@/lib/reports/finalReportToBrochureS
 import { getReportBrandColours } from "@/lib/reports/brandColours";
 import { salesBrochureTemplateIdForFamily } from "@/lib/reports/templates/salesBrochureFamilyMap";
 import { ReportBrochureEditableLayer } from "@/components/reports/inline/ReportBrochureEditableBridge";
-import type { ReportPageOneProps } from "@/lib/reports/templates/shared/reportPageVariant";
+import { resolveReportPageVariant, type ReportPageOneProps } from "@/lib/reports/templates/shared/reportPageVariant";
 import { useMemo, type ReactNode } from "react";
 
 export type ReportBrochureLayoutFamily =
@@ -104,7 +104,11 @@ export function ReportBrochureStylePageOne({ report, reportVariant, family }: Pr
             <MinimalistSpread document={document} report={displayReport} />
           ) : null}
           {family === "landmark" ? (
-            <LandmarkSpread document={document} report={displayReport} />
+            <LandmarkSpread
+              document={document}
+              report={displayReport}
+              reportVariant={resolveReportPageVariant(displayReport, reportVariant)}
+            />
           ) : null}
         </div>
       </BrochurePageShell>

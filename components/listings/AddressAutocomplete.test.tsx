@@ -6,17 +6,18 @@ import { AddressAutocomplete } from "./AddressAutocomplete";
 const request = vi.fn();
 const suggestion = { placeId: "property", address: "18/8 Ascot Street, Kensington NSW", mainText: "18/8 Ascot Street", secondaryText: "Kensington NSW" };
 const reply = (data: unknown) => ({ ok: true, json: async () => data });
-function Harness() {
+function Harness({ onSelect }: { onSelect?: (address: string) => void }) {
   const [value, setValue] = useState("");
   const [resolving, setResolving] = useState(false);
-  return <><label htmlFor="address">Property address</label><AddressAutocomplete id="address" value={value} onChange={setValue} onResolvingChange={setResolving} /><button disabled={resolving}>Find property</button></>;
+  return <><label htmlFor="address">Property address</label><AddressAutocomplete id="address" value={value} onChange={setValue} onResolvingChange={setResolving} onSelect={onSelect} /><button disabled={resolving}>Find property</button></>;
 }
 beforeEach(() => { vi.useFakeTimers(); request.mockReset(); vi.stubGlobal("fetch", request); });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 async function advance() { await act(async () => { await vi.advanceTimersByTimeAsync(300); }); }
 it("debounces typing and selects via keyboard using the same session, then starts a fresh session", async () => {
   request.mockResolvedValueOnce(reply({ suggestions: [suggestion] })).mockResolvedValueOnce(reply({ address: `${suggestion.address} 2033` })).mockResolvedValueOnce(reply({ suggestions: [] }));
-  render(<Harness />);
+  const onSelect = vi.fn();
+  render(<Harness onSelect={onSelect} />);
   const input = screen.getByRole("combobox");
   fireEvent.focus(input);
   fireEvent.change(input, { target: { value: "18/8 Asc" } });
@@ -29,6 +30,7 @@ it("debounces typing and selects via keyboard using the same session, then start
   fireEvent.keyDown(input, { key: "ArrowDown" });
   await act(async () => { fireEvent.keyDown(input, { key: "Enter" }); });
   expect((input as HTMLInputElement).value).toBe(`${suggestion.address} 2033`);
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith(`${suggestion.address} 2033`);
   expect(screen.queryByRole("listbox")).toBeNull();
   const first = JSON.parse(request.mock.calls[0][1].body);
   expect(JSON.parse(request.mock.calls[1][1].body).sessionToken).toBe(first.sessionToken);
@@ -54,7 +56,8 @@ it("ignores a stale response after the address changes and keeps manual input av
 });
 it("supports mouse selection and Escape closes the suggestions", async () => {
   request.mockResolvedValueOnce(reply({ suggestions: [suggestion] })).mockResolvedValueOnce(reply({ address: `${suggestion.address} 2033` }));
-  render(<Harness />);
+  const onSelect = vi.fn();
+  render(<Harness onSelect={onSelect} />);
   const input = screen.getByRole("combobox");
   fireEvent.focus(input);
   fireEvent.change(input, { target: { value: "18/8 Ascot" } });
@@ -64,4 +67,31 @@ it("supports mouse selection and Escape closes the suggestions", async () => {
   fireEvent.focus(input);
   await act(async () => { fireEvent.click(screen.getByRole("option")); });
   expect((input as HTMLInputElement).value).toBe(`${suggestion.address} 2033`);
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith(`${suggestion.address} 2033`);
+});
+it("keeps manual lookup available without automatically searching an unresolved address", async () => {
+  request.mockResolvedValueOnce(reply({ suggestions: [suggestion] })).mockRejectedValueOnce(new Error("Offline"));
+  const onSelect = vi.fn();
+  render(<Harness onSelect={onSelect} />);
+  const input = screen.getByRole("combobox");
+  fireEvent.focus(input);
+  fireEvent.change(input, { target: { value: "18/8 Ascot" } });
+  await advance();
+  await act(async () => { fireEvent.click(screen.getByRole("option")); });
+  expect(onSelect).not.toHaveBeenCalled();
+  expect((screen.getByRole("button", { name: "Find property" }) as HTMLButtonElement).disabled).toBe(false);
+  expect(screen.getByText(/Check the selected address/)).toBeTruthy();
+});
+it("does not search after a pending selection is unmounted", async () => {
+  let finish!: (value: unknown) => void;
+  request.mockResolvedValueOnce(reply({ suggestions: [suggestion] })).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const onSelect = vi.fn();
+  const view = render(<Harness onSelect={onSelect} />);
+  fireEvent.focus(screen.getByRole("combobox"));
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "18/8 Ascot" } });
+  await advance();
+  fireEvent.click(screen.getByRole("option"));
+  view.unmount();
+  await act(async () => { finish(reply({ address: `${suggestion.address} 2033` })); });
+  expect(onSelect).not.toHaveBeenCalled();
 });

@@ -27,6 +27,9 @@ export default async function ListingDetailPage({
     supabase.from("reports").select("*").eq("listing_id", listingId).neq("status", "archived").order("created_at", { ascending: false }),
     supabase.from("collateral_items").select("*").eq("listing_id", listingId).neq("status", "archived").order("created_at", { ascending: true }),
   ]);
+  const { data: strAppraisals, error: strError } = await supabase.from("str_appraisals")
+    .select("report_id,report:reports!inner(listing_id)").eq("agency_id",agency.id).eq("report.listing_id",listingId);
+  if (strError) throw new Error(strError.message);
 
   return (
     <div className="space-y-6">
@@ -36,6 +39,7 @@ export default async function ListingDetailPage({
         collateral={(collateral ?? []) as CollateralItem[]}
         leads={[]}
         reports={(reports ?? []) as Report[]}
+        strReportIds={(strAppraisals ?? []).map((appraisal) => appraisal.report_id)}
         stats={{ total_views: 0, views_last_30d: 0, total_leads: 0 }}
       />
     </div>

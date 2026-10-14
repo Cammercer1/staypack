@@ -21,6 +21,7 @@ import { buildScrapedListingFields } from "@/lib/listings/buildScrapedListingFie
 import { extractListingFromUrl } from "@/lib/scraping/extractListing";
 import { resolveListingImageRole } from "@/lib/listings/listingImageMeta";
 import type { Listing } from "@/lib/types";
+import { userFacingPropertyMessage } from "@/lib/listings/userFacingPropertyMessages";
 
 export const maxDuration = 120;
 const inputSchema = z.discriminatedUnion("action", [
@@ -145,7 +146,7 @@ export async function POST(request: Request) {
           error instanceof z.ZodError
             ? error.issues[0]?.message
             : error instanceof Error
-              ? error.message
+              ? userFacingPropertyMessage(error.message)
               : "Unable to look up this property. Try again or enter the details manually.",
       },
       { status: 400 },

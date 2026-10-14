@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { createRef } from "react";
-import { cleanup, fireEvent, render, screen, act } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, act, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { StrEstimateStep, type StrEstimateHandle } from "./StrEstimateStep";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+function openAssumptions() { fireEvent.click(screen.getByRole("button", { name: "Fine-tune assumptions" })); }
+function applyAssumptions() { fireEvent.click(screen.getByRole("button", { name: "Apply changes" })); }
 it("allows searching the full pool and saves chosen report comps without another estimate request", async () => {
   const f = createLintRegressionFixtures();
   const pool = f.report.str_enrichment_json!.comps;
@@ -34,16 +36,19 @@ it("previews revenue with either lever, saves only assumptions, and resets witho
   vi.stubGlobal("fetch", fetcher);
   const ref = createRef<StrEstimateHandle>();
   render(<StrEstimateStep ref={ref} listing={f.listing} report={f.report} busy={false} onComplete={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />);
+  openAssumptions();
   fireEvent.change(screen.getByLabelText("Average daily rate · ADR ($)"), { target: { value: "400" } });
   fireEvent.change(screen.getByLabelText("Estimated occupancy (%)"), { target: { value: "75" } });
   expect(screen.getByText("$109,500")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Estimated occupancy (%)"), { target: { value: "50" } });
   expect(screen.getByLabelText("Average daily rate · ADR ($)")).toHaveProperty("value", "400");
   expect(screen.getByText("$73,000")).toBeTruthy();
+  applyAssumptions();
   await act(async () => { await ref.current!.savePendingEdits(); });
   expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ str_adjustment: { mode: "management", nightlyRate: 400, occupancyRate: 50, assumptions: { unavailableNights: 0, listingStage: "established", rationale: "Assumes professional presentation and active pricing, with availability as stated." } } });
-  fireEvent.click(screen.getByText("Fine-tune assumptions"));
+  openAssumptions();
   fireEvent.click(screen.getByRole("button", { name: "Reset assumptions" }));
+  applyAssumptions();
   await act(async () => { await ref.current!.savePendingEdits(); });
   // The mock returned the original report, so restoring those same assumptions is a no-op.
   expect(fetcher).toHaveBeenCalledTimes(1);
@@ -56,11 +61,14 @@ it("rejects empty inputs and allows a zero-occupancy scenario", async () => {
   vi.stubGlobal("fetch", fetcher);
   const ref = createRef<StrEstimateHandle>();
   render(<StrEstimateStep ref={ref} listing={f.listing} report={f.report} busy={false} onComplete={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />);
+  openAssumptions();
   fireEvent.change(screen.getByLabelText("Estimated occupancy (%)"), { target: { value: "" } });
+  expect(screen.getByRole("button", { name: "Apply changes" })).toHaveProperty("disabled", true);
   await act(async () => { expect(await ref.current!.savePendingEdits()).toBeNull(); });
   expect(fetcher).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText("Estimated occupancy (%)"), { target: { value: "0" } });
   expect(screen.getByText("$0")).toBeTruthy();
+  applyAssumptions();
   await act(async () => { await ref.current!.savePendingEdits(); });
   expect(JSON.parse(fetcher.mock.calls[0][1].body).str_adjustment.occupancyRate).toBe(0);
 });
@@ -72,8 +80,8 @@ it("applies a company preset explicitly, saves a report snapshot, and enforces u
   vi.stubGlobal("fetch", fetcher);
   const ref = createRef<StrEstimateHandle>();
   render(<StrEstimateStep ref={ref} agency={f.agency} listing={f.listing} report={f.report} busy={false} onComplete={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />);
+  openAssumptions();
   const before = screen.getByLabelText("Average daily rate · ADR ($)").getAttribute("value");
-  fireEvent.click(screen.getByText("Fine-tune assumptions"));
   fireEvent.change(screen.getByLabelText("Use a different preset"), { target: { value: preset.id } });
   expect(screen.getByLabelText("Average daily rate · ADR ($)").getAttribute("value")).toBe(before);
   expect(fetcher).not.toHaveBeenCalled();
@@ -84,18 +92,54 @@ it("applies a company preset explicitly, saves a report snapshot, and enforces u
   await act(async () => { expect(await ref.current!.savePendingEdits()).toBeNull(); });
   expect(fetcher).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText(/Unavailable nights \/ year/), { target: { value: "21" } });
+  applyAssumptions();
   await act(async () => { await ref.current!.savePendingEdits(); });
   const saved = JSON.parse(fetcher.mock.calls[0][1].body).str_adjustment;
   expect(saved).toEqual({ mode: "management", nightlyRate: 440, occupancyRate: 72, assumptions: { ...preset.assumptions, presetName: preset.name } });
+});
+
+it.each(["Cancel", "Cancel assumption changes", "Escape"])("discards modal drafts with %s while retaining the earlier uplift and precision", async (dismissal) => {
+  const f = createLintRegressionFixtures();
+  const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+  const ref = createRef<StrEstimateHandle>();
+  render(<StrEstimateStep ref={ref} agency={f.agency} listing={f.listing} report={f.report} busy={false} onComplete={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("Management uplift (%)"), { target: { value: "28" } });
+  openAssumptions();
+  const originalAdr = (screen.getByLabelText("Average daily rate · ADR ($)") as HTMLInputElement).value;
+  const originalOccupancy = (screen.getByLabelText("Estimated occupancy (%)") as HTMLInputElement).value;
+  fireEvent.change(screen.getByLabelText("Use a different preset"), { target: { value: f.agency.str_management_presets![0].id } });
+  fireEvent.click(screen.getByRole("button", { name: "Apply preset" }));
+  fireEvent.change(screen.getByLabelText("Average daily rate · ADR ($)"), { target: { value: "800" } });
+  fireEvent.change(screen.getByLabelText(/Basis for your management estimate/), { target: { value: "" } });
+  expect(screen.getByRole("button", { name: "Apply changes" })).toHaveProperty("disabled", true);
+  await act(async () => { expect(await ref.current!.savePendingEdits()).toBeNull(); });
+  if (dismissal === "Escape") fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+  else fireEvent.click(screen.getByRole("button", { name: dismissal }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(screen.getByLabelText("Management uplift (%)")).toHaveProperty("value", "28");
+  expect(screen.getByText("$126,080")).toBeTruthy();
+  openAssumptions();
+  expect(screen.getByLabelText("Average daily rate · ADR ($)")).toHaveProperty("value", originalAdr);
+  expect(screen.getByLabelText("Estimated occupancy (%)")).toHaveProperty("value", originalOccupancy);
+  expect(screen.getByLabelText("Use a different preset")).toHaveProperty("value", "");
+  expect(screen.getByRole("button", { name: "Apply changes" })).toHaveProperty("disabled", false);
+  expect(fetcher).not.toHaveBeenCalled();
 });
 
 it("filters professionally managed matches from the saved pool without changing report selection or calling an API", async () => {
   const f = createLintRegressionFixtures();
   const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
   render(<StrEstimateStep listing={f.listing} report={f.report} busy={false} onComplete={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />);
-  fireEvent.click(screen.getByLabelText("Show matching professionally managed properties only"));
+  const filter = screen.getByRole("button", { name: "Professionally managed (3)" });
+  const selectedBefore = screen.getAllByRole("checkbox", { name: /Feature Coastal/, checked: true }).map((input) => input.getAttribute("aria-label"));
+  expect(screen.queryByRole("heading", { name: /Professionally managed properties/ })).toBeNull();
+  fireEvent.click(filter);
+  expect(filter.getAttribute("aria-pressed")).toBe("true");
   expect(screen.getAllByRole("checkbox", { name: /Feature Coastal/ })).toHaveLength(3);
-  expect(screen.getByText(/3 with saved annual revenue evidence/)).toBeTruthy();
+  expect(screen.getByRole("status").textContent).toContain("3 comparables shown");
+  fireEvent.click(filter);
+  expect(filter.getAttribute("aria-pressed")).toBe("false");
+  expect(screen.getAllByRole("checkbox", { name: /Feature Coastal/, checked: true }).map((input) => input.getAttribute("aria-label"))).toEqual(selectedBefore);
   expect(fetcher).not.toHaveBeenCalled();
 });
 
@@ -108,12 +152,14 @@ it("leads with management controls, keeps details collapsed, and never reapplies
   const { rerender } = render(<StrEstimateStep ref={ref} {...props} />);
   expect(screen.getByRole("heading", { name: "Your management estimate" })).toBeTruthy();
   expect(screen.queryByRole("radiogroup", { name: "Report estimate basis" })).toBeNull();
-  expect(screen.getByText("Fine-tune assumptions").closest("details")).toHaveProperty("open", false);
+  expect(screen.queryByRole("dialog")).toBeNull();
   expect(screen.getByText(/View comparison/).closest("details")).toHaveProperty("open", false);
   const changed = structuredClone(f.agency);
   changed.str_management_presets!.find((preset) => preset.mode === "relative")!.adrPercent = 100;
   rerender(<StrEstimateStep ref={ref} {...props} agency={changed} />);
+  openAssumptions();
   expect(screen.getByLabelText("Average daily rate · ADR ($)")).toHaveProperty("value", "440");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   await act(async () => { expect(await ref.current!.savePendingEdits()).toBe(report); });
   expect(fetcher).not.toHaveBeenCalled();
 });
@@ -123,7 +169,7 @@ it("applies a relative preset from the original reference each time, without com
   const preset = f.agency.str_management_presets!.find((preset) => preset.mode === "relative")!;
   const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
   render(<StrEstimateStep agency={f.agency} listing={f.listing} report={f.report} busy={false} onComplete={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />);
-  fireEvent.click(screen.getByText("Fine-tune assumptions"));
+  openAssumptions();
   fireEvent.change(screen.getByLabelText("Use a different preset"), { target: { value: preset.id } });
   fireEvent.click(screen.getByRole("button", { name: "Apply preset" }));
   expect(screen.getByLabelText("Average daily rate · ADR ($)")).toHaveProperty("value", "412.29");
@@ -144,15 +190,18 @@ it("restores fractional company defaults exactly and keeps untouched preset prec
   vi.stubGlobal("fetch", fetcher);
   const ref = createRef<StrEstimateHandle>();
   render(<StrEstimateStep ref={ref} agency={f.agency} listing={f.listing} report={report} busy={false} onComplete={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />);
-  fireEvent.click(screen.getByText("Fine-tune assumptions"));
+  openAssumptions();
   fireEvent.click(screen.getByRole("button", { name: "Restore company defaults" }));
   expect(screen.getByLabelText("Average daily rate · ADR ($)")).toHaveProperty("value", "339.72");
   expect(screen.getByLabelText("Estimated occupancy (%)")).toHaveProperty("value", "61.46");
   expect(screen.getByText("$76,203")).toBeTruthy();
+  applyAssumptions();
   await act(async () => { await ref.current!.savePendingEdits(); });
   expect(JSON.parse(fetcher.mock.calls[0][1].body).str_adjustment).toMatchObject({ nightlyRate: expectedAdr, occupancyRate: expectedOccupancy });
+  openAssumptions();
   fireEvent.click(screen.getByRole("button", { name: "Restore company defaults" }));
   fireEvent.change(screen.getByLabelText("Average daily rate · ADR ($)"), { target: { value: "360" } });
+  applyAssumptions();
   await act(async () => { await ref.current!.savePendingEdits(); });
   expect(JSON.parse(fetcher.mock.calls[1][1].body).str_adjustment).toMatchObject({ nightlyRate: 360, occupancyRate: expectedOccupancy });
   expect(fetcher.mock.calls.every(([url]) => url === `/api/reports/${report.id}`)).toBe(true);
@@ -170,7 +219,7 @@ it("offers first-appraisal default setup to an admin, previews uplift, and saves
   render(<StrEstimateStep ref={ref} agency={agency} listing={f.listing} report={report} canManageDefaults onCompanyPresetsChange={changed} busy={false} onComplete={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />);
   expect(screen.getByText('Set your company’s approach on this first appraisal')).toBeTruthy();
   expect(screen.getByLabelText('Management uplift (%)')).toHaveProperty('value', '0');
-  expect(screen.getByLabelText('Average daily rate · ADR ($)').closest('details')).toHaveProperty('open', false);
+  expect(screen.queryByRole("dialog")).toBeNull();
   fireEvent.change(screen.getByLabelText('Management uplift (%)'), { target: { value: '28' } });
   expect(screen.getByText('$81,458')).toBeTruthy();
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save 28% as company default' })); });
@@ -193,11 +242,12 @@ it("keeps uplift and granular controls in sync, rejects an empty uplift, and nev
   expect(screen.queryByRole('button', { name: /as company default/ })).toBeNull();
   fireEvent.change(screen.getByLabelText('Management uplift (%)'), { target: { value: '28' } });
   expect(screen.getByText('$126,080')).toBeTruthy();
-  fireEvent.click(screen.getByText('Fine-tune assumptions'));
+  openAssumptions();
   fireEvent.change(screen.getByLabelText('Average daily rate · ADR ($)'), { target: { value: '400' } });
   fireEvent.change(screen.getByLabelText('Estimated occupancy (%)'), { target: { value: '75' } });
   expect(screen.getByLabelText('Management uplift (%)')).toHaveProperty('value', '11.17');
   expect(screen.getByText('$109,500')).toBeTruthy();
+  applyAssumptions();
   fireEvent.change(screen.getByLabelText('Management uplift (%)'), { target: { value: '' } });
   await act(async () => { expect(await ref.current!.savePendingEdits()).toBeNull(); });
   expect(fetcher).not.toHaveBeenCalled();
@@ -212,7 +262,7 @@ it("leaves first-appraisal figures editable when company setup fails", async () 
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save 28% as company default' })); });
   expect(screen.getByRole('alert').textContent).toContain('Company settings changed');
   expect(screen.getByLabelText('Management uplift (%)')).toHaveProperty('value', '28');
-  expect(screen.getByRole('button', { name: /Use figures/ })).toHaveProperty('disabled', false);
+  expect(screen.getByRole('button', { name: /Continue to design/ })).toHaveProperty('disabled', false);
 });
 
 it("keeps the requested uplift consistent while correcting wording and changing availability", async () => {
@@ -220,15 +270,38 @@ it("keeps the requested uplift consistent while correcting wording and changing 
   const fetcher = vi.fn().mockResolvedValue(Response.json({ report: f.report })); vi.stubGlobal('fetch', fetcher);
   const ref = createRef<StrEstimateHandle>();
   render(<StrEstimateStep ref={ref} agency={f.agency} listing={f.listing} report={f.report} busy={false} onComplete={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />);
-  fireEvent.click(screen.getByText('Fine-tune assumptions'));
-  fireEvent.change(screen.getByLabelText(/Basis for your management estimate/), { target: { value: '' } });
   fireEvent.change(screen.getByLabelText('Management uplift (%)'), { target: { value: '28' } });
+  openAssumptions();
+  fireEvent.change(screen.getByLabelText(/Basis for your management estimate/), { target: { value: '' } });
   fireEvent.change(screen.getByLabelText(/Basis for your management estimate/), { target: { value: 'Reviewed company assumptions' } });
   expect(screen.getByText('$126,080')).toBeTruthy();
   fireEvent.change(screen.getByLabelText(/Unavailable nights \/ year/), { target: { value: '180' } });
   expect(screen.getByText('$126,080')).toBeTruthy();
+  applyAssumptions();
   await act(async () => { await ref.current!.savePendingEdits(); });
   const saved = JSON.parse(fetcher.mock.calls[0][1].body).str_adjustment;
   expect(saved.occupancyRate / 100 * 365).toBeCloseTo(185);
   expect(Math.round(saved.nightlyRate * saved.occupancyRate / 100 * 365)).toBe(126080);
+});
+
+it.each([undefined, "market_resolution_failed", "insufficient_data"] as const)("keeps the saved estimate usable when the occupancy benchmark is unavailable for %s", (reason) => {
+  const f = createLintRegressionFixtures();
+  f.report.str_enrichment_json!.market_occupancy = { status: "unavailable", unavailable_reason: reason, market: null, label: "Market occupancy unavailable", fetched_at: "2026-10-10", request_key: "legacy-failure", cost_cents: 1, filters: {}, sample_count: null, warnings: ["The market location could not be resolved unambiguously."], months: [] };
+  const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+  render(<StrEstimateStep listing={f.listing} report={f.report} busy={false} onComplete={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />);
+  openAssumptions();
+  expect(screen.getByLabelText("Estimated occupancy (%)")).toHaveProperty("value", String(Math.round(f.report.final_estimate_json!.occupancyRate! * 100) / 100));
+  expect(screen.queryByRole("button", { name: /refresh|retry|fetch/i })).toBeNull();
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+it("keeps the saved management estimate when a broader occupancy benchmark is present", () => {
+  const f = createLintRegressionFixtures();
+  f.report.str_enrichment_json!.market_occupancy = { status: "available", benchmark_scope: "all_property_types", market: { country: "Australia", region: "New South Wales", locality: "Sydney" }, label: "Sydney · 3-bed entire homes · all property types", fetched_at: "2026-10-10", request_key: "broad", cost_cents: 21, filters: {}, sample_count: null, warnings: [], months: [{ month: "2026-09", average: 55, p25: 30, p50: 58, p75: 79, p90: 90 }] };
+  const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+  render(<StrEstimateStep listing={f.listing} report={f.report} busy={false} onComplete={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />);
+  openAssumptions();
+  expect(screen.getByLabelText("Estimated occupancy (%)")).toHaveProperty("value", String(Math.round(f.report.final_estimate_json!.occupancyRate! * 100) / 100));
+  expect(screen.queryByRole("button", { name: /refresh|retry|fetch/i })).toBeNull();
+  expect(fetcher).not.toHaveBeenCalled();
 });

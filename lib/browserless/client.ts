@@ -54,6 +54,7 @@ export async function browserlessRequest(
     responseType?: "text" | "buffer" | "json";
     query?: Record<string, string | number>;
     errorContext?: "scrape" | "pdf";
+    timeoutMs?: number;
   },
 ) {
   const apiKey = getBrowserlessApiKey();
@@ -70,6 +71,7 @@ export async function browserlessRequest(
     buildBrowserlessUrl(path, options?.query),
     {
       method: "POST",
+      ...(options?.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : {}),
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "no-cache",

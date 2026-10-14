@@ -1,4 +1,5 @@
 import { strAdjustmentSchema } from "@/lib/reports/strEstimateAdjustments";
+import { strPropertyContextSchema } from "@/lib/str/propertyInputs";
 import { normalizeAdvertisedPrice } from "@/lib/listings/pricing";
 import { z } from "zod";
 import { domainAvmSchema } from "@/lib/domain-avm/schema";
@@ -233,6 +234,7 @@ export const createListingSchema = updateListingSchema.extend({
 });
 
 export const updateReportSchema = z.object({
+  str_property: strPropertyContextSchema.optional(),
   str_adjustment: strAdjustmentSchema.optional(),
   selected_comp_listing_ids: z.array(z.string().min(1)).min(1).max(6).optional(),
   status: reportStatusSchema.optional(),

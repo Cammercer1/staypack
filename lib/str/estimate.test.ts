@@ -26,3 +26,26 @@ it("uses the AirROI headline without model calls or sparse-comp retries", async 
   expect(fetchAirroiMarketOccupancy).toHaveBeenCalledTimes(1);
   expect(network).not.toHaveBeenCalled();
 });
+
+it("adds broader occupancy evidence and its bounded cost without repricing the subject or changing comparable selection", async () => {
+  const f = createLintRegressionFixtures();
+  const input = { latitude: -33.9, longitude: 151.2, bedrooms: 3, bathrooms: 2, accommodates: 6 };
+  const estimate = f.report.original_estimate_json!;
+  const enrichment = { ...f.report.str_enrichment_json!, cost_cents: 20 };
+  vi.mocked(fetchAirroiEstimate).mockResolvedValue({ estimate, enrichment });
+  const history: Awaited<ReturnType<typeof fetchAirroiMarketOccupancy>> = {
+    status: "available", cost_cents: 21, benchmark_scope: "all_property_types",
+    market: { country: "Australia", region: "New South Wales", locality: "Sydney" },
+    label: "Sydney · 3-bed entire homes · all property types", filters: { room_type: { eq: "entire_home" }, bedrooms: { eq: 3 } },
+    fetched_at: "2026-10-10", request_key: "broad", sample_count: null, warnings: [],
+    months: [{ month: "2026-09", average: 40, p25: 25, p50: 35, p75: 60, p90: 80 }],
+  };
+  vi.mocked(fetchAirroiMarketOccupancy).mockResolvedValue(history);
+  const saved = await fetchStrEstimate(input, { ...f.listing, property_type: "Duplex" });
+  expect(saved.estimate).toEqual(estimate);
+  expect(saved.enrichment).toMatchObject({ market_occupancy: history, cost_cents: 41, comps: enrichment.comps });
+  expect(saved.enrichment.selected_comp_ids).toEqual(enrichment.selected_comp_ids);
+  expect(saved.enrichment.comp_pool).toEqual(enrichment.comp_pool);
+  expect(fetchAirroiEstimate).toHaveBeenCalledOnce();
+  expect(fetchAirroiMarketOccupancy).toHaveBeenCalledOnce();
+});

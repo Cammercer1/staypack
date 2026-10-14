@@ -1,3 +1,4 @@
+import { resolveReportEstimate } from "@/lib/reports/normalizeEstimate";
 import {
   buildFinalReportJson,
   getMockAiCopy,
@@ -43,7 +44,7 @@ export function buildStrTemplatePreview({
       agencyAgents,
       listing,
       report: { ...report, template_id: templateId },
-      estimate: report.final_estimate_json ?? pendingEstimate,
+      estimate: resolveReportEstimate(report) ?? pendingEstimate,
       copy:
         report.ai_copy_json ??
         (report.final_report_json

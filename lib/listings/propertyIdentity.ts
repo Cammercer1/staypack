@@ -28,7 +28,7 @@ export function propertyIdentity(input: Address) {
     "",
   );
   const full = address;
-  address = address.split(",")[0];
+  address = address.split(",")[0].trim();
   // Also accept a full address entered without commas, keeping unit/range intact.
   const suburb = normalize(input.suburb);
   if (suburb && address.endsWith(suburb))

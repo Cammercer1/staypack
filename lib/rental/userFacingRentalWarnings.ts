@@ -1,3 +1,5 @@
+import { isPropertyProviderDiagnostic } from "@/lib/listings/userFacingPropertyMessages";
+
 /** Operational scrape/enrich messages — not shown in product UI. */
 export function isInternalRentalAppraisalWarning(message: string): boolean {
   const trimmed = message.trim();
@@ -9,7 +11,7 @@ export function isInternalRentalAppraisalWarning(message: string): boolean {
     return true;
   }
 
-  if (/RapidAPI|Apify|Bright\s*Data/i.test(trimmed)) {
+  if (isPropertyProviderDiagnostic(trimmed) || /RapidAPI|Apify|Bright\s*Data/i.test(trimmed)) {
     return true;
   }
 

@@ -22,6 +22,7 @@ function buildSnapshotStats(report: FinalReportJson): ReportSnapshotStat[] {
   const range = enrichment?.revenue_range;
   const grossYield = resolveStrGrossYield({
     display_price: report.property.display_price,
+    estimated_value: report.property.estimated_value,
     annual_revenue: str.annual_revenue,
     str_yield: report.str_yield,
   });
@@ -45,6 +46,7 @@ function buildSnapshotStats(report: FinalReportJson): ReportSnapshotStat[] {
       id: "yield",
       label: "Est. gross STR yield",
       value: formatStrGrossYield(grossYield),
+      ...(report.property.estimated_value != null ? { footnote: "based on estimated property value" } : {}),
     });
   }
 

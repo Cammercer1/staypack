@@ -24,7 +24,11 @@ it.each(["relative", "uplift"] as const)("passes %s company defaults and frozen 
     };
     return query;
   };
-  vi.mocked(createAdminClient).mockReturnValue({ from } as unknown as ReturnType<typeof createAdminClient>);
+  const rpc = vi.fn(async (_name, args) => {
+    saved = { ...saved, id: args.p_report_id, template_id: args.p_template_id };
+    return { data: saved.id, error: null };
+  });
+  vi.mocked(createAdminClient).mockReturnValue({ from, rpc } as unknown as ReturnType<typeof createAdminClient>);
   vi.mocked(fetchStrEstimate).mockResolvedValue({ estimate: f.report.original_estimate_json!, enrichment: f.report.str_enrichment_json! });
   // Stop before the external copy/PDF/publishing stages; this test covers their persisted inputs.
   vi.mocked(generateReportCopy).mockRejectedValue(new Error("stop after estimate"));
@@ -33,6 +37,7 @@ it.each(["relative", "uplift"] as const)("passes %s company defaults and frozen 
     templateIdOverride: "classic-detailed", agentProfile: f.agent, agencyAgents: [f.agent],
   })).rejects.toThrow("stop after estimate");
   expect(fetchStrEstimate).toHaveBeenCalledOnce();
+  expect(rpc).toHaveBeenCalledWith("create_str_appraisal", expect.objectContaining({ p_source: "managed_delivery", p_recipient: expect.objectContaining({ mode: "general" }) }));
   expect(saved.original_estimate_json!.annualRevenue).toBe(98500);
   expect(saved.final_estimate_json!.annualRevenue).toBe(mode === "uplift" ? 126080 : 115874);
   if (mode === "uplift") expect(saved.user_overrides_json!.strManagement!.presetUpliftPercent).toBe(28);

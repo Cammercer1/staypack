@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import {
   House,
+  Palmtree,
   Building2,
   LayoutDashboard,
   Menu,
@@ -24,6 +25,7 @@ const navigationGroups = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { href: "/listings", label: "Listings", icon: House },
+      { href: "/short-term-rentals", label: "Short-Term Rentals", icon: Palmtree },
     ],
   },
   {

@@ -8,6 +8,7 @@ import { createListingSchema } from "@/lib/validation/schemas";
 import { findExistingProperty } from "@/lib/listings/findExistingProperty";
 import { unstable_rethrow } from "next/navigation";
 import type { Report } from "@/lib/types";
+import { isConfirmedStrReport } from "@/lib/str-appraisals/classification";
 
 export async function GET(request: Request) {
   try {
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
       const { reports: _reports, ...listing } = row;
       return {
         ...listing,
-        str_report: reports.find((report: Report) => report.status !== "archived") ?? reports[0] ?? null,
+        str_report: reports.find((report: Report) => report.status !== "archived" && isConfirmedStrReport(report)) ?? null,
       };
     });
 

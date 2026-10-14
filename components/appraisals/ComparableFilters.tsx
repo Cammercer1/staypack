@@ -1,6 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
+import type { ReactNode } from "react";
 
 type Props = {
   query: string;
@@ -10,6 +11,8 @@ type Props = {
   totalCount: number;
   selectedCount: number;
   visibleCount: number;
+  compact?: boolean;
+  children?: ReactNode;
 };
 
 export function ComparableFilters({
@@ -20,6 +23,8 @@ export function ComparableFilters({
   totalCount,
   selectedCount,
   visibleCount,
+  compact = false,
+  children,
 }: Props) {
   return (
     <div
@@ -27,8 +32,8 @@ export function ComparableFilters({
       className="space-y-3 text-base-content"
     >
       <div className="flex flex-wrap items-end gap-3">
-        <label className="min-w-0 flex-1 space-y-1 text-sm">
-          <span className="font-medium">Search comparables</span>
+        <label className="min-w-0 flex-1 basis-48 space-y-1 text-sm">
+          <span className={compact ? "sr-only" : "font-medium"}>Search comparables</span>
           <span className="du-input du-input-sm min-h-11 w-full">
             <Search className="size-4 shrink-0" aria-hidden="true" />
             <input
@@ -61,11 +66,12 @@ export function ComparableFilters({
           >
             Selected ({selectedCount})
           </button>
+          {children}
         </div>
       </div>
-      <p role="status" className="text-xs">
+      <p role="status" className={compact ? "sr-only" : "text-xs"}>
         {visibleCount} {visibleCount === 1 ? "comparable" : "comparables"}{" "}
-        shown. Select up to six for the report; deselect one to replace it.
+        shown.{!compact && " Select up to six for the report; deselect one to replace it."}
       </p>
     </div>
   );

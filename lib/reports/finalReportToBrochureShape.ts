@@ -15,6 +15,7 @@ import {
   isLeasePageVariant,
   isSalesAppraisalPageVariant,
   isStrPageVariant,
+  revenueSectionTitle,
   resolveReportPageVariant,
   type ReportPageVariant,
 } from "@/lib/reports/templates/shared/reportPageVariant";
@@ -75,6 +76,13 @@ export function finalReportToBrochureShape(
   const blurb = resolvedCopy.blurb;
   const blurbBlocks = resolvedCopy.blurb_blocks;
   const appealPoints = resolvedCopy.property_highlights;
+  const priceValue = isLeasePageVariant(variant)
+    ? (resolveLeaseBrochurePriceValue(report) ?? "")
+    : isSalesAppraisalPageVariant(variant)
+      ? (resolveSalesAppraisalBrochurePriceValue(report) ?? "")
+      : isStrPageVariant(variant)
+        ? (resolveStrBrochurePriceValue(report) ?? "")
+        : (report.property.display_price ?? "");
 
   return {
     version: "sales_brochure_v1",
@@ -120,7 +128,9 @@ export function finalReportToBrochureShape(
       bathrooms: report.property.bathrooms,
       car_spaces: report.property.car_spaces,
       land_area_sqm: null,
-      display_price: report.property.display_price ?? "",
+      // Shared brochure layouts fall back to this field when price_value is empty.
+      // Keep that fallback scoped to the report's metric, including when missing.
+      display_price: priceValue,
       hero_image_url: images.hero_image_url,
       selected_image_urls: images.selected_image_urls,
       page_one_image_urls: images.page_one_image_urls,
@@ -136,19 +146,13 @@ export function finalReportToBrochureShape(
       inspection_cta: "",
       disclaimer: report.copy.disclaimer ?? "",
       price_label: isLeasePageVariant(variant)
-        ? "Indicative rent"
+        ? revenueSectionTitle(variant)
         : isSalesAppraisalPageVariant(variant)
           ? "Estimated sale price"
           : isStrPageVariant(variant)
             ? resolveStrBrochurePriceLabel(report)
             : "Price",
-      price_value: isLeasePageVariant(variant)
-        ? (resolveLeaseBrochurePriceValue(report) ?? "")
-        : isSalesAppraisalPageVariant(variant)
-          ? (resolveSalesAppraisalBrochurePriceValue(report) ?? "")
-          : isStrPageVariant(variant)
-            ? (resolveStrBrochurePriceValue(report) ?? "")
-            : (report.property.display_price ?? ""),
+      price_value: priceValue,
     },
     qr_target_url: report.document_link?.mode === "custom" ? report.document_link.url : "",
     assets: {

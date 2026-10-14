@@ -92,6 +92,12 @@ export async function PATCH(
     const { id } = await params;
     const { supabase, agency, report: storedReport, listing } = await requireReportWithListing(id);
     const body = updateReportSchema.parse(await request.json());
+    const propertyContext = body.str_property;
+    delete body.str_property;
+    if (propertyContext) {
+      if (body.user_overrides_json || body.str_adjustment) throw new Error("Save property details separately from estimate adjustments.");
+      body.user_overrides_json = { ...storedReport.user_overrides_json, strProperty: propertyContext };
+    }
     const adjustment = body.str_adjustment;
     delete body.str_adjustment;
     if (adjustment) {
@@ -182,7 +188,7 @@ export async function PATCH(
       if (rebuildResult.error) {
         return rebuildResult.error;
       }
-    } else if ((body.final_estimate_json !== undefined || selectedEnrichment) && savedCopy) {
+    } else if ((body.final_estimate_json !== undefined || selectedEnrichment || propertyContext) && savedCopy && resolveReportEstimate(report)) {
       const rebuildResult = await rebuildFinalReportJson({
         supabase,
         agency,

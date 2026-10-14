@@ -115,6 +115,13 @@ export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: 
       const templates = getTemplatesForProduct(url.searchParams.get("product") as TemplateProduct).filter((entry) => entry.scope === "platform").map(serializeTemplateForApi);
       return Response.json({ templates, default_template_id: templates[0]?.id });
     }
+    if (url.pathname === "/api/str/contacts") return Response.json({ contacts: [] });
+    if (url.pathname === "/api/str/appraisals/mock-report" && method === "PATCH") {
+      if (body.expected_updated_at !== data.appraisal.updated_at) return Response.json({ error: "Customer details have changed. Reload before editing." }, { status: 409 });
+      data.appraisal = { ...data.appraisal, recipient_mode: body.recipient.mode, recipient_name: body.recipient.name || null, recipient_email: body.recipient.email || null, recipient_phone: body.recipient.phone || null, updated_at: new Date().toISOString() };
+      return Response.json({ appraisal: data.appraisal });
+    }
+    if (url.pathname === "/api/listings/mock-listing/property-profile") return Response.json({ listing: data.listing, cached: true });
     if (url.pathname === "/api/str/estimate" || url.pathname === "/api/airbtics/estimate") {
       data.listing = { ...data.listing, bedrooms: body.bedrooms, bathrooms: body.bathrooms, accommodates: body.accommodates };
       const initialScenario = !data.report.original_estimate_json && !data.report.final_estimate_json && !data.report.final_report_json && !readStrRateOverride(data.report) ? initialStrManagementScenario(fixtures.report.original_estimate_json!, data.agency.str_management_presets) : null;
@@ -126,6 +133,7 @@ export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: 
       if (method === "GET") return Response.json({ report: data.report, listing: data.listing });
       const generation = url.pathname.endsWith("generate-copy");
       const report = { ...data.report, ...(!generation && !body.copy ? body : {}), template_id: body.template_id ?? data.report.template_id, pdf_url: null, updated_at: new Date().toISOString() };
+      if (body.str_property) report.user_overrides_json = { ...data.report.user_overrides_json, strProperty: body.str_property };
       if (body.str_adjustment && report.original_estimate_json) {
         const adjustment = strAdjustmentSchema.parse(body.str_adjustment);
         const rates = adjustment.mode !== "baseline" ? { nightlyRate: adjustment.nightlyRate, occupancyRate: adjustment.occupancyRate } : null;

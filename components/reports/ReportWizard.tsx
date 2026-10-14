@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ProposalWorkflow, type ProposalWorkflowHandle } from "@/components/digital-proposals/ProposalWorkflow";
+import { LayoutTemplate } from "lucide-react";
+import { StrPropertyStep, type StrPropertyHandle } from "./StrPropertyStep";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentGenerationStatus } from "@/components/documents/DocumentGenerationStatus";
 import {
@@ -21,16 +24,16 @@ import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
-import { resolveAdvertisedPrice } from "@/lib/listings/pricing";
 import { calculateAccommodates } from "@/lib/reports/formatters";
+import { strPropertyContextSchema } from "@/lib/str/propertyInputs";
 import { jsonRequest, reportRequest } from "@/lib/reports/reportRequests";
 import type { Agency, AgentProfile, Listing, Report } from "@/lib/types";
 
 const steps = [
-  { id: "design", label: "Design & property" },
+  { id: "property", label: "Property" },
   { id: "estimate", label: "Estimate & evidence" },
-  { id: "copy", label: "Edit report" },
-  { id: "preview", label: "Download & share" },
+  { id: "design", label: "Design & content" },
+  { id: "preview", label: "Review & share" },
 ];
 
 export function ReportWizard({
@@ -38,6 +41,11 @@ export function ReportWizard({
   initialReport,
   agency,
   availableTemplates,
+  customerPanel,
+  appraisalActions,
+  customerEditing = false,
+  digitalProposal = false,
+  customerRevision,
   onListingChange,
   onReportChange,
 }: {
@@ -45,6 +53,11 @@ export function ReportWizard({
   initialReport: Report;
   agency: Agency;
   availableTemplates?: TemplatesResponse;
+  customerPanel?: ReactNode;
+  appraisalActions?: ReactNode;
+  customerEditing?: boolean;
+  digitalProposal?: boolean;
+  customerRevision?: string;
   onListingChange?: (listing: Listing) => void;
   onReportChange?: (report: Report) => void;
 }) {
@@ -56,8 +69,10 @@ export function ReportWizard({
       ? "preview"
       : initialReport.final_estimate_json
         ? "estimate"
-        : "design",
+        : "property",
   );
+  const [choosingDesign, setChoosingDesign] = useState(!initialReport.final_report_json);
+  const propertyRef = useRef<StrPropertyHandle>(null);
   const [busy, setBusy] = useState(false);
   const navigating = useRef(false);
   const [childBusy, setChildBusy] = useState(false);
@@ -66,10 +81,12 @@ export function ReportWizard({
   const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
   const [previewAgency, setPreviewAgency] = useState(agency);
   const [canManageStrDefaults, setCanManageStrDefaults] = useState(false);
+  const proposalRef = useRef<ProposalWorkflowHandle>(null);
+  const wizardSteps = digitalProposal ? steps.map(item => ({ ...item, label: ({ estimate: "Rental appraisal", design: "Proposal", preview: "Customer & share" } as Record<string, string>)[item.id] ?? item.label })) : steps;
   const designRef = useRef<StrDesignHandle>(null);
   const estimateRef = useRef<StrEstimateHandle>(null);
   const copyRef = useRef<StrCopyEditorHandle>(null);
-  const disabled = busy || childBusy;
+  const disabled = busy || childBusy || customerEditing;
 
   function updateReport(next: Report) {
     reportRef.current = next;
@@ -116,37 +133,35 @@ export function ReportWizard({
     [report.final_report_json, listing, previewAgency, agencyAgents],
   );
 
-  async function saveDesign(): Promise<"saved" | "review" | false> {
-    const values = await designRef.current?.read();
-    if (!values) return false;
+  async function saveProperty(): Promise<"saved" | "review" | false> {
+    const property = await propertyRef.current?.read();
+    if (!property) return false;
+    const { values } = property;
     if (!listing.property_address?.trim())
       throw new Error(
         "Add a property address on the listing before getting an estimate.",
       );
     let current = reportRef.current;
-    let currentListing = listing;
-    const priceChanged =
-      values.display_price !== (resolveAdvertisedPrice(listing, "sale") ?? "");
-    if (priceChanged) {
+    let currentListing = { ...listing, scraped_listing_json: property.profile.scraped_listing_json };
+    if (values.car_spaces !== (property.profile.car_spaces ?? null)) {
       const saved = await reportRequest<{ listing: Listing }>(
         `/api/listings/${listing.id}`,
-        jsonRequest(
-          { advertised_sale_price: values.display_price || null },
-          "PATCH",
-        ),
+        jsonRequest({ car_spaces: values.car_spaces }, "PATCH"),
       );
       currentListing = saved.listing;
-      updateListing(currentListing);
+    } else {
+      currentListing.car_spaces = values.car_spaces;
     }
-    if (values.templateId !== current.template_id || priceChanged) {
+    updateListing(currentListing);
+    const context = strPropertyContextSchema.parse(values);
+    const contextChanged = JSON.stringify(context) !== JSON.stringify(current.user_overrides_json?.strProperty);
+    const parkingSnapshotChanged = current.final_report_json && current.final_report_json.property.car_spaces !== (values.car_spaces ?? 0);
+    if (contextChanged || parkingSnapshotChanged) {
       const saved = await reportRequest<{ report: Report }>(
         `/api/reports/${current.id}`,
         jsonRequest(
           {
-            template_id: values.templateId,
-            ...(priceChanged && current.final_estimate_json
-              ? { final_estimate_json: current.final_estimate_json }
-              : {}),
+            str_property: context,
           },
           "PATCH",
         ),
@@ -188,14 +203,74 @@ export function ReportWizard({
     return "saved";
   }
 
+  async function saveTemplate() {
+    const templateId = designRef.current?.read();
+    if (!templateId) return false;
+    const current = reportRef.current;
+    if (templateId !== current.template_id) {
+      const saved = await reportRequest<{ report: Report }>(
+        `/api/reports/${current.id}`,
+        jsonRequest({ template_id: templateId }, "PATCH"),
+      );
+      updateReport(saved.report);
+    }
+    return true;
+  }
+
+  async function applyDesign() {
+    if (disabled || navigating.current) return;
+    navigating.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      if (!(await saveTemplate())) return;
+      const current = reportRef.current;
+      if (!current.final_report_json) {
+        if (!current.final_estimate_json)
+          throw new Error("Get an estimate before writing the report.");
+        setActivity("copy");
+        const result = await reportRequest<{ report: Report }>(
+          `/api/reports/${current.id}/generate-copy`,
+          jsonRequest({ template_id: current.template_id }),
+        );
+        if (!result.report?.final_report_json)
+          throw new Error("The report was not generated. Please try again.");
+        updateReport(result.report);
+      }
+      setChoosingDesign(false);
+      window.scrollTo({ top: 0, behavior: "instant" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to apply this design. Please try again.");
+    } finally {
+      navigating.current = false;
+      setBusy(false);
+      setActivity(null);
+    }
+  }
+
+  async function changeDesign() {
+    if (disabled || navigating.current) return;
+    navigating.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      if (await copyRef.current?.savePendingEdits()) setChoosingDesign(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save your content. Please try again.");
+    } finally {
+      navigating.current = false;
+      setBusy(false);
+    }
+  }
+
   async function handleStepChange(next: string) {
     if (disabled || navigating.current || next === step) return;
     navigating.current = true;
     setBusy(true);
     setError(null);
     try {
-      if (step === "design") {
-        const result = await saveDesign();
+      if (step === "property") {
+        const result = await saveProperty();
         if (!result) return;
         if (result === "review") {
           setStep("estimate");
@@ -208,20 +283,14 @@ export function ReportWizard({
         !(await estimateRef.current?.savePendingEdits())
       )
         return;
-      if (step === "copy" && !(await copyRef.current?.savePendingEdits()))
-        return;
-      const current = reportRef.current;
-      if (next === "copy" && !current.final_report_json) {
-        if (!current.final_estimate_json)
-          throw new Error("Get an estimate before generating the report.");
-        setActivity("copy");
-        const result = await reportRequest<{ report: Report }>(
-          `/api/reports/${current.id}/generate-copy`,
-          jsonRequest({ template_id: current.template_id }),
-        );
-        if (!result.report?.final_report_json)
-          throw new Error("The report was not generated. Please try again.");
-        updateReport(result.report);
+      if (digitalProposal && (step === "design" || step === "preview")) {
+        if (!(await proposalRef.current?.savePendingEdits())) return;
+      }
+      if (!digitalProposal && step === "design") {
+        if (choosingDesign) {
+          // A template outage must not trap the user away from their evidence.
+          if (designRef.current?.read() && !(await saveTemplate())) return;
+        } else if (!(await copyRef.current?.savePendingEdits())) return;
       }
       setStep(next);
       window.scrollTo({ top: 0, behavior: "instant" });
@@ -262,8 +331,8 @@ export function ReportWizard({
       }
       savedLabel={
         activity === "estimate"
-          ? "Property and design checked"
-          : "Property, design and estimate saved"
+          ? "Property details checked"
+          : "Property, estimate and design saved"
       }
       activeLabel={
         activity === "estimate"
@@ -284,6 +353,7 @@ export function ReportWizard({
           {error}
         </p>
       ) : null}
+      {appraisalActions ? <div inert={disabled}>{appraisalActions}</div> : null}
       <Tabs
         value={step}
         onValueChange={(next) => void handleStepChange(String(next))}
@@ -293,17 +363,17 @@ export function ReportWizard({
           aria-label="Report creation steps"
           className="grid w-full grid-cols-2 gap-1 group-data-horizontal/tabs:h-auto sm:grid-cols-4"
         >
-          {steps.map((item, index) => (
+          {wizardSteps.map((item, index) => (
             <TabsTrigger
               key={item.id}
               value={item.id}
               disabled={
                 disabled ||
                 (item.id === "estimate" &&
-                  step !== "design" &&
+                  step !== "property" &&
                   !report.final_estimate_json) ||
-                (item.id === "copy" && !report.final_report_json) ||
-                (item.id === "preview" && !report.final_report_json)
+                (item.id === "design" && !report.final_estimate_json && !report.final_report_json) ||
+                (item.id === "preview" && (digitalProposal ? !report.final_estimate_json : !report.final_report_json))
               }
               className="h-auto min-h-12 gap-2 whitespace-normal px-2 py-2 text-xs sm:text-sm"
             >
@@ -317,16 +387,13 @@ export function ReportWizard({
             </TabsTrigger>
           ))}
         </TabsList>
-        <TabsContent value="design">
+        <TabsContent value="property">
           {progress}
           <div hidden={Boolean(activity)}>
-            <StrDesignStep
-              ref={designRef}
-              agency={agency}
-              agencyAgents={agencyAgents}
+            <StrPropertyStep
+              ref={propertyRef}
               listing={listing}
               report={report}
-              availableTemplates={availableTemplates}
               busy={disabled}
               onContinue={() => void handleStepChange("estimate")}
             />
@@ -337,6 +404,7 @@ export function ReportWizard({
           <div hidden={Boolean(activity)}>
             <StrEstimateStep
               ref={estimateRef}
+              continueLabel={digitalProposal ? "Continue to proposal" : undefined}
               agency={previewAgency}
               canManageDefaults={canManageStrDefaults}
               onCompanyPresetsChange={(presets) => setPreviewAgency((current) => ({ ...current, str_management_presets: presets }))}
@@ -346,30 +414,57 @@ export function ReportWizard({
               report={report}
               busy={disabled}
               onComplete={updateReport}
-              onContinue={() => void handleStepChange("copy")}
-              onBack={() => void handleStepChange("design")}
+              onContinue={() => void handleStepChange("design")}
+              onBack={() => void handleStepChange("property")}
             />
           </div>
         </TabsContent>
-        <TabsContent value="copy">
-          <GeneratedCopyEditor
-            ref={copyRef}
-            agency={agency}
-            agencyAgents={agencyAgents}
-            listing={listing}
-            report={report}
-            onComplete={updateReport}
-            onBusyChange={setChildBusy}
-            onContinueToPreview={() => void handleStepChange("preview")}
-          />
+        <TabsContent value="design">
+          {progress}
+          <div hidden={Boolean(activity)}>
+            {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="proposal" disabled={busy} onBusyChange={setChildBusy} onContinue={() => void handleStepChange("preview")} /> : choosingDesign ? (
+              <StrDesignStep
+                ref={designRef}
+                agency={previewAgency}
+                agencyAgents={agencyAgents}
+                listing={listing}
+                report={report}
+                availableTemplates={availableTemplates}
+                busy={disabled}
+                onContinue={() => void applyDesign()}
+                onBack={() => void handleStepChange("estimate")}
+              />
+            ) : (
+              <div className="space-y-4">
+                <div data-theme="staypack-workspace" className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-base-content/65">Your design is ready. Personalise the content below.</p>
+                  <button type="button" className="du-btn du-btn-sm min-h-11" disabled={disabled} onClick={() => void changeDesign()}>
+                    <LayoutTemplate className="size-4" aria-hidden="true" />Change report design
+                  </button>
+                </div>
+                <GeneratedCopyEditor
+                  ref={copyRef}
+                  agency={previewAgency}
+                  agencyAgents={agencyAgents}
+                  listing={listing}
+                  report={report}
+                  onComplete={updateReport}
+                  onBusyChange={setChildBusy}
+                  onContinueToPreview={() => void handleStepChange("preview")}
+                />
+              </div>
+            )}
+          </div>
         </TabsContent>
-        <TabsContent value="preview">
-          {preview ? (
+        <TabsContent value="preview" className="space-y-5">
+          {customerPanel ? <div inert={busy || childBusy}>{customerPanel}</div> : null}
+          {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="share" refreshKey={customerRevision} disabled={customerEditing || busy} onBusyChange={setChildBusy} /> : preview ? (
             <StrReportDeliveryStep
+              disabled={customerEditing}
               report={report}
               preview={preview}
               onReportChange={updateReport}
-              onEdit={() => void handleStepChange("copy")}
+              onEdit={() => void handleStepChange("design")}
               onBusyChange={setChildBusy}
             />
           ) : null}

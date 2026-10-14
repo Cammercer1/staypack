@@ -4,13 +4,14 @@ import {
   resolveStrBrochurePriceLabel,
   resolveStrBrochurePriceValue,
 } from "@/lib/reports/resolveStrBrochurePrice";
-import { resolveBrochurePrice } from "@/lib/collateral/templates/types";
+import { resolveBrochurePrice, resolveBrochurePriceLabel } from "@/lib/collateral/templates/types";
 import type { BrochureDocumentJson } from "@/lib/collateral/templates/types";
 import {
   isLeasePageVariant,
   isSalePageVariant,
   isSalesAppraisalPageVariant,
   isStrPageVariant,
+  revenueSectionTitle,
   resolveReportPageVariant,
   type ReportPageVariant,
 } from "@/lib/reports/templates/shared/reportPageVariant";
@@ -37,7 +38,7 @@ function resolveClassicBrochureMetric(
     }
     return {
       id: "listing_price",
-      label: document.type === "rental_brochure" ? "Rent" : "Price guide",
+      label: resolveBrochurePriceLabel(document),
       value: listingPrice,
     };
   }
@@ -49,7 +50,7 @@ function resolveClassicBrochureMetric(
     }
     return {
       id: "lease_rent",
-      label: "Indicative rent",
+      label: revenueSectionTitle(variant),
       value: leaseRent,
       subline: "per week",
     };

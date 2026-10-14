@@ -9,6 +9,7 @@ const ascot = {
 it.each([
   "Unit 18 / 8–12 Ascot St.",
   "18/8-12 Ascot Street, Kensington NSW 2033",
+  "18/8-12 Ascot Street , Kensington NSW 2033",
   "18/8-12 Ascot Street Kensington NSW 2033 Australia",
 ])("recognizes the same unit: %s", (property_address) => {
   expect(
@@ -18,6 +19,34 @@ it.each([
       postcode: "2033",
     }),
   ).toBe(true);
+});
+it("matches provider whitespace before the locality separator in either direction", () => {
+  const selected = {
+    property_address: "24 South Esplanade",
+    suburb: "Glenelg",
+    state: "SA",
+    postcode: "5045",
+  };
+  const returned = {
+    property_address: "24 South Esplanade , Glenelg SA 5045",
+  };
+  expect(sameProperty(selected, returned)).toBe(true);
+  expect(sameProperty(returned, selected)).toBe(true);
+  expect(
+    sameProperty(selected, {
+      property_address: "25 South Esplanade , Glenelg SA 5045",
+    }),
+  ).toBe(false);
+  expect(
+    sameProperty(selected, {
+      property_address: "1/24 South Esplanade , Glenelg SA 5045",
+    }),
+  ).toBe(false);
+  expect(
+    sameProperty(selected, {
+      property_address: "24 South Esplanade , Glenelg SA 5046",
+    }),
+  ).toBe(false);
 });
 it.each([
   "6/8-12 Ascot Street",

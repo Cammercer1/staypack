@@ -1,7 +1,6 @@
 import { mergeClassicBrochureMetricsReport } from "@/lib/collateral/templates/sales-brochure/shared/mergeClassicBrochureMetricsReport";
 import { resolvePlaygroundLeaseAppraisal } from "@/lib/lease-appraisal/resolvePlaygroundLeaseAppraisal";
 import { resolvePlaygroundFinalReport } from "@/lib/reports/resolvePlaygroundFinalReport";
-import { isLeaseAppraisalReport } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
 import type { Agency, CollateralItem, FinalReportJson, Listing, Report } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -43,25 +42,8 @@ export async function loadClassicBrochureMetricsForListing({
     }
   }
 
-  if (!strReport) {
-    const { data: reports } = await admin
-      .from("reports")
-      .select("*")
-      .eq("listing_id", listingId)
-      .order("updated_at", { ascending: false });
-
-    const leaseReportId = leaseCollateral?.report_id;
-    for (const report of (reports ?? []) as Report[]) {
-      if (leaseReportId && report.id === leaseReportId) {
-        continue;
-      }
-      const candidate = await resolvePlaygroundFinalReport(admin, agency, listing, report);
-      if (candidate && !isLeaseAppraisalReport(candidate)) {
-        strReport = candidate;
-        break;
-      }
-    }
-  }
+  // The property-level STR pointer is intentional. A customer's newer appraisal
+  // must not silently replace this source, even if it has newer estimates.
 
   let leaseReport: FinalReportJson | null = null;
   if (leaseCollateral?.report_id) {

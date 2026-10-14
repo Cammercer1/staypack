@@ -33,6 +33,13 @@ beforeEach(() => {
   mocks.copy.mockResolvedValue({ sales_pack_heading: "Mock heading", sales_pack_blurb: "Mock report description", key_metrics_line: "Estimate only", property_appeal_points: [], performance_supporting_factors: [], buyer_checks: [], methodology_note: "", disclaimer: "Estimate only", confidence_notes: "" });
   mocks.brochureCopy.mockResolvedValue(getMockSalesBrochureCopy(fixture.listing, fixture.agency));
   mocks.admin.mockReturnValue({
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      expect(name).toBe("create_str_appraisal");
+      expect(args.p_source).toBe("managed_delivery");
+      expect(args.p_recipient).toMatchObject({ mode: "general", email: null, phone: null });
+      rows.reports = { ...rows.reports, id: args.p_report_id, agency_id: args.p_agency_id, listing_id: args.p_listing_id, template_id: args.p_template_id };
+      return { data: args.p_report_id, error: null };
+    },
     from: (table: string) => {
       let body: Record<string, unknown> | null = null;
       const finish = async () => {

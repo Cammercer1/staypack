@@ -54,9 +54,13 @@ async function responseJson(response: Response) {
 export function NewListingFlow({
   agencyAgents = [],
   storageKey = "staypacks:new-listing",
+  onSaved,
+  includeAgents = true,
 }: {
   agencyAgents?: AgentProfile[];
   storageKey?: string;
+  onSaved?: (listingId: string) => void | Promise<void>;
+  includeAgents?: boolean;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<"find" | "review">("find");
@@ -96,7 +100,7 @@ export function NewListingFlow({
         setQuery(saved.query);
         setUrl(saved.url);
         setDraft(saved.draft);
-        setAgents(saved.agents);
+        setAgents(includeAgents ? saved.agents : []);
         setRestored(true);
         reset(saved.values);
       }
@@ -106,7 +110,7 @@ export function NewListingFlow({
     setReady(true);
     /* eslint-enable react-hooks/set-state-in-effect */
     return () => pending.current?.abort();
-  }, [storageKey, reset]);
+  }, [storageKey, reset, includeAgents]);
 
   useEffect(() => {
     if (!ready || completed.current) return;
@@ -136,7 +140,7 @@ export function NewListingFlow({
   function startDraft(listing: Listing) {
     setDraft(listing);
     reset(valuesFromListing(listing));
-    setAgents(initialListingAgents(listing.scraped_listing_json?.agents));
+    setAgents(includeAgents ? initialListingAgents(listing.scraped_listing_json?.agents) : []);
     setDuplicate(null);
     setError(null);
     setMessage(null);
@@ -191,12 +195,13 @@ export function NewListingFlow({
   async function save(formValues: NewListingValues) {
     if (!draft || saving.current || completed.current) return;
     setError(null);
-    if (agents.some((agent) => !agent.name.trim())) {
+    const listingAgents = includeAgents ? agents : [];
+    if (listingAgents.some((agent) => !agent.name.trim())) {
       setError("Enter a name for each agent, or remove the empty agent card.");
       return;
     }
     const parsed = createListingSchema.safeParse(
-      newListingPayload(draft, formValues, agents),
+      newListingPayload(draft, formValues, listingAgents),
     );
     if (!parsed.success) {
       setError(
@@ -228,8 +233,11 @@ export function NewListingFlow({
       }
       toast.success("Listing created");
       if (result.geocode_warning) toast.message(result.geocode_warning);
-      router.push(`/listings/${result.listing.id}`);
-      router.refresh();
+      if (onSaved) await onSaved(result.listing.id);
+      else {
+        router.push(`/listings/${result.listing.id}`);
+        router.refresh();
+      }
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -261,12 +269,17 @@ export function NewListingFlow({
             {duplicate.property_address}
             {duplicate.suburb ? `, ${duplicate.suburb}` : ""}
           </p>
-          <Link
+          {onSaved ? <button type="button" className="mt-2 inline-flex min-h-10 items-center font-medium text-primary underline underline-offset-4" onClick={async () => {
+            completed.current = true;
+            setSaved(true);
+            try { sessionStorage.removeItem(storageKey); } catch { /* Selection still works without storage. */ }
+            await onSaved(duplicate.id);
+          }}>Use this property</button> : <Link
             className="mt-2 inline-flex font-medium text-primary underline underline-offset-4"
             href={`/listings/${duplicate.id}`}
           >
             Open existing listing
-          </Link>
+          </Link>}
         </div>
       )}
       {error && (
@@ -325,8 +338,9 @@ export function NewListingFlow({
           <div>
             <h2 className="text-xl font-semibold">Start with an address</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              We’ll look for property details, photos and any active listing
-              agents. You can review everything before creating the listing.
+              {includeAgents
+                ? "We’ll look for property details, photos and any active listing agents. You can review everything before creating the listing."
+                : "We’ll look for property details and photos. You can review everything before saving the property."}
             </p>
           </div>
           <div
@@ -410,6 +424,10 @@ export function NewListingFlow({
                   value={query}
                   disabled={busy}
                   onResolvingChange={setAddressResolving}
+                  onSelect={(address) => {
+                    setCandidates([]);
+                    void lookup({ action: "search", query: address });
+                  }}
                   onChange={(address) => {
                     setQuery(address);
                     setCandidates([]);
@@ -431,7 +449,7 @@ export function NewListingFlow({
                   setCandidates([]);
                   setDuplicate(null);
                 }}
-                placeholder="https://www.domain.com.au/…"
+                placeholder="Paste a property listing URL"
               />
               )}
               <Button type="submit" disabled={busy || addressResolving}>
@@ -449,7 +467,7 @@ export function NewListingFlow({
             </div>
             <p className="text-xs text-muted-foreground">
               {mode === "address"
-                ? "Choose an address from the suggestions. Include your unit number, or add it after choosing the street."
+                ? "Include the unit number, then select an address to find the property."
                 : "Paste the full property listing link. You’ll review the imported details next."}
             </p>
           </form>
@@ -544,14 +562,13 @@ export function NewListingFlow({
                   agents={agents}
                   onAgentsChange={setAgents}
                   agencyAgents={agencyAgents}
+                  includeAgents={includeAgents}
                 />
               </fieldset>
               {notices}
               <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border bg-card p-5 sm:flex-row sm:items-center">
                 <p className="max-w-lg text-sm text-muted-foreground">
-                  Create the property record, then choose an appraisal or
-                  marketing document. You can add photos and update details at
-                  any time.
+                  {onSaved ? "Save this property to your shared library, then continue to the customer details for your STR appraisal." : "Create the property record, then choose an appraisal or marketing document. You can add photos and update details at any time."}
                 </p>
                 <Button
                   type="submit"

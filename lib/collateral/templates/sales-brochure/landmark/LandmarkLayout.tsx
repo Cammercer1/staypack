@@ -14,6 +14,10 @@ import {
 } from "@/lib/collateral/templates/types";
 import { formatNumber } from "@/lib/reports/formatters";
 import {
+  reportTypeBannerLabel,
+  type ReportPageVariant,
+} from "@/lib/reports/templates/shared/reportPageVariant";
+import {
   isBrochureFloorPlanImage,
 } from "@/lib/collateral/sales-brochure/brochureImageFit";
 
@@ -82,8 +86,10 @@ function StatBadge({
 
 function LandmarkStatsBanner({
   document,
+  reportVariant,
 }: {
   document: BrochureDocumentJson;
+  reportVariant?: ReportPageVariant;
 }) {
   const { property } = document;
   const accent = document.agency.primary_colour || "#1a1a2e";
@@ -116,7 +122,9 @@ function LandmarkStatsBanner({
         className="text-[1rem] font-bold text-white"
         style={{ fontFamily: headingFont }}
       >
-        For Sale
+        {reportVariant
+          ? reportTypeBannerLabel(reportVariant)
+          : document.type === "rental_brochure" ? "For lease" : "For sale"}
       </p>
       {stats.length > 0 ? (
         <div className="flex items-center gap-7">
@@ -347,9 +355,11 @@ function LandmarkLeftColumn({
 export function LandmarkSpread({
   document,
   report,
+  reportVariant,
 }: {
   document: BrochureDocumentJson;
   report: FinalReportJson;
+  reportVariant?: ReportPageVariant;
 }) {
   const images = document.property.page_one_image_urls
     .filter(Boolean)
@@ -387,7 +397,7 @@ export function LandmarkSpread({
       </div>
 
       {/* Stats banner */}
-      <LandmarkStatsBanner document={document} />
+      <LandmarkStatsBanner document={document} reportVariant={reportVariant} />
 
       {/* Two-column body */}
       <div className="grid min-h-0 flex-1 grid-cols-[1.1fr_0.9fr] gap-0 overflow-hidden">

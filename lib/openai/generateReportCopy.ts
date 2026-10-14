@@ -41,7 +41,7 @@ Other rules:
 - Use Australian English.
 - Do not invent amenities, distances, approvals, regulations, or tax treatment.
 - Use only the supplied property data.
-- Do not mention AirROI, Airbtics or OpenAI.
+- Do not name property-data providers, listing portals, AirROI, Airbtics, Domain or OpenAI. Refer to property estimates, imported details or comparable evidence where needed.
 - Character limits in copy_limits are strict maximums. Count characters carefully and stay under every limit — over-limit responses are rejected and rewritten.
 - Output valid JSON only with exactly the fields in the contract (heading, three blurb lengths, bullets).`;
 

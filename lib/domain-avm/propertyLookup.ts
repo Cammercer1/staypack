@@ -7,6 +7,8 @@ import { createEmptyListingDraft } from "@/lib/listings/emptyListingDraft";
 import { buildScrapedListingFields } from "@/lib/listings/buildScrapedListingFields";
 import { getMetaKeyForUrl } from "@/lib/listings/listingImageMeta";
 import { sameProperty } from "@/lib/listings/propertyIdentity";
+import { isProfileRangeAliasCandidate, selectProfileCandidate } from "./profileAddress";
+import { normalizeAdvertisedPrice } from "@/lib/listings/pricing";
 import type {
   LookupMedia,
   PropertyCandidate,
@@ -163,6 +165,24 @@ function liveAddress(details: Obj) {
   };
 }
 
+function matchesProfileAddress(
+  source: Parameters<typeof sameProperty>[0],
+  expected: Parameters<typeof sameProperty>[0],
+  linkedListings: Obj[],
+) {
+  if (sameProperty(source, expected)) return true;
+  if (!isProfileRangeAliasCandidate(source, expected)) return false;
+  return linkedListings.some((listing) => {
+    const address = object(listing.address);
+    return Number.isSafeInteger(listing.listingId) && sameProperty(expected, {
+      property_address: string(address.displayAddress),
+      suburb: string(address.suburbName),
+      state: string(address.state),
+      postcode: string(address.postcode),
+    });
+  });
+}
+
 export function normalizePropertyLookup(
   profile: Obj,
   slug: string,
@@ -190,21 +210,18 @@ export function normalizePropertyLookup(
     throw new Error(
       "The property profile has no complete address. Enter the details manually.",
     );
-  const active =
-    activeDetails &&
-    activeDetails.lifecycle_status === "Live" &&
-    sameProperty(sourceAddress, liveAddress(activeDetails))
-      ? activeDetails
-      : undefined;
-  const live = active
+  const live = activeDetails
     ? array(profile.listings)
         .map(object)
         .find(
           (l) =>
-            l.status === "LIVE" && Number(l.listingId) === Number(active.id),
+            l.status === "LIVE" && Number(l.listingId) === Number(activeDetails.id),
         )
     : undefined;
-  const current = live ? active : undefined;
+  const current = live && activeDetails?.lifecycle_status === "Live" &&
+    matchesProfileAddress(sourceAddress, liveAddress(activeDetails), [live])
+    ? activeDetails
+    : undefined;
   const listingUrl = current
     ? (httpUrl(current.seo_url) ??
       httpUrl(live?.seoUrl) ??
@@ -230,10 +247,12 @@ export function normalizePropertyLookup(
     matchedAt: new Date().toISOString(),
     profileSlug: slug,
     activeListingId: current ? Number(current.id) : undefined,
+    advertisedSalePrice: current && current.search_mode !== "rent" ? normalizeAdvertisedPrice(string(current.price), "sale") : null,
+    advertisedWeeklyRent: current?.search_mode === "rent" ? normalizeAdvertisedPrice(string(current.price), "lease") : null,
     agencyName: current ? string(object(current.advertiser).name) : undefined,
-    features: array(profile.features).filter(
+    features: [...new Set([...array(profile.features), ...array(current?.features)].filter(
       (v): v is string => typeof v === "string",
-    ),
+    ))],
     media,
     originalAgents: agents,
   };
@@ -334,21 +353,20 @@ export async function lookupDomainProperty(
   );
   const profile = object(object(response.data).propertyDetails);
   const a = object(profile.address);
+  const requestedAddress = {
+    property_address: candidate.streetAddress,
+    suburb: candidate.suburb,
+    state: candidate.state,
+    postcode: candidate.postcode,
+  };
+  const profileAddress = {
+    property_address: string(a.displayAddress),
+    suburb: string(a.suburbName),
+    state: string(a.state),
+    postcode: string(a.postcode),
+  };
   if (
-    !sameProperty(
-      {
-        property_address: candidate.streetAddress,
-        suburb: candidate.suburb,
-        state: candidate.state,
-        postcode: candidate.postcode,
-      },
-      {
-        property_address: string(a.displayAddress),
-        suburb: string(a.suburbName),
-        state: string(a.state),
-        postcode: string(a.postcode),
-      },
-    )
+    !matchesProfileAddress(profileAddress, requestedAddress, array(profile.listings).map(object))
   )
     throw new Error(
       "The returned profile did not match the selected address. Try another result or enter the details manually.",
@@ -387,6 +405,10 @@ export async function lookupDomainProperty(
     }
   }
   const draft = normalizePropertyLookup(profile, candidate.slug, details);
+  if (!sameProperty(profileAddress, requestedAddress)) {
+    // Keep the verified listing alias; original profile data retains its canonical address.
+    draft.property_address = candidate.streetAddress.split(",")[0].trim();
+  }
   if (
     live.length &&
     !draft.scraped_listing_json?.propertyLookup?.activeListingId &&
@@ -422,14 +444,7 @@ export async function importDomainProperty(url: string) {
     .filter(Boolean)
     .join(" ");
   const candidates = await searchDomainProperties(query);
-  const candidate = candidates.find((c) =>
-    sameProperty(address, {
-      property_address: c.streetAddress,
-      suburb: c.suburb,
-      state: c.state,
-      postcode: c.postcode,
-    }),
-  );
+  const candidate = selectProfileCandidate(candidates, address);
   if (!candidate) return null;
   return lookupDomainProperty(candidate, details);
 }

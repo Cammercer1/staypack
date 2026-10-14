@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { airroiInputSchema, type AirroiInput } from "./client";
 import type { Listing, StrMarketOccupancy } from "@/lib/types";
+import { withAirroiMarketCache } from "./marketOccupancyCache";
 
 const marketSchema = z.object({
   country: z.string().min(1), region: z.string().min(1), locality: z.string().min(1),
@@ -23,27 +24,50 @@ function listingType(value?: string | null) {
   if (/apartment|unit|flat/i.test(value ?? "")) return "Entire rental unit";
   if (/townhouse/i.test(value ?? "")) return "Entire townhouse";
   if (/villa/i.test(value ?? "")) return "Entire villa";
-  if (/house|home/i.test(value ?? "")) return "Entire home";
+  if (/house|home|duplex|semi[- ]?detached|terrace/i.test(value ?? "")) return "Entire home";
   return null;
 }
 
-/** Resolve suburb aliases to their enclosing city; never mix same-named suburbs across states. */
-export function resolveOccupancyMarket(raw: unknown, suburb: string, region: string) {
-  const entries = z.object({ entries: z.array(marketSchema) }).parse(raw).entries;
-  const matches = entries.filter((m) => ["australia", "au"].includes(clean(m.country)) && clean(m.region) === clean(region));
-  const districts = matches.filter((m) => clean(m.district) === clean(suburb));
-  const candidates = districts.length ? districts : matches.filter((m) => clean(m.locality) === clean(suburb));
-  const cities = [...new Set(candidates.map((m) => clean(m.locality)))];
-  if (cities.length !== 1) throw new Error("The market location could not be resolved unambiguously.");
-  const { country, region: matchedRegion, locality } = candidates[0];
-  return { country, region: matchedRegion, locality };
+type MarketListing = Pick<Listing, "suburb" | "state" | "country">;
+const countryName = (value: string | null | undefined) => ["au", "australia"].includes(clean(value)) ? "australia" : clean(value);
+const regionName = (value: string | null | undefined) => clean(STATES[value?.trim().toUpperCase() ?? ""] ?? value);
+
+/** The coordinate endpoint returns the nearest listing's market. Validate its
+ * country/state and label its enclosing locality, without guessing from suburb text.
+ */
+export function resolveCoordinateOccupancyMarket(raw: unknown, listing: MarketListing) {
+  const found = marketSchema.parse(raw);
+  if ((listing.country && countryName(found.country) !== countryName(listing.country)) ||
+      (listing.state && regionName(found.region) !== regionName(listing.state))) {
+    throw new Error("The coordinate lookup returned a different country or state.");
+  }
+  return { country: found.country, region: found.region, locality: found.locality };
 }
 
-export function normaliseMarketOccupancy(raw: unknown, expected: NonNullable<StrMarketOccupancy["market"]>, now = new Date()) {
+type SeriesAttempt = { request: unknown; response?: unknown; response_status?: number };
+type Diagnostics = { resolution?: unknown; resolution_status?: number; request?: unknown; response?: unknown; response_status?: number; attempts?: SeriesAttempt[] };
+class OccupancyDataError extends Error {
+  constructor(message: string, readonly reason: NonNullable<StrMarketOccupancy["unavailable_reason"]>, readonly diagnostics: Diagnostics) {
+    super(message);
+  }
+}
+
+async function responseBody(response: Response, key: string): Promise<unknown> {
+  // Preserve failed payloads too, but never retain a credential echoed by a service.
+  const text = (await response.text()).replaceAll(key, "[redacted]");
+  try { return JSON.parse(text); } catch { return text.slice(0, 2000); }
+}
+
+function occupancyPayload(raw: unknown, expected: NonNullable<StrMarketOccupancy["market"]>) {
   const payload = z.object({ market: marketSchema, results: z.array(z.unknown()) }).parse(raw);
   if (["country", "region", "locality", "district"].some((key) => clean(payload.market[key as keyof typeof payload.market]) !== clean(expected[key as keyof typeof expected]))) {
     throw new Error("The occupancy response returned a different market.");
   }
+  return payload;
+}
+
+export function normaliseMarketOccupancy(raw: unknown, expected: NonNullable<StrMarketOccupancy["market"]>, now = new Date()) {
+  const payload = occupancyPayload(raw, expected);
   const cutoff = now.toISOString().slice(0, 7);
   const byMonth = new Map<string, StrMarketOccupancy["months"][number]>();
   let invalidRows = 0;
@@ -72,60 +96,103 @@ export function normaliseMarketOccupancy(raw: unknown, expected: NonNullable<Str
   return { months, warnings };
 }
 
-/** One market resolution plus one historical series. Missing history never blocks the calculator. */
+/** One coordinate resolution, then a typed series and at most one all-type
+ * fallback on confirmed empty data. Shared cached
+ * provider data is copied into each report's own immutable evidence snapshot.
+ */
 export async function fetchAirroiMarketOccupancy(
   unparsedInput: AirroiInput,
-  listing: Pick<Listing, "suburb" | "state" | "country">,
+  listing: MarketListing,
   previous?: StrMarketOccupancy,
 ): Promise<StrMarketOccupancy> {
   const input = airroiInputSchema.parse(unparsedInput);
-  const region = STATES[listing.state?.toUpperCase() ?? ""] ?? listing.state ?? "";
   const type = listingType(input.property_type);
   const filters: StrMarketOccupancy["filters"] = { room_type: { eq: "entire_home" }, bedrooms: { eq: input.bedrooms } };
   if (type) filters.listing_type = { eq: type };
-  const requestKey = createHash("sha256").update(JSON.stringify({ version: 1, lat: input.latitude, lng: input.longitude, suburb: listing.suburb, region, filters })).digest("hex");
+  const locationKey = JSON.stringify({ lat: input.latitude, lng: input.longitude, country: countryName(listing.country), region: regionName(listing.state) });
+  const requestKey = createHash("sha256").update(JSON.stringify({ version: 3, locationKey, filters })).digest("hex");
   const now = new Date();
-  // Reuse both history and confirmed insufficient-data results for a week.
-  // Timeouts, credential errors and other transient failures remain retryable.
   const age = previous ? now.getTime() - Date.parse(previous.fetched_at) : Infinity;
   const reusable = previous?.status === "available" || (previous?.status === "unavailable" && previous.unavailable_reason === "insufficient_data");
-  if (reusable && previous && previous.request_key === requestKey && age >= 0 && age < 7 * 86400000) {
+  if (reusable && previous && previous.request_key === requestKey && age >= 0 && age < 7 * 86400000 && previous.fetched_at.slice(0, 7) === now.toISOString().slice(0, 7)) {
     return { ...previous, cost_cents: 0 };
   }
   const result: StrMarketOccupancy = {
-    status: "unavailable", market: null, label: "Market occupancy unavailable", filters,
+    status: "unavailable", market: null, label: "Annual revenue benchmarks", filters, benchmark_scope: type ? "property_type" : "all_property_types",
     fetched_at: now.toISOString(), request_key: requestKey, cost_cents: 0, sample_count: null, months: [], warnings: [],
   };
   const key = process.env.AIRROI_API_KEY?.trim();
-  if (!key) return { ...result, warnings: ["The market data service is not configured."] };
+  if (!key) return { ...result, unavailable_reason: "not_configured", warnings: ["The market data service is not configured."] };
+  const diagnostics: Diagnostics = {};
+  let stage: "resolution" | "history" = "resolution";
   try {
-    const useSearch = Boolean(listing.suburb?.trim() && region && (!listing.country || ["au", "australia"].includes(clean(listing.country))));
-    const url = new URL(`https://api.airroi.com/markets/${useSearch ? "search" : "lookup"}`);
-    if (useSearch) url.searchParams.set("query", listing.suburb!.trim());
-    else { url.searchParams.set("lat", String(input.latitude)); url.searchParams.set("lng", String(input.longitude)); }
-    result.cost_cents += 1;
-    const resolved = await fetch(url, { headers: { "X-API-KEY": key }, cache: "no-store", signal: AbortSignal.timeout(8000) });
-    if (!resolved.ok) throw new Error(`Market resolution returned ${resolved.status}.`);
-    const resolution: unknown = await resolved.json();
-    const found = useSearch ? resolveOccupancyMarket(resolution, listing.suburb!, region) : marketSchema.parse(resolution);
-    const market = { country: found.country, region: found.region, locality: found.locality };
+    const resolution = await withAirroiMarketCache(`location:${locationKey}`, async () => {
+      const url = new URL("https://api.airroi.com/markets/lookup");
+      url.searchParams.set("lat", String(input.latitude));
+      url.searchParams.set("lng", String(input.longitude));
+      result.cost_cents += 1;
+      const response = await fetch(url, { headers: { "X-API-KEY": key }, cache: "no-store", signal: AbortSignal.timeout(8000) });
+      const body = await responseBody(response, key);
+      const raw = { resolution: body, resolution_status: response.status };
+      if (!response.ok) throw new OccupancyDataError(`Market coordinate lookup returned ${response.status}.`, "market_resolution_failed", raw);
+      try { return { market: resolveCoordinateOccupancyMarket(body, listing), raw }; }
+      catch (error) { throw new OccupancyDataError(error instanceof Error ? error.message : "Invalid coordinate market.", "market_resolution_failed", raw); }
+    }, now);
+    Object.assign(diagnostics, resolution.raw);
+    const market = resolution.market;
     result.market = market;
     result.label = `${market.locality} · ${input.bedrooms}-bed ${type ? type.replace(/^Entire /, "") + "s" : "entire homes"}`;
-    const request = { market, filter: filters, num_months: 13, currency: "native" };
-    result.raw = { resolution, request };
-    result.cost_cents += 10;
-    const response = await fetch("https://api.airroi.com/markets/metrics/occupancy", {
-      method: "POST", headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-      body: JSON.stringify(request), cache: "no-store", signal: AbortSignal.timeout(12000),
-    });
-    if (response.status === 404) result.unavailable_reason = "insufficient_data";
-    if (!response.ok) throw new Error(response.status === 404
-      ? "No occupancy history is available for this market and property type. The provider requires a sufficiently large matching market."
-      : `Market occupancy returned ${response.status}.`);
-    const raw: unknown = await response.json();
-    const normalised = normaliseMarketOccupancy(raw, market, now);
-    return { ...result, ...normalised, status: "available", raw: { resolution, request, response: raw } };
+    stage = "history";
+    async function getSeries(seriesFilters: StrMarketOccupancy["filters"]) {
+      const request = { market, filter: seriesFilters, num_months: 13, currency: "native" };
+      diagnostics.request = request;
+      const seriesKey = JSON.stringify({ market: Object.fromEntries(Object.entries(market).map(([name, value]) => [name, clean(value)])), filters: seriesFilters, num_months: 13 });
+      try {
+        const series = await withAirroiMarketCache(`occupancy:${seriesKey}`, async () => {
+          result.cost_cents += 10;
+          const response = await fetch("https://api.airroi.com/markets/metrics/occupancy", {
+            method: "POST", headers: { "X-API-KEY": key!, "Content-Type": "application/json" },
+            body: JSON.stringify(request), cache: "no-store", signal: AbortSignal.timeout(12000),
+          });
+          const body = await responseBody(response, key!);
+          const raw = { response: body, response_status: response.status };
+          if (response.status === 404) return { status: "unavailable" as const, fetched_at: now.toISOString(), raw };
+          if (!response.ok) throw new OccupancyDataError(`Market occupancy returned ${response.status}.`, "request_failed", raw);
+          try {
+            // An explicitly empty, valid market response can broaden; corrupt or
+            // mismatched data cannot trigger another paid request.
+            if (!occupancyPayload(body, market).results.length) return { status: "unavailable" as const, fetched_at: now.toISOString(), raw };
+            normaliseMarketOccupancy(body, market, now);
+          } catch (error) { throw new OccupancyDataError(error instanceof Error ? error.message : "Invalid occupancy history.", "invalid_data", raw); }
+          return { status: "available" as const, fetched_at: now.toISOString(), raw };
+        }, now);
+        (diagnostics.attempts ??= []).push({ request, ...series.raw });
+        Object.assign(diagnostics, series.raw);
+        return series;
+      } catch (error) {
+        (diagnostics.attempts ??= []).push({ request, ...(error instanceof OccupancyDataError ? error.diagnostics : {}) });
+        throw error;
+      }
+    }
+    let series = await getSeries(filters);
+    if (series.status === "unavailable" && type) {
+      // One broader cohort, never a paid loop through individual property types.
+      result.filters = { room_type: { eq: "entire_home" }, bedrooms: { eq: input.bedrooms } };
+      result.benchmark_scope = "all_property_types";
+      series = await getSeries(result.filters);
+    }
+    if (result.benchmark_scope === "all_property_types") result.label = `${market.locality} · ${input.bedrooms}-bed entire homes · all property types`;
+    // Keep the provider fetch date on cache hits; do not extend the history's lifetime.
+    result.fetched_at = series.fetched_at;
+    if (series.status === "unavailable") return { ...result, unavailable_reason: "insufficient_data", raw: diagnostics,
+      warnings: ["The provider returned no occupancy history for this market and bedroom count. Annual revenue benchmarks are included instead."] };
+    const normalised = normaliseMarketOccupancy(series.raw.response, market, now);
+    if (result.benchmark_scope === "all_property_types") normalised.warnings.push("The occupancy benchmark includes all property types with the same bedroom count and entire-home stays. It does not change the property revenue estimate or selected comparables.");
+    return { ...result, ...normalised, status: "available", raw: diagnostics };
   } catch (error) {
-    return { ...result, warnings: [error instanceof Error ? error.message : "Market occupancy data is unavailable."] };
+    if (error instanceof OccupancyDataError) Object.assign(diagnostics, error.diagnostics);
+    return { ...result, raw: diagnostics,
+      unavailable_reason: error instanceof OccupancyDataError ? error.reason : stage === "resolution" ? "market_resolution_failed" : "request_failed",
+      warnings: [error instanceof Error ? error.message : "Market occupancy could not be retrieved."] };
   }
 }

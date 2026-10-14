@@ -6,7 +6,7 @@ import { BrochurePageShell } from "@/lib/collateral/templates/sales-brochure/sha
 import { getBrochurePageData } from "@/lib/collateral/templates/sales-brochure/shared/getBrochurePageData";
 
 /** Landmark · 1 page — hero, branded stats banner, copy left + price/agents right. */
-export function LandmarkBrochureOnePage({ document, pageFormat = "a4-portrait" }: CollateralTemplateProps) {
+export function LandmarkBrochureOnePage({ document, pageFormat = "a4-portrait", reportVariant }: CollateralTemplateProps) {
   if (!isBrochureDocument(document)) return null;
 
   const { report, brand } = getBrochurePageData(document);
@@ -21,7 +21,7 @@ export function LandmarkBrochureOnePage({ document, pageFormat = "a4-portrait" }
       }}
     >
       <BrochurePageShell brand={brand}>
-        <LandmarkSpread document={document} report={report} />
+        <LandmarkSpread document={document} report={report} reportVariant={reportVariant} />
       </BrochurePageShell>
     </div>
   );

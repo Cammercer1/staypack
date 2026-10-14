@@ -1,84 +1,16 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { notFound, redirect } from "next/navigation";
 import { requireListingReportAccess } from "@/lib/auth/requireUser";
-import { ReportEditor } from "@/components/reports/ReportEditor";
-import { Button } from "@/components/ui/button";
-import { STR_REPORT_LABEL } from "@/lib/listings/collateralTypes";
-import { refreshStrEnrichmentInFinalReport } from "@/lib/airbtics/enrich";
-import { serializeTemplateForApi } from "@/lib/templates/serializeForApi";
-import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
-import type { FinalReportJson, Listing, Report } from "@/lib/types";
+import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
+import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSalesAppraisalReport";
 
-export default async function ListingReportEditorPage({
-  params,
-}: {
-  params: Promise<{ listingId: string; reportId: string }>;
-}) {
+export default async function LegacyListingReportPage({ params }: { params: Promise<{ listingId: string; reportId: string }> }) {
   const { listingId, reportId } = await params;
-
-  let agency;
-  let listing: Listing;
-  let report: Report;
-
-  try {
-    ({ agency, listing, report } = await requireListingReportAccess(
-      listingId,
-      reportId,
-    ));
-  } catch {
-    notFound();
-  }
-
-  const availableTemplates = await resolveAvailableTemplates(agency, "str");
-  const soleTemplateId =
-    availableTemplates.templates.length === 1
-      ? availableTemplates.templates[0].id
-      : null;
-  const cachedFinalReport = report.final_report_json as FinalReportJson | null;
-  const editorReport: Report = soleTemplateId
-    ? {
-        ...report,
-        template_id: soleTemplateId,
-        final_report_json: cachedFinalReport
-          ? {
-              ...refreshStrEnrichmentInFinalReport(
-                cachedFinalReport,
-                report.raw_airbtics_json,
-              ),
-              template_id: soleTemplateId,
-            }
-          : null,
-      }
-    : report;
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href={`/listings/${listing.id}`}>
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="h-4 w-4" />
-            Back to listing
-          </Button>
-        </Link>
-      </div>
-
-      <div>
-        <h1 className="heading-gradient text-3xl font-semibold">
-          {STR_REPORT_LABEL}
-        </h1>
-        <p className="text-muted-foreground">
-          Create a branded report for{" "}
-          {listing.property_address ?? "this listing"}.
-        </p>
-      </div>
-
-      <ReportEditor
-        initialListing={listing}
-        initialReport={editorReport}
-        agency={agency}
-        availableTemplates={{ default_template_id: availableTemplates.defaultTemplateId, templates: availableTemplates.templates.map(serializeTemplateForApi) }}
-      />
-    </div>
-  );
+  const { supabase, report, agency } = await requireListingReportAccess(listingId,reportId);
+  const { data: appraisal, error } = await supabase.from("str_appraisals").select("report_id").eq("report_id",reportId).eq("agency_id",agency.id).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (appraisal) redirect(`/short-term-rentals/appraisals/${reportId}`);
+  const { data: collateral } = await supabase.from("collateral_items").select("type").eq("report_id",reportId).eq("agency_id",agency.id).maybeSingle();
+  if (collateral?.type === "lease_appraisal" || isLeaseAppraisalTemplateId(report.template_id)) redirect(`/listings/${listingId}/lease-appraisal?reportId=${reportId}`);
+  if (collateral?.type === "sales_appraisal" || isSalesAppraisalTemplateId(report.template_id)) redirect(`/listings/${listingId}/sales-appraisal?reportId=${reportId}`);
+  notFound();
 }

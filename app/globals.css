@@ -6,7 +6,7 @@
 /* Opt in per workspace view; omit daisyUI's global base/reset styles. */
 @plugin "daisyui" {
   themes: false;
-  include: skeleton, button, badge, input, select, list, stat, card, alert, menu, hero, table, carousel;
+  include: skeleton, button, badge, input, select, textarea, range, list, stat, card, alert, menu, hero, file-input, table, carousel;
   prefix: "du-";
   logs: false;
 }
@@ -48,6 +48,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* The prospect renderer keeps the agency's palette isolated from the workspace. */
 @plugin "daisyui/theme" {
   name: "property-providers";
   default: false;

@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const protectedPrefixes = ["/dashboard", "/onboarding", "/reports", "/listings", "/leads", "/settings"];
+const protectedPrefixes = ["/dashboard", "/onboarding", "/reports", "/listings", "/leads", "/settings", "/short-term-rentals"];
 
 const CANONICAL_PRODUCTION_HOST = "staypack.app";
 const LEGACY_NETLIFY_HOST = "staypack.netlify.app";
@@ -16,9 +16,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // Public examples use frozen snapshots and never depend on a visitor's session.
-  const examplePath = request.nextUrl.pathname;
-  if (["/example", "/examples"].some(prefix => examplePath === prefix || examplePath.startsWith(`${prefix}/`))) {
+  // Public proposals perform their own fresh access check; account cookies are irrelevant.
+  const pathname = request.nextUrl.pathname;
+  if (pathname === "/proposal" || pathname.startsWith("/proposal/") || pathname.startsWith("/api/proposals/")
+    || pathname === "/example" || pathname.startsWith("/example/")
+    || pathname === "/examples" || pathname.startsWith("/examples/")) {
     return NextResponse.next({ request });
   }
 
@@ -49,7 +51,6 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
   const isProtected = protectedPrefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );

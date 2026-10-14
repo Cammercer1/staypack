@@ -41,3 +41,27 @@ it("modelled seasonal allocations follow the reviewed annual figure and sum exac
   expect(aligned.seasonality.every((r) => r.occupancy === null && r.adr === null && r.revenue_low === null)).toBe(true);
   expect(alignStrSeasonality(report.str_enrichment_json!, 87654)).toBe(report.str_enrichment_json);
 });
+
+it("recognises duplexes as homes when ranking saved comparables", () => {
+  const base = createLintRegressionFixtures().report.str_enrichment_json!.comps[0];
+  const ranked = rankStrComps([
+    { ...base, listing_id: "unit", property_type: "Entire rental unit", bedrooms: 3 },
+    { ...base, listing_id: "home", property_type: "Entire home", bedrooms: 3 },
+  ], { bedrooms: 3, bathrooms: 2, accommodates: 6, property_type: "Duplex" });
+  expect(ranked[0].listing_id).toBe("home");
+  expect(ranked[1].match_notes).toContain("Different or unknown property type");
+});
+
+it("prioritises shared amenities among similar peers without promoting a different size or changing revenue", () => {
+  const base = createLintRegressionFixtures().report.str_enrichment_json!.comps[0];
+  const comps = [
+    { ...base, listing_id: "plain", bedrooms: 3, property_type: "Apartment", amenities: [] },
+    { ...base, listing_id: "pool", bedrooms: 3, property_type: "Apartment", amenities: ["pool", "air_conditioning"] },
+    { ...base, listing_id: "large", bedrooms: 5, property_type: "Apartment", amenities: ["pool", "air_conditioning"] },
+  ];
+  const original = structuredClone(comps);
+  const ranked = rankStrComps(comps, { bedrooms: 3, bathrooms: 2, accommodates: 6, property_type: "Apartment", amenities: ["pool", "air_conditioning"] });
+  expect(ranked.map(c => c.listing_id)).toEqual(["pool", "plain", "large"]);
+  expect(comps).toEqual(original);
+  expect(ranked.every(c => c.annual_revenue === base.annual_revenue)).toBe(true);
+});

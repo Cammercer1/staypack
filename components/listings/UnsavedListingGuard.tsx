@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-export function UnsavedListingGuard({ dirty }: { dirty: boolean }) {
+export function UnsavedListingGuard({ dirty, description = "Your property details or photo selections have unsaved changes. Stay to save them, or discard them and leave." }: { dirty: boolean; description?: string }) {
   const leaving = useRef(false);
   const [destination, setDestination] = useState<string | null>(null);
   useEffect(() => {
@@ -62,8 +62,7 @@ export function UnsavedListingGuard({ dirty }: { dirty: boolean }) {
       <DialogContent>
         <DialogTitle>Leave without saving?</DialogTitle>
         <DialogDescription>
-          Your property details or photo selections have unsaved changes. Stay
-          to save them, or discard them and leave.
+          {description}
         </DialogDescription>
         <DialogFooter>
           <Button variant="outline" onClick={() => setDestination(null)}>

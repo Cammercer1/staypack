@@ -41,10 +41,16 @@ async function placesRequest(path: string, fields: string, init?: RequestInit) {
 }
 
 export async function autocompleteAddresses(input: string, sessionToken: string): Promise<AddressSuggestion[]> {
+  const normalizedInput = input.trim().replace(/[–—−]/g, "-");
+  // Search the building separately: Places can transpose Australian unit/range
+  // inputs such as 21/8-12 into 8 12/21. The unit remains user-supplied.
+  const apartmentRange = normalizedInput.match(/^(?:(?:unit|apartment|apt)\s*)?(\d+[a-z]?)\s*(?:\/|,\s*)\s*(\d+[a-z]?)\s*-\s*(\d+[a-z]?)\s+(.+)$/i);
+  const buildingNumber = apartmentRange ? `${apartmentRange[2]}-${apartmentRange[3]}` : null;
+  const searchInput = apartmentRange ? `${buildingNumber} ${apartmentRange[4]}` : input;
   const data = predictionSchema.parse(await placesRequest(
     "places:autocomplete",
     "suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat",
-    { method: "POST", body: JSON.stringify({ input, sessionToken, includedRegionCodes: ["au"], regionCode: "au", languageCode: "en", includedPrimaryTypes: ["street_address", "premise", "subpremise", "route"] }) },
+    { method: "POST", body: JSON.stringify({ input: searchInput, sessionToken, includedRegionCodes: ["au"], regionCode: "au", languageCode: "en", includedPrimaryTypes: ["street_address", "premise", "subpremise", "route"] }) },
   ));
   const suggestions = data.suggestions.flatMap(({ placePrediction: p }) => p ? [{
     placeId: p.placeId,
@@ -52,6 +58,22 @@ export async function autocompleteAddresses(input: string, sessionToken: string)
     mainText: p.structuredFormat?.mainText.text ?? p.text.text,
     secondaryText: p.structuredFormat?.secondaryText?.text ?? "",
   }] : []).slice(0, 5);
+  if (apartmentRange) {
+    const seen = new Set<string>();
+    return suggestions.flatMap((suggestion) => {
+      const street = suggestion.address.split(",")[0].trim().replace(/[–—−]/g, "-");
+      const match = street.match(/^(?:(?:(?:unit|apartment|apt)\s*)?(\d+[a-z]?)\s*\/\s*)?(\d+[a-z]?)\s*-\s*(\d+[a-z]?)\s+(.+)$/i);
+      // Don't attach a unit to a different building or to somebody else's unit.
+      if (!match || `${match[2]}-${match[3]}`.toLowerCase() !== buildingNumber!.toLowerCase() ||
+        (match[1] && match[1].toLowerCase() !== apartmentRange[1].toLowerCase())) return [];
+      const mainText = `${apartmentRange[1]}/${buildingNumber} ${match[4]}`;
+      const comma = suggestion.address.indexOf(",");
+      const address = mainText + (comma < 0 ? "" : suggestion.address.slice(comma));
+      if (seen.has(address.toLowerCase())) return [];
+      seen.add(address.toLowerCase());
+      return [{ ...suggestion, mainText, address }];
+    });
+  }
   // Google can rank reversed Australian unit/street numbers first (22A/12 vs 12/22A).
   // Prioritize an exact number match without changing any suggestion's address.
   const numbers = (text: string) => text.match(/^(?:(?:unit|apartment|apt)\s*)?(\d+[a-z]?\s*\/\s*\d+[a-z]?(?:\s*[-–]\s*\d+[a-z]?)?)/i)?.[1].replace(/\s/g, "").replace(/–/g, "-").toLowerCase();

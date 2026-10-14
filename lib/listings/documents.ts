@@ -2,6 +2,7 @@ import { hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
 import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
 import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSalesAppraisalReport";
 import { collateralEditorPath, COLLATERAL_TYPE_META } from "./collateralTypes";
+import { isConfirmedStrReport } from "@/lib/str-appraisals/classification";
 import type {
   Listing,
   Report,
@@ -20,10 +21,10 @@ export type ListingDocument = {
   report?: Report;
   collateral?: CollateralItem;
 };
-export function reportDocumentType(report: Report): CollateralType {
+export function reportDocumentType(report: Report): CollateralType | null {
   if (isSalesAppraisalTemplateId(report.template_id)) return "sales_appraisal";
   if (isLeaseAppraisalTemplateId(report.template_id)) return "lease_appraisal";
-  return "str_report";
+  return isConfirmedStrReport(report) ? "str_report" : null;
 }
 export function documentStatus(status: string, stale: boolean) {
   if (status === "failed") return "Needs attention";
@@ -36,18 +37,20 @@ export function listingDocuments(
   listing: Listing,
   reports: Report[],
   collateral: CollateralItem[],
+  strReportIds: string[] = [],
 ): ListingDocument[] {
   const active = reports.filter((r) => r.status !== "archived");
-  const documents: ListingDocument[] = active.map((report) => {
+  const documents: ListingDocument[] = active.flatMap((report) => {
     const type =
       collateral.find(
         (item) => item.report_id === report.id && item.status !== "archived",
-      )?.type ?? reportDocumentType(report);
+      )?.type ?? (strReportIds.includes(report.id) ? "str_report" : reportDocumentType(report));
+    if (!type) return [];
     const stale =
       type === "sales_appraisal"
         ? hasStaleAppraisal(listing, "sales")
         : type === "lease_appraisal" && hasStaleAppraisal(listing, "lease");
-    return {
+    return [{
       id: report.id,
       type,
       name: COLLATERAL_TYPE_META[type].label,
@@ -55,11 +58,11 @@ export function listingDocuments(
       updatedAt: report.updated_at,
       href:
         type === "str_report"
-          ? `/listings/${listing.id}/reports/${report.id}`
+          ? `/short-term-rentals/appraisals/${report.id}`
           : `${collateralEditorPath(listing.id, type)}?reportId=${report.id}`,
       publicUrl: report.status === "published" ? report.public_url : null,
       report,
-    };
+    }];
   });
   for (const item of collateral) {
     if (

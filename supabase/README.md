@@ -45,3 +45,222 @@ to `agencies`; existing agencies start with no presets. A save was verified on a
 temporary table in a rolled-back transaction, with agency RLS confirmed enabled.
 The application writes presets through the existing agency-admin access check
 and scopes updates to that admin's agency. No existing report is modified.
+
+## Short-Term Rentals workspace
+
+[`20261010232632_str_appraisal_workspace.sql`](migrations/20261010232632_str_appraisal_workspace.sql)
+is applied to the existing StayPack project, which is shared by production and
+the staging preview. This is additive: 150 positively identified STR reports were
+registered without rewriting their final report JSON, PDF URLs or public links.
+Compatibility triggers register STR reports created by the previous app version
+while the new workspace is evaluated on staging.
+
+[`20261010233726_str_recipient_conflict_http_status.sql`](migrations/20261010233726_str_recipient_conflict_http_status.sql)
+is applied immediately after it. Expected stale edits use `PT409` so PostgREST
+returns HTTP 409 instead of retrying an engine serialization error. See
+[Supabase's RPC conflict guidance](https://supabase.com/docs/guides/troubleshooting/high-cpu-and-infinite-transaction-retries-when-using-custom-error-codes-in-rpc-functions-77326b).
+
+`str_appraisals` adds customer-specific metadata to the existing report. Private
+recipient snapshots and reusable `agency_contacts` are protected by agency RLS
+and are never merged into public report JSON. Creation and recipient edits use
+security-invoker RPCs, with atomic creation, retry-safe request IDs and stale-edit
+checks. Existing agencies retain access through the central STR access helper;
+subscription gating can be added there later.
+
+The review environment is
+[Short-Term Rentals staging](https://str-workspace--staypack.netlify.app/short-term-rentals).
+Netlify's `str-workspace` branch context and deploy-preview build context use the
+staging site/report URLs with the existing Supabase credentials. Build the preview
+with `netlify deploy --context deploy-preview --alias str-workspace`; do not add
+`--prod`. Production remains a separate app deploy. Next.js middleware bundling
+requires the pinned `@opentelemetry/api` dependency in `package.json`.
+
+The STR editor follows Property & customer → Estimate & evidence → Design &
+content → Review & share. Layout selection uses saved estimates; switching layouts
+preserves the evidence, wording and photos. Property changes that affect an
+estimate return the user to evidence review. No database migration is needed for
+this step order. LTR, sales and brochure wizard ordering is unchanged.
+
+Properties and import stay shared. Multiple appraisals can use the same listing;
+the existing property-level STR collateral pointer stays stable for brochures.
+Archiving an appraisal disables its public report page without deleting the
+property or PDFs already downloaded. Restoring does not republish it.
+
+The calculator widget, engagement analytics, messaging and billing remain future
+work. This change captures contact details but does not send email or SMS.
+
+Validation:
+
+- `tests/str_workspace_fixture.sql` and `tests/str_workspace_assertions.sql` run
+  only in an **empty disposable PostgreSQL 17 database**: fixture, both STR migrations, then
+  assertions with `psql -v ON_ERROR_STOP=1`. Never run the fixture on Supabase.
+- Unit coverage is in `lib/str-appraisals` and existing report/delivery suites.
+- `components/reports/StrJourney.test.tsx` covers ordering, save failures,
+  backtracking, template switching and saved-report compatibility.
+- `tests/staging/str-step-order.spec.ts` runs the complete desktop/mobile journey
+  against `/dev/lint-regression` with synthetic provider responses.
+- `tests/staging/str-workspace.spec.ts` is opt-in live browser coverage. Set
+  `STR_LIVE_TEST=1`, `STAGING_BASE_URL` and Supabase environment credentials. It
+  creates a temporary agency/account, exercises the real API, and removes its
+  records. No messages or paid estimate/PDF generation are triggered.
+- Supabase advisors report no findings on the added objects. Existing findings
+  remain on legacy functions and Auth settings; see the
+  [database security advisor](https://supabase.com/dashboard/project/qmtfugaeujeikyegoxwi/advisors/security).
+
+## Digital STR proposal workflow
+
+The main editor at `/short-term-rentals/appraisals/[reportId]` now follows
+**Property → Rental appraisal → Proposal → Customer & share**. The old
+`/proposal` editor URL redirects there. Legacy non-workspace report flows are
+unchanged. The development template studio remains at
+`/dev/str-proposal?reportId=...`; it is not the customer authoring interface.
+
+Apply these migrations after the STR workspace migrations, in order:
+
+- `20261012000950_digital_proposal_workspace.sql`
+- `20261012002612_digital_proposal_draft_index.sql`
+- `20261012020830_digital_proposal_integration.sql`
+- `20261012021839_proposal_activity_version_details.sql`
+
+### Account designs and publication
+
+`digital_proposal_assignments` holds one onboarding-owned design per agency:
+`agency_id`, `name`, positive integer `version`, and `defaults` (validated by
+`proposalDraftSchema`). Provision/update assignments using a trusted server or
+admin migration and increment `version` when changing the design. Members can
+read the assignment but cannot write it. Without a row, the base template uses
+the agency's current brand. New drafts inherit the assigned content/pages;
+existing drafts keep their introduction, configured page selection/order, agents,
+documents and links. Save and publish enforce the assignment's page definitions,
+appraisal heading, renderer, preset, brand, hero and motion settings. Pages can
+be added or have their copy changed during brand onboarding; users cannot create
+or rewrite pages in an appraisal. Unconfigured text pages cannot be enabled.
+The development studio can save experimental settings with
+`?studio=1`; publication still uses the account assignment. Additional bespoke
+renderers require a registered, versioned renderer in code.
+
+Drafts use revision checks to reject stale saves. Publishing checks the current
+property, appraisal, customer and assignment fingerprint. It stores data, brand,
+enabled pages and selected documents in an immutable `final_report_json` snapshot.
+Identical publication requests reuse the version. Separate
+`digital_proposal_links` records allow revocation and a fresh link for the same
+version without restoring an old link. Existing links remain on their original
+version after edits. Customer email and phone stay private; the customer display
+name is included. Up to two active account agents can be attached to a proposal;
+their public name, role, photo, phone and email are frozen into the published
+snapshot and displayed on Next steps and the PDF. Archived or cross-account agent
+IDs are rejected. Agent choices do not change the listing's agents. Public pages
+use no-index, no-referrer and no-store headers.
+
+### Documents, agreement links and PDF
+
+Documents are PDFs up to 4 MiB in the private `proposal-documents` bucket. Downloads
+require agency access or an active share token whose snapshot includes that
+attachment. Files are streamed through the server; no public storage URLs or
+reusable signed URLs are exposed. Archiving a listing or appraisal revokes its
+versions permanently. Previously downloaded copies cannot be recalled.
+
+**Review & sign** opens the supplied HTTPS signing URL. A click is not a signature
+or a completed agreement. Embedded signing, provider callbacks and automated
+email/SMS delivery remain future integrations.
+
+Publishing makes the digital link available first, then requests the PDF. A
+failed PDF can be retried independently. Browserless renders the same immutable
+snapshot through the trusted print renderer; PDFs live in private
+`proposal-pdfs` storage and downloads check the active token each time. The
+Next steps page exposes **Download proposal PDF** once it is ready. PDF generation
+needs the configured Browserless server key; the digital proposal does not.
+
+Havenly's `haven-properties-str` assignment uses its two-page branded PDF. New
+publications freeze a separate, validated `pdfReport` in the existing JSON snapshot,
+with the same saved appraisal inputs and explicitly selected proposal agents. The
+signed `/proposal/print/[versionId]` route renders that version through the existing
+Browserless report pipeline. It does not fetch current estimates or agent profiles.
+Older publications without `pdfReport` retain their original digital print output;
+republish to create a version with the branded PDF. No schema migration is required.
+
+### Activity
+
+Public links record an open, enabled page views, comparison-tab interactions,
+visible comparables, document/PDF clicks, and action/agreement clicks. Private
+previews and the template studio do not record events. Sessions use a random
+per-link browser identifier with 30 minutes of inactivity expiry, not contact
+details or fingerprinting. Repeated event targets count once per session;
+known bots are excluded and inserts are rate bounded. These are link visits and
+interactions, not verified customer identities or proof a document was read.
+Forwarded links can contribute activity. Labels are resolved against the exact
+published version viewed. The dashboard shows opens; Customer & share includes
+the activity breakdown. Signing completion is not inferred from clicks.
+
+### Validation
+
+Run `lib/digital-proposals`, `components/digital-proposals`, and
+`components/reports/StrJourney.test.tsx` with Vitest. The opt-in
+`STR_LIVE_TEST=1 ... vitest run lib/digital-proposals/integration.live.test.ts`
+uses disposable agencies, users, synthetic saved estimates and test files for
+isolation, publication, versioning, activity and revocation checks. Add
+`STR_PDF_TEST=1` only when intentionally testing real Browserless generation.
+Add `STR_HAVEN_TEST=1` to exercise the branded PDF, print-token access and selected
+agents using a disposable account with the Havenly template grant.
+It removes its own database and storage records. The opt-in Playwright
+`tests/staging/str-proposal-workspace.spec.ts` covers the development template
+studio and stubs PDF generation. `str-digital-proposal.spec.ts` covers the renderer.
+For SQL-only checks, use an empty disposable PostgreSQL 17 database and the
+fixtures/assertions in `supabase/tests/`; never run those fixtures on the app DB.
+
+### Published proposal performance
+
+The public viewer uses one uncached inner-join lookup across links, versions,
+reports and listings. It verifies matching agency ownership and active status on
+every request. It bypasses dashboard session refresh; share tokens remain the
+public access boundary. No schema migration is required.
+
+A separate server-side Next Data Cache stores the immutable digital snapshot by
+version and content hash for 24 hours. PDF source data is excluded from that
+projection. The publication route warms it with `after()`; opening an existing
+publication fills a cold cache automatically. The mutable access check and PDF
+availability are never cached, and public HTML/download responses remain
+`private, no-store`. Do not add `force-dynamic` to the viewer page: that would also
+disable its explicitly cached data fetch. Its `no-store` access fetch already
+makes the page dynamic. PDFs use only the fresh access lookup before downloading.
+
+The browser paints the branded cover first and shows a preparation indicator for
+at most three seconds. Page modules and images use separate queues (two jobs each)
+so slow photography does not hold up JavaScript. Included pages render once in
+inert, inaccessible offscreen frames at their actual width; charts finish rendering
+before navigation reveals them. Fonts and primary images have bounded waits.
+Navigation keeps the current page visible until its destination is ready, with
+latest-request-wins behaviour and a reload/cancel fallback for failures. Prepared
+pages stay mounted, preserving chart tabs and carousel position. Reduced-motion
+users receive no reveal animation; data-saving connections prepare only the next
+page automatically. Hidden frames never generate page/comparable views, and
+preparation never fetches PDFs, attachments or agreement links.
+
+Performance checks should compare cold-browser visits using production builds.
+Dev compilation times are not representative. Verify direct section links,
+mobile layout, browser history, real interaction tracking, fresh PDF availability,
+and revocation/archive behaviour after warming the snapshot cache.
+
+## Detached prospect brands
+
+`20261013045131_detached_prospect_brands.sql` is applied to the shared StayPack database.
+Its filename matches the recorded migration version. Prospect brand profiles and example
+proposals have no required agency reference, login, membership or billing record. Only
+explicitly enrolled internal operators can read their own rows. The private `/prospects`
+library is not included in customer navigation. Customer membership alone grants no access.
+
+`/example/[token]` renders the saved public projection; raw imports, provider payloads,
+operator details and original selling agents remain private. Examples can be revoked.
+Signup is separate: the service-only `attach_prospect_brand` operation atomically applies
+branding and management defaults to an existing agency, installs its proposal design and
+links the prospect record. It creates no account and leaves shared example snapshots intact.
+
+See `lib/prospects/profiles/README.md` for creation and onboarding commands. The current
+creation flow is operator-driven, and the internal library is read-only. This feature is
+available on the `prospect-examples` draft deployment; production was not redeployed.
+
+Verification: 21 focused tests and TypeScript/ESLint checks pass. The preview build passed.
+Database RLS was exercised using both Cameron's operator identity and the existing Havenly
+member identity (zero prospect rows visible to Havenly). Anonymous access and customer
+writes/adoption are denied. Supabase security advisors report no findings on the added
+objects; pre-existing advisor findings were unchanged.

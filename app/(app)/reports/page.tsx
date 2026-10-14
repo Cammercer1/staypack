@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function ReportsPage() {
-  redirect("/listings");
+  redirect("/short-term-rentals");
 }

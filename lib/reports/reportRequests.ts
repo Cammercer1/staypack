@@ -1,4 +1,5 @@
 import type { Report } from "@/lib/types";
+import { userFacingPropertyMessage } from "@/lib/listings/userFacingPropertyMessages";
 
 export class ReportRequestError extends Error {
   constructor(
@@ -29,8 +30,8 @@ export async function reportRequest<T>(
   const payload = await response.json().catch(() => null);
   if (!response.ok || !payload) {
     throw new ReportRequestError(
-      payload?.error ??
-        "The server did not finish responding. Please try again.",
+      userFacingPropertyMessage(payload?.error ??
+        "The server did not finish responding. Please try again."),
       response.status >= 500 || !payload,
     );
   }

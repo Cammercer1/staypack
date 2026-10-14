@@ -1,3 +1,4 @@
+import { createStrAppraisal } from "@/lib/str-appraisals/service";
 import { applyDocumentLinkDraft, type DocumentLink } from "@/lib/documents/documentLink";
 import { createDocumentLinkDraft } from "@/lib/documents/createDocumentLinkDraft";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -113,32 +114,10 @@ export async function generateHeadlessStrReport({
     tenant.brand?.report_template_id ??
     templateIdFromPack(tenant.str_template_pack_id);
 
-  const { data: report, error: reportError } = await admin
-    .from("reports")
-    .insert({
-      agency_id: agency.id,
-      listing_id: listing.id,
-      status: "draft",
-      template_id: packTemplateId,
-    })
-    .select("*")
-    .single();
-
-  if (reportError || !report) {
-    throw new Error(reportError?.message ?? "Failed to create report");
-  }
-
-  const { error: collateralError } = await admin.from("collateral_items").insert({
-    listing_id: listing.id,
-    agency_id: agency.id,
-    type: "str_report",
-    status: "draft",
-    report_id: report.id,
+  const report = await createStrAppraisal({
+    supabase: admin, agency, listing, requestId: crypto.randomUUID(),
+    templateId: packTemplateId, source: "managed_delivery",
   });
-
-  if (collateralError && collateralError.code !== "23505") {
-    throw new Error(collateralError.message);
-  }
 
   const geocoded = await geocodeReportAddress({
     property_address: listing.property_address,

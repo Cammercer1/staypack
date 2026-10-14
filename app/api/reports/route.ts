@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAgency, requireListingAccess } from "@/lib/auth/requireUser";
-import { collateralPhotoRequirementError } from "@/lib/listings/collateralPhotoRequirements";
-import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
+import { createStrAppraisal } from "@/lib/str-appraisals/service";
+import { unstable_rethrow } from "next/navigation";
 import { createReportSchema } from "@/lib/validation/schemas";
 
 export async function GET(request: Request) {
@@ -33,6 +33,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ reports: data ?? [] });
   } catch (error) {
+    unstable_rethrow(error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to load reports" },
       { status: 400 },
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { supabase, agency, user } = await requireAgency();
+    const { supabase, agency } = await requireAgency();
     const body = createReportSchema.parse(await request.json());
 
     if (!body.listing_id) {
@@ -55,45 +56,11 @@ export async function POST(request: Request) {
     const { listing } = await requireListingAccess(body.listing_id);
 
 
-    const photoError = collateralPhotoRequirementError(listing);
-    if (photoError) {
-      return NextResponse.json({ error: photoError }, { status: 400 });
-    }
-
-    const availableTemplates = await resolveAvailableTemplates(agency, "str");
-
-    const { data, error } = await supabase
-      .from("reports")
-      .insert({
-        agency_id: agency.id,
-        listing_id: listing.id,
-        created_by: user.id,
-        template_id: availableTemplates.defaultTemplateId,
-        status: "draft",
-      })
-      .select("*")
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    const { error: collateralError } = await supabase
-      .from("collateral_items")
-      .insert({
-        listing_id: listing.id,
-        agency_id: agency.id,
-        type: "str_report",
-        status: "draft",
-        report_id: data.id,
-      });
-
-    if (collateralError && collateralError.code !== "23505") {
-      return NextResponse.json({ error: collateralError.message }, { status: 400 });
-    }
+    const data = await createStrAppraisal({ supabase, agency, listing, requestId: crypto.randomUUID() });
 
     return NextResponse.json({ report: data });
   } catch (error) {
+    unstable_rethrow(error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to create report" },
       { status: 400 },

@@ -1,5 +1,7 @@
 "use client";
 
+import { isPropertyProviderDiagnostic } from "@/lib/listings/userFacingPropertyMessages";
+
 import type { UseFormReturn } from "react-hook-form";
 import { Check, ImageIcon, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -221,6 +223,7 @@ export function NewListingReview({
   agents,
   onAgentsChange,
   agencyAgents,
+  includeAgents = true,
 }: {
   draft: Listing;
   onDraftChange: (draft: Listing) => void;
@@ -228,6 +231,7 @@ export function NewListingReview({
   agents: ListingAgentDraft[];
   onAgentsChange: (agents: ListingAgentDraft[]) => void;
   agencyAgents: AgentProfile[];
+  includeAgents?: boolean;
 }) {
   const source = draft.scraped_listing_json?.propertyLookup;
   const purpose = draft.listing_purpose;
@@ -283,7 +287,7 @@ export function NewListingReview({
           Check the unit and street number, then confirm or correct the details
           below. Only the street address is required to get started.
         </p>
-        {draft.scraped_listing_json?.warnings.map((warning, index) => (
+        {draft.scraped_listing_json?.warnings.filter((warning) => !isPropertyProviderDiagnostic(warning)).map((warning, index) => (
           <p
             key={index}
             className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-950"
@@ -336,7 +340,7 @@ export function NewListingReview({
         </details>
       </section>
       <PropertyPhotos draft={draft} onChange={onDraftChange} />
-      <ListingAgentsEditor
+      {includeAgents && <ListingAgentsEditor
         agents={agents}
         agencyAgents={agencyAgents}
         onChange={onAgentsChange}
@@ -347,7 +351,7 @@ export function NewListingReview({
               ? "Review any contacts imported from the listing URL, or choose up to two agents from your own team."
               : "Optional. Choose up to two agents from your team or enter their details. Historical listing agents are not assigned automatically."
         }
-      />
+      />}
     </div>
   );
 }

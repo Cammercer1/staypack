@@ -260,6 +260,36 @@ The full dependency inventory and rollout notes are in [the property-pages audit
 - `npm run build` — production build
 - `npm run lint` — ESLint
 
+### Production release integrity
+
+Netlify builds production from `main`. Production features must be committed
+with their pages, API routes, supporting modules, migrations and lockfile before
+deployment. A manual deploy from uncommitted files is temporary: the next Git
+build replaces the whole application. Build from the current `origin/main` plus
+the reviewed change so newer public proposals are preserved.
+
+`npm run build` now runs desktop/mobile navigation regression tests and checks
+the compiled route manifest for the STR workspace, appraisal APIs, proposal
+sharing/print/download routes and existing prospect examples. A missing entry
+fails the build instead of publishing an incomplete application.
+
+Before pushing, run `npm test` and `npm run build` in the Node 24 container.
+For authenticated release verification, run the opt-in browser test against the
+candidate deployment, then repeat it against production:
+
+```bash
+STR_LIVE_TEST=1 STAGING_BASE_URL=https://YOUR-DEPLOY.netlify.app \
+  npm run test:staging -- tests/staging/str-workspace.spec.ts
+```
+
+This requires the configured Supabase URL, anonymous key and server-only service
+key. It creates and removes a disposable QA agency/user, checks desktop/mobile
+navigation, creates an appraisal, saves assumptions and proposal/customer edits,
+publishes a test link, and checks legacy links. It seeds provider output and skips
+paid estimate, copy and PDF calls. Never commit credentials or browser sessions.
+`lib/digital-proposals/integration.live.test.ts` additionally checks isolation,
+attachments, immutable versions, activity and revocation on the same deployment.
+
 ### Mock staging regression checks
 
 `/dev/lint-regression` renders the real affected UI components with synthetic records. Click **Start mock test session** before selecting a test screen. All app API calls are intercepted in that tab; saves are kept in memory and reset on reload. Unhandled API calls fail closed. The landing-template iframe contains a fixture page; the modal's selection, cancellation, and save behaviour are tested separately from landing-page content.

@@ -7,8 +7,10 @@ import type { FinalReportJson } from "@/lib/types";
 
 export function AppraisalTemplateGallery({
   previewForTemplate,
+  description,
   ...props
 }: {
+  description?: string;
   product: TemplateProduct;
   initialTemplates?: TemplatesResponse;
   value: string;
@@ -20,7 +22,7 @@ export function AppraisalTemplateGallery({
   return (
     <DocumentTemplateGallery
       {...props}
-      description="Your branding, photos and agent details are included. The wording shown here is a sample; your appraisal is written after you review the evidence."
+      description={description ?? "Your branding, photos and agent details are included. The wording shown here is a sample; your appraisal is written after you review the evidence."}
       renderPreview={(id) => {
         const preview = previewForTemplate(id);
         return preview ? (

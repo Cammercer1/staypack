@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireListingAccess } from "@/lib/auth/requireUser";
 import { prepareListingPatch } from "@/lib/listings/prepareListingInput";
 import { updateListingSchema } from "@/lib/validation/schemas";
+import { isConfirmedStrReport } from "@/lib/str-appraisals/classification";
 
 export async function GET(
   _request: Request,
@@ -24,7 +25,7 @@ export async function GET(
 
     return NextResponse.json({
       listing,
-      str_report: reports?.[0] ?? null,
+      str_report: reports?.find(isConfirmedStrReport) ?? null,
       reports: reports ?? [],
     });
   } catch (error) {

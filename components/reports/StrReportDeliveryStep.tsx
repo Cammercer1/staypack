@@ -9,12 +9,14 @@ import type { FinalReportJson, Report } from "@/lib/types";
 
 export function StrReportDeliveryStep({
   report,
+  disabled = false,
   preview,
   onReportChange,
   onEdit,
   onBusyChange,
 }: {
   report: Report;
+  disabled?: boolean;
   preview: FinalReportJson;
   onReportChange: (report: Report) => void;
   onEdit: () => void;
@@ -25,6 +27,7 @@ export function StrReportDeliveryStep({
   return (
     <DocumentDeliveryStep
       name="appraisal"
+      disabled={disabled}
       preview={
         <FittedReportPreview
           pageLabels={["Overview", "Market evidence"]}

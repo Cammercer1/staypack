@@ -33,7 +33,6 @@ import { PropertyDetailsForm } from "./PropertyDetailsForm";
 import { UnsavedListingGuard } from "./UnsavedListingGuard";
 import { CreateLeaseAppraisalButton } from "./CreateLeaseAppraisalButton";
 import { CreateSalesAppraisalButton } from "./CreateSalesAppraisalButton";
-import { CreateStrReportButton } from "./CreateStrReportButton";
 import { getCollateralPhotoRequirement } from "@/lib/listings/collateralPhotoRequirements";
 import {
   COLLATERAL_TYPE_META,
@@ -54,6 +53,7 @@ import type {
 type Props = {
   listing: Listing;
   reports: Report[];
+  strReportIds?: string[];
   collateral: CollateralItem[];
   agencySlug: string;
   leads: Lead[];
@@ -109,13 +109,16 @@ export function ListingWorkspace({
   listing: initialListing,
   reports,
   collateral,
+  strReportIds = [],
 }: Props) {
   const [listing, setListing] = useState(initialListing);
   const [tab, setTab] = useState("documents");
   const [createOpen, setCreateOpen] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [photosDirty, setPhotosDirty] = useState(false);
-  const documents = listingDocuments(listing, reports, collateral);
+  const allDocuments = listingDocuments(listing, reports, collateral, strReportIds);
+  const strDocuments = allDocuments.filter((document) => document.type === "str_report");
+  const documents = allDocuments.filter((document) => document.type !== "str_report");
   const requirement = getCollateralPhotoRequirement(listing);
   const address = listing.property_address || "Untitled property";
   return (
@@ -178,6 +181,10 @@ export function ListingWorkspace({
         </div>
         <ListingAgentsStrip listing={listing} onUpdated={setListing} />
       </header>
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-base-300 bg-base-100 p-5">
+        <div><h2 className="font-display text-xl">Short-Term Rentals</h2><p className="mt-1 text-sm text-base-content/65">{strDocuments.length} active appraisal{strDocuments.length === 1 ? "" : "s"} for this property. Prepare a separate appraisal for each customer.</p></div>
+        <div className="flex flex-wrap gap-2"><Link href={`/short-term-rentals?listing_id=${listing.id}`} className="du-btn du-btn-sm min-h-11">View appraisals</Link><Link href={`/short-term-rentals/appraisals/new?listing_id=${listing.id}`} className="du-btn du-btn-sm du-btn-outline min-h-11">Create STR appraisal</Link></div>
+      </section>
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList
           variant="line"
@@ -377,7 +384,7 @@ export function ListingWorkspace({
           ) : (
             <ul className="divide-y divide-base-300">
               {collateralOrderForPurpose(listing.listing_purpose)
-                .filter((type) => !COLLATERAL_TYPE_META[type].comingSoon)
+                .filter((type) => type !== "str_report" && !COLLATERAL_TYPE_META[type].comingSoon)
                 .map((type) => {
                   const existing = documents.find((doc) => doc.type === type);
                   return (
@@ -405,12 +412,6 @@ export function ListingWorkspace({
                         />
                       ) : type === "lease_appraisal" ? (
                         <CreateLeaseAppraisalButton
-                          listingId={listing.id}
-                          photoRequirement={requirement}
-                          label="Create"
-                        />
-                      ) : type === "str_report" ? (
-                        <CreateStrReportButton
                           listingId={listing.id}
                           photoRequirement={requirement}
                           label="Create"

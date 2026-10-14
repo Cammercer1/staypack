@@ -1,12 +1,13 @@
 "use client";
 import { AppraisalGenerationStatus } from "@/components/appraisals/AppraisalGenerationStatus";
+import { ReportEditor } from "@/components/reports/ReportEditor";
 import { ReportWizard } from "@/components/reports/ReportWizard";
 import { LeaseAppraisalWizard } from "@/components/lease-appraisal/LeaseAppraisalWizard";
 import { SalesAppraisalWizard } from "@/components/sales-appraisal/SalesAppraisalWizard";
 import { ListingWorkspace } from "@/components/listings/ListingWorkspace";
 import { BusinessCardEditor } from "@/components/collateral/business-card/BusinessCardEditor";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useForm } from "react-hook-form";
 import { createLintRegressionFixtures, installRegressionMocks, type RegressionFixtures } from "./lintRegressionFixtures";
 import { DashboardAnalytics } from "@/components/dashboard/DashboardAnalytics";
@@ -33,8 +34,10 @@ import { Button } from "@/components/ui/button";
 import type { AgencyInput } from "@/lib/validation/schemas";
 
 const cases = ["brochure", "sales-brochure-new", "lease-brochure-new", "brochure-generation", "editor", "wizard", "report", "gallery", "landing", "agents", "unknown-agents", "branding", "analytics", "leads", "progress", "social", "report-wizard", "str-new", "str-first", "lease-wizard", "sales-wizard", "lease-new", "sales-new", "appraisal-generation", "workspace", "business-card"] as const;
+const subscribeToHydration = () => () => {};
 
 export function LintRegressionPlayground() {
+  const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const [fixtures] = useState(createLintRegressionFixtures);
   const [started, setStarted] = useState(false);
   const [selected, setSelected] = useState<string>("brochure");
@@ -51,7 +54,7 @@ export function LintRegressionPlayground() {
     <header className="space-y-3 rounded-xl border bg-amber-50 p-4 text-slate-900">
       <h1 className="text-2xl font-semibold">StayPack mock regression preview</h1>
       <p>Synthetic listing and agency. Saves stay in this browser tab and reset on reload.</p>
-      {!started ? <Button onClick={start}>Start mock test session</Button> : <label>Test screen <select aria-label="Test screen" value={selected} onChange={(e) => {
+      {!started ? <Button disabled={!hydrated} onClick={start}>Start mock test session</Button> : <label>Test screen <select aria-label="Test screen" value={selected} onChange={(e) => {
         const name = e.target.value;
         restore.current?.();
         setRequests([]);
@@ -85,7 +88,7 @@ function RegressionCase({ name, fixtures }: { name: string; fixtures: Regression
 
   if (name === "sales-brochure-new" || name === "lease-brochure-new") return <SalesBrochureWizard agency={agency} initialListing={listing} initialCollateral={brochureDraft} collateralType={brochureDraft.type} initialAgencyAgents={[fixtures.agent]} />;
   if (name === "brochure-generation") return <BrochureGenerationStatus />;
-  if (name === "str-new" || name === "str-first") return <ReportWizard agency={name === "str-first" ? { ...agency, str_management_presets: [] } : agency} initialListing={listing} initialReport={{ ...fixtures.report, template_id: null, original_estimate_json: null, user_overrides_json: null, final_estimate_json: null, final_report_json: null, ai_copy_json: null, str_enrichment_json: null, status: "draft" }} />;
+  if (name === "str-new" || name === "str-first") return <ReportEditor appraisal={fixtures.appraisal} agency={name === "str-first" ? { ...agency, str_management_presets: [] } : agency} initialListing={listing} initialReport={{ ...fixtures.report, template_id: null, original_estimate_json: null, user_overrides_json: null, final_estimate_json: null, final_report_json: null, ai_copy_json: null, str_enrichment_json: null, status: "draft" }} />;
   if (name === "report-wizard") return <ReportWizard agency={agency} initialListing={listing} initialReport={fixtures.report} />;
   if (name === "lease-wizard") return <LeaseAppraisalWizard agency={agency} initialListing={listing} initialReport={fixtures.lease} initialCollateral={fixtures.leaseCollateral} initialAgencyAgents={[fixtures.agent]} />;
   if (name === "sales-wizard") return <SalesAppraisalWizard agency={agency} initialListing={listing} initialReport={fixtures.sales} initialCollateral={fixtures.salesCollateral} initialAgencyAgents={[fixtures.agent]} />;

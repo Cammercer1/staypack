@@ -15,6 +15,7 @@ import { DocumentStepHeader } from "@/components/documents/DocumentStepHeader";
 
 export function DocumentDeliveryStep({
   name,
+  disabled = false,
   preview,
   pdfReady,
   downloadUrl,
@@ -30,6 +31,7 @@ export function DocumentDeliveryStep({
   pdfProgressText,
 }: {
   name: "appraisal" | "brochure";
+  disabled?: boolean;
   pdfProgressText?: string;
   preview: ReactNode;
   pdfReady: boolean;
@@ -48,8 +50,10 @@ export function DocumentDeliveryStep({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const blocked = disabled || Boolean(busy);
+
   async function prepare(action: "pdf" | "publish") {
-    if (busy) return;
+    if (blocked) return;
     setBusy(action);
     onBusyChange(true);
     setError(null);
@@ -66,6 +70,7 @@ export function DocumentDeliveryStep({
   }
 
   async function copyLink() {
+    if (blocked) return;
     try {
       await navigator.clipboard.writeText(publicUrl!);
       setCopied(true);
@@ -90,7 +95,7 @@ export function DocumentDeliveryStep({
         <button
           type="button"
           className="du-btn du-btn-sm du-btn-outline min-h-11"
-          disabled={Boolean(busy)}
+          disabled={blocked}
           onClick={onEdit}
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
@@ -99,7 +104,7 @@ export function DocumentDeliveryStep({
       </DocumentStepHeader>
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">{preview}</div>
-        <aside className="order-first space-y-4 xl:order-last xl:sticky xl:top-32">
+        <aside inert={disabled} className="order-first space-y-4 xl:order-last xl:sticky xl:top-32">
           <section className="du-card du-card-border bg-base-100">
             <div className="du-card-body gap-4 p-5">
               <div className="flex items-center gap-3">
@@ -135,7 +140,7 @@ export function DocumentDeliveryStep({
                   <button
                     type="button"
                     className="du-btn du-btn-sm du-btn-ghost min-h-11"
-                    disabled={Boolean(busy) || linkPending}
+                    disabled={blocked || linkPending}
                     onClick={() => void prepare("pdf")}
                   >
                     <RefreshCw className="size-4" aria-hidden="true" />
@@ -146,7 +151,7 @@ export function DocumentDeliveryStep({
                 <button
                   type="button"
                   className="du-btn du-btn-sm du-btn-primary min-h-11"
-                  disabled={Boolean(busy) || linkPending || hasLinkDraft}
+                  disabled={blocked || linkPending || hasLinkDraft}
                   onClick={() => void prepare("pdf")}
                 >
                   {busy === "pdf" ? "Preparing PDF…" : "Prepare PDF"}
@@ -180,6 +185,7 @@ export function DocumentDeliveryStep({
                   <button
                     type="button"
                     className="du-btn du-btn-sm min-h-11"
+                    disabled={blocked}
                     onClick={() => void copyLink()}
                   >
                     {copied ? (
@@ -200,11 +206,11 @@ export function DocumentDeliveryStep({
                   </a>
                 </div>
               ) : null}
-              {renderLinkEditor(Boolean(busy))}
+              {renderLinkEditor(blocked)}
               <button
                 type="button"
                 className="du-btn du-btn-sm du-btn-outline min-h-11"
-                disabled={Boolean(busy) || linkPending}
+                disabled={blocked || linkPending}
                 onClick={() => void prepare("publish")}
               >
                 {busy === "publish" ? (
