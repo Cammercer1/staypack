@@ -30,12 +30,12 @@ export function ProposalComparison({ data, brand, draft }: ProposalTemplateProps
       <dl className="mt-5 grid @min-[600px]/proposal:grid-cols-3 @min-[600px]/proposal:gap-6" aria-label="Rental comparison figures">
         {rows.map(row => <div key={row.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 border-t border-current/15 py-3 @min-[600px]/proposal:block @min-[600px]/proposal:py-4" data-testid={`scenario-${row.id}`}>
           <dt className="text-sm font-medium leading-snug">{row.label}</dt>
-          <dd className={cn("text-right font-[family-name:var(--proposal-heading)] tabular-nums tracking-tight @min-[600px]/proposal:mt-2 @min-[600px]/proposal:text-left", row.value === null ? "text-sm text-(--proposal-muted)" : "text-2xl @min-[600px]/proposal:text-4xl")}>{row.value === null ? "Not available" : mode === "yield" ? `${row.value.toFixed(1)}%` : formatCurrency(row.value)}</dd>
+          <dd className={cn("text-right font-[family-name:var(--proposal-heading)] tabular-nums tracking-tight @min-[600px]/proposal:mt-2 @min-[600px]/proposal:text-left", row.value === null ? "text-sm text-(--proposal-muted)" : "text-2xl @min-[600px]/proposal:text-4xl")}>{row.value === null ? "Not available" : mode === "yield" ? `${row.value.toFixed(1)}%` : formatCurrency(row.value, data.market?.currency)}</dd>
           {row.value === null && <dd className="col-span-2 mt-1 text-xs text-(--proposal-muted)">{row.id === "ltr" ? "Rental estimate needed" : "Scenario not supplied"}</dd>}
         </div>)}
       </dl>
       <div className="mt-6"><RentalComparisonChart data={data} brand={brand} mode={mode} motion={draft.motion} /></div>
-      {mode === "yield" && <p className="text-sm text-(--proposal-muted)">Based on an estimated property value of {formatCurrency(data.property.estimatedValue)}.</p>}
+      {mode === "yield" && <p className="text-sm text-(--proposal-muted)">Based on an estimated property value of {formatCurrency(data.property.estimatedValue, data.market?.currency)}.</p>}
       {mode === "annual" && !draft.pages.some(page => page.kind === "forecast") && <div className="mt-8 border-t border-current/15 pt-6"><MonthlyRevenueChart data={data} brand={brand} motion={draft.motion} /></div>}
     </>}
     <details className="mt-4 text-sm text-(--proposal-muted)">

@@ -1,3 +1,4 @@
+import { requireListingAgencyCountry } from "@/lib/property-market/requireAgencyCountry";
 import { enrichWorkspaceAppraisal } from "@/lib/appraisals/enrichWorkspaceAppraisal";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { enrichListingForSalesAppraisal } from "@/lib/sales-appraisal/enrichListingForSalesAppraisal";
@@ -102,6 +103,7 @@ export async function runSalesAppraisalJob({
       supabase,
       processingJob as SalesAppraisalJob,
     );
+    if (typeof job.request_json.appraisal_report_id !== "string") await requireListingAgencyCountry(supabase, listing);
     const result = typeof job.request_json.appraisal_report_id === "string"
       ? await enrichWorkspaceAppraisal({ supabase, reportId: job.request_json.appraisal_report_id, agencyId: job.agency_id, kind: "sales", expected: String(job.request_json.appraisal_updated_at) })
       : await enrichListingForSalesAppraisal({ supabase, listing, requestId: job.id });

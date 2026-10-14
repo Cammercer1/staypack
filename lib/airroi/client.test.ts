@@ -62,3 +62,9 @@ describe("AirROI calculator adapter", () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
 });
+
+it("accepts native USD for US estimates and rejects AUD instead of relabelling it", () => {
+  const us = { ...input, latitude: 34.080734, longitude: -118.37964, currency: "USD" as const };
+  expect(normaliseAirroiResponse({ ...payload, currency: "USD" }, us).enrichment.currency).toBe("USD");
+  expect(() => normaliseAirroiResponse(payload, us)).toThrow(/currency/);
+});

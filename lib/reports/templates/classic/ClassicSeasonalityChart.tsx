@@ -3,6 +3,7 @@ import { formatCurrency, formatMonthLabel, formatPercent } from "@/lib/reports/f
 import { ClassicMarketOccupancyChart } from "./ClassicMarketOccupancyChart";
 
 type Props = {
+  currency?: "AUD" | "USD";
   seasonality: StrEnrichmentJson["seasonality"];
   compact?: boolean;
   revenueRange?: StrEnrichmentJson["revenue_range"];
@@ -16,7 +17,7 @@ type ChartProps = Props & {
 };
 
 export function ClassicSeasonalityChart({
-  seasonality,
+  seasonality, currency,
   compact = false,
   chartColour = DEFAULT_CHART_COLOUR,
   revenueRange,
@@ -32,7 +33,7 @@ export function ClassicSeasonalityChart({
       <p className="mb-2 h-10 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-neutral-600">Annual revenue benchmarks</p>
       <div className="grid h-[7.25rem] grid-cols-4 items-end gap-3 border-y border-neutral-200 py-2" role="img" aria-label="Annual estimated gross STR revenue percentiles">
         {points.map(([label, value]) => <div key={label} className="flex h-full flex-col justify-end text-center text-[0.58rem]">
-          <span>{formatCurrency(value)}</span>
+          <span>{formatCurrency(value, currency)}</span>
           <div className="mx-auto mt-1 w-8 max-w-full" style={{ height: `${Math.max(3, (value ?? 0) / max * 65)}%`, backgroundColor: chartColour, opacity: label === "Median" ? 1 : 0.55 }} />
           <span className="mt-1">{label}</span>
         </div>)}
@@ -122,7 +123,7 @@ export function ClassicSeasonalityChart({
       <p className="mt-1.5 min-h-[1.25rem] text-[0.55rem] leading-snug text-neutral-500">
         Peak {formatMonthLabel(peak.month)} {formatPercent(peak.occupancy)} · Quiet{" "}
         {formatMonthLabel(low.month)} {formatPercent(low.occupancy)} · Avg{" "}
-        {formatCurrency(avgAdr)}/night
+        {formatCurrency(avgAdr, currency)}/night
       </p>
     </div>
   );

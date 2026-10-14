@@ -1,10 +1,11 @@
+import { marketCopyPrompt } from "@/lib/property-market/copy";
+import { marketForCountry, rentRange } from "@/lib/property-market";
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import {
   deriveLeaseAppraisalCopy,
   type LeaseAppraisalCopy,
 } from "@/lib/lease-appraisal/deriveLeaseAppraisalCopy";
-import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import { isDevelopment } from "@/lib/env";
 import { LEASE_APPRAISAL_COMPARABLE_DISCLAIMER } from "@/lib/lease-appraisal/comparableEvidenceCopy";
 import { resolveLeaseAppraisalComparableDisclaimer } from "@/lib/lease-appraisal/leaseAppraisalDisclaimer";
@@ -30,7 +31,7 @@ Rules:
 - heading: one engaging line drawn from the listing (feature or positioning), not the street address alone.
 - Blurbs: rewrite listing_description; weave in how rent sits vs the suburb without dollar amounts (range is in the sidebar). Provide three lengths per the contract — short (1 paragraph), medium (2 paragraphs), long (3 paragraphs). Each length must add detail; do not repeat the same paragraph across all three.
 - bullets: exactly four short feature bullets drawn from the listing (layout, location, parking, amenities, etc.).
-- Do not mention OpenAI or AI.
+- Do not mention OpenAI, AI, Domain or other property-data providers. Use neutral wording such as property estimates and comparable evidence.
 - Character limits in copy_limits are strict maximums. Stay under every limit — over-limit responses are rejected and rewritten.
 - Output valid JSON only with exactly the fields in the contract.`;
 
@@ -50,7 +51,7 @@ export async function generateLeaseAppraisalCopy(
 ): Promise<LeaseAppraisalCopy> {
   const rentRangeLabel =
     input.weeklyMin != null && input.weeklyMax != null
-      ? formatWeeklyRentRange(input.weeklyMin, input.weeklyMax)
+      ? rentRange(input.weeklyMin, input.weeklyMax, marketForCountry(input.listing.country))
       : "";
 
   const weeklyMid =
@@ -96,6 +97,7 @@ export async function generateLeaseAppraisalCopy(
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const payload = {
+    market: marketForCountry(input.listing.country),
     property: {
       address: input.listing.property_address ?? input.parsed.address,
       suburb: input.listing.suburb ?? input.parsed.suburb,
@@ -143,7 +145,7 @@ export async function generateLeaseAppraisalCopy(
           "lease_appraisal_copy",
         ),
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: marketCopyPrompt(SYSTEM_PROMPT, input.listing.country) },
           {
             role: "user",
             content:

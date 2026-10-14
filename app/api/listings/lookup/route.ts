@@ -1,3 +1,5 @@
+import { assertRequestedCountry, assertPropertyCountry, assertListingUrlCountry } from "@/lib/property-market/agencyCountry";
+import { searchPlaceProperties } from "@/lib/geocoding/places";
 import { NextResponse } from "next/server";
 import { unstable_rethrow } from "next/navigation";
 import { z } from "zod";
@@ -9,6 +11,7 @@ import {
 } from "@/lib/domain-avm/propertyLookup";
 import {
   lookupGoogleProperty,
+  addressOnlyPropertyDraft,
   searchGoogleProperties,
 } from "@/lib/geocoding/propertyLookup";
 import {
@@ -27,15 +30,17 @@ export const maxDuration = 120;
 const inputSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("search"),
+    country: z.enum(["AU", "US"]).optional(),
     query: z
       .string()
       .trim()
       .min(5, "Enter a street address and suburb")
       .max(300),
   }),
-  z.object({ action: z.literal("select"), candidate: propertyCandidateSchema }),
+  z.object({ action: z.literal("select"), country: z.enum(["AU", "US"]).optional(), candidate: propertyCandidateSchema }),
   z.object({
     action: z.literal("import"),
+    country: z.enum(["AU", "US"]).optional(),
     url: z
       .string()
       .url()
@@ -59,18 +64,20 @@ export async function POST(request: Request) {
     // Authorize before any paid provider call. All reads are scoped to this agency.
     const { supabase, agency } = await requireAgency();
     const body = inputSchema.parse(await request.json());
+    const country = assertRequestedCountry(agency, body.country);
+    if (body.action === "import") assertListingUrlCountry(country, body.url);
     if (body.action === "search") {
       let candidates: PropertyCandidate[];
       let domainFailed = false;
       try {
-        candidates = await searchDomainProperties(body.query);
+        candidates = country === "US" ? await searchPlaceProperties(body.query, country) : await searchDomainProperties(body.query);
       } catch {
         domainFailed = true;
         candidates = [];
       }
-      if (!candidates.length) {
+      if (!candidates.length && country === "AU") {
         try {
-          candidates = await searchGoogleProperties(body.query);
+          candidates = await searchGoogleProperties(body.query, country);
         } catch {
           /* Manual entry remains available. */
         }
@@ -78,7 +85,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         candidates,
         message: candidates.length
-          ? candidates[0].source === "google"
+          ? country === "AU" && candidates[0].source === "google"
             ? "Property profiles were unavailable. These address suggestions will need property details entered manually."
             : null
           : domainFailed
@@ -88,17 +95,32 @@ export async function POST(request: Request) {
     }
     let draft: Listing;
     if (body.action === "select") {
+      assertPropertyCountry(agency, { ...body.candidate, country: body.candidate.country ?? (body.candidate.source === "zillow" ? "US" : "AU") });
+      if ((country === "US" && body.candidate.source === "domain") || (country === "AU" && body.candidate.source === "zillow")) throw new Error("Choose a property in your agency country.");
       const duplicate = await findExistingProperty(supabase, agency.id, {
+        country: body.candidate.country,
         property_address: body.candidate.streetAddress,
         suburb: body.candidate.suburb,
         state: body.candidate.state,
         postcode: body.candidate.postcode,
       });
       if (duplicate) return NextResponse.json({ duplicate });
-      draft =
-        body.candidate.source === "domain"
+      if (country === "US") {
+        // Verify a Google place's actual country before asking Zillow for its profile.
+        const verified = body.candidate.source === "google" ? await lookupGoogleProperty(body.candidate) : null;
+        try {
+          draft = await (await import("@/lib/us-property/lookup")).lookupUsProperty(body.candidate);
+        } catch {
+          draft = verified ?? addressOnlyPropertyDraft({ ...body.candidate, country: "US" },
+            "We couldn't retrieve details for this exact home. Check the address and add the property details manually, or go back and paste its Zillow link.");
+        }
+      } else {
+        draft = body.candidate.source === "domain"
           ? await lookupDomainProperty(body.candidate)
           : await lookupGoogleProperty(body.candidate);
+      }
+    } else if (country === "US") {
+      draft = await (await import("@/lib/us-property/lookup")).importUsProperty(body.url);
     } else {
       let imported: Listing | null = null;
       try {
@@ -135,6 +157,7 @@ export async function POST(request: Request) {
         draft.hero_image_url = draft.selected_image_urls[0] ?? null;
       }
     }
+    assertPropertyCountry(agency, draft);
     const duplicate = await findExistingProperty(supabase, agency.id, draft);
     // A preview only: no listing, scrape job or agent directory entry is created here.
     return NextResponse.json({ draft, duplicate });

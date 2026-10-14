@@ -90,3 +90,18 @@ it("distinguishes unknown parking from zero and rejects invalid counts", async (
   fireEvent.change(screen.getByLabelText("Car spaces"), { target: { value: "" } });
   await act(async () => { expect((await ref.current!.read())?.values.car_spaces).toBeNull(); });
 });
+
+it("shows and edits US monthly rent while persisting an equivalent annual comparison", async () => {
+  const { listing, report } = createLintRegressionFixtures();
+  listing.country = "United States";
+  report.user_overrides_json = { strProperty: { propertyValue: 1584100, weeklyRent: 6269 * 12 / 52, amenities: [], additionalAmenities: [] } };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ listing })));
+  const ref = createRef<StrPropertyHandle>();
+  render(<StrPropertyStep ref={ref} listing={listing} report={report} busy={false} onContinue={vi.fn()} />);
+  const input = await screen.findByLabelText("Long-term rent (USD / month)");
+  expect((input as HTMLInputElement).value).toBe("6269");
+  expect(screen.getByText("US$75,228 / year")).toBeTruthy();
+  fireEvent.change(input, { target: { value: "7000" } });
+  await waitFor(() => expect(screen.getByText("US$84,000 / year")).toBeTruthy());
+  await act(async () => { expect((await ref.current!.read())!.values.weeklyRent! * 52).toBeCloseTo(84000); });
+});

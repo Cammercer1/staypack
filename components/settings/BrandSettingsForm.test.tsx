@@ -12,6 +12,8 @@ import { BrandSettingsForm } from "./BrandSettingsForm";
 import { DEFAULT_BRAND_VALUES } from "@/lib/branding/normalize";
 import type { Agency } from "@/lib/types";
 
+const refresh = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 vi.mock("./BrandPreviewCard", () => ({
   BrandPreviewCard: () => <div>Report preview</div>,
 }));
@@ -259,6 +261,7 @@ it("separates agency fields from branding and sends only agency details", async 
   const body = JSON.parse(fetchMock.mock.calls[0][1].body);
   expect(Object.keys(body).sort()).toEqual(
     [
+      "country_code",
       "email",
       "name",
       "phone",
@@ -300,4 +303,14 @@ it("saves report defaults with branding without submitting agency identity", asy
   for (const key of ["name", "email", "phone", "slug", "website_url"])
     expect(body).not.toHaveProperty(key);
   await waitFor(() => expect(saveButton().disabled).toBe(true));
+});
+
+it("refreshes the account country after saving agency details", async () => {
+  refresh.mockClear();
+  fetchMock.mockResolvedValue({ ok: true, json: async () => ({ agency: { ...agency, country_code: "US" } }) });
+  render(<BrandSettingsForm agency={agency} mode="details" />);
+  fireEvent.change(screen.getByLabelText("Agency country"), { target: { value: "US" } });
+  fireEvent.click(saveButton());
+  await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body).country_code).toBe("US");
 });

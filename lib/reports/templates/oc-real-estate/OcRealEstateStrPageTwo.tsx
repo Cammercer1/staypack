@@ -17,7 +17,7 @@ import { StrScenarioSummary } from "@/lib/reports/templates/shared/StrScenarioSu
 const OC_CREAM = "#F2E3CF";
 const OC_ORANGE = "#AB592A";
 
-function OcStrComparableCard({ comp, showManagement }: { comp: StrCompCard; showManagement: boolean }) {
+function OcStrComparableCard({ comp, showManagement, currency }: { comp: StrCompCard; showManagement: boolean; currency?: "AUD" | "USD" }) {
   return (
     <article className="flex h-[178px] min-w-0 flex-col overflow-hidden border-t border-[#C0A591] bg-[#F2E3CF] pt-2">
       <div className="relative h-[88px] shrink-0 overflow-hidden bg-[#D8CDC0]">
@@ -51,13 +51,13 @@ function OcStrComparableCard({ comp, showManagement }: { comp: StrCompCard; show
         </div>
         <div className="mt-auto flex items-end justify-between gap-3">
           <p className="text-[13px] font-extrabold leading-none">
-            {formatCurrency(comp.annual_revenue)}
+            {formatCurrency(comp.annual_revenue, currency)}
             <span className="ml-1 text-[7px] font-medium text-[#6F5D57]">
               est. gross /yr
             </span>
           </p>
           <p className="shrink-0 text-[8px] font-semibold text-[#413532]">
-            {formatCurrency(comp.nightly_rate)}/night
+            {formatCurrency(comp.nightly_rate, currency)}/night
           </p>
         </div>
         {comp.reviews != null && <p className="mt-1 text-[7px] text-[#6F5D57]">{comp.property_type?.replace(/^Entire /, "")}{comp.rating != null ? ` · ${comp.rating.toFixed(1)} / 5` : ""} · {comp.reviews} reviews</p>}
@@ -92,16 +92,17 @@ function AgentSummary({ agent }: { agent: FinalReportJson["agents"][number] }) {
 }
 
 function MarketSnapshot({ report }: { report: FinalReportJson }) {
+  const currency = report.market?.currency;
   const revenueRange = report.str_enrichment?.revenue_range;
   const annualRange =
     revenueRange?.p25 != null && revenueRange.p75 != null
-      ? `${formatCurrency(revenueRange.p25)} – ${formatCurrency(revenueRange.p75)}`
+      ? `${formatCurrency(revenueRange.p25, currency)} – ${formatCurrency(revenueRange.p75, currency)}`
       : "—";
 
   const metrics = [
     {
       label: "Estimated gross STR revenue",
-      value: formatCurrency(report.str.annual_revenue),
+      value: formatCurrency(report.str.annual_revenue, currency),
     },
     {
       label: "Estimated annual range",
@@ -113,7 +114,7 @@ function MarketSnapshot({ report }: { report: FinalReportJson }) {
     },
     {
       label: "Nightly rate",
-      value: `${formatCurrency(report.str.nightly_rate)}/night`,
+      value: `${formatCurrency(report.str.nightly_rate, currency)}/night`,
     },
   ];
 
@@ -207,7 +208,7 @@ export function OcRealEstateStrPageTwo({
           compact
           chartColour={OC_ORANGE}
         />
-        <ClassicSeasonalityChart
+        <ClassicSeasonalityChart currency={report.market?.currency}
           seasonality={seasonality}
           marketOccupancy={report.str_enrichment?.market_occupancy}
           revenueRange={report.str_enrichment?.provider === "airroi" ? report.str_enrichment.revenue_range : null}
@@ -230,7 +231,7 @@ export function OcRealEstateStrPageTwo({
         </div>
         <div className="mt-3 grid grid-cols-3 gap-x-[14px] gap-y-[12px]">
           {comps.map((comp) => (
-            <OcStrComparableCard key={comp.listing_id || comp.name} comp={comp} showManagement={report.str_scenario?.basis === "management"} />
+            <OcStrComparableCard currency={report.market?.currency} key={comp.listing_id || comp.name} comp={comp} showManagement={report.str_scenario?.basis === "management"} />
           ))}
         </div>
       </section>

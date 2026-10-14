@@ -1,12 +1,16 @@
 "use client";
 
+import { useAgencyCountry } from "@/components/properties/AgencyCountryProvider";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { AddressSuggestion } from "@/lib/geocoding/places";
+import { pastedListingUrl } from "@/lib/us-property/url";
 
 type Props = {
+  country?: "AU" | "US";
+  allowListingUrl?: boolean;
   id: string;
   value: string;
   disabled?: boolean;
@@ -15,7 +19,9 @@ type Props = {
   onSelect?: (address: string) => void;
 };
 
-export function AddressAutocomplete({ id, value, disabled, onChange, onResolvingChange, onSelect }: Props) {
+export function AddressAutocomplete({ country: requestedCountry, allowListingUrl = false, id, value, disabled, onChange, onResolvingChange, onSelect }: Props) {
+  const accountCountry = useAgencyCountry();
+  const country = requestedCountry ?? accountCountry;
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
@@ -52,6 +58,7 @@ export function AddressAutocomplete({ id, value, disabled, onChange, onResolving
     setMessage("");
     setLoading(false);
     if (input.trim().length < 3) return;
+    if (allowListingUrl && pastedListingUrl(input)) return;
     session.current ??= crypto.randomUUID();
     const token = session.current;
     const controller = new AbortController();
@@ -61,7 +68,7 @@ export function AddressAutocomplete({ id, value, disabled, onChange, onResolving
       try {
         const response = await fetch("/api/listings/address-suggestions", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "suggest", input, sessionToken: token }), signal: controller.signal,
+          body: JSON.stringify({ action: "suggest", country, input, sessionToken: token }), signal: controller.signal,
         });
         if (!response.ok || response.redirected) throw new Error("Suggestions unavailable");
         const result = await response.json();
@@ -97,7 +104,7 @@ export function AddressAutocomplete({ id, value, disabled, onChange, onResolving
     try {
       const response = await fetch("/api/listings/address-suggestions", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "select", placeId: suggestion.placeId, address: suggestion.address, sessionToken: token }), signal: controller.signal,
+        body: JSON.stringify({ action: "select", country, placeId: suggestion.placeId, address: suggestion.address, sessionToken: token }), signal: controller.signal,
       });
       if (!response.ok || response.redirected) throw new Error("Address unavailable");
       const result = await response.json();
@@ -126,8 +133,8 @@ export function AddressAutocomplete({ id, value, disabled, onChange, onResolving
         aria-controls={expanded ? `${id}-suggestions` : undefined}
         aria-activedescendant={expanded && active >= 0 ? `${id}-suggestion-${active}` : undefined}
         aria-describedby={`${id}-status`} value={value} disabled={disabled || resolving}
-        autoComplete="off" required minLength={5} maxLength={300}
-        placeholder="Start typing a property address…" className="pr-10"
+        autoComplete="off" required minLength={5} maxLength={allowListingUrl ? 2000 : 300}
+        placeholder={allowListingUrl ? "Type an address or paste a Zillow link…" : "Start typing a property address…"} className="pr-10"
         onChange={(event) => search(event.target.value)}
         onFocus={() => { focused.current = true; if (suggestions.length) setOpen(true); }}
         onBlur={() => { focused.current = false; setOpen(false); }}

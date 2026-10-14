@@ -338,3 +338,11 @@ schema replay, legacy backfill assertions and PostgreSQL schema lint passed.
 TypeScript, the production build and both Netlify worker bundles passed. ESLint
 reported zero errors and 53 existing warnings. External market evidence was
 synthetic; no production records or provider configuration were changed.
+
+### Agency property country
+
+`agencies.country_code` is the account's ISO country code (`AU` or `US`), set during onboarding or in Settings → Agency details. Existing agencies default to `AU`. The existing agency membership and administrator RLS policies govern this field.
+
+Property searches, imports, saved-property selection and appraisal provider calls enforce the account country on the server. Australian accounts use Domain profiles and Australian address suggestions; US accounts use Google Places restricted to the US and Zillow-backed property profiles/comparables. `RAPIDAPI_US_PROPERTY_KEY` is an optional dedicated US provider credential (otherwise the existing RapidAPI key is used).
+
+Report/proposal snapshots store their own country, currency and rent period. US rentals display monthly USD; Australian rentals remain weekly AUD. Existing weekly database amounts remain weekly internally, with conversion at the input/display boundaries. Changing an account country does not rewrite properties, reports or published proposal versions. Add future countries deliberately to the database constraint, validation and provider routing together.

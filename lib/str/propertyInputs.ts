@@ -1,3 +1,4 @@
+import { marketForCountry } from "@/lib/property-market";
 import { z } from "zod";
 import { avmPriceSuggestion, resolveAdvertisedPrice } from "@/lib/listings/pricing";
 import { extractPropertyPriceAmounts } from "@/lib/scraping/normalizeDisplayPrice";
@@ -54,10 +55,10 @@ export function matchingStrAmenities(selected: readonly string[], available: rea
 }
 export function suggestedWeeklyRent(listing: Listing) {
   const domain = avmPriceSuggestion(listing, "lease");
-  if (domain) return { ...domain, source: "Estimated weekly rent" };
+  if (domain) return { ...domain, source: marketForCountry(listing.country).country === "US" ? "Estimated monthly rent" : "Estimated weekly rent" };
   const advertised = resolveAdvertisedPrice(listing, "lease") ?? listing.scraped_listing_json?.propertyLookup?.advertisedWeeklyRent;
   const amounts = advertised ? extractPropertyPriceAmounts(advertised) : [];
-  if (amounts.length) return { value: amounts.reduce((a, b) => a + b, 0) / amounts.length, source: "Advertised weekly rent", date: undefined };
+  if (amounts.length) return { value: amounts.reduce((a, b) => a + b, 0) / amounts.length, source: marketForCountry(listing.country).country === "US" ? "Advertised monthly rent" : "Advertised weekly rent", date: undefined };
   const appraisal = listing.scraped_listing_json?.rentalAppraisal;
   const value = appraisal?.weeklyMidpoint ?? (appraisal?.weeklyMin != null && appraisal.weeklyMax != null ? (appraisal.weeklyMin + appraisal.weeklyMax) / 2 : null);
   return value != null && value > 0 ? { value, source: "Saved rental appraisal", date: undefined } : null;

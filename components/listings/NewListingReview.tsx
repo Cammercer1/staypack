@@ -274,7 +274,7 @@ export function NewListingReview({
           <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
             {source?.activeListingId
               ? "Active listing found"
-              : source?.source === "domain"
+              : source?.source === "domain" || source?.source === "zillow"
                 ? "Property profile found"
                 : source?.source === "url"
                   ? "Listing imported"
@@ -301,9 +301,9 @@ export function NewListingReview({
           "e.g. 18/8–12 Ascot Street",
         )}
         <div className="grid gap-4 sm:grid-cols-3">
-          {field("suburb", "Suburb")}
-          {field("state", "State", "NSW")}
-          {field("postcode", "Postcode", "2033", true)}
+          {field("suburb", form.watch("country") === "US" ? "City" : "Suburb")}
+          {field("state", "State", form.watch("country") === "US" ? "CA" : "NSW")}
+          {field("postcode", form.watch("country") === "US" ? "ZIP code" : "Postcode", form.watch("country") === "US" ? "90048" : "2033", true)}
         </div>
         {field("property_type", "Property type", "e.g. Apartment")}
         <div className="grid grid-cols-3 gap-3">
@@ -334,7 +334,7 @@ export function NewListingReview({
               />
             </div>
             {field("advertised_sale_price", "Advertised sale price", "e.g. $1,175,000")}
-            {field("advertised_weekly_rent", "Advertised weekly rent", "e.g. $850 per week")}
+            {field("advertised_weekly_rent", form.watch("country") === "US" ? "Advertised monthly rent (USD)" : "Advertised weekly rent", form.watch("country") === "US" ? "e.g. $6000 per month" : "e.g. $850 per week")}
             {purpose === "lease" && field("bond", "Bond", "Optional")}
           </div>
         </details>

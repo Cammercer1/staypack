@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 import { useEffect, useMemo, useState } from "react";
@@ -52,6 +53,7 @@ export function BrandSettingsForm({
   agency: Agency;
   mode?: "brand" | "details";
 }) {
+  const router = useRouter();
   const detailsOnly = mode === "details";
   const [agency, setAgency] = useState(initialAgency);
   const [section, setSection] = useState<Section>(
@@ -185,8 +187,10 @@ export function BrandSettingsForm({
         throw new Error(
           payload?.error || "We couldn’t save your changes. Please try again.",
         );
+      const countryChanged = (agency.country_code ?? "AU") !== payload.agency.country_code;
       setAgency(payload.agency);
       form.reset(agencyToFormInput(payload.agency));
+      if (detailsOnly && countryChanged) router.refresh();
       toast.success(
         detailsOnly ? "Agency details saved" : "Brand settings saved",
       );
@@ -436,6 +440,11 @@ export function BrandSettingsForm({
                     </p>
                   </div>
                   <div className="space-y-5">
+                    <div>
+                      <label htmlFor="country_code" className="mb-2 block text-sm font-medium">Agency country</label>
+                      <select id="country_code" className="du-select min-h-11 w-full" {...form.register("country_code")} aria-describedby="agency-country-hint"><option value="AU">Australia</option><option value="US">United States</option></select>
+                      <p id="agency-country-hint" className="mt-2 text-sm text-muted-foreground">Property searches are limited to this country. Australia uses AUD and weekly rent; the United States uses USD and monthly rent. Saved documents keep their original figures.</p>
+                    </div>
                     {agencyFields.map(([key, label, type]) => (
                       <div key={key}>
                         <label

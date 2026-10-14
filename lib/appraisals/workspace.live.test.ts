@@ -1,5 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { expect, it, vi } from "vitest";
+vi.mock("server-only", () => ({}));
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { randomUUID } from "node:crypto";
@@ -15,7 +16,7 @@ vi.mock("@/lib/lease-appraisal/enrichParsedListingForLeaseAppraisal", () => ({ e
 vi.mock("@/lib/sales-appraisal/enrichParsedListingForSalesAppraisal", () => ({ enrichParsedListingForSalesAppraisal: vi.fn(async (parsed: ParsedListing) => ({ parsed: { ...parsed, warnings: ["Synthetic sales refresh"] }, warnings: [] })) }));
 
 // Opt-in only. Disposable agencies, synthetic provider evidence and no messages.
-it.skipIf(process.env.APPRAISAL_INTEGRATION_TEST !== "1")("rental and sales: authenticated APIs, isolation, immutable versions and brochure sources", async () => {
+it.skipIf(process.env.APPRAISAL_INTEGRATION_TEST !== "1").each(["AU", "US"] as const)("%s rental and sales: authenticated APIs, isolation, immutable versions and brochure sources", async country => {
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false}});
   const origin = process.env.STAGING_BASE_URL ?? "http://localhost:3000";
   const agencies = [randomUUID(),randomUUID()], listingId = randomUUID(), userIds: string[] = [], clients: SupabaseClient[] = [], cookies: string[] = [];
@@ -26,7 +27,7 @@ it.skipIf(process.env.APPRAISAL_INTEGRATION_TEST !== "1")("rental and sales: aut
     for(const agencyId of agencies) {
       const email=`appraisal-${agencyId}@example.com`,password=`${randomUUID()}Aa1!`;
       const user=check(await admin.auth.admin.createUser({email,password,email_confirm:true})).user!; userIds.push(user.id);
-      check(await admin.from("agencies").insert({id:agencyId,name:"Appraisal Integration",slug:`appraisal-${agencyId}`}));
+      check(await admin.from("agencies").insert({id:agencyId,name:"Appraisal Integration",country_code:country,slug:`appraisal-${agencyId}`}));
       check(await admin.from("agency_members").insert({agency_id:agencyId,user_id:user.id,role:"owner"}));
       const values:{name:string;value:string}[]=[];
       const auth=createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,{cookies:{getAll:()=>values,setAll:next=>{values.splice(0,values.length,...next); }}});
@@ -34,8 +35,10 @@ it.skipIf(process.env.APPRAISAL_INTEGRATION_TEST !== "1")("rental and sales: aut
     }
     const f=createLintRegressionFixtures();
     const source={...f.listing,id:listingId,agency_id:agencies[0],created_by:userIds[0],agent_profile_id:null,public_slug:`appraisal-${listingId}`};
-    source.scraped_listing_json=mergeAppraisalResults(source,"lease",resolveAppraisalInput(f.listing));
-    source.scraped_listing_json=mergeAppraisalResults(source,"sales",resolveAppraisalInput(f.listing));
+    if (country === "US") Object.assign(source, {country:"United States",property_address:"545 Westbourne Dr",suburb:"West Hollywood",state:"CA",postcode:"90048",latitude:34.0811,longitude:-118.3801});
+    if (country === "US") source.scraped_listing_json = { ...source.scraped_listing_json!, country: "US", address: source.property_address!, suburb: source.suburb!, state: source.state!, postcode: source.postcode!, domainAvm: undefined, domainAvmInputFingerprint: undefined, appraisalInputFingerprints: undefined };
+    source.scraped_listing_json=mergeAppraisalResults(source,"lease",resolveAppraisalInput(source));
+    source.scraped_listing_json=mergeAppraisalResults(source,"sales",resolveAppraisalInput(source));
     const seed = { ...source, landing_template: "minimal" };
     check(await admin.from("listings").insert(seed));
     const anonymous = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,{auth:{persistSession:false}});
@@ -83,6 +86,8 @@ it.skipIf(process.env.APPRAISAL_INTEGRATION_TEST !== "1")("rental and sales: aut
       expect(prepared.appraisal.document_revision).toBe(prepared.appraisal.input_revision);
       let workspace=await json(`${root}/proposal`) as ProposalWorkspace;
       expect(workspace.data?.appraisal?.kind).toBe(kind);
+      expect(workspace.data?.market?.country).toBe(country);
+      expect(workspace.data?.market?.rentPeriod).toBe(country === "US" ? "month" : "week");
       expect(workspace.data?.appraisal?.midpoint).toBe(kind === "lease" ? 1500 : 3000000);
       const draft={...workspace.assignment!.defaults,content:{...workspace.assignment!.defaults.content,introduction:`Private ${kind} proposal`}};
       check(await admin.from("digital_proposal_assignments").insert({agency_id:agencies[0],kind,name:workspace.assignment!.name,version:1,defaults:workspace.assignment!.defaults}));

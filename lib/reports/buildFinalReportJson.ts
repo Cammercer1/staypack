@@ -1,3 +1,4 @@
+import { marketForCountry } from "@/lib/property-market";
 import { preserveDocumentLink } from "@/lib/documents/documentLink";
 import type {
   Agency,
@@ -53,6 +54,8 @@ export function buildFinalReportJson({
   resolvedAgents,
   propertyImages,
 }: BuildFinalReportInput): FinalReportJson {
+  const market = marketForCountry(listing.country);
+  if (report.str_enrichment_json?.currency && report.str_enrichment_json.currency !== market.currency) throw new Error("The saved STR estimate uses a different currency. Request a new estimate for this property.");
   const scrapedListing = scraped ?? listing.scraped_listing_json;
   const propertyContext = strPropertyContextSchema.safeParse(report.user_overrides_json?.strProperty);
   const weeklyMin = propertyContext.success ? null : scrapedListing?.rentalAppraisal?.weeklyMin ?? null;
@@ -80,7 +83,7 @@ export function buildFinalReportJson({
   const strYield = calculateStrGrossYield(propertyValue === null ? null : String(propertyValue), estimate.annualRevenue);
   const strImages =
     propertyImages ?? resolveCollateralImageSelection(listing, "str_report");
-  const reportCopy = alignCopyWithEstimate(copy, estimate.annualRevenue);
+  const reportCopy = alignCopyWithEstimate(copy, estimate.annualRevenue, market.currency);
   const savedEnrichment = ensureStrEnrichmentFeaturedComps(report.str_enrichment_json ?? null, report.raw_airbtics_json);
   const baseline = report.original_estimate_json ? reconcileStrEstimate(report.original_estimate_json) : null;
   const rates = readStrRateOverride(report);
@@ -88,6 +91,7 @@ export function buildFinalReportJson({
 
   return {
     ...preserveDocumentLink(report.final_report_json ?? { assets: { qr_code_url: report.qr_code_url ?? "" } }),
+    market: marketForCountry(listing.country),
     version: "standard_2_page_v1",
     template_id: resolveReportTemplateId(agency, report),
     generated_at: new Date().toISOString(),
@@ -158,6 +162,7 @@ export function buildFinalReportJson({
       ...(rates && management.success ? { management: { ...management.data, companyName: agency.name } } : {}),
     } } : {}),
     ltr: {
+      market: marketForCountry(listing.country),
       weekly_min: weeklyMin,
       weekly_max: weeklyMax,
       weekly_midpoint: weeklyMidpoint,
@@ -189,6 +194,7 @@ export function buildFinalReportJson({
 function alignCopyWithEstimate(
   copy: AiCopyJson,
   annualRevenue: number | null | undefined,
+  currency: "AUD" | "USD" = "AUD",
 ): AiCopyJson {
   if (annualRevenue == null) {
     return copy;
@@ -198,32 +204,32 @@ function alignCopyWithEstimate(
     ...copy,
     sales_pack_blurb: enforceCanonicalStrRevenueInText(
       copy.sales_pack_blurb,
-      annualRevenue,
+      annualRevenue, currency,
     ),
     sales_pack_blurb_variants: copy.sales_pack_blurb_variants
       ? {
           short: enforceCanonicalStrRevenueInText(
             copy.sales_pack_blurb_variants.short,
-            annualRevenue,
+            annualRevenue, currency,
           ),
           medium: enforceCanonicalStrRevenueInText(
             copy.sales_pack_blurb_variants.medium,
-            annualRevenue,
+            annualRevenue, currency,
           ),
           long: enforceCanonicalStrRevenueInText(
             copy.sales_pack_blurb_variants.long,
-            annualRevenue,
+            annualRevenue, currency,
           ),
         }
       : undefined,
     key_metrics_line: enforceCanonicalStrRevenueInText(
       copy.key_metrics_line,
-      annualRevenue,
+      annualRevenue, currency,
     ),
     property_appeal_points: copy.property_appeal_points.map((point) => /\brevenue\b/i.test(point)
-      ? enforceCanonicalStrRevenueInText(point, annualRevenue) : point),
+      ? enforceCanonicalStrRevenueInText(point, annualRevenue, currency) : point),
     performance_supporting_factors: copy.performance_supporting_factors.map((point) => /\brevenue\b/i.test(point)
-      ? enforceCanonicalStrRevenueInText(point, annualRevenue) : point),
+      ? enforceCanonicalStrRevenueInText(point, annualRevenue, currency) : point),
   };
 }
 

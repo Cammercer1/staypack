@@ -33,7 +33,7 @@ Rules:
 - Do not mention short-term rental income, Airbtics, or investment yields.
 - Focus on rental appeal, lifestyle and inspection — not buying or investment.
 - Use only the supplied property data.
-- Do not mention OpenAI.
+- Do not mention OpenAI, Domain or other property-data providers.
 - Output valid JSON only with exactly the three fields in the contract.`;
 
 export class RentalBrochureCopyValidationError extends Error {

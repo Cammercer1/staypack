@@ -1,3 +1,4 @@
+import { zillowPropertyId } from "@/lib/us-property/url";
 import type { ParsedListing } from "@/lib/types";
 import { hasBrightDataUnlockerConfig } from "@/lib/brightdata/client";
 import { parseListingFromHtml } from "@/lib/openai/parseListingFromHtml";
@@ -253,6 +254,7 @@ export type ExtractListingResult = {
   method:
     | "static_fetch"
     | "browserless_rendered"
+    | "rapidapi_us"
     | "rapidapi_rea"
     | "apify_rea"
     | "brightdata_rea"
@@ -364,6 +366,11 @@ export async function extractListingFromUrl(
   url: string,
   inputOptions?: ExtractListingOptions,
 ): Promise<ExtractListingResult> {
+  if (zillowPropertyId(url)) {
+    const draft = await (await import("@/lib/us-property/lookup")).importUsProperty(url);
+    const listing = draft.scraped_listing_json!;
+    return applyExtractOptions({ listing, warnings: listing.warnings, method: "rapidapi_us", parserName: "zillow" }, inputOptions);
+  }
   const options: ExtractListingOptions = {
     ...inputOptions,
     subjectListingUrl: url,

@@ -1,3 +1,4 @@
+import { marketForCountry, monthlyToWeekly } from "@/lib/property-market";
 import { z } from "zod";
 import { getListingImagePool } from "@/lib/listings/collateralImages";
 import type { Listing, ParsedListing } from "@/lib/types";
@@ -18,6 +19,7 @@ function number(value: unknown) {
 function subject(listing: Listing): ParsedListing {
   return {
     ...listing.scraped_listing_json,
+    country: marketForCountry(listing.country).country,
     address: text(listing.property_address),
     suburb: text(listing.suburb),
     state: text(listing.state)?.toUpperCase(),
@@ -39,7 +41,7 @@ function subject(listing: Listing): ParsedListing {
 
 const INPUT_FIELDS = [
   "address", "suburb", "state", "postcode", "propertyType", "purpose", "bedrooms",
-  "bathrooms", "carSpaces", "title", "description", "displayPrice", "landAreaSqm", "floorAreaSqm",
+  "bathrooms", "carSpaces", "title", "description", "displayPrice", "landAreaSqm", "floorAreaSqm", "country",
 ] as const;
 
 export function appraisalInputFingerprint(listing: Listing) {
@@ -89,7 +91,13 @@ export function resolveAppraisalInput(listing: Listing, options: { applyOverride
   } else {
     staleAvm = avmFields.some((key) => listing.scraped_listing_json?.[key] != null && listing.scraped_listing_json[key] !== parsed[key]);
   }
-  if (staleAvm) delete parsed.domainAvm;
+  if (staleAvm) { delete parsed.domainAvm; delete parsed.usProperty; }
+  if (marketForCountry(listing.country).country === "US") {
+    delete parsed.domainAvm;
+    const us = parsed.usProperty;
+    if (us?.rentMonthly && !parsed.rentalAppraisal?.weeklyMidpoint) parsed.rentalAppraisal = { weeklyMidpoint: monthlyToWeekly(us.rentMonthly.mid), weeklyMin: us.rentMonthly.low == null ? undefined : monthlyToWeekly(us.rentMonthly.low), weeklyMax: us.rentMonthly.high == null ? undefined : monthlyToWeekly(us.rentMonthly.high), source: "zillow" };
+    if (us?.valuation && !parsed.salesAppraisal?.priceMidpoint) parsed.salesAppraisal = { priceMidpoint: us.valuation.mid, priceMin: us.valuation.low, priceMax: us.valuation.high, source: "zillow" };
+  }
   const rental = parsed.domainAvm?.rentalEstimate;
   if (rental?.weeklyRent && !parsed.rentalAppraisal?.weeklyMidpoint) {
     parsed.rentalAppraisal = { ...parsed.rentalAppraisal, weeklyMidpoint: rental.weeklyRent };
@@ -131,8 +139,10 @@ export function mergeAppraisalResults(listing: Listing, kind: AppraisalKind, res
   const next: ParsedListing = {
     ...stored,
     warnings: result.warnings,
+    country: marketForCountry(listing.country).country,
+    usProperty: result.usProperty,
     domainAvm: result.domainAvm,
-    domainAvmInputFingerprint: result.domainAvm ? appraisalInputFingerprint(listing) : undefined,
+    domainAvmInputFingerprint: (result.domainAvm || result.usProperty) ? appraisalInputFingerprint(listing) : undefined,
     appraisalInputFingerprints: { ...stored.appraisalInputFingerprints, [kind]: appraisalInputFingerprint(listing) },
   };
   if (kind === "lease") {

@@ -27,9 +27,9 @@ export default function RentalComparisonChart({ data, brand, mode, motion }: {
     grid: { borderColor: brand.muted + "26", strokeDashArray: 4 },
     xaxis: { categories: [["Long-term"], ["Market", "STR"], managedLabel.split(/\s+/)], axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { fontSize: "12px" }, trim: false, rotate: 0 } },
     yaxis: { min: 0, tickAmount: 4, labels: { formatter: value => mode === "yield" ? `${value.toFixed(1)}%` : `$${Math.round(value / 1000)}k` } },
-    tooltip: { shared: false, intersect: false, theme: "light", y: { formatter: value => value == null ? "Not available" : mode === "yield" ? `${value.toFixed(1)}%` : formatCurrency(value) } },
+    tooltip: { shared: false, intersect: false, theme: "light", y: { formatter: value => value == null ? "Not available" : mode === "yield" ? `${value.toFixed(1)}%` : formatCurrency(value, data.market?.currency) } },
     states: { hover: { filter: { type: "lighten" } }, active: { filter: { type: "none" } } },
-  }), [brand, mode, animate, managedLabel]);
+  }), [brand, mode, animate, managedLabel, data.market?.currency]);
 
   return <div ref={ref} className="min-h-72 w-full min-w-0" aria-hidden="true" data-testid="rental-chart">
     {visible && <Chart options={options} series={[{ name: mode === "yield" ? "Estimated gross yield" : "Estimated gross revenue", data: rows.map(row => row.value) }]} type="bar" height={288} width="100%" />}

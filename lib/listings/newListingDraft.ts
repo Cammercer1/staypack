@@ -1,4 +1,5 @@
-import { resolveAdvertisedPrice } from "./pricing";
+import { countryName, marketForCountry } from "@/lib/property-market";
+import { resolveAdvertisedPrice, rentPriceForInput, rentPriceFromInput } from "./pricing";
 import { z } from "zod";
 import { createEmptyListingDraft } from "./emptyListingDraft";
 import {
@@ -16,29 +17,29 @@ const optionalCount = z
     "Enter a whole number from 0 to 100, or leave blank",
   );
 export const newListingFormSchema = z.object({
+  country: z.enum(["AU", "US"]).optional(),
   property_address: z.string().trim().min(1, "Enter the property address"),
   suburb: z.string(),
   state: z.string(),
-  postcode: z
-    .string()
-    .refine(
-      (value) => !value.trim() || /^\d{4}$/.test(value.trim()),
-      "Enter a four-digit postcode",
-    ),
+  postcode: z.string(),
   property_type: z.string(),
   bedrooms: optionalCount,
-  bathrooms: optionalCount,
+  bathrooms: z.string().refine((value) => !value.trim() || /^(?:\d+)(?:\.5)?$/.test(value) && Number(value) <= 100, "Enter a bathroom count in increments of 0.5"),
   car_spaces: optionalCount,
   listing_title: z.string(),
   listing_description: z.string(),
   advertised_sale_price: z.string(),
   advertised_weekly_rent: z.string(),
   bond: z.string(),
+}).superRefine((values, ctx) => {
+  const valid = marketForCountry(values.country).country === "US" ? /^\d{5}(?:-\d{4})?$/.test(values.postcode.trim()) : /^\d{4}$/.test(values.postcode.trim());
+  if (values.postcode.trim() && !valid) ctx.addIssue({ code: "custom", path: ["postcode"], message: values.country === "US" ? "Enter a five-digit ZIP code (optional +4)" : "Enter a four-digit postcode" });
 });
 export type NewListingValues = z.infer<typeof newListingFormSchema>;
 
 export function valuesFromListing(listing: Listing): NewListingValues {
   return {
+    country: marketForCountry(listing.country).country,
     property_address: listing.property_address ?? "",
     suburb: listing.suburb ?? "",
     state: listing.state ?? "",
@@ -50,7 +51,7 @@ export function valuesFromListing(listing: Listing): NewListingValues {
     listing_title: listing.listing_title ?? "",
     listing_description: listing.listing_description ?? "",
     advertised_sale_price: resolveAdvertisedPrice(listing, "sale") ?? "",
-    advertised_weekly_rent: resolveAdvertisedPrice(listing, "lease") ?? "",
+    advertised_weekly_rent: rentPriceForInput(resolveAdvertisedPrice(listing, "lease"), listing.country),
     bond: listing.bond ?? "",
   };
 }
@@ -60,6 +61,7 @@ export function newListingPayload(
   values: NewListingValues,
   agents: ListingAgentDraft[],
 ) {
+  const rent = rentPriceFromInput(values.advertised_weekly_rent, values.country);
   const nullable = (value: string) => value.trim() || null;
   const count = (value: string) => (value.trim() ? Number(value) : null);
   const addressChanged = (
@@ -78,11 +80,11 @@ export function newListingPayload(
     car_spaces: count(values.car_spaces),
     listing_title: nullable(values.listing_title),
     listing_description: nullable(values.listing_description),
-    display_price: nullable(draft.listing_purpose === "lease" ? values.advertised_weekly_rent : values.advertised_sale_price),
+    display_price: nullable(draft.listing_purpose === "lease" ? rent : values.advertised_sale_price),
     advertised_sale_price: nullable(values.advertised_sale_price),
-    advertised_weekly_rent: nullable(values.advertised_weekly_rent),
+    advertised_weekly_rent: nullable(rent),
     bond: draft.listing_purpose === "lease" ? nullable(values.bond) : null,
-    country: "Australia",
+    country: countryName(values.country),
     listing_url: draft.listing_url || null,
     latitude: addressChanged ? null : draft.latitude,
     longitude: addressChanged ? null : draft.longitude,
@@ -100,7 +102,7 @@ export function newListingPayload(
 }
 
 // Draft storage accepts incomplete form values so an unfinished edit can be recovered.
-const storedValues = newListingFormSchema.extend({
+const storedValues = z.object({ ...newListingFormSchema.shape,
   advertised_sale_price: z.string().default(""),
   advertised_weekly_rent: z.string().default(""),
   property_address: z.string(),

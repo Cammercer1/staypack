@@ -1,7 +1,8 @@
 "use client";
 
+import { marketForCountry, rentForPeriod, rentFromPeriod } from "@/lib/property-market";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Popover } from "@base-ui/react/popover";
@@ -26,6 +27,7 @@ export type StrPropertyHandle = { read: () => Promise<{ values: StrPropertyValue
 export const StrPropertyStep = forwardRef<StrPropertyHandle, {
   listing: Listing; report: Report; busy: boolean; onContinue: () => void;
 }>(function StrPropertyStep({ listing, report, busy, onContinue }, ref) {
+  const market = marketForCountry(listing.country);
   const savedContext = useRef(strPropertyContextSchema.safeParse(report.user_overrides_json?.strProperty).success);
   const savedPropertyValue = useRef(report.user_overrides_json?.strProperty?.propertyValue !== undefined);
   const edited = useRef(new Set<string>());
@@ -142,18 +144,18 @@ export const StrPropertyStep = forwardRef<StrPropertyHandle, {
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="min-w-0 space-y-2">
-              <label htmlFor="str-property-value" className="text-sm font-medium">Estimated property value ($)</label>
+              <label htmlFor="str-property-value" className="text-sm font-medium">Estimated property value ({market.country === "US" ? "USD" : "$"})</label>
               <input id="str-property-value" type="number" inputMode="decimal" min="1" max="1000000000" step="any" className="du-input du-input-sm min-h-11 w-full" placeholder="e.g. 1200000" aria-invalid={Boolean(errors.propertyValue)} aria-describedby="str-value-help" {...register("propertyValue", { setValueAs: (value) => value == null || value === "" ? null : Number(value), onChange: () => edited.current.add("propertyValue") })} />
               {errors.propertyValue && <p role="alert" className="text-sm text-error">Enter an estimated value between $1 and $1 billion, or leave it blank.</p>}
               <p id="str-value-help" className="text-xs text-base-content/65">{valuation ? "An estimated property value is available below. Use it or enter your own appraisal." : "An estimated property value is unavailable. Enter your own property value estimate, or add it later."} Saved for this appraisal’s yield comparisons.</p>
               {valuation && <p className="rounded-lg bg-base-200 px-3 py-2 text-xs leading-relaxed">Property estimate: <strong>{valuation.display}</strong>{valuationBand ? ` · range ${formatCurrency(valuationBand.lowerPrice)}–${formatCurrency(valuationBand.upperPrice)}` : ""}{valuation.date ? ` · ${valuation.date}` : ""}{valuation.confidence ? ` · ${valuation.confidence} confidence` : ""}.</p>}
             </div>
             <div className="min-w-0 space-y-2">
-              <label htmlFor="str-weekly-rent" className="text-sm font-medium">Long-term rent ($ / week)</label>
-              <input id="str-weekly-rent" type="number" inputMode="decimal" min="1" max="50000" step="1" className="du-input du-input-sm min-h-11 w-full" placeholder="e.g. 850" aria-invalid={Boolean(errors.weeklyRent)} aria-describedby="str-rent-help" {...register("weeklyRent", { setValueAs: (value) => value == null || value === "" ? null : Number(value), onChange: () => edited.current.add("weeklyRent") })} />
-              {errors.weeklyRent && <p role="alert" className="text-sm text-error">Enter a weekly rent greater than zero, or leave it blank.</p>}
-              <p id="str-rent-help" className="text-xs text-base-content/65">{rentSuggestion ? `${rentSuggestion.source}: ${formatCurrency(rentSuggestion.value)} / week${rentSuggestion.date ? ` · ${rentSuggestion.date}` : ""}. Edit to use your own appraisal.` : "Add your expected long-term weekly rent to compare with short-term rental revenue."}</p>
-              {annualRent !== null && <p className="text-sm font-medium">{formatCurrency(annualRent)} / year <span className="font-normal text-base-content/65">before costs</span></p>}
+              <label htmlFor="str-weekly-rent" className="text-sm font-medium">Long-term rent ({market.country === "US" ? "USD" : "$"} / {market.rentPeriod})</label>
+              <Controller name="weeklyRent" control={control} render={({ field }) => <input id="str-weekly-rent" type="number" inputMode="decimal" min="1" step="any" className="du-input du-input-sm min-h-11 w-full" placeholder={market.country === "US" ? "e.g. 6000" : "e.g. 850"} aria-invalid={Boolean(errors.weeklyRent)} aria-describedby="str-rent-help" name={field.name} ref={field.ref} onBlur={field.onBlur} value={field.value == null ? "" : Number(rentForPeriod(field.value, market).toFixed(6))} onChange={(event) => { edited.current.add("weeklyRent"); field.onChange(event.target.value === "" ? null : rentFromPeriod(Number(event.target.value), market)); }} />} />
+              {errors.weeklyRent && <p role="alert" className="text-sm text-error">Enter a {market.rentPeriod === "month" ? "monthly" : "weekly"} rent greater than zero, or leave it blank.</p>}
+              <p id="str-rent-help" className="text-xs text-base-content/65">{rentSuggestion ? `${rentSuggestion.source}: ${formatCurrency(rentForPeriod(rentSuggestion.value, market), market.currency)} / ${market.rentPeriod}${rentSuggestion.date ? ` · ${rentSuggestion.date}` : ""}. Edit to use your own appraisal.` : `Add your expected long-term ${market.rentPeriod === "month" ? "monthly" : "weekly"} rent to compare with short-term rental revenue.`}</p>
+              {annualRent !== null && <p className="text-sm font-medium">{formatCurrency(annualRent, market.currency)} / year <span className="font-normal text-base-content/65">before costs</span></p>}
               {rentalYield && <div className="flex items-center gap-1 text-xs text-base-content/70">
                 <span aria-live="polite">Estimated gross LTR yield: {formatStrGrossYield(rentalYield)}</span>
                 <Popover.Root>
@@ -167,7 +169,7 @@ export const StrPropertyStep = forwardRef<StrPropertyHandle, {
                           <Popover.Title className="font-semibold">Estimated gross LTR yield</Popover.Title>
                           <Popover.Close aria-label="Close yield explanation" className="du-btn du-btn-sm du-btn-ghost du-btn-circle size-11 shrink-0"><X className="size-4" aria-hidden="true" /></Popover.Close>
                         </div>
-                        <Popover.Description className="leading-relaxed text-base-content/70">Based on 52 weeks’ rent and the estimated property value, before vacancy, expenses and purchase costs. This is a comparison guide, not a guaranteed return.</Popover.Description>
+                        <Popover.Description className="leading-relaxed text-base-content/70">Based on {market.rentPeriod === "month" ? "12 months’" : "52 weeks’"} rent and the estimated property value, before vacancy, expenses and purchase costs. This is a comparison guide, not a guaranteed return.</Popover.Description>
                       </Popover.Popup>
                     </Popover.Positioner>
                   </Popover.Portal>

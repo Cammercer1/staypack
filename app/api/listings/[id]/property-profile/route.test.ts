@@ -9,7 +9,7 @@ afterEach(() => vi.resetAllMocks());
 function setup(conflict = false) {
   const { listing } = createLintRegressionFixtures();
   const query = { update: vi.fn((data: Record<string, unknown>) => { void data; return query; }), eq: vi.fn(() => query), select: vi.fn(() => query), maybeSingle: vi.fn(async () => ({ data: conflict ? null : listing, error: null })) };
-  vi.mocked(requireListingAccess).mockResolvedValue({ listing, supabase: { from: () => query } } as unknown as Awaited<ReturnType<typeof requireListingAccess>>);
+  vi.mocked(requireListingAccess).mockResolvedValue({ listing, agency: { country_code: "AU" }, supabase: { from: () => query } } as unknown as Awaited<ReturnType<typeof requireListingAccess>>);
   vi.mocked(refreshPropertyProfile).mockResolvedValue({ ...listing.scraped_listing_json!, domainAvm: undefined, propertyLookup: { source: "domain", matchedAt: new Date().toISOString(), media: [], originalAgents: [] } });
   return { listing, query, request: (refresh = false) => POST(new Request("http://localhost/api/property-profile", { method: "POST", body: JSON.stringify({ refresh }) }), { params: Promise.resolve({ id: listing.id }) }) };
 }

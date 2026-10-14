@@ -5,6 +5,24 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
+it("keeps a US unit and direction on address-only suggestions and uses the US market for manual review", async () => {
+  vi.stubEnv("GOOGLE_MAPS_API_KEY", "test-key");
+  const result = {
+    formatted_address: "616 Croft Ave, West Hollywood, CA 90048, USA", place_id: "croft",
+    address_components: [
+      ["616", "street_number"], ["Croft Ave", "route"], ["West Hollywood", "locality"],
+      ["CA", "administrative_area_level_1"], ["90048", "postal_code"], ["US", "country"],
+    ].map(([name, type]) => ({ long_name: name, short_name: name, types: [type] })),
+    geometry: { location: { lat: 34.08257, lng: -118.37391 } },
+  };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: "OK", results: [result] }) }));
+  const [candidate] = await searchGoogleProperties("616 N Croft Ave apt 2, West Hollywood CA 90048", "US");
+  expect(candidate).toMatchObject({ source: "google", country: "US", streetAddress: "616 N Croft Ave Apt 2" });
+  expect(candidate.address).toContain("N Croft Ave Apt 2");
+  const draft = await lookupGoogleProperty(candidate);
+  expect(draft).toMatchObject({ country: "United States", property_address: candidate.streetAddress, state: "CA", postcode: "90048" });
+  expect(draft.scraped_listing_json?.usProperty).toBeUndefined();
+});
 it("preserves a unit and street range on a partial Google match and does not certify its coordinates", async () => {
   vi.stubEnv("GOOGLE_MAPS_API_KEY", "test-key");
   const result = {
@@ -23,6 +41,7 @@ it("preserves a unit and street range on a partial Google match and does not cer
         types: ["administrative_area_level_1"],
       },
       { long_name: "2033", short_name: "2033", types: ["postal_code"] },
+      { long_name: "Australia", short_name: "AU", types: ["country"] },
     ],
     geometry: { location: { lat: -33.9, lng: 151.2 } },
   };

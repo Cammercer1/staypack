@@ -1,3 +1,4 @@
+import { agencyCountry, assertPropertyCountry, assertListingUrlCountry } from "@/lib/property-market/agencyCountry";
 import { NextResponse } from "next/server";
 import { findUnknownScrapedAgents } from "@/lib/agents/matchScrapedAgents";
 import {
@@ -165,11 +166,15 @@ async function updateListingFromScrape({
 export async function POST(request: Request) {
   try {
     const body = scrapeListingSchema.parse(await request.json());
+    const context = body.listing_id ? await requireListingAccess(body.listing_id) : await requireAgency();
+    if ("listing" in context) assertPropertyCountry(context.agency, context.listing as Listing);
+    assertListingUrlCountry(agencyCountry(context.agency), body.listing_url);
     const { listing, method, parserName, warnings } = await extractListingFromUrl(
       body.listing_url,
     );
 
     const scrapedFields = buildScrapedListingFields(body.listing_url, listing);
+    assertPropertyCountry(context.agency, scrapedFields);
 
     if (!scrapedFields.property_address?.trim()) {
       return NextResponse.json(

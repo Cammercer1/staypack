@@ -1,0 +1,36 @@
+{
+  "zpid": 20517162,
+  "address": {
+    "streetAddress": "545 Westbourne Dr",
+    "city": "West Hollywood",
+    "state": "CA",
+    "zipcode": "90048",
+    "neighborhood": null,
+    "community": null,
+    "subdivision": null
+  },
+  "country": "USA",
+  "currency": "USD",
+  "homeStatus": "OTHER",
+  "homeType": "SINGLE_FAMILY",
+  "bedrooms": 2,
+  "bathrooms": 2,
+  "livingArea": 1120,
+  "lotAreaValue": 4358,
+  "lotAreaUnits": "Square Feet",
+  "latitude": 34.080734,
+  "longitude": -118.37964,
+  "price": 1584100,
+  "zestimate": 1584100,
+  "rentZestimate": 6269,
+  "zestimateLowPercent": "11",
+  "zestimateHighPercent": "12",
+  "restimateLowPercent": "13",
+  "restimateHighPercent": "14",
+  "lastSoldPrice": 780007,
+  "responsivePhotos": [
+    {
+      "url": "https://photos.zillowstatic.com/fp/d8ed1d90b66b412e0e3a0de1526be8f1-p_d.jpg"
+    }
+  ]
+}

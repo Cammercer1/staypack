@@ -1,3 +1,4 @@
+import { requireListingAgencyCountry } from "@/lib/property-market/requireAgencyCountry";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { enrichParsedListingForLeaseAppraisal } from "@/lib/lease-appraisal/enrichParsedListingForLeaseAppraisal";
 import { enrichParsedListingForSalesAppraisal } from "@/lib/sales-appraisal/enrichParsedListingForSalesAppraisal";
@@ -20,6 +21,7 @@ export async function enrichWorkspaceAppraisal({ supabase, reportId, agencyId, k
   const property = await supabase.from("listings").select("*").eq("id", report.data!.listing_id).eq("agency_id", agencyId).neq("status", "archived").single();
   checkAppraisalError(property.error);
   const listing = appraisalListing(property.data as Listing, appraisal);
+  await requireListingAgencyCountry(supabase, listing);
   assertAppraisalInput(listing);
   const input = resolveAppraisalInput(listing, { applyOverrides: false });
   const result = await (kind === "lease" ? enrichParsedListingForLeaseAppraisal : enrichParsedListingForSalesAppraisal)(input, { subjectListingUrl: listing.listing_url });

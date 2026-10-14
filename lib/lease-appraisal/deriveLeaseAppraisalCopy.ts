@@ -1,3 +1,4 @@
+import { marketForCountry } from "@/lib/property-market";
 import { PAGE_ONE_BULLET_COUNT } from "@/lib/copy/pageOneMarketingCopy";
 import {
   blurbVariantsParagraphsToStored,
@@ -158,6 +159,7 @@ export function deriveLeaseAppraisalCopy({
   suburbMarket = null,
   featuredComps = [],
 }: DeriveLeaseAppraisalCopyInput): LeaseAppraisalCopy {
+  const us = marketForCountry(listing.country).country === "US";
   const descriptionLead = firstSentences(
     parsed.description ?? listing.listing_description ?? "",
     2,
@@ -171,7 +173,7 @@ export function deriveLeaseAppraisalCopy({
       " ",
     );
 
-  const rentLine = rentPositionLine(weeklyMid, suburbMarket, compCount);
+  const rentLine = us ? "The monthly rental guide is an indicative estimate to review against local asking rents and the property’s condition." : rentPositionLine(weeklyMid, suburbMarket, compCount);
   const suburbLine = suburbContextLine(suburbMarket ?? parsed.ltrSuburbMarket);
 
   const blurbBody = [propertyLead, rentLine, suburbLine].filter(Boolean).join(" ");
@@ -198,11 +200,11 @@ export function deriveLeaseAppraisalCopy({
   const appeal_points = [
     propertyLead || `Well-located ${(listing.property_type ?? parsed.propertyType ?? "property").toLowerCase()} in ${suburb}.`,
     rentLine || "Rent range informed by comparable lease listings nearby.",
-    suburbLine || "Suburb rental fundamentals support long-term leasing demand.",
+    suburbLine || (us ? "Review local demand, condition and inclusions before setting the rent." : "Suburb rental fundamentals support long-term leasing demand."),
     "Confirm inclusions, condition and letting strategy when finalising rent.",
   ].slice(0, PAGE_ONE_BULLET_COUNT);
 
-  const comparable_evidence = deriveComparableEvidence({
+  const comparable_evidence = us ? `${compCount} matching active rental listings are available for review. Advertised monthly asking rents are in USD and are not evidence of executed leases. The subject guide reflects the available automated estimate or your appraisal override; it is not a guaranteed achievable rent.` : deriveComparableEvidence({
     suburb: listing.suburb ?? parsed.suburb,
     bedrooms: listing.bedrooms ?? parsed.bedrooms,
     bathrooms: listing.bathrooms ?? parsed.bathrooms,
@@ -226,7 +228,7 @@ export function deriveLeaseAppraisalCopy({
       "Confirm body corporate, furnishing and inclusions when setting achievable rent.",
       "Allow for vacancy, letting fees and condition when underwriting cashflow.",
     ],
-    methodology_note:
+    methodology_note: us ? "Monthly rent in USD. The guide uses the available automated property estimate or the agent’s appraisal override. Nearby active asking rents provide comparison evidence; no achieved lease price is implied." :
       "Weekly rent range from comparable REA lease listings matched on beds, baths and parking. Suburb metrics from PropRadar. Outliers trimmed; median and interquartile range shown on page 2.",
     disclaimer: resolveLeaseAppraisalDisclaimer(agency.default_disclaimer),
     comparable_evidence,

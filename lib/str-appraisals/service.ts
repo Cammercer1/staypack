@@ -1,3 +1,4 @@
+import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireAgency, requireReportWithListing } from "@/lib/auth/requireUser";
 import { collateralPhotoRequirementError } from "@/lib/listings/collateralPhotoRequirements";
@@ -39,6 +40,7 @@ export async function createStrAppraisal({ supabase, agency, listing, requestId,
   source?: "manual" | "managed_delivery";
 }): Promise<Report> {
   if (listing.agency_id !== agency.id || listing.status === "archived") throw new Error("Choose an active property in your agency.");
+  assertPropertyCountry(agency, listing);
   const photoError = collateralPhotoRequirementError(listing);
   if (photoError) throw new Error(photoError);
   const selectedTemplate = templateId ?? (await resolveAvailableTemplates(agency, "str")).defaultTemplateId;

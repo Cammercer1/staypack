@@ -1,3 +1,4 @@
+import { usPropertySchema } from "@/lib/us-property/schema";
 import { strAdjustmentSchema } from "@/lib/reports/strEstimateAdjustments";
 import { strPropertyContextSchema } from "@/lib/str/propertyInputs";
 import { normalizeAdvertisedPrice } from "@/lib/listings/pricing";
@@ -51,6 +52,7 @@ export const reportStatusSchema = z.enum([
 ]);
 
 export const agencySchema = z.object({
+  country_code: z.enum(["AU", "US"]).optional(),
   name: z.string().min(2, "Agency name is required"),
   slug: z
     .string()
@@ -102,6 +104,8 @@ export const listingAgentSchema = z.object({
 });
 
 export const parsedListingSchema = z.object({
+  country: z.string().optional(),
+  usProperty: usPropertySchema.optional(),
   domainAvm: domainAvmSchema.optional(),
   propertyLookup: propertyLookupSourceSchema.optional(),
   title: z.string().nullable().optional(),

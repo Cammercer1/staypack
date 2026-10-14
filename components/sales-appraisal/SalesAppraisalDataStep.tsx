@@ -2,6 +2,7 @@
 import { UnsavedListingGuard } from "@/components/listings/UnsavedListingGuard";
 import { AppraisalDataToolbar } from "@/components/appraisals/AppraisalDataToolbar";
 import { ComparableFilters } from "@/components/appraisals/ComparableFilters";
+import { UsComparableDetails, UsComparableSearchSummary } from "@/components/appraisals/UsComparableDetails";
 import { avmPriceSuggestion } from "@/lib/listings/pricing";
 
 import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
@@ -551,6 +552,7 @@ export function SalesAppraisalDataStep({
               </div>
             </div>
 
+            <UsComparableSearchSummary search={appraisal?.usSearch} />
             {discoveryGaps.length > 0 ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
                 <p className="font-medium">Comparable evidence is below target</p>
@@ -629,6 +631,7 @@ export function SalesAppraisalDataStep({
                             {comp.bedrooms ?? "?"} bed · {saleCompPriceLabel(comp)}
                             {comp.suburb ? ` · ${comp.suburb}` : ""}
                           </p>
+                          <UsComparableDetails match={comp.usMatch} floorAreaSqm={comp.floorAreaSqm} />
                         </div>
                         {selected ? (
                           <Check className="h-5 w-5 shrink-0 text-primary" />

@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 export const propertyCandidateSchema = z.object({
-  source: z.enum(["domain", "google"]),
+  source: z.enum(["domain", "google", "zillow"]),
+  country: z.enum(["AU", "US"]).optional(),
+  zpid: z.string().regex(/^\d+$/).optional(),
   address: z.string().trim().min(1).max(300),
   streetAddress: z.string().trim().min(1).max(250),
   suburb: z.string().max(120).default(""),
@@ -26,8 +28,9 @@ export const lookupMediaSchema = z.object({
 export type LookupMedia = z.infer<typeof lookupMediaSchema>;
 
 export const propertyLookupSourceSchema = z.object({
-  source: z.enum(["domain", "google", "url"]),
+  source: z.enum(["domain", "google", "url", "zillow"]),
   matchedAt: z.string(),
+  zpid: z.string().regex(/^\d+$/).optional(),
   profileSlug: z.string().optional(),
   activeListingId: z.number().optional(),
   agencyName: z.string().optional(),
@@ -50,6 +53,7 @@ export const propertyLookupSourceSchema = z.object({
 export type PropertyLookupSource = z.infer<typeof propertyLookupSourceSchema>;
 
 export type ExistingProperty = {
+  country?: string | null;
   id: string;
   property_address: string | null;
   suburb: string | null;

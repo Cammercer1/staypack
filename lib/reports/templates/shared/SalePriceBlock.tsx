@@ -18,7 +18,7 @@ export function SalePriceBlock({
   const { sale_estimate, copy, sales_enrichment } = report;
   const amount =
     sale_estimate?.price_min != null && sale_estimate?.price_max != null
-      ? saleCalloutFromReport(sale_estimate)
+      ? saleCalloutFromReport(sale_estimate, report.market?.currency)
       : null;
 
   if (!amount) {

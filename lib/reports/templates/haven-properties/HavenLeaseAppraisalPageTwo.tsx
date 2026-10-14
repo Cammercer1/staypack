@@ -48,7 +48,7 @@ export function HavenLeaseAppraisalPageTwo({ report }: Props) {
                 Comparable rentals near {report.property.suburb}
               </h2>
             ) : null}
-            <HavenLtrCompsGrid
+            <HavenLtrCompsGrid market={report.market}
               comps={comps}
               featuredCount={HAVEN_LTR_FEATURED_COMP_COUNT}
               imageAspectClass={HAVEN_LTR_COMP_IMAGE_ASPECT}

@@ -28,7 +28,7 @@ const steps = [
     id: "details",
     label: "Agency details",
     description: "Your agency name, contact details and public report link.",
-    fields: ["name", "slug", "website_url", "email", "phone"] as const,
+    fields: ["name", "country_code", "slug", "website_url", "email", "phone"] as const,
   },
   {
     id: "logos",
@@ -160,6 +160,7 @@ export function OnboardingForm() {
     resolver: zodResolver(agencySchema),
     defaultValues: {
       name: "",
+      country_code: "AU",
       slug: "",
       website_url: "",
       email: "",
@@ -317,6 +318,12 @@ export function OnboardingForm() {
                 <Label htmlFor="name">Agency name</Label>
                 <Input id="name" aria-invalid={!!errors.name} {...register("name")} />
                 <FieldError message={errors.name?.message} />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="country_code">Agency country</Label>
+                <select id="country_code" className="h-11 w-full rounded-md border bg-background px-3" {...register("country_code")}><option value="AU">Australia</option><option value="US">United States</option></select>
+                <p className="text-xs text-muted-foreground">Property searches and appraisal currency follow your agency country.</p>
+                <FieldError message={errors.country_code?.message} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="slug">Report link name</Label>

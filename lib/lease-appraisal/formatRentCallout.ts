@@ -1,4 +1,4 @@
-import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
+import { rentRange, type PropertyMarket } from "@/lib/property-market";
 
 /** Dollar amount only (sidebar headline). */
 export function formatRentCalloutAmount(weeklyMin: number, weeklyMax: number) {
@@ -21,20 +21,10 @@ export function formatRentCalloutSubline(compCount: number | null | undefined) {
 }
 
 export function rentCalloutFromReport(ltr: {
-  weekly_min: number | null;
-  weekly_max: number | null;
-  weekly_midpoint?: number | null;
+  weekly_min: number | null; weekly_max: number | null; weekly_midpoint?: number | null;
+  market?: PropertyMarket;
 }) {
-  const min = ltr.weekly_min;
-  const max = ltr.weekly_max;
-  if (min == null || max == null) {
-    if (ltr.weekly_midpoint != null) {
-      return formatWeeklyRentRange(ltr.weekly_midpoint, ltr.weekly_midpoint).replace(
-        /\s*per week\s*$/i,
-        "",
-      );
-    }
-    return null;
-  }
-  return formatRentCalloutAmount(min, max);
+  const min = ltr.weekly_min ?? ltr.weekly_midpoint;
+  const max = ltr.weekly_max ?? ltr.weekly_midpoint;
+  return min == null || max == null ? null : rentRange(min, max, ltr.market).replace(/ per (week|month)$/, "");
 }

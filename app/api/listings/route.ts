@@ -1,3 +1,5 @@
+import { agencyCountry, assertPropertyCountry } from "@/lib/property-market/agencyCountry";
+import { countryName } from "@/lib/property-market";
 import { NextResponse } from "next/server";
 import { requireAgency } from "@/lib/auth/requireUser";
 import { prepareListingInput } from "@/lib/listings/prepareListingInput";
@@ -59,7 +61,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { supabase, agency, user } = await requireAgency();
-    const body = createListingSchema.parse(await request.json());
+    const input = await request.json();
+    const body = createListingSchema.parse({ ...input, country: input.country ?? countryName(agencyCountry(agency)) });
+    body.country = countryName(assertPropertyCountry(agency, body));
     const duplicate = await findExistingProperty(supabase, agency.id, body);
     if (duplicate) {
       return NextResponse.json({ error: "This property is already in your library.", duplicate }, { status: 409 });

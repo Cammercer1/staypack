@@ -35,8 +35,8 @@ export default function MonthlyRevenueChart({ data, brand, motion }: { data: Pro
     grid: { borderColor: brand.muted + "26", strokeDashArray: 4, padding: { left: 0, right: 8 } },
     xaxis: { categories: months?.map(month => month.month) ?? [], tickPlacement: "on", axisBorder: { show: false }, axisTicks: { show: false },
       labels: { rotate: 0, hideOverlappingLabels: true, trim: false, style: { fontSize: "11px" } }, tooltip: { enabled: false } },
-    yaxis: { min: 0, max: axisMaximum, tickAmount: 4, labels: { minWidth: 34, maxWidth: 48, style: { fontSize: "11px" }, formatter: value => value >= 1000 ? `$${Number((value / 1000).toFixed(1))}k` : formatCurrency(value) } },
-    tooltip: { shared: true, intersect: false, theme: "light", style: { fontSize: "12px" }, y: { formatter: value => formatCurrency(value) } },
+    yaxis: { min: 0, max: axisMaximum, tickAmount: 4, labels: { minWidth: 34, maxWidth: 48, style: { fontSize: "11px" }, formatter: value => value >= 1000 ? `$${Number((value / 1000).toFixed(1))}k` : formatCurrency(value, data.market?.currency) } },
+    tooltip: { shared: true, intersect: false, theme: "light", style: { fontSize: "12px" }, y: { formatter: value => formatCurrency(value, data.market?.currency) } },
     states: { active: { filter: { type: "none" } } },
   };
   if (!months || !scenarios.length) return null;
@@ -48,7 +48,7 @@ export default function MonthlyRevenueChart({ data, brand, motion }: { data: Pro
           <table className="du-table du-table-sm tabular-nums">
             <caption className="sr-only">Estimated gross revenue by month in Australian dollars</caption>
             <thead><tr><th scope="col">Month</th>{scenarios.map(scenario => <th key={scenario.id} scope="col" className="text-right">{scenario.label}</th>)}</tr></thead>
-            <tbody>{months.map(month => <tr key={month.month}><th scope="row">{month.month}</th>{scenarios.map(scenario => <td key={scenario.id} className="text-right">{formatCurrency(month[scenario.id])}</td>)}</tr>)}</tbody>
+            <tbody>{months.map(month => <tr key={month.month}><th scope="row">{month.month}</th>{scenarios.map(scenario => <td key={scenario.id} className="text-right">{formatCurrency(month[scenario.id], data.market?.currency)}</td>)}</tr>)}</tbody>
           </table>
         </div>
       </ProposalDetailsPopover>

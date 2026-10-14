@@ -1,11 +1,11 @@
-export function formatCurrency(value: number | null | undefined) {
+export function formatCurrency(value: number | null | undefined, currency: "AUD" | "USD" = "AUD") {
   if (value == null || Number.isNaN(value)) {
     return "—";
   }
 
-  return new Intl.NumberFormat("en-AU", {
+  return (currency === "USD" ? "US" : "") + new Intl.NumberFormat(currency === "USD" ? "en-US" : "en-AU", {
     style: "currency",
-    currency: "AUD",
+    currency,
     maximumFractionDigits: 0,
   }).format(value);
 }

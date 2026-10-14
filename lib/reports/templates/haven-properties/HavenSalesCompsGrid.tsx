@@ -11,6 +11,7 @@ export const HAVEN_SALES_COMP_IMAGE_ASPECT = "aspect-[5/2]";
 const DEFAULT_FEATURED = HAVEN_SALES_FEATURED_COMP_COUNT;
 
 type Props = {
+  currency?: "AUD" | "USD";
   comps: SaleCompCard[];
   suburb?: string;
   totalCompCount?: number;
@@ -34,9 +35,9 @@ function formatSoldDate(value: string | null) {
   });
 }
 
-function compPriceLabel(comp: SaleCompCard) {
+function compPriceLabel(comp: SaleCompCard, currency?: "AUD" | "USD") {
   if (comp.price != null && comp.price > 0) {
-    return formatSalePriceRange(comp.price, comp.price);
+    return formatSalePriceRange(comp.price, comp.price, currency);
   }
   return comp.price_display?.trim() || "Price undisclosed";
 }
@@ -85,7 +86,7 @@ function SaleStatusLabel({
 }
 
 export function HavenSalesCompsGrid({
-  comps,
+  comps, currency,
   suburb,
   totalCompCount,
   featuredCount = DEFAULT_FEATURED,
@@ -163,7 +164,7 @@ export function HavenSalesCompsGrid({
                 }`}
               >
                 <span className="font-semibold text-neutral-800">
-                  {compPriceLabel(comp)}
+                  {compPriceLabel(comp, currency)}
                 </span>
                 {comp.bedrooms != null ? (
                   <span className="inline-flex items-center gap-1">

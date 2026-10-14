@@ -43,3 +43,18 @@ it("fails cleanly without a key or when Google rejects the request", async () =>
   request.mockResolvedValue({ ok: false });
   await expect(autocompleteAddresses("Ascot", session)).rejects.toThrow("still type");
 });
+it("keeps an explicitly typed US direction and apartment when autocomplete returns only the building", async () => {
+  request.mockResolvedValue({ ok: true, json: async () => ({ suggestions: [
+    "616 Croft Ave", "616 Croft Ave Apt 3", "618 Croft Ave", "616 S Croft Ave",
+  ].map((text) => ({ placePrediction: { placeId: text, text: { text: `${text}, West Hollywood, CA, USA` }, structuredFormat: { mainText: { text }, secondaryText: { text: "West Hollywood, CA, USA" } } } })) }) });
+  const result = await autocompleteAddresses("616 N Croft Ave, Apt 2, West Hollywood CA 90048", session, "US");
+  expect(result).toEqual([{ placeId: "616 Croft Ave", mainText: "616 N Croft Ave Apt 2", address: "616 N Croft Ave Apt 2, West Hollywood, CA, USA", secondaryText: "West Hollywood, CA, USA" }]);
+  expect(JSON.parse(request.mock.calls[0][1].body).includedRegionCodes).toEqual(["us"]);
+});
+it("keeps a US apartment written after a comma when completing the ZIP", async () => {
+  request.mockResolvedValue({ ok: true, json: async () => ({ formattedAddress: "616 Croft Ave, West Hollywood, CA 90048", addressComponents: [
+    { shortText: "US", types: ["country"] }, { longText: "West Hollywood", types: ["locality"] },
+    { shortText: "CA", types: ["administrative_area_level_1"] }, { longText: "90048", types: ["postal_code"] },
+  ] }) });
+  expect(await completePlaceAddress("croft", session, "616 N Croft Ave, Apt 2, West Hollywood", "US")).toBe("616 N Croft Ave Apt 2, West Hollywood CA 90048");
+});

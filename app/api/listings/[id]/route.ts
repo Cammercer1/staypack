@@ -1,3 +1,5 @@
+import { countryName } from "@/lib/property-market";
+import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import { NextResponse } from "next/server";
 import { requireListingAccess } from "@/lib/auth/requireUser";
 import { prepareListingPatch } from "@/lib/listings/prepareListingInput";
@@ -45,8 +47,10 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { supabase, listing } = await requireListingAccess(id);
+    const { supabase, listing, agency } = await requireListingAccess(id);
     const body = updateListingSchema.parse(await request.json());
+    const country = assertPropertyCountry(agency, { ...listing, ...body });
+    if (body.country !== undefined) body.country = countryName(country);
     if (body.custom_landing_url !== undefined || body.landing_template !== undefined) {
       return NextResponse.json({ error: "Choose links on each report instead of the property" }, { status: 410 });
     }

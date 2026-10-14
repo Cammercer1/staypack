@@ -12,7 +12,7 @@ export async function findExistingProperty(
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await supabase
       .from("listings")
-      .select("id,property_address,suburb,state,postcode")
+      .select("id,property_address,suburb,state,postcode,country")
       .eq("agency_id", agencyId)
       .neq("status", "archived")
       .order("id")

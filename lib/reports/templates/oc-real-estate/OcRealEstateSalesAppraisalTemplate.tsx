@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/lib/reports/formatters";
 import Image from "next/image";
 import { BrandFontLoader } from "@/components/settings/BrandFontLoader";
 import { ReportEditableImage } from "@/components/reports/inline/ReportEditableImage";
@@ -13,24 +14,18 @@ import type { ReportTemplateProps } from "@/lib/reports/templates/types";
 import type { FinalReportJson } from "@/lib/types";
 import type { ReportImageSlot } from "@/lib/reports/editable/reportImageSlots";
 
-const currency = new Intl.NumberFormat("en-AU", {
-  style: "currency",
-  currency: "AUD",
-  maximumFractionDigits: 0,
-});
-
 function formatSalesEstimate(report: FinalReportJson) {
   const estimate = report.sale_estimate;
   if (estimate?.price_min == null || estimate.price_max == null) {
     return "Price on request";
   }
 
-  return `${currency.format(estimate.price_min)} – ${currency.format(estimate.price_max)}`;
+  return `${formatCurrency(estimate.price_min, report.market?.currency)} – ${formatCurrency(estimate.price_max, report.market?.currency)}`;
 }
 
 function formatLeaseEstimate(report: FinalReportJson) {
   const amount = rentCalloutFromReport(report.ltr);
-  return amount ? `${amount} / week` : "Rent on request";
+  return amount ? `${amount} / ${report.market?.rentPeriod ?? "week"}` : "Rent on request";
 }
 
 function PropertyImage({

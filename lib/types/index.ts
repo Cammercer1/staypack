@@ -80,6 +80,8 @@ export type ListingImageMeta = {
 export type ListingImageMetaMap = Record<string, ListingImageMeta>;
 
 export type ParsedListing = {
+  country?: string;
+  usProperty?: import("@/lib/us-property/schema").UsProperty;
   /** Subject inputs used to generate each appraisal; absent on legacy evidence. */
   appraisalInputFingerprints?: Partial<Record<"lease" | "sales", string>>;
   domainAvmInputFingerprint?: string;
@@ -114,6 +116,7 @@ export type ParsedListing = {
   /** Original lookup evidence; reviewed property fields remain on the listing. */
   propertyLookup?: PropertyLookupSource;
   rentalAppraisal?: {
+    usSearch?: import("@/lib/us-property/comparableTypes").UsComparableSearch;
     weeklyMin?: number;
     weeklyMax?: number;
     weeklyMidpoint?: number;
@@ -123,7 +126,8 @@ export type ParsedListing = {
       /** @deprecated Historical persisted reports only. */
       | "rea_discover"
       | "apify_rea"
-      | "rapidapi_rea";
+      | "rapidapi_rea"
+      | "zillow";
     /** Eligible evidence pool size; distinct from the six featured report cards. */
     compCount?: number;
     featuredCompCount?: number;
@@ -142,6 +146,8 @@ export type ParsedListing = {
   };
   /** Featured rental comps (e.g. from REA rent discover). */
   rentalComps?: {
+    usMatch?: import("@/lib/us-property/comparableTypes").UsComparableMatch;
+    floorAreaSqm?: number;
     address: string;
     suburb?: string;
     weeklyRent: number;
@@ -151,13 +157,14 @@ export type ParsedListing = {
     propertyType?: string;
     imageUrl?: string;
     listingUrl?: string;
-    provider?: "rea" | "domain_avm";
+    provider?: "rea" | "domain_avm" | "zillow";
   }[];
   /** PropRadar suburb medians / demographics for lease appraisal. */
   ltrSuburbMarket?: LtrSuburbMarketJson;
   /** Async rental comp enrichment status for lease appraisal UI polling. */
   leaseAppraisalEnrichment?: LeaseAppraisalEnrichmentStatus;
   salesAppraisal?: {
+    usSearch?: import("@/lib/us-property/comparableTypes").UsComparableSearch;
     priceMin?: number;
     priceMax?: number;
     priceMidpoint?: number;
@@ -167,7 +174,8 @@ export type ParsedListing = {
       /** @deprecated Historical persisted reports only. */
       | "rea_discover"
       | "apify_rea"
-      | "rapidapi_rea";
+      | "rapidapi_rea"
+      | "zillow";
     /** Eligible sold + for-sale pool size; distinct from featured report cards. */
     compCount?: number;
     featuredCompCount?: number;
@@ -205,6 +213,7 @@ export type ParsedListing = {
   };
   /** Sale comps (recently sold + for sale) from REA for sales appraisal. */
   salesComps?: {
+    usMatch?: import("@/lib/us-property/comparableTypes").UsComparableMatch;
     address: string;
     suburb?: string;
     price: number;
@@ -378,7 +387,7 @@ export type StrEnrichmentJson = {
   fetched_at?: string;
   cost_cents?: number;
   request_id?: string | null;
-  currency?: "AUD";
+  currency?: "AUD" | "USD";
   estimate_basis?: "p50" | "provider";
   seasonality_basis?: "modelled";
   market_occupancy?: StrMarketOccupancy;
@@ -548,6 +557,7 @@ export type { AgencyBrandAdvanced } from "@/lib/branding/advanced";
 
 export type FinalReportJson = import("@/lib/documents/documentLink").DocumentLinkFields & {
   /** An explicit proposal selection (including zero agents) overrides legacy brand defaults. */
+  market?: import("@/lib/property-market").PropertyMarket;
   agent_selection?: "explicit";
   version: string;
   template_id: string;
@@ -635,6 +645,7 @@ export type FinalReportJson = import("@/lib/documents/documentLink").DocumentLin
     management?: StrManagementAssumptions & { companyName: string };
   };
   ltr: {
+    market?: import("@/lib/property-market").PropertyMarket;
     weekly_min: number | null;
     weekly_max: number | null;
     weekly_midpoint: number | null;
@@ -679,6 +690,7 @@ export type FinalReportJson = import("@/lib/documents/documentLink").DocumentLin
 };
 
 export type Agency = {
+  country_code?: "AU" | "US";
   id: string;
   agency_group_id?: string | null;
   name: string;

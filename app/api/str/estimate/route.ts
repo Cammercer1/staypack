@@ -1,3 +1,4 @@
+import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { invalidateReportPdf, preserveReportImages } from "@/lib/reports/invalidateReportPdf";
 import { finalReportCopyToAiCopy } from "@/lib/reports/editable/strReportCopyAdapter";
@@ -18,6 +19,8 @@ export async function POST(request: Request) {
   try {
     const body = strEstimateSchema.parse(await request.json());
     const { supabase, agency, report, listing } = await requireReportWithListing(body.report_id);
+
+    assertPropertyCountry(agency, listing);
 
     let latitude =
       body.latitude != null ? Number(body.latitude) : listing.latitude;

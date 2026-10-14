@@ -10,6 +10,7 @@ export function normalizeAgencyBrandPayload(body: AgencyInput) {
 
   return {
     ...rest,
+    country_code: body.country_code ?? "AU",
     website_url: body.website_url || null,
     email: body.email || null,
     phone: body.phone || null,
@@ -54,6 +55,7 @@ export const DEFAULT_BRAND_VALUES: Partial<AgencyInput> = {
 export function agencyToFormInput(agency: Agency): AgencyInput {
   return {
     name: agency.name,
+    country_code: agency.country_code ?? "AU",
     slug: agency.slug,
     website_url: agency.website_url ?? "",
     email: agency.email ?? "",

@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { preserveUsStreet, usStreetAddress } from "@/lib/us-property/address";
 
 export type AddressSuggestion = {
   placeId: string;
@@ -40,7 +41,7 @@ async function placesRequest(path: string, fields: string, init?: RequestInit) {
   return response.json();
 }
 
-export async function autocompleteAddresses(input: string, sessionToken: string): Promise<AddressSuggestion[]> {
+export async function autocompleteAddresses(input: string, sessionToken: string, country: "AU" | "US" = "AU"): Promise<AddressSuggestion[]> {
   const normalizedInput = input.trim().replace(/[–—−]/g, "-");
   // Search the building separately: Places can transpose Australian unit/range
   // inputs such as 21/8-12 into 8 12/21. The unit remains user-supplied.
@@ -50,7 +51,7 @@ export async function autocompleteAddresses(input: string, sessionToken: string)
   const data = predictionSchema.parse(await placesRequest(
     "places:autocomplete",
     "suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat",
-    { method: "POST", body: JSON.stringify({ input: searchInput, sessionToken, includedRegionCodes: ["au"], regionCode: "au", languageCode: "en", includedPrimaryTypes: ["street_address", "premise", "subpremise", "route"] }) },
+    { method: "POST", body: JSON.stringify({ input: searchInput, sessionToken, includedRegionCodes: [country.toLowerCase()], regionCode: country.toLowerCase(), languageCode: "en", includedPrimaryTypes: ["street_address", "premise", "subpremise", "route"] }) },
   ));
   const suggestions = data.suggestions.flatMap(({ placePrediction: p }) => p ? [{
     placeId: p.placeId,
@@ -58,6 +59,13 @@ export async function autocompleteAddresses(input: string, sessionToken: string)
     mainText: p.structuredFormat?.mainText.text ?? p.text.text,
     secondaryText: p.structuredFormat?.secondaryText?.text ?? "",
   }] : []).slice(0, 5);
+  if (country === "US") {
+    return suggestions.flatMap((suggestion) => {
+      const mainText = preserveUsStreet(input, suggestion.mainText);
+      if (!mainText) return [];
+      return [{ ...suggestion, mainText, address: [mainText, suggestion.secondaryText].filter(Boolean).join(", ") }];
+    });
+  }
   if (apartmentRange) {
     const seen = new Set<string>();
     return suggestions.flatMap((suggestion) => {
@@ -81,8 +89,8 @@ export async function autocompleteAddresses(input: string, sessionToken: string)
   return inputNumbers ? suggestions.sort((a, b) => Number(numbers(b.mainText) === inputNumbers) - Number(numbers(a.mainText) === inputNumbers)) : suggestions;
 }
 
-export async function completePlaceAddress(placeId: string, sessionToken: string, selectedAddress: string) {
-  const params = new URLSearchParams({ sessionToken, languageCode: "en", regionCode: "au" });
+export async function completePlaceAddress(placeId: string, sessionToken: string, selectedAddress: string, country: "AU" | "US" = "AU") {
+  const params = new URLSearchParams({ sessionToken, languageCode: "en", regionCode: country.toLowerCase() });
   const data = detailsSchema.parse(await placesRequest(
     `places/${encodeURIComponent(placeId)}?${params}`,
     "formattedAddress,addressComponents",
@@ -91,10 +99,25 @@ export async function completePlaceAddress(placeId: string, sessionToken: string
     const c = data.addressComponents.find((item) => item.types.includes(type));
     return (short ? c?.shortText : c?.longText) ?? "";
   };
-  if (component("country", true) !== "AU") throw new Error("Choose an Australian property address.");
+  if (component("country", true) !== country) throw new Error("Choose a property address in the selected country.");
   // Details can resolve to a building even when the chosen prediction includes a unit.
   // Keep the street the user selected; use Details to complete the locality/postcode.
-  const street = selectedAddress.split(",")[0].trim();
+  const street = country === "US" ? usStreetAddress(selectedAddress) : selectedAddress.split(",")[0].trim();
   const locality = [component("locality") || component("postal_town"), component("administrative_area_level_1", true), component("postal_code")].filter(Boolean).join(" ");
   return locality ? `${street}, ${locality}` : selectedAddress.replace(/,?\s*Australia$/i, "");
+}
+
+/** Address discovery stays in Google Places; property data is fetched only after selection. */
+export async function searchPlaceProperties(query: string, country: "AU" | "US"): Promise<import("@/lib/listings/propertyLookupTypes").PropertyCandidate[]> {
+  const sessionToken = crypto.randomUUID();
+  const suggestions = await autocompleteAddresses(query, sessionToken, country);
+  const candidates = await Promise.all(suggestions.map(async suggestion => {
+    const data = detailsSchema.parse(await placesRequest(`places/${encodeURIComponent(suggestion.placeId)}?${new URLSearchParams({ sessionToken, languageCode: "en", regionCode: country.toLowerCase() })}`, "formattedAddress,addressComponents"));
+    const component = (type: string, short = false) => { const c = data.addressComponents.find(c => c.types.includes(type)); return (short ? c?.shortText : c?.longText) ?? ""; };
+    if (component("country", true) !== country) return null;
+    const streetAddress = country === "US" ? usStreetAddress(suggestion.address) : suggestion.mainText;
+    return { source: "google" as const, country, placeId: suggestion.placeId, address: suggestion.address, streetAddress,
+      suburb: component("locality") || component("postal_town"), state: component("administrative_area_level_1", true), postcode: component("postal_code") };
+  }));
+  return candidates.filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null);
 }

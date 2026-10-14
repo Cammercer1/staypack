@@ -40,12 +40,12 @@ export function roundSalePrice(value: number) {
   return Math.round(value / 5000) * 5000;
 }
 
-export function formatSalePriceRange(min: number, max: number) {
-  const formatter = new Intl.NumberFormat("en-AU", {
+export function formatSalePriceRange(min: number, max: number, currency: "AUD" | "USD" = "AUD") {
+  const formatter = { format: (value: number) => (currency === "USD" ? "US" : "") + new Intl.NumberFormat(currency === "USD" ? "en-US" : "en-AU", {
     style: "currency",
-    currency: "AUD",
+    currency,
     maximumFractionDigits: 0,
-  });
+  }).format(value) };
   const low = formatter.format(min);
   const high = formatter.format(max);
   if (min === max) {

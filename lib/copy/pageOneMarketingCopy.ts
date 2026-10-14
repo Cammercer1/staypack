@@ -246,16 +246,17 @@ export function deriveStrKeyMetricsLine(estimate?: Pick<StrEstimate, "annualReve
 export function enforceCanonicalStrRevenueInText(
   text: string,
   annualRevenue: number,
+  currency: "AUD" | "USD" = "AUD",
 ): string {
   if (!text.trim()) {
     return text;
   }
 
-  const canonical = formatCurrency(annualRevenue);
+  const canonical = formatCurrency(annualRevenue, currency);
   const tolerance = annualRevenue * 0.03;
 
   return text.replace(
-    /\$[\d,]+(?:\.\d+)?(?:\s*(?:k|K))?(?:\s*(?:\/|per)\s*(?:year|annum|yr))?/gi,
+    /(?:US|A)?\$[\d,]+(?:\.\d+)?(?:\s*(?:k|K))?(?:\s*(?:\/|per)\s*(?:year|annum|yr))?/gi,
     (match) => {
       const digits = match.replace(/[^\d]/g, "");
       const value = Number(digits);
@@ -263,7 +264,7 @@ export function enforceCanonicalStrRevenueInText(
         return match;
       }
       if (Math.abs(value - annualRevenue) <= tolerance) {
-        return match;
+        return currency === "USD" ? match.replace(/^(?:US|A)?\$/, "US$") : match;
       }
       return canonical;
     },

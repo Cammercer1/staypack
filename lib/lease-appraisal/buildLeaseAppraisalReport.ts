@@ -1,5 +1,5 @@
+import { marketForCountry, rentRange } from "@/lib/property-market";
 import { preserveDocumentLink } from "@/lib/documents/documentLink";
-import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
 import { ltrEnrichmentFromParsed } from "@/lib/lease-appraisal/ltrEnrichmentFromParsed";
 import { HAVEN_PROPERTIES_LEASE_APPRAISAL_TEMPLATE_ID } from "@/lib/reports/templates/ids";
 import { calculateAccommodates } from "@/lib/reports/formatters";
@@ -79,9 +79,9 @@ export function buildLeaseAppraisalReport({
 
   const rentRangeLabel =
     weeklyMin != null && weeklyMax != null
-      ? formatWeeklyRentRange(weeklyMin, weeklyMax)
+      ? rentRange(weeklyMin, weeklyMax, marketForCountry(listing.country))
       : weeklyMidpoint != null
-        ? formatWeeklyRentRange(weeklyMidpoint, weeklyMidpoint)
+        ? rentRange(weeklyMidpoint, weeklyMidpoint, marketForCountry(listing.country))
         : "";
 
   const address = listing.property_address ?? parsed.address ?? "";
@@ -104,6 +104,7 @@ export function buildLeaseAppraisalReport({
 
   return {
     ...preserveDocumentLink(report.final_report_json ?? { assets: { qr_code_url: report.qr_code_url ?? "" } }),
+    market: marketForCountry(listing.country),
     version: "lease_appraisal_v1",
     template_id: templateId,
     generated_at: new Date().toISOString(),
@@ -169,6 +170,7 @@ export function buildLeaseAppraisalReport({
     },
     str_yield: null,
     ltr: {
+      market: marketForCountry(listing.country),
       weekly_min: weeklyMin,
       weekly_max: weeklyMax,
       weekly_midpoint: weeklyMidpoint,

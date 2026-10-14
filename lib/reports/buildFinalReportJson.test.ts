@@ -82,3 +82,18 @@ it("keeps legacy published yield snapshots compatible", () => {
   expect(legacyYield?.yield_midpoint_percent).toBe(3);
   expect(resolveStrGrossYield({ str_yield: legacyYield, display_price: "$1,000,000", annual_revenue: 60000 })).toEqual(legacyYield);
 });
+
+it("freezes USD/monthly rent and prevents mismatched STR currencies", () => {
+  const f = createLintRegressionFixtures();
+  f.listing.country = "United States";
+  f.report.user_overrides_json = { strProperty: { propertyValue: 1584100, weeklyRent: 6269 * 12 / 52, amenities: [], additionalAmenities: [] } };
+  f.report.str_enrichment_json = { ...f.report.str_enrichment_json!, currency: "USD" };
+  const input = { agency: f.agency, listing: f.listing, report: f.report, estimate: f.report.final_estimate_json!, copy: f.report.ai_copy_json! };
+  const document = buildFinalReportJson(input);
+  expect(document.market).toEqual({ country: "US", currency: "USD", rentPeriod: "month" });
+  expect(document.ltr.market).toEqual(document.market);
+  expect(document.ltr.annual_midpoint).toBeCloseTo(75228);
+  f.listing.country = "Australia";
+  expect(document.market?.country).toBe("US");
+  expect(() => buildFinalReportJson(input)).toThrow(/currency/);
+});

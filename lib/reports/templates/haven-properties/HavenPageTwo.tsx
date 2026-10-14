@@ -57,12 +57,12 @@ export function HavenPageTwo({ report }: Props) {
           <section>
             <div className="grid grid-cols-2 items-stretch gap-x-6">
               <ClassicMonthlyRevenueChart report={report} compact />
-              <ClassicSeasonalityChart seasonality={seasonality} marketOccupancy={enrichment?.market_occupancy} revenueRange={enrichment?.provider === "airroi" ? enrichment.revenue_range : null} compact />
+              <ClassicSeasonalityChart currency={report.market?.currency} seasonality={seasonality} marketOccupancy={enrichment?.market_occupancy} revenueRange={enrichment?.provider === "airroi" ? enrichment.revenue_range : null} compact />
             </div>
           </section>
 
           <section className="border-t border-neutral-200/80 pt-4">
-            <ClassicCompsGrid
+            <ClassicCompsGrid currency={report.market?.currency}
               comps={comps}
               showManagement={report.str_scenario?.basis === "management"}
               suburb={report.property.suburb}

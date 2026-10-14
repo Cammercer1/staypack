@@ -1,7 +1,7 @@
 import { BedDouble, Bath } from "lucide-react";
 import type { LtrRentalCompCard } from "@/lib/types";
 import { MAX_LEASE_APPRAISAL_FEATURED_COMPS } from "@/lib/lease-appraisal/leaseAppraisalData";
-import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
+import { rentRange, type PropertyMarket } from "@/lib/property-market";
 import { formatNumber } from "@/lib/reports/formatters";
 
 /** Haven lease appraisal page 2 — matches STR comp count (2×3 grid). */
@@ -11,6 +11,7 @@ export const HAVEN_LTR_COMP_IMAGE_ASPECT = "aspect-[5/2]";
 const DEFAULT_FEATURED = HAVEN_LTR_FEATURED_COMP_COUNT;
 
 type Props = {
+  market?: PropertyMarket;
   comps: LtrRentalCompCard[];
   suburb?: string;
   totalCompCount?: number;
@@ -22,7 +23,7 @@ type Props = {
 };
 
 export function HavenLtrCompsGrid({
-  comps,
+  comps, market,
   suburb,
   totalCompCount,
   featuredCount = DEFAULT_FEATURED,
@@ -98,7 +99,7 @@ export function HavenLtrCompsGrid({
               >
                 {comp.weekly_rent != null ? (
                   <span className="font-semibold text-neutral-800">
-                    {formatWeeklyRentRange(comp.weekly_rent, comp.weekly_rent)}
+                    {rentRange(comp.weekly_rent, comp.weekly_rent, market)}
                   </span>
                 ) : null}
                 {comp.bedrooms != null ? (

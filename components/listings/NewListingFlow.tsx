@@ -1,5 +1,8 @@
 "use client";
 
+import { useAgencyCountry } from "@/components/properties/AgencyCountryProvider";
+import { countryName } from "@/lib/property-market";
+import { pastedListingUrl } from "@/lib/us-property/url";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -51,18 +54,25 @@ async function responseJson(response: Response) {
   }
 }
 
-export function NewListingFlow({
-  agencyAgents = [],
-  storageKey = "staypacks:new-listing",
-  onSaved,
-  includeAgents = true,
-}: {
+type NewListingFlowProps = {
   agencyAgents?: AgentProfile[];
   storageKey?: string;
   onSaved?: (listingId: string) => void | Promise<void>;
   includeAgents?: boolean;
-}) {
+};
+export function NewListingFlow(props: NewListingFlowProps) {
+  const country = useAgencyCountry();
+  return <CountryListingFlow key={`${props.storageKey ?? "staypacks:new-listing"}:${country}`} {...props} country={country} />;
+}
+function CountryListingFlow({
+  agencyAgents = [],
+  storageKey: storageKeyPrefix = "staypacks:new-listing",
+  onSaved,
+  includeAgents = true,
+  country,
+}: NewListingFlowProps & { country: "AU" | "US" }) {
   const router = useRouter();
+  const storageKey = `${storageKeyPrefix}:${country}`;
   const [step, setStep] = useState<"find" | "review">("find");
   const [mode, setMode] = useState<"address" | "url">("address");
   const [query, setQuery] = useState("");
@@ -84,10 +94,11 @@ export function NewListingFlow({
   const saving = useRef(false);
   const form = useForm<NewListingValues>({
     resolver: zodResolver(newListingFormSchema),
-    defaultValues: valuesFromListing(createEmptyListingDraft()),
+    defaultValues: valuesFromListing(createEmptyListingDraft({ country: countryName(country) })),
   });
   const values = useWatch({ control: form.control });
   const { reset } = form;
+  const pastedUrl = mode === "address" ? pastedListingUrl(query) : null;
 
   useEffect(() => {
     // Session storage can only be read after hydration, and is scoped to user + agency.
@@ -159,7 +170,7 @@ export function NewListingFlow({
       const response = await fetch("/api/listings/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ country, ...body }),
         signal: controller.signal,
       });
       const result: LookupResponse = await responseJson(response);
@@ -190,7 +201,12 @@ export function NewListingFlow({
   function manualEntry() {
     pending.current?.abort();
     setBusy(false);
-    startDraft(createEmptyListingDraft({ property_address: mode === "address" ? query.trim() : "" }));
+    const candidate = candidates.length === 1 ? candidates[0] : null;
+    startDraft(createEmptyListingDraft({
+      country: countryName(candidate?.country ?? country),
+      property_address: candidate?.streetAddress ?? (mode === "address" && !pastedUrl ? query.trim() : ""),
+      suburb: candidate?.suburb ?? null, state: candidate?.state ?? null, postcode: candidate?.postcode ?? null,
+    }));
   }
   async function save(formValues: NewListingValues) {
     if (!draft || saving.current || completed.current) return;
@@ -408,18 +424,24 @@ export function NewListingFlow({
               if (addressResolving || busy) return;
               setCandidates([]);
               void lookup(
-                mode === "address"
+                pastedUrl
+                  ? { action: "import", url: pastedUrl, country }
+                  : mode === "address"
                   ? { action: "search", query }
                   : { action: "import", url },
               );
             }}
           >
+            <p className="mb-4 text-sm text-muted-foreground">Searching {countryName(country)} · <Link href="/settings/agency" className="underline underline-offset-4">Agency country</Link></p>
             <Label htmlFor="new-property-search">
               {mode === "address" ? "Property address" : "Listing URL"}
             </Label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
               {mode === "address" ? (
                 <AddressAutocomplete
+                  key={country}
+                  country={country}
+                  allowListingUrl
                   id="new-property-search"
                   value={query}
                   disabled={busy}
@@ -460,14 +482,16 @@ export function NewListingFlow({
                 )}
                 {busy
                   ? "Looking up…"
-                  : mode === "address"
+                  : mode === "address" && !pastedUrl
                     ? "Find property"
                     : "Import listing"}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
               {mode === "address"
-                ? "Include the unit number, then select an address to find the property."
+                ? country === "US" || pastedUrl
+                  ? "Paste a Zillow home link, or enter the street address, apartment number, city, state and ZIP code."
+                  : "Include the unit number, then select an address to find the property."
                 : "Paste the full property listing link. You’ll review the imported details next."}
             </p>
           </form>
@@ -492,7 +516,7 @@ export function NewListingFlow({
                     <span className="mt-1 block text-xs text-muted-foreground">
                       {candidate.partialMatch
                         ? "Partial match · confirm the unit and street number"
-                        : candidate.source === "domain"
+                        : candidate.source === "domain" || candidate.source === "zillow"
                           ? "Property profile available"
                           : "Address only · add property details next"}
                     </span>

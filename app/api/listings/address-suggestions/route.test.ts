@@ -5,7 +5,7 @@ vi.mock("@/lib/geocoding/places", () => ({ autocompleteAddresses: mocks.suggest,
 import { POST } from "./route";
 const body = { action: "suggest", input: "18/8 Ascot", sessionToken: "04a22f81-999e-4c8d-b164-51b706029580" };
 const call = (data = body) => POST(new Request("http://localhost/api", { method: "POST", body: JSON.stringify(data) }));
-beforeEach(() => { vi.resetAllMocks(); mocks.auth.mockResolvedValue({}); mocks.suggest.mockResolvedValue([]); });
+beforeEach(() => { vi.resetAllMocks(); mocks.auth.mockResolvedValue({ agency: { country_code: "AU" } }); mocks.suggest.mockResolvedValue([]); });
 it("requires an agency session before calling Google", async () => {
   mocks.auth.mockRejectedValue(new Error("Unauthorized"));
   expect((await call()).status).toBe(503);
@@ -21,4 +21,15 @@ it("returns suggestions without caching them", async () => {
   expect(response.status).toBe(200);
   expect(response.headers.get("Cache-Control")).toBe("no-store");
   expect(await response.json()).toEqual({ suggestions: [] });
+});
+it.each(["AU", "US"] as const)("uses the agency's %s restriction when no country is supplied", async country => {
+  mocks.auth.mockResolvedValue({ agency: { country_code: country } });
+  expect((await call()).status).toBe(200);
+  expect(mocks.suggest).toHaveBeenCalledWith(body.input, body.sessionToken, country);
+});
+it("rejects a forged country before calling Google", async () => {
+  const response = await call({ ...body, country: "US" } as typeof body);
+  expect(response.status).toBe(400);
+  expect((await response.json()).error).toContain("Australia");
+  expect(mocks.suggest).not.toHaveBeenCalled();
 });

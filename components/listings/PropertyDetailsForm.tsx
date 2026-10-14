@@ -1,5 +1,6 @@
 "use client";
-import { resolveAdvertisedPrice } from "@/lib/listings/pricing";
+import { marketForCountry } from "@/lib/property-market";
+import { resolveAdvertisedPrice, rentPriceFromInput, rentPriceForInput } from "@/lib/listings/pricing";
 import { useEffect, useState } from "react";
 import { useForm, useFormState, type FieldErrors } from "react-hook-form";
 import { z } from "zod";
@@ -17,16 +18,16 @@ const count = z
     (v) => !v || (/^\d+$/.test(v) && Number(v) <= 100),
     "Enter a whole number from 0 to 100",
   );
-const schema = z.object({
+const schema = (country?: string | null) => z.object({
   property_address: z.string().trim().min(1, "Enter the property address"),
   suburb: z.string(),
   state: z.string(),
   postcode: z
     .string()
-    .refine((v) => !v || /^\d{4}$/.test(v), "Enter a four-digit postcode"),
+    .refine((v) => !v || (marketForCountry(country).country === "US" ? /^\d{5}(?:-\d{4})?$/.test(v) : /^\d{4}$/.test(v)), "Enter a valid postcode or ZIP code"),
   property_type: z.string(),
   bedrooms: count,
-  bathrooms: count,
+  bathrooms: z.string().refine((value) => !value.trim() || /^(?:\d+)(?:\.5)?$/.test(value) && Number(value) <= 100, "Enter a bathroom count in increments of 0.5"),
   car_spaces: count,
   accommodates: count,
   listing_title: z.string(),
@@ -34,7 +35,7 @@ const schema = z.object({
   advertised_weekly_rent: z.string(),
   listing_description: z.string(),
 });
-type Values = z.infer<typeof schema>;
+type Values = z.infer<ReturnType<typeof schema>>;
 function defaults(listing: Listing): Values {
   return {
     property_address: listing.property_address || "",
@@ -48,7 +49,7 @@ function defaults(listing: Listing): Values {
     accommodates: String(listing.accommodates ?? ""),
     listing_title: listing.listing_title || "",
     advertised_sale_price: resolveAdvertisedPrice(listing, "sale") ?? "",
-    advertised_weekly_rent: resolveAdvertisedPrice(listing, "lease") ?? "",
+    advertised_weekly_rent: rentPriceForInput(resolveAdvertisedPrice(listing, "lease"), listing.country),
     listing_description: listing.listing_description || "",
   };
 }
@@ -78,7 +79,7 @@ export function PropertyDetailsForm({
   const form = useForm<Values>({
     defaultValues: defaults(listing),
     resolver: async (values) => {
-      const result = schema.safeParse(values);
+      const result = schema(listing.country).safeParse(values);
       if (result.success) return { values: result.data, errors: {} };
       return {
         values: {},
@@ -103,6 +104,7 @@ export function PropertyDetailsForm({
     try {
       const body = {
         ...values,
+        advertised_weekly_rent: rentPriceFromInput(values.advertised_weekly_rent, listing.country),
         bedrooms: values.bedrooms === "" ? null : Number(values.bedrooms),
         bathrooms: values.bathrooms === "" ? null : Number(values.bathrooms),
         car_spaces: values.car_spaces === "" ? null : Number(values.car_spaces),
@@ -175,7 +177,7 @@ export function PropertyDetailsForm({
                 key === "property_address" ? "sm:col-span-2 lg:col-span-3" : ""
               }
             >
-              <Label htmlFor={`property-${key}`}>{label}</Label>
+              <Label htmlFor={`property-${key}`}>{marketForCountry(listing.country).country === "US" ? key === "advertised_weekly_rent" ? "Advertised monthly rent (USD)" : key === "postcode" ? "ZIP code" : label : label}</Label>
               <Input
                 id={`property-${key}`}
                   aria-label={label}

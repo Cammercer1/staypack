@@ -1,3 +1,5 @@
+import { matchesUsProfile } from "@/lib/us-property/normalise";
+import { marketForCountry } from "@/lib/property-market";
 import { lookupDomainProperty, searchDomainProperties } from "./propertyLookup";
 import { selectProfileCandidate } from "./profileAddress";
 import { sameProperty } from "@/lib/listings/propertyIdentity";
@@ -5,12 +7,14 @@ import type { Listing } from "@/lib/types";
 
 export function hasFreshPropertyProfile(listing: Listing, now = Date.now()) {
   const profile = listing.scraped_listing_json?.propertyLookup;
+  if (marketForCountry(listing.country).country === "US" && !matchesUsProfile(listing, listing.scraped_listing_json?.usProperty)) return false;
   const age = now - Date.parse(profile?.matchedAt ?? "");
-  return profile?.source === "domain" && profile.advertisedSalePrice !== undefined && age >= 0 && age < 24 * 60 * 60 * 1000;
+  return profile?.source === (marketForCountry(listing.country).country === "US" ? "zillow" : "domain") && profile.advertisedSalePrice !== undefined && age >= 0 && age < 24 * 60 * 60 * 1000;
 }
 
 /** Refresh provider evidence only; never replace edited property facts, prices or photos. */
 export async function refreshPropertyProfile(listing: Listing) {
+  if (marketForCountry(listing.country).country === "US") return (await import("@/lib/us-property/lookup")).refreshUsProperty(listing);
   const slug = listing.scraped_listing_json?.propertyLookup?.profileSlug;
   const query = [listing.property_address?.split(",")[0].trim(), listing.suburb, listing.state, listing.postcode].filter(Boolean).join(" ");
   const candidate = slug ? {

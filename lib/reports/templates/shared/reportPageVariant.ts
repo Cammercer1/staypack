@@ -45,8 +45,8 @@ export function showGuestStat(variant: ReportPageVariant) {
   return variant === "str";
 }
 
-export function revenueSectionTitle(variant: ReportPageVariant) {
-  if (variant === "lease") return "Estimated weekly rent";
+export function revenueSectionTitle(variant: ReportPageVariant, rentPeriod: "week" | "month" = "week") {
+  if (variant === "lease") return `Estimated ${rentPeriod === "month" ? "monthly" : "weekly"} rent`;
   if (variant === "sales_appraisal") return "Estimated sale price";
   if (variant === "sale") return "Price guide";
   return "STR Revenue";

@@ -1,4 +1,5 @@
 import { appraisalProposalDataSchema, appraisalProposalData } from "./appraisalData";
+import { propertyMarketSchema } from "@/lib/property-market/schema";
 import { z } from "zod";
 import { DEFAULT_DISCLAIMER, type FinalReportJson } from "@/lib/types";
 import { seasonalProfileFromReport, seasonalProfileSchema } from "./seasonality";
@@ -16,6 +17,7 @@ export type ProposalAgent = z.infer<typeof proposalAgentSchema>;
 export const proposalDataSchema = z.object({
   version: z.union([z.literal(1), z.literal(2)]),
   appraisal: appraisalProposalDataSchema.optional(),
+  market: propertyMarketSchema.optional(),
   generatedAt: z.iso.datetime(),
   agency: z.object({ name: z.string(), logoUrl: assetUrlSchema }),
   agent: z.object({ name: z.string(), role: z.string() }),
@@ -43,6 +45,7 @@ export function proposalFromReport(report: FinalReportJson, recipientDisplayName
   const scenario = report.str_scenario;
   const weeklyRent = validFigure(report.ltr.weekly_midpoint);
   return proposalDataSchema.parse({
+    market: report.market,
     version: 1, generatedAt: report.generated_at,
     agency: { name: report.agency.name, logoUrl: safeAsset(report.agency.logo_dark_url) || safeAsset(report.agency.logo_url) },
     agent: { name: report.agent.name, role: report.agent.role_title },

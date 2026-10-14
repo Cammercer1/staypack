@@ -1,3 +1,4 @@
+import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import { NextResponse } from "next/server";
 import { unstable_rethrow } from "next/navigation";
 import { z } from "zod";
@@ -12,7 +13,8 @@ const headers = { "Cache-Control": "private, no-store" };
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const { supabase, listing } = await requireListingAccess(id);
+    const { supabase, listing, agency } = await requireListingAccess(id);
+    assertPropertyCountry(agency, listing);
     const input = inputSchema.parse(await request.json());
     if (listing.status === "archived") return NextResponse.json({ error: "Restore this property before refreshing it." }, { status: 409, headers });
     if (!input.refresh && hasFreshPropertyProfile(listing)) return NextResponse.json({ listing, cached: true }, { headers });

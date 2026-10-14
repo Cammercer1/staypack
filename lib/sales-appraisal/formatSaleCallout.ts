@@ -1,8 +1,8 @@
 import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
 
 /** Dollar amount only (sidebar headline). */
-export function formatSaleCalloutAmount(priceMin: number, priceMax: number) {
-  return formatSalePriceRange(priceMin, priceMax);
+export function formatSaleCalloutAmount(priceMin: number, priceMax: number, currency: "AUD" | "USD" = "AUD") {
+  return formatSalePriceRange(priceMin, priceMax, currency);
 }
 
 export function formatSaleCalloutSubline(
@@ -30,7 +30,7 @@ export function saleCalloutFromReport(saleEstimate: {
   price_min: number | null;
   price_max: number | null;
   price_midpoint?: number | null;
-}) {
+}, currency: "AUD" | "USD" = "AUD") {
   const min = saleEstimate.price_min;
   const max = saleEstimate.price_max;
   if (min == null || max == null) {
@@ -38,9 +38,10 @@ export function saleCalloutFromReport(saleEstimate: {
       return formatSalePriceRange(
         saleEstimate.price_midpoint,
         saleEstimate.price_midpoint,
+        currency,
       );
     }
     return null;
   }
-  return formatSaleCalloutAmount(min, max);
+  return formatSaleCalloutAmount(min, max, currency);
 }

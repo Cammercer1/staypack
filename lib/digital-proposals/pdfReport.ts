@@ -1,5 +1,6 @@
 import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
 import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSalesAppraisalReport";
+import { propertyMarketSchema } from "@/lib/property-market/schema";
 import { z } from "zod";
 import { strManagementAssumptionsSchema } from "@/lib/reports/strEstimateAdjustments";
 import type { FinalReportJson } from "@/lib/types";
@@ -12,6 +13,7 @@ const blankAgent = { name: "", role_title: "", phone: "", email: "", photo_url: 
 
 /** Frozen, printable fields only. Never retain provider payloads, the unused comp pool or draft links. */
 export const proposalPdfReportSchema = z.object({
+  market: propertyMarketSchema.optional(),
   version: z.string(), template_id: z.string().refine(id => id === "haven-properties-str" || isLeaseAppraisalTemplateId(id) || isSalesAppraisalTemplateId(id)), generated_at: z.iso.datetime(),
   agent_selection: z.literal("explicit"), agent, agents: z.array(agent).max(2),
   agency: z.object({
@@ -32,7 +34,7 @@ export const proposalPdfReportSchema = z.object({
     market_benchmark: z.object({ annual_revenue: figure, nightly_rate: figure, occupancy_rate: figure }),
     management: strManagementAssumptionsSchema.extend({ companyName: z.string() }).optional(),
   }).optional(),
-  ltr: z.object({ weekly_min: figure, weekly_max: figure, weekly_midpoint: figure, annual_midpoint: figure, difference_before_costs: figure }),
+  ltr: z.object({ market: propertyMarketSchema.optional(), weekly_min: figure, weekly_max: figure, weekly_midpoint: figure, annual_midpoint: figure, difference_before_costs: figure }),
   sale_estimate: z.object({ price_min: figure, price_max: figure, price_midpoint: figure }).optional(),
   ltr_enrichment: z.object({ comp_count: z.number(), weekly_range: z.object({ p25: figure, p50: figure, p75: figure }),
     comps: z.array(z.object({ listing_id: z.string(), name: z.string(), thumbnail_url: assetUrlSchema, listing_url: assetUrlSchema,
@@ -55,6 +57,7 @@ export const proposalPdfReportSchema = z.object({
   assets: z.object({ qr_code_url: z.literal(""), pdf_url: z.literal("") }),
   document_link: z.object({ mode: z.literal("none") }),
   str_enrichment: z.object({
+    currency: z.enum(["AUD", "USD"]).optional(),
     tier: z.literal("full"), provider: z.enum(["airbtics", "airroi"]).optional(), comp_count: z.number(), radius_m: figure,
     revenue_range: range.nullable(), selected_comp_ids: z.array(z.string()).optional(), seasonality_basis: z.literal("modelled").optional(),
     seasonality: z.array(z.object({ month: z.string(), revenue_low: figure, revenue: figure, revenue_high: figure, occupancy: figure, adr: figure, modelled: z.boolean().optional() })),

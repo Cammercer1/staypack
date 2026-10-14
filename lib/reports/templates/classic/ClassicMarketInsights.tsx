@@ -36,7 +36,7 @@ function buildSnapshotStats(report: FinalReportJson): ReportSnapshotStat[] {
     stats.push({
       id: "median",
       label: report.str_scenario ? (report.str_scenario.basis === "management" ? "Managed revenue est." : "Est. gross revenue") : positioned ? "Est. gross revenue" : "Median gross revenue",
-      value: formatCurrency(str.annual_revenue),
+      value: formatCurrency(str.annual_revenue, report.market?.currency),
       footnote: "per year before costs",
     });
   }
@@ -54,7 +54,7 @@ function buildSnapshotStats(report: FinalReportJson): ReportSnapshotStat[] {
     stats.push({
       id: "range",
       label: "Annual range",
-      value: `${formatCurrency(range.p25)} – ${formatCurrency(range.p75)}`,
+      value: `${formatCurrency(range.p25, report.market?.currency)} – ${formatCurrency(range.p75, report.market?.currency)}`,
     });
   }
 
@@ -70,7 +70,7 @@ function buildSnapshotStats(report: FinalReportJson): ReportSnapshotStat[] {
     stats.push({
       id: "nightly",
       label: "Nightly rate",
-      value: `${formatCurrency(str.nightly_rate)}/night`,
+      value: `${formatCurrency(str.nightly_rate, report.market?.currency)}/night`,
     });
   }
 

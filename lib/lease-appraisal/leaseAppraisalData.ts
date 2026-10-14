@@ -4,6 +4,8 @@ import {
   buildRentalCompSelectionPool,
 } from "@/lib/rental/rankRentalCompsForSubject";
 import type { ParsedListing } from "@/lib/types";
+import { marketForCountry } from "@/lib/property-market";
+import { orderUsComparablePool } from "@/lib/us-property/comparablePresentation";
 
 /** Page 2 comparable grid (2×3). */
 export const MAX_LEASE_APPRAISAL_FEATURED_COMPS = 6;
@@ -45,6 +47,7 @@ export function defaultSelectedCompListingIds(
 
 export function orderLeaseAppraisalCompPool(parsed: ParsedListing) {
   const pool = parsed.rentalComps ?? [];
+  if (marketForCountry(parsed.country).country === "US" && pool.some((comp) => comp.usMatch)) return orderUsComparablePool(pool);
   const subjectPropertyType = resolveRentSubjectPropertyType(parsed);
   return buildRentalCompSelectionPool(pool, {
     suburb: parsed.suburb,

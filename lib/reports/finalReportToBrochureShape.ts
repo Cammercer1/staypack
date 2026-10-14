@@ -146,7 +146,7 @@ export function finalReportToBrochureShape(
       inspection_cta: "",
       disclaimer: report.copy.disclaimer ?? "",
       price_label: isLeasePageVariant(variant)
-        ? revenueSectionTitle(variant)
+        ? revenueSectionTitle(variant, report.market?.rentPeriod)
         : isSalesAppraisalPageVariant(variant)
           ? "Estimated sale price"
           : isStrPageVariant(variant)

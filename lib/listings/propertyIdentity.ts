@@ -1,3 +1,5 @@
+import { marketForCountry } from "@/lib/property-market";
+import { normaliseUsStreet } from "@/lib/us-property/normalise";
 import type { ExistingProperty } from "./propertyLookupTypes";
 
 type Address = Partial<Omit<ExistingProperty, "id">>;
@@ -23,6 +25,7 @@ function normalize(value: string | null | undefined) {
     .trim();
 }
 export function propertyIdentity(input: Address) {
+  if (marketForCountry(input.country).country === "US") return { address: normaliseUsStreet(input.property_address ?? ""), suburb: normalize(input.suburb), state: normalize(input.state), postcode: normalize(input.postcode).slice(0,5) };
   let address = normalize(input.property_address).replace(
     /^(?:unit|apartment|apt)\s+/,
     "",
@@ -56,6 +59,7 @@ export function propertyIdentity(input: Address) {
   return { address, suburb, state, postcode };
 }
 export function sameProperty(left: Address, right: Address) {
+  if (marketForCountry(left.country).country !== marketForCountry(right.country).country) return false;
   // Use known locality to strip a full display address on either side.
   const a = propertyIdentity({ ...left, suburb: left.suburb || right.suburb });
   const b = propertyIdentity({ ...right, suburb: right.suburb || left.suburb });

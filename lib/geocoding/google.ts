@@ -1,3 +1,4 @@
+import { marketForCountry } from "@/lib/property-market";
 import { isDevelopment } from "@/lib/env";
 import {
   buildAddressQuery,
@@ -35,7 +36,7 @@ type GoogleGeocodeResponse = {
   error_message?: string;
 };
 
-export async function geocodeAddress(query: string): Promise<GeocodeResult> {
+export async function geocodeAddress(query: string, country: string = "AU"): Promise<GeocodeResult> {
   const trimmed = query.trim();
   if (!trimmed) {
     throw new Error("Address is required for geocoding");
@@ -43,7 +44,7 @@ export async function geocodeAddress(query: string): Promise<GeocodeResult> {
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
-    if (isDevelopment()) {
+    if (isDevelopment() && marketForCountry(country).country === "AU") {
       return getMockGeocode(trimmed);
     }
 
@@ -53,8 +54,8 @@ export async function geocodeAddress(query: string): Promise<GeocodeResult> {
   const params = new URLSearchParams({
     address: trimmed,
     key: apiKey,
-    region: "au",
-    components: "country:AU",
+    region: marketForCountry(country).country.toLowerCase(),
+    components: `country:${marketForCountry(country).country}`,
   });
 
   const response = await fetch(
@@ -93,7 +94,7 @@ export async function geocodeReportAddress(input: AddressInput) {
     throw new Error("Property address is required before geocoding");
   }
 
-  return geocodeAddress(buildAddressQuery(input));
+  return geocodeAddress(buildAddressQuery(input), input.country ?? "AU");
 }
 
 function getMockGeocode(query: string): GeocodeResult {

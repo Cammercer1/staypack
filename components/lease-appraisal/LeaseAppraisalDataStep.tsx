@@ -2,11 +2,12 @@
 import { UnsavedListingGuard } from "@/components/listings/UnsavedListingGuard";
 import { AppraisalDataToolbar } from "@/components/appraisals/AppraisalDataToolbar";
 import { ComparableFilters } from "@/components/appraisals/ComparableFilters";
+import { UsComparableDetails, UsComparableSearchSummary } from "@/components/appraisals/UsComparableDetails";
 import { avmPriceSuggestion } from "@/lib/listings/pricing";
 
 import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -23,7 +24,7 @@ import {
   orderLeaseAppraisalCompPool,
 } from "@/lib/lease-appraisal/leaseAppraisalData";
 import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
-import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
+import { marketForCountry, rentForPeriod, rentFromPeriod, rentRange } from "@/lib/property-market";
 import {
   rentalCompSelectionTier,
 } from "@/lib/rental/rankRentalCompsForSubject";
@@ -64,6 +65,8 @@ export function LeaseAppraisalDataStep({
   onBusyChange,
 }: Props) {
   const endpoint = appraisalEndpoint ?? `/api/listings/${listing.id}/lease-appraisal`;
+  const market = useMemo(() => marketForCountry(listing.country), [listing.country]);
+  const localRent = useCallback((value?: number) => value == null ? "" : String(Number(rentForPeriod(value, market).toFixed(6))), [market]);
   const parsed = useMemo(() => resolveAppraisalInput(listing), [listing]);
   const pool = useMemo(
     () => (parsed ? orderLeaseAppraisalCompPool(parsed) : []),
@@ -87,13 +90,13 @@ export function LeaseAppraisalDataStep({
   const pollErrorShownRef = useRef(false);
   const jobCompletionToastRef = useRef<string | null>(null);
   const [weeklyMin, setWeeklyMin] = useState<string>(
-    () => String(appraisal?.weeklyMin ?? ""),
+    () => localRent(appraisal?.weeklyMin),
   );
   const [weeklyMax, setWeeklyMax] = useState<string>(
-    () => String(appraisal?.weeklyMax ?? ""),
+    () => localRent(appraisal?.weeklyMax),
   );
   const [weeklyMid, setWeeklyMid] = useState<string>(
-    () => String(appraisal?.weeklyMidpoint ?? ""),
+    () => localRent(appraisal?.weeklyMidpoint),
   );
   const [selectedIds, setSelectedIds] = useState<string[]>(() => {
     if (appraisal?.selectedCompListingIds?.length) {
@@ -112,16 +115,16 @@ export function LeaseAppraisalDataStep({
   /* eslint-disable react-hooks/set-state-in-effect -- sync editable fields when job polling refreshes the listing. */
   useEffect(() => {
     if (!priceEdited.current) {
-      setWeeklyMin(String(appraisal?.weeklyMin ?? ""));
-      setWeeklyMax(String(appraisal?.weeklyMax ?? ""));
-      setWeeklyMid(String(appraisal?.weeklyMidpoint ?? ""));
+      setWeeklyMin(localRent(appraisal?.weeklyMin));
+      setWeeklyMax(localRent(appraisal?.weeklyMax));
+      setWeeklyMid(localRent(appraisal?.weeklyMidpoint));
     }
     if (appraisal?.selectedCompListingIds?.length) {
       setSelectedIds(appraisal.selectedCompListingIds);
     } else if (parsed && pool.length > 0) {
       setSelectedIds(defaultSelectedCompListingIds(parsed));
     }
-  }, [listing.updated_at, appraisal, parsed, pool.length]);
+  }, [listing.updated_at, appraisal, parsed, pool.length, localRent]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const compRows = useMemo(
@@ -148,14 +151,14 @@ export function LeaseAppraisalDataStep({
     const min = Number(weeklyMin);
     const max = Number(weeklyMax);
     if (Number.isFinite(min) && Number.isFinite(max) && min > 0 && max > 0) {
-      return formatWeeklyRentRange(min, max);
+      return rentRange(rentFromPeriod(min, market), rentFromPeriod(max, market), market);
     }
     const mid = Number(weeklyMid);
     if (Number.isFinite(mid) && mid > 0) {
-      return formatWeeklyRentRange(mid, mid);
+      return rentRange(rentFromPeriod(mid, market), rentFromPeriod(mid, market), market);
     }
     return null;
-  }, [weeklyMin, weeklyMax, weeklyMid]);
+  }, [weeklyMin, weeklyMax, weeklyMid, market]);
 
   const inputError = appraisalInputError(listing);
   const staleEvidence = hasStaleAppraisal(listing, "lease");
@@ -329,9 +332,9 @@ export function LeaseAppraisalDataStep({
           body: JSON.stringify({
             ...(appraisalEndpoint ? { expected_updated_at: listing.updated_at } : {}),
             ...(priceEdited.current ? {
-              weekly_min: parseRent(weeklyMin),
-              weekly_max: parseRent(weeklyMax),
-              weekly_midpoint: parseRent(weeklyMid),
+              weekly_min: (weeklyMin.trim() ? rentFromPeriod(Number(weeklyMin), market) : null),
+              weekly_max: (weeklyMax.trim() ? rentFromPeriod(Number(weeklyMax), market) : null),
+              weekly_midpoint: (weeklyMid.trim() ? rentFromPeriod(Number(weeklyMid), market) : null),
             } : {}),
             selected_comp_listing_ids: selectedIds,
           }),
@@ -386,7 +389,7 @@ export function LeaseAppraisalDataStep({
               : `Review the suggested rent range and choose up to ${MAX_LEASE_APPRAISAL_FEATURED_COMPS} comparable rentals. Properties in ${listing.suburb ?? "your suburb"} appear first, followed by nearby areas.`
             : jobProcessing
               ? "Comparable rentals are being fetched in the background. This page will update when they are ready."
-              : "Fetch comparable rentals to support your appraisal. Adjust the weekly rent band if needed, then choose featured comps."}
+              : `Fetch comparable rentals to support your appraisal. Adjust the ${market.rentPeriod === "month" ? "monthly" : "weekly"} rent band if needed, then choose featured comps.`}
         </p>
       </div>
 
@@ -458,7 +461,7 @@ export function LeaseAppraisalDataStep({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="weekly-min">Weekly min ($)</Label>
+              <Label htmlFor="weekly-min">{market.rentPeriod === "month" ? "Monthly" : "Weekly"} min ({market.country === "US" ? "USD" : "$"})</Label>
               <Input
                 id="weekly-min"
                 type="number"
@@ -468,7 +471,7 @@ export function LeaseAppraisalDataStep({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="weekly-max">Weekly max ($)</Label>
+              <Label htmlFor="weekly-max">{market.rentPeriod === "month" ? "Monthly" : "Weekly"} max ({market.country === "US" ? "USD" : "$"})</Label>
               <Input
                 id="weekly-max"
                 type="number"
@@ -478,7 +481,7 @@ export function LeaseAppraisalDataStep({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="weekly-mid">Weekly midpoint ($)</Label>
+              <Label htmlFor="weekly-mid">{market.rentPeriod === "month" ? "Monthly" : "Weekly"} midpoint ({market.country === "US" ? "USD" : "$"})</Label>
               <Input
                 id="weekly-mid"
                 type="number"
@@ -505,6 +508,7 @@ export function LeaseAppraisalDataStep({
               </div>
             </div>
 
+            <UsComparableSearchSummary search={appraisal?.usSearch} />
             {discovery && !discovery.targetMet ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
                 <p className="font-medium">Comparable evidence is below target</p>
@@ -638,12 +642,13 @@ export function LeaseAppraisalDataStep({
                                     {comp.address}
                                   </p>
                                   <p className="mt-1 text-sm font-semibold">
-                                    ${comp.weeklyRent}/wk
+                                    {rentRange(comp.weeklyRent, comp.weeklyRent, market)}
                                   </p>
                                   <p className="mt-0.5 text-xs text-muted-foreground">
                                     {comp.bedrooms ?? "?"} bed · {comp.bathrooms ?? "?"} bath · {comp.carSpaces ?? "?"} car
                                     {comp.suburb ? ` · ${comp.suburb}` : ""}
                                   </p>
+                                  <UsComparableDetails match={comp.usMatch} floorAreaSqm={comp.floorAreaSqm} />
                                 </div>
                                 {selected ? (
                                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -669,10 +674,6 @@ export function LeaseAppraisalDataStep({
   );
 }
 
-function parseRent(value: string) {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
 
 function formatPropertyType(value?: string) {
   const normalized = value?.trim() || "Property";

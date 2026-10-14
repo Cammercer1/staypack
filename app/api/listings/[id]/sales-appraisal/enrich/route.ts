@@ -1,3 +1,4 @@
+import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import { appraisalInputError } from "@/lib/appraisals/resolveAppraisalInput";
 import { NextResponse } from "next/server";
 import { requireListingAccess } from "@/lib/auth/requireUser";
@@ -68,6 +69,7 @@ export async function POST(
   try {
     const { id } = await params;
     const { supabase, listing, agency, user } = await requireListingAccess(id);
+    assertPropertyCountry(agency, listing);
 
     const inputError = appraisalInputError(listing);
     if (inputError) {

@@ -1,3 +1,4 @@
+import { marketForCountry } from "@/lib/property-market";
 import { PAGE_ONE_BULLET_COUNT } from "@/lib/copy/pageOneMarketingCopy";
 import {
   blurbVariantsParagraphsToStored,
@@ -103,6 +104,7 @@ export function deriveSalesAppraisalCopy({
   priceMax = null,
   featuredComps = [],
 }: DeriveSalesAppraisalCopyInput): SalesAppraisalCopy {
+  const us = marketForCountry(listing.country).country === "US";
   const descriptionLead = firstSentences(
     parsed.description ?? listing.listing_description ?? "",
     2,
@@ -116,7 +118,7 @@ export function deriveSalesAppraisalCopy({
       " ",
     );
 
-  const priceLine = pricePositionLine(
+  const priceLine = us ? "The current property value estimate should be reviewed against recent local sales and the property’s condition." : pricePositionLine(
     soldCompCount,
     forSaleCompCount,
     Boolean(parsed.salesAppraisal?.agencyGuide),
@@ -154,7 +156,7 @@ export function deriveSalesAppraisalCopy({
     "Confirm presentation, campaign strategy and timing when finalising the asking price.",
   ].slice(0, PAGE_ONE_BULLET_COUNT);
 
-  const comparable_evidence = deriveSaleComparableEvidence({
+  const comparable_evidence = us ? `${soldCompCount} matching sold properties from the past 18 months are available for review. Prices are in USD. The subject guide uses the available current automated estimate or your appraisal override. A historic sale price is not a current valuation.` : deriveSaleComparableEvidence({
     suburb: listing.suburb ?? parsed.suburb,
     bedrooms: listing.bedrooms ?? parsed.bedrooms,
     bathrooms: listing.bathrooms ?? parsed.bathrooms,
@@ -179,7 +181,7 @@ export function deriveSalesAppraisalCopy({
       "Confirm presentation, styling and campaign inclusions when setting the asking price.",
       "Allow for marketing costs, agent fees and settlement timing when planning the sale.",
     ],
-    methodology_note: parsed.salesAppraisal?.agencyGuide
+    methodology_note: us ? "Current property estimate in USD, with nearby sold properties offered as comparison evidence. The guide is the available automated estimate or agent override, not the last sold or asking price." : parsed.salesAppraisal?.agencyGuide
       ? "The agency’s current marketed guide is retained as the estimated sale price range and reviewed against same-property-type comparables sold within the past 12 months. Current for-sale listings provide additional context; comparable evidence is shown on page 2."
       : "Estimated sale price range from same-property-type REA comparables sold within the past 12 months, matched on beds, baths and parking. The search expands to nearby areas when local evidence is limited; current for-sale listings provide context only. Outliers trimmed; comparable evidence shown on page 2.",
     disclaimer:

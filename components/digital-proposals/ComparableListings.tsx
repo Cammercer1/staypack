@@ -16,7 +16,8 @@ function carouselPosition(track: HTMLDivElement) {
   return { start, end: Math.min(track.children.length, start + visible), stride };
 }
 
-export function ComparableListings({ comparables, motion, maxVisible = 2, className, renderComparable }: {
+export function ComparableListings({ comparables, currency, motion, maxVisible = 2, className, renderComparable }: {
+  currency?: "AUD" | "USD";
   comparables: ProposalData["comparables"]; motion: boolean;
   maxVisible?: 2 | 3;
   className?: string;
@@ -67,7 +68,7 @@ export function ComparableListings({ comparables, motion, maxVisible = 2, classN
             <h2 title={comp.name} className="font-[family-name:var(--proposal-heading)] text-lg font-semibold leading-snug [overflow-wrap:anywhere]">{comp.name}</h2>
             <p className="mt-2 text-sm text-(--proposal-muted)">{[comp.bedrooms !== null ? `${comp.bedrooms} ${comp.bedrooms === 1 ? "bedroom" : "bedrooms"}` : "", comp.distanceM !== null ? `${(comp.distanceM / 1000).toFixed(1)} km away` : ""].filter(Boolean).join(" · ")}</p>
             <div className="mt-auto pt-4">
-              <p className="font-[family-name:var(--proposal-heading)] text-3xl tabular-nums">{comp.annualRevenue !== null ? formatCurrency(comp.annualRevenue) : "Not available"}</p>
+              <p className="font-[family-name:var(--proposal-heading)] text-3xl tabular-nums">{comp.annualRevenue !== null ? formatCurrency(comp.annualRevenue, currency) : "Not available"}</p>
               <p className="mt-1 text-xs text-(--proposal-muted)">Estimated gross STR revenue / year</p>
             </div>
           </div></>}

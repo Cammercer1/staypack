@@ -25,7 +25,8 @@ import {
   strUpliftPercentSchema,
   strManagementAssumptionsSchema,
 } from "@/lib/reports/strEstimateAdjustments";
-import { formatCurrency, formatPercent } from "@/lib/reports/formatters";
+import { marketForCountry } from "@/lib/property-market";
+import { formatCurrency as currencyAmount, formatPercent } from "@/lib/reports/formatters";
 import { jsonRequest, reportRequest } from "@/lib/reports/reportRequests";
 import { DEFAULT_DISCLAIMER, type Agency, type Listing, type Report, type StrManagementPreset } from "@/lib/types";
 
@@ -66,6 +67,8 @@ export const StrEstimateStep = forwardRef<
   { listing, agency, report, busy, canManageDefaults = false, onCompanyPresetsChange, onBusyChange, onComplete, onContinue, onBack, continueLabel },
   ref,
 ) {
+  const currency = marketForCountry(listing.country).currency;
+  const formatCurrency = (value: number | null | undefined) => currencyAmount(value, currency);
   const estimate = report.final_estimate_json;
   const enrichment = report.str_enrichment_json;
   const initialValues = controlValues(report);

@@ -1,3 +1,4 @@
+import { rentForPeriod, weeklyToMonthly } from "@/lib/property-market";
 import { formatCurrency } from "@/lib/reports/formatters";
 import type { ProposalData } from "./data";
 
@@ -12,6 +13,8 @@ export const DATA_TOKENS = {
   "recipient.displayName": { label: "Customer name", type: "text", read: d => d.recipient?.displayName ?? null },
   "agency.name": { label: "Agency name", type: "text", read: d => d.agency.name },
   "agent.name": { label: "Agent name", type: "text", read: d => d.agent.name },
+  "ltr.rent": { label: "Estimated local-period LTR", type: "currency", read: d => d.ltr.weeklyRent == null ? null : rentForPeriod(d.ltr.weeklyRent, d.market) },
+  "ltr.monthlyRent": { label: "Estimated monthly LTR", type: "currency", read: d => d.ltr.weeklyRent == null ? null : weeklyToMonthly(d.ltr.weeklyRent) },
   "ltr.weeklyRent": { label: "Estimated weekly LTR", type: "currency", read: d => d.ltr.weeklyRent },
   "ltr.annualRent": { label: "Estimated annual LTR", type: "currency", read: d => d.ltr.annualRent },
   "str.market.annualRevenue": { label: "Market estimated gross STR revenue", type: "currency", read: d => d.str.market.annualRevenue },
@@ -23,7 +26,7 @@ export function readToken(key: DataToken, data: ProposalData) { return DATA_TOKE
 export function formatToken(key: DataToken, data: ProposalData) {
   const value = readToken(key, data);
   if (value === null || value === "") return null;
-  return DATA_TOKENS[key].type === "currency" ? formatCurrency(Number(value)) : String(value);
+  return DATA_TOKENS[key].type === "currency" ? formatCurrency(Number(value), data.market?.currency) : String(value);
 }
 
 /** Plain text only: no HTML, eval, nested object access or recursive token expansion. */

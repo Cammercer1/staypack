@@ -8,6 +8,7 @@ export const STR_PAGE_TWO_COMP_IMAGE_ASPECT = "aspect-[3/1]";
 const DEFAULT_FEATURED_COMP_COUNT = STR_PAGE_TWO_FEATURED_COMP_COUNT;
 
 type Props = {
+  currency?: "AUD" | "USD";
   comps: StrCompCard[];
   suburb?: string;
   totalCompCount?: number;
@@ -25,7 +26,7 @@ type Props = {
 };
 
 export function ClassicCompsGrid({
-  comps,
+  comps, currency,
   suburb,
   totalCompCount,
   featuredCount = DEFAULT_FEATURED_COMP_COUNT,
@@ -126,7 +127,7 @@ export function ClassicCompsGrid({
                 ) : null}
                 <span className="inline-flex items-center gap-1">
                   <DollarSign className="h-3 w-3" strokeWidth={1.75} aria-hidden />
-                  {formatCurrency(comp.nightly_rate)}
+                  {formatCurrency(comp.nightly_rate, currency)}
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <Percent className="h-3 w-3" strokeWidth={1.75} aria-hidden />
@@ -143,7 +144,7 @@ export function ClassicCompsGrid({
                   color: "var(--report-text-colour, inherit)",
                 }}
               >
-                {formatCurrency(comp.annual_revenue)}
+                {formatCurrency(comp.annual_revenue, currency)}
                 <span
                   className={`ml-1 font-medium text-neutral-600 ${
                     compact ? "text-[0.55rem]" : "text-[0.6rem]"

@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/lib/reports/formatters";
 import { comparablesByEstimate, comparisonRows } from "./data";
 import { monthlyRevenueProjection } from "./seasonality";
 import { occupancyMonthLabel } from "./occupancy";
@@ -5,7 +6,7 @@ import { resolveTokenText } from "./tokens";
 import { proposalPrintFontUrl } from "./fonts";
 import type { ProposalSnapshot } from "./workspace";
 const escape = (value: string) => value.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
-const money = (value: number | null) => value === null ? "Not available" : new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(value);
+
 const image = (url: string, alt: string, className = "") => /^https:\/\//i.test(url) ? `<img class="${className}" src="${escape(url)}" alt="${escape(alt)}">` : "";
 /** Trusted, versioned print renderer. Uses the exact published data and token values. */
 export function proposalPrintHtml(snapshot: ProposalSnapshot) {
@@ -14,6 +15,7 @@ export function proposalPrintHtml(snapshot: ProposalSnapshot) {
   const text = (value: string) => escape(resolveTokenText(value, data).text);
   const rows = comparisonRows(data, "annual");
   const months = monthlyRevenueProjection(data);
+  const money = (value: number | null) => value === null ? "Not available" : formatCurrency(value, data.market?.currency);
   const annual = `<div class="figures">${rows.map(row => `<div><span>${escape(row.label)}</span><strong>${money(row.value)}</strong><small>Estimated annual gross revenue</small></div>`).join("")}</div>`;
   const monthly = months ? `<h3>Monthly revenue estimates</h3><table><thead><tr><th>Month</th>${rows.map(row => `<th>${escape(row.label)}</th>`).join("")}</tr></thead><tbody>${months.map(month => `<tr><td>${month.month}</td><td>${money(month.ltr)}</td><td>${money(month.market)}</td><td>${money(month.managed)}</td></tr>`).join("")}</tbody></table>` : "";
   const occupancy = data.occupancy ? `<h3>Historical market occupancy</h3><table><thead><tr><th>Month</th><th>Occupancy</th></tr></thead><tbody>${data.occupancy.months.map(row => `<tr><td>${occupancyMonthLabel(row.month)}</td><td>${row.average === null ? "Not available" : Math.round(row.average) + "%"}</td></tr>`).join("")}</tbody></table><p class="note">Historical market averages${data.occupancy.label ? ` for ${escape(data.occupancy.label)}` : ""}; not a forecast for this property.${data.occupancy.allPropertyTypes ? " Includes all property types with the same bedroom count." : ""}</p>` : `<p class="note">Monthly occupancy history is not available for this market.</p>`;

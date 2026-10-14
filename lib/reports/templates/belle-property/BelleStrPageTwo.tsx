@@ -51,12 +51,12 @@ export function BelleStrPageTwo({ report }: Props) {
           <section className="shrink-0">
             <div className="grid grid-cols-2 items-stretch gap-x-8">
               <ClassicMonthlyRevenueChart report={report} compact />
-              <ClassicSeasonalityChart seasonality={seasonality} marketOccupancy={enrichment?.market_occupancy} revenueRange={enrichment?.provider === "airroi" ? enrichment.revenue_range : null} compact />
+              <ClassicSeasonalityChart currency={report.market?.currency} seasonality={seasonality} marketOccupancy={enrichment?.market_occupancy} revenueRange={enrichment?.provider === "airroi" ? enrichment.revenue_range : null} compact />
             </div>
           </section>
 
           <section className={`shrink-0 border-t border-neutral-200/80 ${hasScenarioSummary ? "pt-3" : "pt-5"}`}>
-            <ClassicCompsGrid
+            <ClassicCompsGrid currency={report.market?.currency}
               comps={comps}
               showManagement={report.str_scenario?.basis === "management"}
               imageAspectClass={hasScenarioSummary ? "aspect-[4/1]" : undefined}

@@ -12,7 +12,7 @@ export function resolveStrBrochurePriceValue(
   if (revenue == null || Number.isNaN(revenue)) {
     return null;
   }
-  const formatted = formatCurrency(revenue);
+  const formatted = formatCurrency(revenue, report.market?.currency);
   return formatted === "—" ? null : formatted;
 }
 

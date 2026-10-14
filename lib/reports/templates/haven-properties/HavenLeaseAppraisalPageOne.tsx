@@ -233,7 +233,7 @@ export function HavenLeaseAppraisalPageOne({ report }: { report: FinalReportJson
                   style={{ fontFamily: headingFont, fontSize: "2rem" }}
                 >
                   {rentAmount}
-                  <span className="text-[0.9rem] font-semibold text-white/85"> /wk</span>
+                  <span className="text-[0.9rem] font-semibold text-white/85"> /{report.market?.rentPeriod === "month" ? "mo" : "wk"}</span>
                 </p>
                 <p
                   className="mt-2 border-t border-white/25 pt-2 text-[0.68rem] leading-[1.6] text-white/85"

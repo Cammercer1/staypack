@@ -4,6 +4,7 @@ import type { StrCompCard, StrEnrichmentJson, StrEstimate } from "@/lib/types";
 import { rankStrComps } from "@/lib/str/comparables";
 
 export const airroiInputSchema = z.object({
+  currency: z.enum(["AUD", "USD"]).default("AUD"),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   bedrooms: z.number().int().min(0).max(20),
@@ -17,7 +18,7 @@ export type AirroiInput = z.input<typeof airroiInputSchema>;
 const curve = z.object({ p25: z.number().nonnegative(), p50: z.number().nonnegative(), p75: z.number().nonnegative(), p90: z.number().nonnegative() })
   .refine((p) => p.p25 <= p.p50 && p.p50 <= p.p75 && p.p75 <= p.p90, "Invalid percentile order");
 const payloadSchema = z.object({
-  currency: z.literal("AUD"),
+  currency: z.enum(["AUD", "USD"]),
   revenue: z.number().positive(),
   occupancy: z.number().positive().max(1),
   average_daily_rate: z.number().positive(),
@@ -57,6 +58,7 @@ function distanceM(lat: number, lng: number, otherLat: number, otherLng: number)
 export function normaliseAirroiResponse(raw: unknown, unparsedInput: AirroiInput) {
   const input = airroiInputSchema.parse(unparsedInput);
   const payload = payloadSchema.parse(raw);
+  if (payload.currency !== input.currency) throw new Error("STR data currency does not match the property country. Request a new estimate.");
   const revenue = Math.round(payload.revenue);
   const occupancy = payload.occupancy;
   if (revenue <= 0 || occupancy <= 0 || payload.percentiles.occupancy.p90 > 1) throw new Error("STR estimate contains invalid revenue or occupancy");
@@ -95,7 +97,7 @@ export function normaliseAirroiResponse(raw: unknown, unparsedInput: AirroiInput
   });
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const enrichment: StrEnrichmentJson = {
-    provider: "airroi", tier: "full", currency: "AUD", estimate_basis: "provider", seasonality_basis: "modelled",
+    provider: "airroi", tier: "full", currency: payload.currency, estimate_basis: "provider", seasonality_basis: "modelled",
     comp_count: pool.length, radius_m: input.radiusM, revenue_range: payload.percentiles.revenue,
     occupancy_range: Object.fromEntries(Object.entries(payload.percentiles.occupancy).map(([key, value]) => [key, value * 100])) as NonNullable<StrEnrichmentJson["occupancy_range"]>,
     nightly_rate_range: payload.percentiles.average_daily_rate,

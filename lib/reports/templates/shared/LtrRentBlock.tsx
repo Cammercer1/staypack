@@ -18,9 +18,7 @@ export function LtrRentBlock({
 }) {
   const { ltr, copy } = report;
   const amount =
-    ltr.weekly_min != null && ltr.weekly_max != null
-      ? rentCalloutFromReport(ltr)
-      : null;
+    rentCalloutFromReport(ltr);
 
   if (!amount) {
     return null;
@@ -46,7 +44,7 @@ export function LtrRentBlock({
       }}
     >
       <p className={labelClass} style={{ fontFamily: headingFont }}>
-        Estimated weekly rent
+        Estimated {report.market?.rentPeriod === "month" ? "monthly" : "weekly"} rent
       </p>
       <p
         className="mt-1.5 font-semibold leading-none tracking-tight"
@@ -58,7 +56,7 @@ export function LtrRentBlock({
       >
         {amount}
       </p>
-      <p className={subClass}>per week before costs</p>
+      <p className={subClass}>per {report.market?.rentPeriod ?? "week"} before costs</p>
       {copy.key_metrics_line ? (
         <p className={metricsClass}>{copy.key_metrics_line}</p>
       ) : (

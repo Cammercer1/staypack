@@ -56,6 +56,7 @@ Format rules:
 - Do not invent amenities, distances, approvals, regulations or returns not provided.
 - Use Australian English.
 - Do not mention price or STR/investment returns.
+- Do not name property-data providers or listing portals, including Domain.
 - No hype words: "stunning", "magnificent", "rare opportunity", "dream home".
 - Tone: warm, confident, factual. Write like a great agent, not a marketing robot.
 - Output only the markdown — no preamble, no code fences.

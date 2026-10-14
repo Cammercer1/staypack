@@ -30,7 +30,7 @@ Rules:
 - Do not guarantee outcomes or invent amenities, distances, approvals or returns.
 - Do not mention short-term rental income, Airbtics, or investment yields.
 - Use only the supplied property data.
-- Do not mention OpenAI.
+- Do not mention OpenAI, Domain or other property-data providers.
 - Output valid JSON only with exactly the fields in the contract (heading, three blurb lengths, bullets).`;
 
 export class SalesBrochureCopyValidationError extends Error {

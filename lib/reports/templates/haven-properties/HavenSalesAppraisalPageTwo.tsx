@@ -46,7 +46,7 @@ export function HavenSalesAppraisalPageTwo({ report }: Props) {
                 Comparable sales near {report.property.suburb}
               </h2>
             ) : null}
-            <HavenSalesCompsGrid
+            <HavenSalesCompsGrid currency={report.market?.currency}
               comps={comps}
               featuredCount={HAVEN_SALES_FEATURED_COMP_COUNT}
               imageAspectClass={HAVEN_SALES_COMP_IMAGE_ASPECT}

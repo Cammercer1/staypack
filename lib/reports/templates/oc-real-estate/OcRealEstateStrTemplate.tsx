@@ -147,7 +147,7 @@ export function OcRealEstateStrPageOne({
                 {report.str_scenario?.basis === "management" ? "Managed STR revenue estimate" : "Estimated gross STR revenue"}
               </p>
               <strong className="mt-2 block whitespace-nowrap text-[29px] font-extrabold leading-none tracking-[-0.035em] tabular-nums">
-                {formatCurrency(report.str.annual_revenue)}
+                {formatCurrency(report.str.annual_revenue, report.market?.currency)}
               </strong>
               <p className="mt-2 text-[10px] leading-none text-[#6F5D57]">
                 per year before costs
@@ -161,7 +161,7 @@ export function OcRealEstateStrPageOne({
               <div className="flex items-baseline justify-between gap-5">
                 <dt>Nightly</dt>
                 <dd className="font-extrabold">
-                  {formatCurrency(report.str.nightly_rate)}
+                  {formatCurrency(report.str.nightly_rate, report.market?.currency)}
                 </dd>
               </div>
               <div className="flex items-baseline justify-between gap-5">

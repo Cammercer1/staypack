@@ -29,8 +29,9 @@ function listingType(value?: string | null) {
 }
 
 type MarketListing = Pick<Listing, "suburb" | "state" | "country">;
-const countryName = (value: string | null | undefined) => ["au", "australia"].includes(clean(value)) ? "australia" : clean(value);
-const regionName = (value: string | null | undefined) => clean(STATES[value?.trim().toUpperCase() ?? ""] ?? value);
+const countryName = (value: string | null | undefined) => ["au", "australia"].includes(clean(value)) ? "australia" : ["us", "usa", "united states", "united states of america"].includes(clean(value)) ? "united states" : clean(value);
+const US_STATES: Record<string, string> = Object.fromEntries("AL:Alabama|AK:Alaska|AZ:Arizona|AR:Arkansas|CA:California|CO:Colorado|CT:Connecticut|DE:Delaware|DC:District of Columbia|FL:Florida|GA:Georgia|HI:Hawaii|ID:Idaho|IL:Illinois|IN:Indiana|IA:Iowa|KS:Kansas|KY:Kentucky|LA:Louisiana|ME:Maine|MD:Maryland|MA:Massachusetts|MI:Michigan|MN:Minnesota|MS:Mississippi|MO:Missouri|MT:Montana|NE:Nebraska|NV:Nevada|NH:New Hampshire|NJ:New Jersey|NM:New Mexico|NY:New York|NC:North Carolina|ND:North Dakota|OH:Ohio|OK:Oklahoma|OR:Oregon|PA:Pennsylvania|RI:Rhode Island|SC:South Carolina|SD:South Dakota|TN:Tennessee|TX:Texas|UT:Utah|VT:Vermont|VA:Virginia|WA:Washington|WV:West Virginia|WI:Wisconsin|WY:Wyoming".split("|").map(pair => pair.split(":")));
+const regionName = (value: string | null | undefined, country?: string | null) => clean((countryName(country) === "united states" ? US_STATES : STATES)[value?.trim().toUpperCase() ?? ""] ?? value);
 
 /** The coordinate endpoint returns the nearest listing's market. Validate its
  * country/state and label its enclosing locality, without guessing from suburb text.
@@ -38,7 +39,7 @@ const regionName = (value: string | null | undefined) => clean(STATES[value?.tri
 export function resolveCoordinateOccupancyMarket(raw: unknown, listing: MarketListing) {
   const found = marketSchema.parse(raw);
   if ((listing.country && countryName(found.country) !== countryName(listing.country)) ||
-      (listing.state && regionName(found.region) !== regionName(listing.state))) {
+      (listing.state && regionName(found.region, listing.country) !== regionName(listing.state, listing.country))) {
     throw new Error("The coordinate lookup returned a different country or state.");
   }
   return { country: found.country, region: found.region, locality: found.locality };
@@ -109,7 +110,7 @@ export async function fetchAirroiMarketOccupancy(
   const type = listingType(input.property_type);
   const filters: StrMarketOccupancy["filters"] = { room_type: { eq: "entire_home" }, bedrooms: { eq: input.bedrooms } };
   if (type) filters.listing_type = { eq: type };
-  const locationKey = JSON.stringify({ lat: input.latitude, lng: input.longitude, country: countryName(listing.country), region: regionName(listing.state) });
+  const locationKey = JSON.stringify({ lat: input.latitude, lng: input.longitude, country: countryName(listing.country), region: regionName(listing.state, listing.country) });
   const requestKey = createHash("sha256").update(JSON.stringify({ version: 3, locationKey, filters })).digest("hex");
   const now = new Date();
   const age = previous ? now.getTime() - Date.parse(previous.fetched_at) : Infinity;

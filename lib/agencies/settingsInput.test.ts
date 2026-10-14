@@ -29,6 +29,7 @@ it("updates only contact details, rejecting stale brand fields from the page", (
     agency,
   );
   expect(result).toEqual({
+    country_code: "AU",
     name: "New name",
     slug: "current-agency",
     website_url: "https://new.example.com",
@@ -48,7 +49,7 @@ it("updates branding without writing stale identity fields", () => {
     agency,
   );
   expect(result.primary_colour).toBe("#123456");
-  for (const key of ["name", "slug", "email", "phone", "website_url"])
+  for (const key of ["name", "slug", "email", "phone", "website_url", "country_code"])
     expect(result).not.toHaveProperty(key);
 });
 it("validates only the settings owned by each page", () => {
@@ -85,4 +86,12 @@ it("keeps legacy full updates working and rejects an unknown section", () => {
       agency,
     ),
   ).toThrow("Invalid settings section");
+});
+it("stores country with agency details and does not overwrite it from stale branding or legacy clients", () => {
+  const us = { ...agency, country_code: "US" as const };
+  expect(parseAgencySettingsUpdate({ ...values, settings_section: "details", country_code: "US" }, agency).country_code).toBe("US");
+  expect(parseAgencySettingsUpdate({ ...values, settings_section: "brand", country_code: "AU" }, us)).not.toHaveProperty("country_code");
+  const { country_code: ignored, ...legacy } = values; void ignored;
+  expect(parseAgencySettingsUpdate(legacy, us).country_code).toBe("US");
+  expect(() => parseAgencySettingsUpdate({ ...values, settings_section: "details", country_code: "NZ" }, agency)).toThrow();
 });

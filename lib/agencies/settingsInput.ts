@@ -6,6 +6,7 @@ import {
 import type { Agency } from "@/lib/types";
 
 const detailsFields = {
+  country_code: true,
   name: true,
   slug: true,
   website_url: true,
@@ -31,8 +32,10 @@ export function parseAgencySettingsUpdate(input: unknown, current: Agency) {
     input && typeof input === "object" && "settings_section" in input
       ? input.settings_section
       : undefined;
-  if (section === undefined)
-    return normalizeAgencyBrandPayload(agencySchema.parse(input));
+  if (section === undefined) {
+    const values = agencySchema.parse(input);
+    return normalizeAgencyBrandPayload({ ...values, country_code: values.country_code ?? current.country_code ?? "AU" });
+  }
   if (section === "details") {
     const details = agencyDetailsSchema.parse(input);
     return {

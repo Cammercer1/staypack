@@ -1,5 +1,7 @@
 import type { PropertyCandidate } from "@/lib/listings/propertyLookupTypes";
 import { createEmptyListingDraft } from "@/lib/listings/emptyListingDraft";
+import { countryName } from "@/lib/property-market";
+import { preserveUsStreet, usStreetAddress } from "@/lib/us-property/address";
 
 type GoogleResult = {
   formatted_address: string;
@@ -32,29 +34,54 @@ function component(result: GoogleResult, type: string, short = false) {
 }
 export async function searchGoogleProperties(
   query: string,
+  country: "AU" | "US" = "AU",
 ): Promise<PropertyCandidate[]> {
   const results = await googleResults(
     new URLSearchParams({
       address: query,
-      region: "au",
-      components: "country:AU",
+      region: country.toLowerCase(),
+      components: `country:${country}`,
     }),
   );
-  return results.slice(0, 5).map((result) => {
+  return results.filter(result => component(result, "country", true) === country).slice(0, 5).flatMap((result): PropertyCandidate[] => {
     const unit = component(result, "subpremise").replace(/^unit\s+/i, "");
     const street =
-      `${unit ? `${unit}/` : ""}${component(result, "street_number")} ${component(result, "route")}`.trim();
-    return {
+      `${country === "AU" && unit ? `${unit}/` : ""}${component(result, "street_number")} ${component(result, "route")}${country === "US" && unit ? ` Unit ${unit}` : ""}`.trim();
+    const streetAddress = country === "US"
+      ? preserveUsStreet(query, street)
+      : result.partial_match ? query.split(",")[0].trim() : street;
+    if (!streetAddress) return [];
+    return [{
       source: "google",
-      address: result.formatted_address,
+      country,
+      address: country === "US"
+        ? [streetAddress, component(result, "locality"), component(result, "administrative_area_level_1", true), component(result, "postal_code")].filter(Boolean).join(", ")
+        : result.formatted_address,
       placeId: result.place_id,
       // Never drop or transpose a unit/range from a partial Google match.
-      streetAddress: result.partial_match ? query.split(",")[0].trim() : street,
+      streetAddress: country === "US" && result.partial_match ? usStreetAddress(query) : streetAddress,
       suburb: component(result, "locality"),
       state: component(result, "administrative_area_level_1", true),
       postcode: component(result, "postal_code"),
       partialMatch: Boolean(result.partial_match),
-    };
+    }];
+  });
+}
+export function addressOnlyPropertyDraft(candidate: PropertyCandidate, warning: string) {
+  return createEmptyListingDraft({
+    country: countryName(candidate.country ?? "AU"),
+    property_address: candidate.streetAddress,
+    suburb: candidate.suburb,
+    state: candidate.state,
+    postcode: candidate.postcode,
+    scraped_listing_json: {
+      country: candidate.country ?? "AU",
+      address: candidate.streetAddress,
+      suburb: candidate.suburb,
+      state: candidate.state,
+      postcode: candidate.postcode,
+      images: [], agents: [], confidence: "low", warnings: [warning],
+    },
   });
 }
 export async function lookupGoogleProperty(candidate: PropertyCandidate) {
@@ -66,8 +93,10 @@ export async function lookupGoogleProperty(candidate: PropertyCandidate) {
     throw new Error(
       "The address could not be verified. Enter the details manually.",
     );
+  if (component(result, "country", true) !== (candidate.country ?? "AU")) throw new Error("Choose a property address in your agency country.");
   const partial = candidate.partialMatch || result.partial_match;
   return createEmptyListingDraft({
+    country: countryName(candidate.country ?? "AU"),
     property_address: candidate.streetAddress,
     suburb: candidate.suburb,
     state: candidate.state,
@@ -75,6 +104,7 @@ export async function lookupGoogleProperty(candidate: PropertyCandidate) {
     latitude: partial ? null : result.geometry.location.lat,
     longitude: partial ? null : result.geometry.location.lng,
     scraped_listing_json: {
+      country: candidate.country ?? "AU",
       address: candidate.streetAddress,
       suburb: candidate.suburb,
       state: candidate.state,

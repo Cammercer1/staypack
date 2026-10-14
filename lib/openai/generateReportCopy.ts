@@ -1,3 +1,5 @@
+import { marketCopyPrompt } from "@/lib/property-market/copy";
+import { marketForCountry } from "@/lib/property-market";
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import type { Agency, AiCopyJson, Listing, Report, StrEstimate } from "@/lib/types";
@@ -134,6 +136,7 @@ function buildUserPayload({
     | undefined;
 
   return {
+    market: marketForCountry(listing.country),
     agency: {
       name: agency.name,
       default_report_title: agency.default_report_title,
@@ -219,7 +222,7 @@ async function requestCopy(
         "report_copy",
       ),
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: marketCopyPrompt(SYSTEM_PROMPT, (payloadObject?.market as { country?: string } | undefined)?.country) },
         {
           role: "user",
           content: repair

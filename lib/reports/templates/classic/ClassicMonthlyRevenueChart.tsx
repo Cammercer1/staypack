@@ -134,7 +134,7 @@ export function ClassicMonthlyRevenueChart({
                 color: "var(--report-text-colour, inherit)",
               }}
             >
-              {formatCurrency(report.str.annual_revenue)}
+              {formatCurrency(report.str.annual_revenue, report.market?.currency)}
             </p>
           </div>
         ) : null}

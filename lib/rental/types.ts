@@ -1,4 +1,6 @@
 export type RentalComp = {
+  usMatch?: import("@/lib/us-property/comparableTypes").UsComparableMatch;
+  floorAreaSqm?: number;
   address: string;
   suburb?: string;
   weeklyRent: number;

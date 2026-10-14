@@ -8,9 +8,9 @@ import {
 } from "@/components/reports/inline/ReportCopyFields";
 import type { FinalReportJson, SaleCompCard } from "@/lib/types";
 
-function comparablePrice(comp: SaleCompCard) {
+function comparablePrice(comp: SaleCompCard, currency?: "AUD" | "USD") {
   if (comp.price != null && comp.price > 0) {
-    return formatCurrency(comp.price);
+    return formatCurrency(comp.price, currency);
   }
 
   return comp.price_display?.trim() || "Price undisclosed";
@@ -32,7 +32,7 @@ function soldDateLabel(comp: SaleCompCard) {
       });
 }
 
-function OcComparableCard({ comp }: { comp: SaleCompCard }) {
+function OcComparableCard({ comp, currency }: { comp: SaleCompCard; currency?: "AUD" | "USD" }) {
   const soldDate = soldDateLabel(comp);
   const reportableArea = reportableSaleArea({
     propertyType: comp.property_type,
@@ -116,7 +116,7 @@ function OcComparableCard({ comp }: { comp: SaleCompCard }) {
           </dl>
         </div>
         <p className="mt-auto text-[15px] font-semibold leading-none text-[#15110f]">
-          {comparablePrice(comp)}
+          {comparablePrice(comp, currency)}
         </p>
       </div>
     </article>
@@ -188,7 +188,7 @@ export function OcRealEstateSalesAppraisalPageTwo({
 
       <div className="mt-[18px] grid shrink-0 grid-cols-2 gap-[12px]">
         {comps.map((comp) => (
-          <OcComparableCard key={comp.listing_id || comp.name} comp={comp} />
+          <OcComparableCard currency={report.market?.currency} key={comp.listing_id || comp.name} comp={comp} />
         ))}
       </div>
 

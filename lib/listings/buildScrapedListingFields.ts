@@ -1,3 +1,4 @@
+import { countryName } from "@/lib/property-market";
 import { normalizeAdvertisedPrice } from "./pricing";
 import { mergeScrapeMasterSelection } from "@/lib/listings/collateralImages";
 import { detectListingPurpose } from "@/lib/listings/detectListingPurpose";
@@ -24,6 +25,7 @@ export function buildScrapedListingFields(
 
   const importedPurpose = detectListingPurpose({ url: listingUrl, displayPrice: listing.displayPrice, aiPurpose: listing.purpose ?? null });
   return {
+    country: countryName(listing.country ?? existing?.country),
     advertised_sale_price: existing?.advertised_sale_price !== undefined ? existing.advertised_sale_price : importedPurpose === "sale" ? normalizeAdvertisedPrice(listing.displayPrice, "sale") : null,
     advertised_weekly_rent: existing?.advertised_weekly_rent !== undefined ? existing.advertised_weekly_rent : importedPurpose === "lease" ? normalizeAdvertisedPrice(listing.displayPrice, "lease") : null,
     listing_url: listingUrl,

@@ -13,6 +13,7 @@ vi.mock("./UnsavedListingGuard", () => ({ UnsavedListingGuard: () => null }));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), message: vi.fn(), error: vi.fn() },
 }));
+import { AgencyCountryProvider } from "@/components/properties/AgencyCountryProvider";
 import { NewListingFlow } from "./NewListingFlow";
 import { createEmptyListingDraft } from "@/lib/listings/emptyListingDraft";
 const request = vi.fn();
@@ -88,11 +89,11 @@ it("automatically looks up the completed unit/range address after choosing a sug
   const input = await screen.findByLabelText("Property address");
   fireEvent.focus(input);
   fireEvent.change(input, { target: { value: "21/8-12 ascot st" } });
-  fireEvent.click(await screen.findByRole("option"));
+  fireEvent.click(await screen.findByRole("option", { name: /21\/8-12 Ascot Street/ }));
   await screen.findByRole("button", { name: /21\/8-12 Ascot Street.*Property profile available/ });
   const lookups = request.mock.calls.filter(([url]) => url === "/api/listings/lookup");
   expect(lookups).toHaveLength(1);
-  expect(JSON.parse(lookups[0][1].body)).toEqual({ action: "search", query: address });
+  expect(JSON.parse(lookups[0][1].body)).toEqual({ action: "search", query: address, country: "AU" });
   expect((input as HTMLInputElement).value).toBe(address);
 });
 it("previews an active property without creating records, then saves reviewed data and the agent portrait", async () => {
@@ -244,4 +245,28 @@ it("requires explicit selection of historical photos, keeping floor plans out of
   fireEvent.click(screen.getByRole("button", { name: "Select latest photos" }));
   await screen.findByText(/1 of 25 selected/);
   expect(screen.queryByLabelText("Photo URL")).toBeNull();
+});
+it("imports a pasted Zillow link directly from the address box without geocoding or changing modes", async () => {
+  const url = "https://www.zillow.com/homedetails/616-N-Croft-Ave-APT-2/333350724_zpid/?utm_campaign=share";
+  request.mockResolvedValueOnce(reply({ draft: createEmptyListingDraft({ country: "United States", property_address: "616 N Croft Ave Apt 2", suburb: "West Hollywood", state: "CA", postcode: "90048" }) }));
+  render(<AgencyCountryProvider country="US"><NewListingFlow storageKey="draft-test" /></AgencyCountryProvider>);
+  fireEvent.change(await screen.findByLabelText("Property address"), { target: { value: url } });
+  fireEvent.click(screen.getByRole("button", { name: "Import listing" }));
+  await screen.findByLabelText("Street address");
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ country: "US", action: "import", url });
+  expect((screen.getByLabelText("Street address") as HTMLInputElement).value).toBe("616 N Croft Ave Apt 2");
+});
+it("labels a confirmed US profile correctly and keeps all address fields when entering details manually", async () => {
+  const usCandidate = { ...candidate, source: "zillow", country: "US", address: "616 N Croft Ave Apt 2, West Hollywood CA 90048", streetAddress: "616 N Croft Ave Apt 2", suburb: "West Hollywood", state: "CA", postcode: "90048", zpid: "333350724" };
+  request.mockResolvedValueOnce(reply({ candidates: [usCandidate] }));
+  render(<AgencyCountryProvider country="US"><NewListingFlow storageKey="draft-test" /></AgencyCountryProvider>);
+  await screen.findByLabelText("Property address");
+  expect(screen.queryByLabelText("Country")).toBeNull();
+  fireEvent.change(screen.getByLabelText("Property address"), { target: { value: usCandidate.address } });
+  fireEvent.click(screen.getByRole("button", { name: "Find property" }));
+  await screen.findByRole("button", { name: /616 N Croft.*Property profile available/ });
+  fireEvent.click(screen.getByRole("button", { name: "Enter details manually" }));
+  expect((await screen.findByLabelText("Street address") as HTMLInputElement).value).toBe(usCandidate.streetAddress);
+  expect((screen.getByLabelText("ZIP code") as HTMLInputElement).value).toBe("90048");
 });

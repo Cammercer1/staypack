@@ -154,7 +154,7 @@ export function ClassicPropertySection({
                 color: "var(--report-text-colour, inherit)",
               }}
             >
-              {formatCurrency(str.annual_revenue)}
+              {formatCurrency(str.annual_revenue, report.market?.currency)}
             </p>
             <p className="mt-2 text-sm font-medium text-neutral-700">per year before costs</p>
             {copy.key_metrics_line ? (

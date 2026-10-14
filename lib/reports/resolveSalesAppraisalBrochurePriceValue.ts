@@ -7,7 +7,7 @@ export function resolveSalesAppraisalBrochurePriceValue(
   report: FinalReportJson,
 ): string | null {
   if (report.sale_estimate) {
-    const fromEstimate = saleCalloutFromReport(report.sale_estimate);
+    const fromEstimate = saleCalloutFromReport(report.sale_estimate, report.market?.currency);
     if (fromEstimate) {
       return fromEstimate;
     }
@@ -20,7 +20,7 @@ export function resolveSalesAppraisalBrochurePriceValue(
 
   const mid = report.sale_estimate?.price_midpoint;
   if (mid != null) {
-    return formatSalePriceRange(mid, mid);
+    return formatSalePriceRange(mid, mid, report.market?.currency);
   }
 
   return null;

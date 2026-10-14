@@ -15,7 +15,8 @@ vi.mock("@/lib/domain-avm/propertyLookup", () => ({
   lookupDomainProperty: mocks.select,
   importDomainProperty: mocks.domainImport,
 }));
-vi.mock("@/lib/geocoding/propertyLookup", () => ({
+vi.mock("@/lib/geocoding/propertyLookup", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/geocoding/propertyLookup")>(),
   searchGoogleProperties: mocks.googleSearch,
   lookupGoogleProperty: mocks.googleSelect,
 }));
@@ -144,3 +145,68 @@ it.each(["http://localhost:3000/", "http://127.0.0.1/", "file:///etc/passwd"])(
     expect(mocks.scrape).not.toHaveBeenCalled();
   },
 );
+
+vi.mock("@/lib/us-property/lookup", () => ({ lookupUsProperty: vi.fn(), importUsProperty: vi.fn() }));
+vi.mock("@/lib/geocoding/places", () => ({ searchPlaceProperties: vi.fn() }));
+const usCandidate = { source: "google", country: "US", address: "616 N Croft Ave Apt 2, West Hollywood CA 90048", streetAddress: "616 N Croft Ave Apt 2", suburb: "West Hollywood", state: "CA", postcode: "90048", placeId: "croft" };
+function usAccount() { mocks.auth.mockResolvedValue({ supabase: database, agency: { id: "agency", country_code: "US" } }); }
+it("uses account country for US Google Places searches even when the request omits it", async () => {
+  usAccount();
+  const { searchPlaceProperties } = await import("@/lib/geocoding/places");
+  vi.mocked(searchPlaceProperties).mockResolvedValue([usCandidate as import("@/lib/listings/propertyLookupTypes").PropertyCandidate]);
+  const result = await (await POST(request({ action: "search", query: usCandidate.address }))).json();
+  expect(result.candidates[0].source).toBe("google");
+  expect(searchPlaceProperties).toHaveBeenCalledWith(usCandidate.address, "US");
+  expect(mocks.search).not.toHaveBeenCalled();
+  expect(mocks.googleSearch).not.toHaveBeenCalled();
+});
+it.each(["AU", "US"] as const)("rejects a country override for a %s account before provider calls", async country => {
+  mocks.auth.mockResolvedValue({ agency: { country_code: country } });
+  const response = await POST(request({ action: "search", country: country === "AU" ? "US" : "AU", query: candidate.address }));
+  expect(response.status).toBe(400);
+  expect(mocks.search).not.toHaveBeenCalled();
+  const { searchPlaceProperties } = await import("@/lib/geocoding/places");
+  expect(searchPlaceProperties).not.toHaveBeenCalled();
+});
+it("verifies the Google place and enriches US property details through Zillow", async () => {
+  usAccount();
+  const { lookupUsProperty } = await import("@/lib/us-property/lookup");
+  const draft = createEmptyListingDraft({ country: "United States", property_address: usCandidate.streetAddress, state: "CA", postcode: "90048" });
+  mocks.googleSelect.mockResolvedValue(draft);
+  vi.mocked(lookupUsProperty).mockResolvedValue({ ...draft, bedrooms: 3 });
+  const result = await (await POST(request({ action: "select", candidate: usCandidate }))).json();
+  expect(result.draft.country).toBe("United States");
+  expect(result.draft.bedrooms).toBe(3);
+  expect(mocks.googleSelect).toHaveBeenCalledWith(usCandidate);
+  expect(lookupUsProperty).toHaveBeenCalledWith(usCandidate);
+  expect(mocks.select).not.toHaveBeenCalled();
+});
+it("keeps the verified US address editable when its exact profile cannot be retrieved", async () => {
+  usAccount();
+  const { lookupUsProperty } = await import("@/lib/us-property/lookup");
+  vi.mocked(lookupUsProperty).mockRejectedValue(new Error("Profile mismatch"));
+  mocks.googleSelect.mockResolvedValue(createEmptyListingDraft({ country: "United States", property_address: usCandidate.streetAddress, state: "CA", postcode: "90048" }));
+  const response = await POST(request({ action: "select", candidate: usCandidate }));
+  expect(response.status).toBe(200);
+  const { draft } = await response.json();
+  expect(draft).toMatchObject({ country: "United States", property_address: usCandidate.streetAddress, state: "CA", postcode: "90048" });
+  expect(draft.scraped_listing_json?.usProperty).toBeUndefined();
+});
+it("rejects a forged Google place before calling Zillow", async () => {
+  usAccount();
+  mocks.googleSelect.mockRejectedValue(new Error("Choose a property in United States"));
+  expect((await POST(request({ action: "select", candidate: usCandidate }))).status).toBe(400);
+  expect((await import("@/lib/us-property/lookup")).lookupUsProperty).not.toHaveBeenCalled();
+});
+it.each(["AU", "US"] as const)("rejects overseas property links for a %s account", async country => {
+  mocks.auth.mockResolvedValue({ agency: { country_code: country } });
+  const response = await POST(request({ action: "import", url: country === "AU" ? "https://www.zillow.com/homedetails/123_zpid/" : "https://www.domain.com.au/example-2021107984" }));
+  expect(response.status).toBe(400);
+  expect((await import("@/lib/us-property/lookup")).importUsProperty).not.toHaveBeenCalled();
+  expect(mocks.domainImport).not.toHaveBeenCalled();
+  expect(mocks.scrape).not.toHaveBeenCalled();
+});
+it("rejects an overseas selection without performing a duplicate lookup", async () => {
+  expect((await POST(request({ action: "select", candidate: usCandidate }))).status).toBe(400);
+  expect(mocks.duplicate).not.toHaveBeenCalled();
+});

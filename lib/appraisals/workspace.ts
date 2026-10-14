@@ -1,3 +1,4 @@
+import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import { checkAppraisalError } from "./workspacePersistence";
 export { checkAppraisalError, saveWorkspaceInputs } from "./workspacePersistence";
 import "server-only";
@@ -26,6 +27,7 @@ export async function requireAppraisalAccess(reportId: string) {
   return { ...context, appraisal, workingListing: appraisalListing(context.listing, appraisal) };
 }
 export function requireEditableAppraisal(context: Awaited<ReturnType<typeof requireAppraisalAccess>>) {
+  assertPropertyCountry(context.agency, context.workingListing);
   if (context.appraisal.kind === "str") throw new ProposalError("Use the short-term rental editor for this appraisal.");
   if (context.report.status === "archived" || context.listing.status === "archived") throw new ProposalError("Restore this appraisal and its property before editing.", 409);
   return context.appraisal.kind;
@@ -33,6 +35,7 @@ export function requireEditableAppraisal(context: Awaited<ReturnType<typeof requ
 export async function createWorkspaceAppraisal({ supabase, agency, listing, requestId, recipient, kind }: {
   supabase: SupabaseClient; agency: Agency; listing: Listing; requestId: string; recipient: RecipientValues; kind: WorkspaceAppraisalKind;
 }) {
+  assertPropertyCountry(agency, listing);
   if (kind === "str") return createStrAppraisal({ supabase, agency, listing, requestId, recipient });
   if (listing.status === "archived" || listing.agency_id !== agency.id) throw new ProposalError("Choose an active property in your agency.");
   const photoError = collateralPhotoRequirementError(listing);

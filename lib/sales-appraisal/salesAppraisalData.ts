@@ -7,6 +7,8 @@ import {
 import { filterRecentSaleComps } from "@/lib/sales/saleCompFreshness";
 import type { SaleComp } from "@/lib/sales/types";
 import type { ParsedListing } from "@/lib/types";
+import { marketForCountry } from "@/lib/property-market";
+import { orderUsComparablePool } from "@/lib/us-property/comparablePresentation";
 
 /** Page 2 comparable grid (2×3). */
 export const MAX_SALES_APPRAISAL_FEATURED_COMPS = 6;
@@ -56,6 +58,7 @@ export function orderSalesAppraisalCompPool(parsed: ParsedListing): SaleComp[] {
   const eligible = filterRecentSaleComps(
     filterSaleCompsForSubjectType(pool, subjectPropertyType),
   );
+  if (marketForCountry(parsed.country).country === "US" && eligible.some((comp) => comp.usMatch)) return orderUsComparablePool(eligible);
   return rankSaleCompsForSubject(eligible, {
     suburb: parsed.suburb,
     bedrooms: parsed.bedrooms ?? undefined,

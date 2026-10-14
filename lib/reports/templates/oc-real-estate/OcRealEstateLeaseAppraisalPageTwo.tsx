@@ -4,10 +4,10 @@ import {
   ReportCopyComparableDisclaimer,
   ReportCopyComparableEvidence,
 } from "@/components/reports/inline/ReportCopyFields";
-import { formatCurrency } from "@/lib/reports/formatters";
+import { rentRange, type PropertyMarket } from "@/lib/property-market";
 import type { FinalReportJson, LtrRentalCompCard } from "@/lib/types";
 
-function OcRentalComparableCard({ comp }: { comp: LtrRentalCompCard }) {
+function OcRentalComparableCard({ comp, market }: { comp: LtrRentalCompCard; market?: PropertyMarket }) {
   return (
     <article className="flex h-[246px] min-w-0 flex-col overflow-hidden bg-[#F2E3CF]">
       <div className="relative h-[148px] shrink-0 overflow-hidden bg-[#D8CDC0]">
@@ -71,7 +71,7 @@ function OcRentalComparableCard({ comp }: { comp: LtrRentalCompCard }) {
         </div>
         <p className="mt-auto text-[15px] font-semibold leading-none text-[#15110f]">
           {comp.weekly_rent != null
-            ? `${formatCurrency(comp.weekly_rent)} / week`
+            ? rentRange(comp.weekly_rent, comp.weekly_rent, market)
             : "Rent on request"}
         </p>
       </div>
@@ -144,7 +144,7 @@ export function OcRealEstateLeaseAppraisalPageTwo({
 
       <div className="mt-[18px] grid shrink-0 grid-cols-2 gap-[12px]">
         {comps.map((comp) => (
-          <OcRentalComparableCard key={comp.listing_id || comp.name} comp={comp} />
+          <OcRentalComparableCard market={report.market} key={comp.listing_id || comp.name} comp={comp} />
         ))}
       </div>
 

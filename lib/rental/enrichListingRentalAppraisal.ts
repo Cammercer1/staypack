@@ -1,3 +1,4 @@
+import { marketForCountry } from "@/lib/property-market";
 import {
   getReaMaxListings,
   hasReaDataProviderConfig,
@@ -314,6 +315,7 @@ export async function enrichListingRentalAppraisal(
   listing: ParsedListing,
   options?: EnrichRentalAppraisalOptions,
 ): Promise<ParsedListing> {
+  if (marketForCountry(listing.country).country === "US") return (await import("@/lib/us-property/enrich")).enrichUsAppraisal(listing, "lease");
   const warnings = [...listing.warnings];
   const premiumSignals = parseListingPremiumSignals(listing);
   let listingWithSignals: ParsedListing = {

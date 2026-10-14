@@ -1,6 +1,7 @@
 export type SaleCompStatus = "sold" | "for_sale";
 
 export type SaleComp = {
+  usMatch?: import("@/lib/us-property/comparableTypes").UsComparableMatch;
   address: string;
   suburb?: string;
   /** Sold price or for-sale price guide (AUD). */

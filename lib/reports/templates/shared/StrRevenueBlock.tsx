@@ -30,7 +30,7 @@ export function formatStrCalloutMetrics(report: FinalReportJson): string | null 
     parts.push(`${occupancy} avg occupancy`);
   }
   if (str.nightly_rate != null) {
-    parts.push(`${formatCurrency(str.nightly_rate)}/night ADR`);
+    parts.push(`${formatCurrency(str.nightly_rate, report.market?.currency)}/night ADR`);
   }
   return parts.length > 0 ? parts.join(" · ") : null;
 }
@@ -102,7 +102,7 @@ export function StrRevenueBlock({
           color: onAccent ? "#ffffff" : "var(--report-text-colour, inherit)",
         }}
       >
-        {formatCurrency(str.annual_revenue)}
+        {formatCurrency(str.annual_revenue, report.market?.currency)}
       </p>
       <p className={subClass}>per year before costs</p>
       {(calloutMetrics ?? copy.key_metrics_line) ? (
@@ -129,7 +129,7 @@ export function StrStatRow({
   const items: { label: string; value: string }[] = [];
 
   if (str.nightly_rate) {
-    items.push({ label: "Per night", value: formatCurrency(str.nightly_rate) });
+    items.push({ label: "Per night", value: formatCurrency(str.nightly_rate, report.market?.currency) });
   }
   if (str.occupancy_rate) {
     items.push({ label: "Occupancy", value: `${Math.round(str.occupancy_rate * 100)}%` });

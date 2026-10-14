@@ -50,9 +50,9 @@ function resolveClassicBrochureMetric(
     }
     return {
       id: "lease_rent",
-      label: revenueSectionTitle(variant),
+      label: revenueSectionTitle(variant, report.market?.rentPeriod),
       value: leaseRent,
-      subline: "per week",
+      subline: `per ${report.market?.rentPeriod ?? "week"}`,
     };
   }
 

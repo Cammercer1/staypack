@@ -41,7 +41,7 @@ Calibration rules:
 Output JSON with:
 - price_min, price_max, price_midpoint: integer AUD sale prices
 - confidence: "low" | "medium" | "high"
-- rationale: 1-2 plain-English sentences explaining the range. Mention concrete comps/evidence. Do not mention percentiles, REA, or OpenAI.
+- rationale: 1-2 plain-English sentences explaining the range. Mention concrete comps/evidence. Do not mention percentiles, REA, Domain, OpenAI or other property-data providers.
 - featured_comp_indices: up to 6 indices (0-based) into comparable_listings for the best evidence comps to show the vendor. Prefer recently sold, same-bedroom, same-suburb matches; a strong for-sale guide may be included.`;
 
 const positioningAiSchema = z.object({

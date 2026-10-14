@@ -39,7 +39,7 @@ import { hasLeaseAppraisalComps } from "@/lib/lease-appraisal/generateLeaseAppra
 import { hasLeaseAppraisalSelectedComps } from "@/lib/lease-appraisal/leaseAppraisalData";
 import type { LeaseAppraisalCopy } from "@/lib/lease-appraisal/deriveLeaseAppraisalCopy";
 import { isLeaseAppraisalTemplateId } from "@/lib/lease-appraisal/leaseAppraisalTemplates";
-import { formatWeeklyRentRange } from "@/lib/rental/computeRentBand";
+import { marketForCountry, rentRange } from "@/lib/property-market";
 import { resolveAdvertisedPrice } from "@/lib/listings/pricing";
 import { AppraisalStepHeader } from "@/components/appraisals/AppraisalStepHeader";
 import type {
@@ -163,16 +163,17 @@ export const LeaseAppraisalCopyEditor = forwardRef<
 
   const rentRangeLabel = useMemo(() => {
     if (appraisal?.weeklyMin != null && appraisal?.weeklyMax != null) {
-      return formatWeeklyRentRange(appraisal.weeklyMin, appraisal.weeklyMax);
+      return rentRange(appraisal.weeklyMin, appraisal.weeklyMax, marketForCountry(listing.country));
     }
     if (appraisal?.weeklyMidpoint != null) {
-      return formatWeeklyRentRange(
+      return rentRange(
         appraisal.weeklyMidpoint,
         appraisal.weeklyMidpoint,
+        marketForCountry(listing.country),
       );
     }
     return null;
-  }, [appraisal]);
+  }, [appraisal, listing.country]);
 
   const currentSnapshot = copy ? editorSnapshot(copy, propertyImages) : null;
   const isDirty =
