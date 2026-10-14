@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import {
   Calculator,
+  CreditCard,
   FileText,
   House,
   Palmtree,
@@ -49,6 +50,7 @@ const navigationGroups = [
       { href: "/settings/agency", label: "Agency details", icon: Building2 },
       { href: "/settings/brand", label: "Brand settings", icon: Palette },
       { href: "/settings/agents", label: "Agents", icon: Users },
+      { href: "/settings/billing", label: "Billing", icon: CreditCard },
     ],
   },
 ];

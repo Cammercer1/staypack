@@ -18,6 +18,10 @@ export async function middleware(request: NextRequest) {
 
   // Public proposals perform their own fresh access check; account cookies are irrelevant.
   const pathname = request.nextUrl.pathname;
+  // These endpoints authenticate with a Stripe signature or scheduler secret.
+  if (pathname === "/api/billing/webhook" || pathname === "/api/billing/usage-sync") {
+    return NextResponse.next({ request });
+  }
   // Embedded calculators do not depend on third-party account cookies.
   if (pathname.startsWith("/embed/str-calculator/") || pathname.startsWith("/api/str-calculator/")) {
     return NextResponse.next({ request });

@@ -419,3 +419,15 @@ to build and upload the adapter output together, verify the draft's styling and
 assets, then promote that exact deploy. A standalone `netlify build` followed by
 `netlify deploy --no-build` using `.next` uploads the restored raw Next.js build,
 not the adapter's prepared public assets.
+
+## Agency billing
+
+[`20261014051147_agency_billing.sql`](migrations/20261014051147_agency_billing.sql)
+is applied and recorded in StayPack project `qmtfugaeujeikyegoxwi`. It adds agency
+subscriptions, an idempotent usage ledger, webhook processing records, and report
+publication triggers. Existing agencies are not enrolled or back-billed.
+
+RLS and service-only writes were verified remotely. A temporary agency completed
+the local app/Supabase/Stripe sandbox integration check, including usage overages
+and cancellation; its test records were removed afterward. Commercial billing
+remains disabled. See [billing setup and launch requirements](../docs/billing-infrastructure.md).
