@@ -3,662 +3,665 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
-  BarChart3,
+  ArrowUpRight,
   Check,
-  ChevronRight,
-  Globe2,
-  KeyRound,
-  LayoutTemplate,
+  ChevronDown,
+  FileText,
+  Link as LinkIcon,
   Palette,
-  Quote,
-  ScanLine,
-  Share2,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
+  Plus,
   Users,
-  Zap,
-  MapPinned,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { StayPackLogo } from "@/components/app-shell/StayPackLogo";
-import styles from "./home.module.css";
+import {
+  HomeNavigation,
+  ProductExplorer,
+} from "@/components/marketing/HomeInteractions";
 
 export const metadata: Metadata = {
-  title: "StayPack | Branded property collateral, without the design bottleneck",
+  title: { absolute: "StayPack | Every property. Beautifully presented." },
   description:
-    "Turn a property listing into branded reports, appraisals, brochures, social posts and data-backed property collateral.",
+    "Create branded property appraisals, brochures, social posts and digital short-term rental proposals. Your property knowledge, beautifully presented in your agency’s brand.",
+  // Preserve the existing launch indexing policy.
   robots: {
     index: false,
     follow: false,
-    googleBot: {
-      index: false,
-      follow: false,
-    },
+    googleBot: { index: false, follow: false },
   },
 };
 
-const PROPERTY_IMAGE =
-  "https://i2.au.reastatic.net/1000x750-format=webp/422520a544404447b3705e0c4c61557f6cb3a7c7da5aec3419311d8ad31e329a/image.jpg";
-
-type ProductOutput = {
-  icon: LucideIcon;
-  label: string;
-  title: string;
-  copy: string;
-  accent: string;
-  number: string;
-  status?: "Coming soon";
-};
-
-const outputs: ProductOutput[] = [
+const container = "mx-auto w-full max-w-7xl px-6 sm:px-10 lg:px-14";
+const primaryButton =
+  "du-btn du-btn-primary min-h-12 rounded-full px-6 text-sm font-medium shadow-none";
+const textLink =
+  "inline-flex min-h-11 items-center gap-3 text-sm font-medium underline-offset-4 hover:underline";
+const questions = [
   {
-    icon: BarChart3,
-    label: "Branded STR appraisals",
-    title: "Make the potential tangible.",
-    copy: "Create buyer-friendly reports that combine property details, market evidence and a clearly labelled estimated gross STR revenue.",
-    accent: "mint",
-    number: "01",
+    question: "What can I create with StayPack?",
+    answer:
+      "Sales and rental appraisals, property and rental brochures, social media posts, and short-term rental appraisals. The dedicated short-term rental workspace also brings your evidence, services and next steps together in a branded digital proposal.",
   },
   {
-    icon: KeyRound,
-    label: "Branded lease appraisals",
-    title: "Present the rental opportunity clearly.",
-    copy: "Package the weekly rent range, comparable evidence and your property management proposition into one polished appraisal.",
-    accent: "apricot",
-    number: "02",
+    question: "Will it look like our agency?",
+    answer:
+      "Yes. Add your logo, colours and agent details, then choose from the available designs. If your agency needs a more tailored presentation, talk to us about a custom template and brand setup.",
   },
   {
-    icon: TrendingUp,
-    label: "Branded sales appraisals",
-    title: "Walk into every pitch better prepared.",
-    copy: "Bring the property story, price guidance and relevant sales evidence together in a presentation built to win confidence.",
-    accent: "blue",
-    number: "03",
+    question: "Can I review the details before sharing?",
+    answer:
+      "Absolutely. Review the property details, imagery, copy and available comparable evidence, then make adjustments before publishing. If a listing import is missing something, you can enter it yourself.",
   },
   {
-    icon: LayoutTemplate,
-    label: "Branded property brochures",
-    title: "One source. Every useful format.",
-    copy: "Turn approved listing details and imagery into beautifully branded brochures and social assets.",
-    accent: "gold",
-    number: "04",
+    question: "How does the monthly report allowance work?",
+    answer:
+      "The agency plan includes 30 first-published reports per month, shared by your team. Additional reports are A$5 each, plus GST. Editing or downloading an already published report does not count as another report. Publishing a duplicated appraisal counts as a new report.",
   },
   {
-    icon: Share2,
-    label: "Branded social media posts",
-    title: "Keep every listing recognisable in the feed.",
-    copy: "Turn the same approved property imagery and copy into on-brand social posts across the formats your agents use most.",
-    accent: "lavender",
-    number: "05",
-  },
-  {
-    icon: MapPinned,
-    label: "Branded suburb profiles",
-    title: "Package the local knowledge buyers value.",
-    copy: "Bring lifestyle, amenity and market context into a reusable local-area profile that looks and feels like your agency.",
-    accent: "coral",
-    number: "06",
-    status: "Coming soon",
+    question: "Are short-term rental estimates guaranteed?",
+    answer:
+      "No. Estimated gross STR revenue is indicative and depends on the available data and assumptions. It excludes operating costs and is not a valuation or income guarantee. Reports include a disclaimer, and owners should make their own enquiries and seek independent advice.",
   },
 ];
 
-const benefits = [
-  {
-    icon: Palette,
-    title: "Always on brand",
-    copy: "Lock in your colours, typography, logos and layouts once. Every new pack starts agency-ready.",
-  },
-  {
-    icon: Zap,
-    title: "No design queue",
-    copy: "Give agents a repeatable way to produce high-quality material without waiting on a designer for every listing.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Evidence, handled carefully",
-    copy: "Clear methodology and compliant language keep estimates useful, transparent and grounded in available data.",
-  },
-  {
-    icon: Users,
-    title: "Built for the whole agency",
-    copy: "Create once, keep the logic consistent, and let every agent work from the same approved system.",
-  },
-];
-
-function ArrowLink({ href, children }: { href: string; children: React.ReactNode }) {
+function HeroFolio() {
   return (
-    <Link className={styles.arrowLink} href={href}>
-      {children}
-      <ArrowRight aria-hidden="true" size={16} strokeWidth={2} />
-    </Link>
-  );
-}
-
-function ReportArtwork() {
-  return (
-    <div className={styles.previewStage} aria-label="A branded StayPack report pack preview">
-      <div className={styles.previewOrb} />
-
-      <div className={styles.reportPages}>
-        <figure className={`${styles.reportPage} ${styles.reportPageBack}`}>
-          <figcaption>Evidence · page 02</figcaption>
+    <figure className="mt-12 sm:mt-16">
+      <div className="grid gap-0 lg:grid-cols-[1fr_280px]">
+        <div className="relative min-w-0 bg-base-200">
           <Image
-            src="/marketing/staypack-rental-appraisal-comparables.webp"
-            alt="Comparable rental evidence page from a StayPack rental appraisal"
-            width={986}
-            height={1400}
-            sizes="(max-width: 640px) 47vw, (max-width: 900px) 300px, 305px"
-          />
-        </figure>
-
-        <figure className={`${styles.reportPage} ${styles.reportPageFront}`}>
-          <figcaption>Appraisal · page 01</figcaption>
-          <Image
-            src="/marketing/staypack-rental-appraisal-front.webp"
-            alt="Front page of a branded StayPack rental appraisal"
-            width={992}
-            height={1404}
-            sizes="(max-width: 640px) 58vw, (max-width: 900px) 330px, 330px"
+            src="/marketing/property-exterior.webp"
+            alt="Contemporary home framed by trees at dusk"
+            width={1600}
+            height={1067}
+            sizes="(max-width: 1024px) 100vw, 850px"
+            loading="eager"
             fetchPriority="high"
+            className="h-80 w-full object-cover sm:h-[450px]"
           />
-        </figure>
-      </div>
-
-      <div className={styles.browserCard} aria-hidden="true">
-        <div className={styles.browserBar}>
-          <span />
-          <span />
-          <span />
-          <div>staypack.app/north-and-co/42-ocean-parade</div>
+          <div className="absolute bottom-5 left-5 bg-base-100 px-4 py-3 text-base-content sm:bottom-7 sm:left-7">
+            <p className="text-xs tracking-[0.14em] uppercase">
+              A place worth presenting.
+            </p>
+            <p className="mt-1 font-display text-2xl">
+              Make the first impression count.
+            </p>
+          </div>
+          <div className="absolute -right-6 top-8 hidden w-52 rotate-6 bg-base-100 p-3 text-base-content shadow-xl shadow-neutral/20 motion-safe:transition-transform motion-safe:duration-300 hover:rotate-0 sm:block lg:-right-4 lg:w-56">
+            <p className="flex items-center justify-between pb-3 text-xs font-medium">
+              <span>Your agency.</span>
+              <span>01 / 04</span>
+            </p>
+            <Image
+              src="/marketing/property-interior.webp"
+              alt="Sample brochure featuring a light-filled living room"
+              width={1000}
+              height={680}
+              sizes="224px"
+              loading="eager"
+              className="aspect-[4/3] w-full object-cover"
+            />
+            <p className="mt-4 font-display text-3xl leading-none">
+              Room to
+              <br />
+              imagine.
+            </p>
+            <p className="mt-3 border-t border-base-content/20 pt-3 text-xs">
+              Property brochure · Sample design
+            </p>
+            <div className="mt-4 flex items-center justify-between border-t border-base-content/20 pt-3 text-xs">
+              <span>Prepared in your brand</span>
+              <ArrowUpRight size={15} aria-hidden="true" />
+            </div>
+          </div>
         </div>
-        <div className={styles.browserContent}>
-          <span>REPORT WORKSPACE</span>
-          <strong>Review, publish and share in one place.</strong>
-          <div className={styles.browserButton}>Open report preview</div>
+        <div className="flex flex-col justify-between bg-primary p-7 text-primary-content sm:p-9 lg:pl-14">
+          <p className="font-display text-3xl leading-tight">
+            One property.
+            <br />
+            <em>So much possibility.</em>
+          </p>
+          <ul className="mt-7 grid grid-cols-2 gap-x-5 gap-y-3 text-sm lg:grid-cols-1">
+            {[
+              "Appraisals",
+              "Brochures",
+              "Social posts",
+              "Digital proposals",
+            ].map((label, i) => (
+              <li className="flex items-center gap-3" key={label}>
+                <span className="text-xs tabular-nums opacity-65">
+                  0{i + 1}
+                </span>
+                {label}
+              </li>
+            ))}
+          </ul>
+          <a
+            href="#product"
+            className="mt-8 flex min-h-11 items-center justify-between border-t border-primary-content/30 pt-5 text-sm hover:underline"
+          >
+            Explore the collection
+            <ArrowRight size={18} aria-hidden="true" />
+          </a>
         </div>
       </div>
-
-      <div className={`${styles.floatTag} ${styles.floatTagTop}`}>
-        <span className={styles.floatIcon}><Check size={14} strokeWidth={3} /></span>
-        Brand system applied
-      </div>
-      <div className={`${styles.floatTag} ${styles.floatTagBottom}`}>
-        <Sparkles size={15} />
-        Report pack ready
-      </div>
-    </div>
+      <figcaption className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/65">
+        <span>PROPERTY MARKETING, CONSIDERED FROM EVERY ANGLE.</span>
+        <span>Illustrative property &amp; design</span>
+      </figcaption>
+    </figure>
   );
 }
 
-function MiniPackPreview() {
+function ProposalPreview() {
   return (
-    <div className={styles.packPreview} aria-hidden="true">
-      <div className={styles.packSidebar}>
-        <StayPackLogo href={undefined} height={17} />
-        <div className={styles.packSidebarLine} />
-        <div className={styles.packSidebarLine} />
-        <div className={styles.packSidebarLine} />
-      </div>
-      <div className={styles.packWorkspace}>
-        <div className={styles.packWorkspaceTop}>
-          <div>
-            <small>LISTING WORKSPACE</small>
-            <strong>42 Ocean Parade</strong>
+    <figure className="relative min-w-0">
+      <div className="overflow-hidden rounded-lg border border-primary-content/25 bg-base-100 text-base-content shadow-xl shadow-neutral/20">
+        <div className="flex items-center justify-between border-b border-base-300 px-5 py-3 text-xs">
+          <span className="font-medium">Your agency.</span>
+          <span className="flex items-center gap-2">
+            <LinkIcon size={13} aria-hidden="true" /> Digital proposal
+          </span>
+        </div>
+        <div className="grid sm:grid-cols-[1.05fr_1fr]">
+          <Image
+            src="/marketing/proposal-property.webp"
+            alt="Poolside property featured in a sample digital proposal"
+            width={1600}
+            height={1061}
+            sizes="(max-width: 640px) 100vw, 350px"
+            className="h-48 w-full object-cover sm:h-full"
+          />
+          <div className="p-6 sm:py-9">
+            <p className="text-xs text-base-content/65">
+              PREPARED FOR THE PROPERTY OWNER
+            </p>
+            <p className="mt-4 font-display text-3xl leading-tight">
+              A considered plan
+              <br />
+              for your property.
+            </p>
+            <p className="mt-4 text-sm leading-relaxed text-base-content/75">
+              The opportunity. The evidence. The people who will look after it.
+            </p>
+            <div className="mt-6 border-t border-base-300 pt-4 text-xs">
+              {[
+                "Estimated gross STR revenue",
+                "Comparable properties",
+                "Your management service",
+              ].map((item) => (
+                <p
+                  key={item}
+                  className="flex items-center justify-between gap-2 py-2"
+                >
+                  {item}
+                  <Check size={14} className="shrink-0" aria-hidden="true" />
+                </p>
+              ))}
+            </div>
           </div>
-          <span>Complete</span>
         </div>
-        <div className={styles.packItems}>
-          <div><BarChart3 size={18} /><span>STR potential report</span><Check size={15} /></div>
-          <div><KeyRound size={18} /><span>Lease appraisal</span><Check size={15} /></div>
-          <div><TrendingUp size={18} /><span>Sales appraisal</span><Check size={15} /></div>
-          <div><LayoutTemplate size={18} /><span>Property brochure</span><Check size={15} /></div>
+        <div className="flex flex-wrap justify-between gap-2 border-t border-base-300 px-5 py-4 text-xs">
+          <span>Property → Evidence → Your service → Next steps</span>
+          <span className="text-base-content/65">Sample presentation</span>
         </div>
       </div>
-    </div>
+      <figcaption className="mt-4 text-xs text-primary-content/75">
+        A shareable proposal, with your agency at the centre.
+      </figcaption>
+    </figure>
   );
 }
 
 export default function HomePage() {
   return (
-    <main className={styles.page}>
-      <header className={styles.siteHeader}>
-        <div className={styles.headerInner}>
-          <StayPackLogo href="/" height={26} />
-          <nav className={styles.desktopNav} aria-label="Main navigation">
-            <a href="#product">Product</a>
-            <a href="#how-it-works">How it works</a>
-            <a href="#solutions">For agencies</a>
-            <a href="#pricing">Pricing</a>
-          </nav>
-          <div className={styles.headerActions}>
-            <Link className={styles.loginLink} href="/login">Log in</Link>
-            <Link className={styles.headerCta} href="/signup">
-              Create a report
-              <ArrowRight aria-hidden="true" size={15} />
+    <div
+      data-theme="staypack-workspace"
+      className="min-h-screen bg-base-100 text-base-content selection:bg-primary selection:text-primary-content [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-4 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-4 [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-4"
+    >
+      <a
+        href="#main-content"
+        className="sr-only z-50 bg-base-100 p-4 focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+      >
+        Skip to content
+      </a>
+      <HomeNavigation />
+      <main id="main-content">
+        <section
+          className="mx-auto w-full max-w-7xl px-6 sm:px-10 lg:px-14 pt-14 pb-10 sm:pt-20 sm:pb-14"
+          aria-labelledby="hero-heading"
+        >
+          <div className="grid items-end gap-8 lg:grid-cols-[1.6fr_1fr] lg:gap-16">
+            <h1
+              id="hero-heading"
+              className="font-display text-5xl leading-[1.03] font-normal tracking-[-0.045em] sm:text-7xl lg:text-[80px] xl:text-[88px]"
+            >
+              <span className="block">Every property.</span>
+              <span className="block text-primary">
+                <em>Beautifully</em>
+              </span>
+              <span className="block">presented.</span>
+            </h1>
+            <div className="max-w-md pb-1 lg:pb-3">
+              <p className="text-lg leading-relaxed text-base-content/80">
+                Turn your property knowledge into appraisals, brochures, social
+                posts and digital proposals. All together. All in your brand.
+              </p>
+              <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3">
+                <Link href="/signup" className={primaryButton}>
+                  Get started
+                  <ArrowUpRight size={17} aria-hidden="true" />
+                </Link>
+                <a href="#product" className={textLink}>
+                  See what you can create
+                  <ChevronDown size={15} aria-hidden="true" />
+                </a>
+              </div>
+              <p className="mt-5 text-xs text-base-content/65">
+                Made for real estate agencies &amp; property managers.
+              </p>
+            </div>
+          </div>
+          <HeroFolio />
+        </section>
+        <div className="border-y border-base-content/15">
+          <div className="mx-auto w-full max-w-7xl px-6 sm:px-10 lg:px-14 grid gap-4 py-6 text-sm sm:grid-cols-3 sm:gap-6">
+            <p className="flex items-center gap-3">
+              <FileText size={18} strokeWidth={1.5} aria-hidden="true" /> One
+              property record, more possibilities
+            </p>
+            <p className="flex items-center gap-3">
+              <Palette size={18} strokeWidth={1.5} aria-hidden="true" /> Your
+              brand, down to the details
+            </p>
+            <p className="flex items-center gap-3">
+              <Users size={18} strokeWidth={1.5} aria-hidden="true" /> A
+              consistent standard for every agent
+            </p>
+          </div>
+        </div>
+        <section
+          id="product"
+          className="mx-auto w-full max-w-7xl px-6 sm:px-10 lg:px-14 scroll-mt-8 py-20 sm:py-28"
+          aria-labelledby="product-heading"
+        >
+          <div className="mb-12 grid gap-6 lg:grid-cols-[1.35fr_1fr] lg:gap-24">
+            <h2
+              id="product-heading"
+              className="max-w-xl font-display text-4xl leading-[1.1] tracking-tight sm:text-5xl"
+            >
+              From the first appraisal
+              <br className="hidden sm:block" /> to the final impression.
+            </h2>
+            <p className="max-w-md self-end text-base leading-relaxed text-base-content/75">
+              The details are already there. Make more of them. Bring the
+              property, evidence and your expertise together in material you’re
+              proud to put your name on.
+            </p>
+          </div>
+          <ProductExplorer />
+        </section>
+        <section
+          id="how-it-works"
+          className="scroll-mt-8 bg-base-200 py-20 sm:py-24"
+          aria-labelledby="workflow-heading"
+        >
+          <div className={container}>
+            <div className="grid gap-7 lg:grid-cols-[1fr_1.1fr] lg:gap-24">
+              <h2
+                id="workflow-heading"
+                className="font-display text-4xl leading-[1.12] tracking-tight sm:text-5xl"
+              >
+                Less starting over.
+                <br />
+                <em>More moving forward.</em>
+              </h2>
+              <p className="max-w-lg self-end leading-relaxed text-base-content/75">
+                No more copying the same address, hunting for the right photo,
+                or rebuilding a document. Start with the property. Keep your
+                expertise in the process.
+              </p>
+            </div>
+            <ol className="mt-14 grid gap-9 md:grid-cols-3 md:gap-10">
+              {[
+                [
+                  "01",
+                  "Bring the property.",
+                  "Start with a listing URL, an address or the details you already have. Review the facts and choose your imagery.",
+                ],
+                [
+                  "02",
+                  "Make it your own.",
+                  "Choose your format and design. Review the copy, adjust the evidence and add the local knowledge only you have.",
+                ],
+                [
+                  "03",
+                  "Make an impression.",
+                  "Preview the finished result. Download your material or publish a report or proposal link, ready for the next conversation.",
+                ],
+              ].map(([number, title, copy]) => (
+                <li
+                  key={number}
+                  className="border-t border-base-content/25 pt-5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-display text-3xl text-primary">
+                      {number}
+                    </span>
+                    <ArrowRight
+                      size={18}
+                      strokeWidth={1.5}
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <h3 className="mt-6 text-lg font-medium">{title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-base-content/75">
+                    {copy}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+        <section
+          id="digital-proposals"
+          className="scroll-mt-8 bg-primary py-20 text-primary-content sm:py-28"
+          aria-labelledby="proposal-heading"
+        >
+          <div className="mx-auto w-full max-w-7xl px-6 sm:px-10 lg:px-14 grid items-center gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
+            <div>
+              <h2
+                id="proposal-heading"
+                className="font-display text-4xl leading-[1.1] tracking-tight sm:text-5xl"
+              >
+                More than an estimate.
+                <br />
+                <em>A reason to choose you.</em>
+              </h2>
+              <p className="mt-7 max-w-md leading-relaxed text-primary-content/80">
+                Give short-term rental owners the full picture. Turn your
+                appraisal into a digital proposal that brings the property’s
+                potential, your service and the next steps together.
+              </p>
+              <ul className="mt-7 space-y-4 text-sm">
+                {[
+                  "Estimated gross STR revenue and comparable evidence",
+                  "Your team, management service and supporting documents",
+                  "A branded link that’s ready to share",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <Check
+                      size={16}
+                      className="mt-0.5 shrink-0"
+                      aria-hidden="true"
+                    />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/signup"
+                className="mt-8 inline-flex min-h-12 items-center gap-4 border-b border-primary-content/60 text-sm font-medium hover:border-primary-content"
+              >
+                Create your first proposal
+                <ArrowUpRight size={18} aria-hidden="true" />
+              </Link>
+            </div>
+            <ProposalPreview />
+          </div>
+        </section>
+        <section
+          id="your-brand"
+          className="mx-auto w-full max-w-7xl px-6 sm:px-10 lg:px-14 grid gap-12 py-20 sm:py-28 lg:grid-cols-2 lg:gap-24"
+          aria-labelledby="brand-heading"
+        >
+          <div className="flex flex-col justify-center">
+            <h2
+              id="brand-heading"
+              className="font-display text-4xl leading-[1.1] tracking-tight sm:text-5xl"
+            >
+              Your agency has a look.
+              <br />
+              <em>Let’s keep it that way.</em>
+            </h2>
+            <p className="mt-7 max-w-lg leading-relaxed text-base-content/75">
+              Your logo. Your colours. Your people. StayPack brings your
+              identity into every new document, so the whole team can create
+              with the same level of care.
+            </p>
+            <a
+              href="mailto:hello@staypack.app?subject=StayPack%20brand%20setup"
+              className="inline-flex min-h-11 items-center gap-3 text-sm font-medium underline-offset-4 hover:underline mt-7 self-start"
+            >
+              Talk to us about your brand
+              <ArrowUpRight size={17} aria-hidden="true" />
+            </a>
+          </div>
+          <div className="border border-base-content/20 p-7 sm:p-10">
+            <div className="flex items-center justify-between border-b border-base-content/20 pb-5">
+              <p className="text-sm font-medium">
+                The essentials, beautifully connected.
+              </p>
+              <Palette size={20} strokeWidth={1.5} aria-hidden="true" />
+            </div>
+            <div className="grid grid-cols-[1fr_auto] items-center gap-5 py-7">
+              <p className="font-display text-5xl tracking-tight">
+                Aa<span className="ml-3 font-sans text-3xl">Aa</span>
+              </p>
+              <div
+                className="flex -space-x-2"
+                aria-label="StayPack’s cream, sage and forest palette"
+              >
+                <span className="size-10 rounded-full border border-base-content/20 bg-base-200" />
+                <span className="size-10 rounded-full border border-base-content/20 bg-accent" />
+                <span className="size-10 rounded-full border border-base-content/20 bg-primary" />
+              </div>
+            </div>
+            <p className="text-xs text-base-content/65">
+              Typography, colour and layouts that feel like you.
+            </p>
+            <ul className="mt-7 border-t border-base-content/20">
+              {[
+                "Agency branding & template designs",
+                "Agent details & team consistency",
+                "Custom design setup available",
+              ].map((item) => (
+                <li
+                  key={item}
+                  className="flex justify-between gap-4 border-b border-base-content/15 py-4 text-sm"
+                >
+                  {item}
+                  <Check
+                    size={16}
+                    className="shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+        <section
+          id="pricing"
+          className="scroll-mt-8 border-y border-base-content/15 bg-base-200 py-20 sm:py-24"
+          aria-labelledby="pricing-heading"
+        >
+          <div className="mx-auto w-full max-w-7xl px-6 sm:px-10 lg:px-14 grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-24">
+            <div>
+              <h2
+                id="pricing-heading"
+                className="max-w-md font-display text-4xl leading-[1.1] tracking-tight sm:text-5xl"
+              >
+                One agency.
+                <br />
+                <em>One shared plan.</em>
+              </h2>
+              <p className="mt-7 max-w-sm leading-relaxed text-base-content/75">
+                A monthly home for your team’s property presentations. A shared
+                report allowance, with room for the busier months.
+              </p>
+              <p className="mt-6 text-sm font-medium">
+                No setup fee for the standard plan.
+              </p>
+            </div>
+            <div className="du-card rounded-none border border-base-content/20 bg-base-100 shadow-none">
+              <div className="du-card-body gap-0 p-7 sm:p-10">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-lg font-medium">Agency</h3>
+                  <span className="du-badge du-badge-sm du-badge-outline rounded-none">
+                    Monthly plan
+                  </span>
+                </div>
+                <p className="mt-6 flex flex-wrap items-baseline gap-x-3">
+                  <span className="font-display text-6xl tracking-tight tabular-nums">
+                    A$199
+                  </span>
+                  <span className="text-sm text-base-content/70">
+                    / month + GST
+                  </span>
+                </p>
+                <ul className="mt-7 space-y-4 border-t border-base-content/20 pt-6 text-sm">
+                  {[
+                    "30 published reports included each month",
+                    "One allowance shared across your agency",
+                    "Additional reports at A$5 each + GST",
+                    "Edits and downloads of published reports included",
+                  ].map((item) => (
+                    <li key={item} className="flex gap-3">
+                      <Check
+                        size={16}
+                        className="shrink-0 text-primary"
+                        aria-hidden="true"
+                      />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <div className="du-card-actions mt-8">
+                  <Link
+                    href="/signup"
+                    className="du-btn du-btn-primary min-h-12 rounded-full px-6 text-sm font-medium shadow-none w-full"
+                  >
+                    Get started
+                    <ArrowUpRight size={17} aria-hidden="true" />
+                  </Link>
+                </div>
+                <p className="mt-4 text-center text-xs text-base-content/65">
+                  Need a custom agency design?{" "}
+                  <a
+                    className="underline underline-offset-2"
+                    href="mailto:hello@staypack.app?subject=Custom%20StayPack%20design"
+                  >
+                    Let’s talk.
+                  </a>
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section
+          className="mx-auto w-full max-w-7xl px-6 sm:px-10 lg:px-14 grid gap-9 py-20 sm:py-24 lg:grid-cols-[0.7fr_1.3fr] lg:gap-24"
+          aria-labelledby="faq-heading"
+        >
+          <div>
+            <h2
+              id="faq-heading"
+              className="font-display text-4xl tracking-tight"
+            >
+              A few good questions.
+            </h2>
+            <p className="mt-5 text-sm text-base-content/75">
+              Something else on your mind?
+            </p>
+            <a href="mailto:hello@staypack.app" className={textLink}>
+              Say hello
+              <ArrowUpRight size={16} aria-hidden="true" />
+            </a>
+          </div>
+          <div className="border-t border-base-content/20">
+            {questions.map(({ question, answer }) => (
+              <details
+                name="homepage-faq"
+                key={question}
+                className="group border-b border-base-content/20"
+              >
+                <summary className="flex min-h-18 cursor-pointer items-center justify-between gap-5 py-5 text-base font-medium [&::-webkit-details-marker]:hidden">
+                  {question}
+                  <Plus
+                    size={18}
+                    className="shrink-0 transition-transform group-open:rotate-45 motion-reduce:transition-none"
+                    aria-hidden="true"
+                  />
+                </summary>
+                <p className="max-w-xl pb-6 pr-6 text-sm leading-7 text-base-content/75">
+                  {answer}
+                </p>
+              </details>
+            ))}
+          </div>
+        </section>
+        <section
+          className="mx-auto w-full max-w-7xl px-6 sm:px-10 lg:px-14 pb-20 sm:pb-24"
+          aria-labelledby="closing-heading"
+        >
+          <div className="flex flex-col justify-between gap-8 border-t border-base-content/25 pt-12 sm:flex-row sm:items-end">
+            <h2
+              id="closing-heading"
+              className="max-w-2xl font-display text-4xl leading-[1.1] tracking-tight sm:text-6xl"
+            >
+              Your next property.
+              <br />
+              <em className="text-primary">Your best presentation.</em>
+            </h2>
+            <Link
+              href="/signup"
+              className="du-btn du-btn-primary min-h-12 rounded-full px-6 text-sm font-medium shadow-none self-start sm:mb-2 sm:self-end"
+            >
+              Let’s make it a StayPack
+              <ArrowUpRight size={18} aria-hidden="true" />
             </Link>
           </div>
-          <details className={styles.mobileMenu}>
-            <summary aria-label="Open navigation">
-              <span />
-              <span />
-            </summary>
-            <nav aria-label="Mobile navigation">
-              <a href="#product">Product</a>
-              <a href="#how-it-works">How it works</a>
-              <a href="#solutions">For agencies</a>
-              <a href="#pricing">Pricing</a>
-              <Link href="/login">Log in</Link>
-              <Link className={styles.mobileMenuCta} href="/signup">Create a report</Link>
-            </nav>
-          </details>
-        </div>
-      </header>
-
-      <section className={styles.hero}>
-        <div className={styles.heroInner}>
-          <div className={styles.heroCopy}>
-            <div className={styles.eyebrow}>
-              <span><Sparkles size={13} /></span>
-              Property marketing, packed.
-            </div>
-            <h1>
-              Picture-perfect
-              <br />property collateral.
-              <br /><em>No designer or data scientist required.</em>
-            </h1>
-            <p className={styles.heroLead}>
-              Turn one listing into branded reports,
-              sales and lease appraisals, brochures, social posts and
-              data-backed STR potential reports—all from one property record.
-            </p>
-            <div className={styles.heroActions}>
-              <Link className={styles.primaryButton} href="/signup">
-                Create your first report
-                <ArrowRight aria-hidden="true" size={18} />
-              </Link>
-              <a className={styles.secondaryButton} href="#product">
-                See what you can create
-              </a>
-            </div>
-            <div className={styles.heroProof}>
-              <span><Check size={14} /> No specialist team required</span>
-              <span><Check size={14} /> Free branded preview</span>
-              <span><Check size={14} /> Publish when ready</span>
-            </div>
-          </div>
-          <ReportArtwork />
-        </div>
-      </section>
-
-      <section className={styles.proofStrip} aria-label="StayPack capabilities">
-        <div className={styles.proofStripInner}>
-          <p>One listing in.</p>
-          <div><Globe2 size={17} /> Optional report links and QR codes</div>
-          <div><TrendingUp size={17} /> Sales &amp; lease appraisals</div>
-          <div><LayoutTemplate size={17} /> Brochures + social posts</div>
-          <div><BarChart3 size={17} /> STR potential reports</div>
-          <p>A complete pack out.</p>
-        </div>
-      </section>
-
-      <section className={styles.transformationSection} id="product">
-        <div className={styles.sectionInner}>
-          <div className={styles.sectionIntro}>
-            <p className={styles.kicker}>YOUR PROPERTY CONTENT SYSTEM</p>
-            <h2>Stop rebuilding the same listing, over and over.</h2>
-            <p>
-              Add the property once. StayPack keeps the details, imagery,
-              evidence and brand system together—then turns them into every
-              format your team needs.
-            </p>
-          </div>
-
-          <div className={styles.transformationGrid}>
-            <div className={styles.inputCard}>
-              <div className={styles.cardTopline}>
-                <span>01</span>
-                <span>THE INPUT</span>
-              </div>
-              <div className={styles.urlField}>
-                <ScanLine size={18} />
-                <span>realestate.com.au/property...</span>
-                <button type="button" tabIndex={-1}>Import</button>
-              </div>
-              <div className={styles.inputDetails}>
-                <div className={styles.inputImage}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={PROPERTY_IMAGE} alt="" />
-                </div>
-                <div>
-                  <small>PROPERTY FOUND</small>
-                  <strong>42 Ocean Parade</strong>
-                  <span>Burleigh Heads, QLD</span>
-                  <div className={styles.miniPills}><i>4 bed</i><i>2 bath</i><i>2 car</i></div>
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.transformArrow} aria-hidden="true">
-              <ArrowRight />
-            </div>
-
-            <div className={styles.outputCard}>
-              <div className={styles.cardTopline}>
-                <span>02</span>
-                <span>THE OUTPUT</span>
-              </div>
-              <MiniPackPreview />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.outputSection}>
-        <div className={styles.sectionInner}>
-          <div className={styles.outputHeading}>
-            <div>
-              <p className={styles.kicker}>A COMPLETE PROPERTY CONTENT SUITE</p>
-              <h2>Give every property conversation a better story.</h2>
-            </div>
-            <p>
-              From an STR opportunity or lease appraisal to a sales pitch and
-              finished brochure, social post or local-area profile, keep every
-              touchpoint useful, credible and beautifully consistent.
-            </p>
-          </div>
-
-          <div className={styles.outputCards}>
-            {outputs.map((output) => {
-              const Icon = output.icon;
-              return (
-                <article className={`${styles.outputFeature} ${styles[output.accent]}`} key={output.label}>
-                  <div className={styles.outputNumber}>{output.number}</div>
-                  <div className={styles.outputIcon}><Icon size={21} /></div>
-                  <p className={styles.outputLabel}>{output.label}</p>
-                  <h3>{output.title}</h3>
-                  <p className={styles.outputCopy}>{output.copy}</p>
-                  {output.status ? (
-                    <span className={styles.outputStatus}>{output.status}</span>
-                  ) : (
-                    <a href="#examples" aria-label={`See ${output.label.toLowerCase()} examples`}>
-                      View examples <ChevronRight size={15} />
-                    </a>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.benefitsSection}>
-        <div className={styles.sectionInner}>
-          <div className={styles.benefitsLayout}>
-            <div className={styles.benefitsStatement}>
-              <p className={styles.kicker}>DESIGNED TO DISAPPEAR INTO YOUR WORKFLOW</p>
-              <h2>The polish of a studio. The speed of a system.</h2>
-              <p>
-                StayPack takes care of the repetitive production work, so your
-                team can stay focused on the property, the vendor and the next
-                conversation.
-              </p>
-              <figure className={styles.handoverFigure}>
-                <Image
-                  src="/marketing/businessman-presenting-brochure.webp"
-                  alt="Real estate agent presenting a branded property brochure to a client"
-                  width={1536}
-                  height={1024}
-                  sizes="(max-width: 900px) calc(100vw - 40px), 460px"
-                />
-                <figcaption>
-                  <span>FROM SCREEN TO FRONT DOOR</span>
-                  <strong>Beautifully prepared for the conversations that matter.</strong>
-                </figcaption>
-              </figure>
-              <div className={styles.quoteCard}>
-                <Quote size={23} />
-                <blockquote>
-                  The goal isn&apos;t to make more documents. It&apos;s to make every
-                  property conversation feel better prepared.
-                </blockquote>
-              </div>
-            </div>
-            <div className={styles.benefitList}>
-              {benefits.map((benefit) => {
-                const Icon = benefit.icon;
-                return (
-                  <article key={benefit.title}>
-                    <div><Icon size={20} /></div>
-                    <h3>{benefit.title}</h3>
-                    <p>{benefit.copy}</p>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.stepsSection} id="how-it-works">
-        <div className={styles.sectionInner}>
-          <div className={styles.stepsHeader}>
-            <p className={styles.kicker}>FROM LISTING TO LIVE</p>
-            <h2>Three steps. One beautifully consistent result.</h2>
-          </div>
-          <ol className={styles.steps}>
-            <li>
-              <span>1</span>
-              <div className={styles.stepVisual}><ScanLine size={27} /></div>
-              <h3>Bring in the listing</h3>
-              <p>Paste a listing URL or enter the details yourself. Review the facts and choose the best imagery.</p>
-            </li>
-            <li>
-              <span>2</span>
-              <div className={styles.stepVisual}><BarChart3 size={27} /></div>
-              <h3>Review the evidence</h3>
-              <p>Review STR, lease or sales evidence and comparables, then refine the appraisal with your local knowledge.</p>
-            </li>
-            <li>
-              <span>3</span>
-              <div className={styles.stepVisual}><Sparkles size={27} /></div>
-              <h3>Publish the pack</h3>
-              <p>Choose your approved design, check the preview and share a polished PDF, online report or collateral set.</p>
-            </li>
-          </ol>
-        </div>
-      </section>
-
-      <section className={styles.examplesSection} id="examples">
-        <div className={styles.sectionInner}>
-          <div className={styles.examplesHeading}>
-            <p className={styles.kicker}>YOUR BRAND, NOT OURS</p>
-            <h2>One platform. A completely different expression for every agency.</h2>
-          </div>
-          <div className={styles.brandExamples}>
-            <article className={styles.brandExampleDark}>
-              <div className={styles.brandExampleMeta}><span>01</span><span>EDITORIAL / MINIMAL</span></div>
-              <div className={styles.brandExampleDocument}>
-                <span>OBSIDIAN</span>
-                <div className={styles.brandExamplePhoto}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={PROPERTY_IMAGE} alt="Sample editorial property report" />
-                </div>
-                <small>PROPERTY APPRAISAL</small>
-                <strong>Designed for considered decisions.</strong>
-              </div>
-            </article>
-            <article className={styles.brandExampleBlue}>
-              <div className={styles.brandExampleMeta}><span>02</span><span>BOLD / CONTEMPORARY</span></div>
-              <div className={styles.brandExampleDocument}>
-                <span>HOMESTEAD.</span>
-                <small>SHORT-TERM RENTAL POTENTIAL</small>
-                <strong>$98,500</strong>
-                <i>estimated gross revenue p.a.</i>
-                <div className={styles.brandBars}><b /><b /><b /><b /><b /></div>
-              </div>
-            </article>
-            <article className={styles.brandExampleWarm}>
-              <div className={styles.brandExampleMeta}><span>03</span><span>WARM / LIFESTYLE</span></div>
-              <div className={styles.brandExampleDocument}>
-                <span>FIELD &amp; FOLK</span>
-                <small>42 OCEAN PARADE</small>
-                <strong>Make yourself at home.</strong>
-                <div className={styles.brandCircleImage}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={PROPERTY_IMAGE} alt="Sample lifestyle property brochure" />
-                </div>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.solutionsSection} id="solutions">
-        <div className={styles.sectionInner}>
-          <div className={styles.solutionsHeading}>
-            <p className={styles.kicker}>START THE WAY THAT SUITS YOU</p>
-            <h2>Self-serve when you&apos;re ready. Custom when your brand needs more.</h2>
-          </div>
-          <div className={styles.solutionCards}>
-            <article>
-              <div className={styles.solutionBadge}>SELF-SERVE</div>
-              <h3>Start creating today.</h3>
-              <p>Set up your logo, colours and team, then create from our ready-to-use report designs.</p>
-              <ul>
-                <li><Check size={16} /> Pay per pack or choose a monthly plan</li>
-                <li><Check size={16} /> Approved StayPack template library</li>
-                <li><Check size={16} /> Upgrade whenever your team grows</li>
-              </ul>
-              <Link href="/signup">Create an account <ArrowRight size={16} /></Link>
-            </article>
-            <article className={styles.customSolution}>
-              <div className={styles.solutionBadge}>CUSTOM AGENCY ROLLOUT</div>
-              <h3>Make StayPack unmistakably yours.</h3>
-              <p>We translate your visual identity into a tailored report system, configure your team and guide the launch.</p>
-              <ul>
-                <li><Check size={16} /> Bespoke report and collateral designs</li>
-                <li><Check size={16} /> Done-with-you brand implementation</li>
-                <li><Check size={16} /> Proofing, revisions and team handover</li>
-              </ul>
-              <a href="mailto:hello@staypack.app?subject=Custom%20StayPack%20agency%20rollout">
-                Talk about your rollout <ArrowRight size={16} />
-              </a>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.pricingSection} id="pricing">
-        <div className={styles.sectionInner}>
-          <div className={styles.pricingPanel}>
-            <div className={styles.pricingCopy}>
-              <p className={styles.kicker}>FLEXIBLE FROM THE FIRST LISTING</p>
-              <h2>Try the value before you build the habit.</h2>
-              <p>
-                Start with a single listing pack, move to a monthly plan when
-                the volume makes sense, or have us build a custom agency system.
-              </p>
-              <ArrowLink href="/signup">Create a free branded preview</ArrowLink>
-            </div>
-            <div className={styles.pricingModes}>
-              <div>
-                <span>PAY AS YOU GO</span>
-                <strong><small>from</small> $99</strong>
-                <p>per published listing pack</p>
-              </div>
-              <div>
-                <span>SELF-SERVE</span>
-                <strong><small>from</small> $249</strong>
-                <p>per month, plus GST</p>
-              </div>
-              <div>
-                <span>CUSTOM</span>
-                <strong>Let&apos;s talk</strong>
-                <p>brand launch + monthly plan</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.faqSection}>
-        <div className={styles.sectionInner}>
-          <div className={styles.faqLayout}>
-            <div>
-              <p className={styles.kicker}>THE SHORT VERSION</p>
-              <h2>A few things agencies usually ask.</h2>
-            </div>
-            <div className={styles.faqs}>
-              <details>
-                <summary>Does this replace our designer?<span>+</span></summary>
-                <p>It removes the need for repetitive production work on each listing. You can use StayPack&apos;s ready-made designs or have us translate your designer&apos;s brand direction into a reusable template system.</p>
-              </details>
-              <details>
-                <summary>Can every agent use the same brand setup?<span>+</span></summary>
-                <p>Yes. Your agency controls the approved brand system and templates, while individual agents can use their own profile, contact details and headshot.</p>
-              </details>
-              <details>
-                <summary>Are short-term rental estimates guaranteed?<span>+</span></summary>
-                <p>No. StayPack presents estimated gross STR revenue using available market evidence and clearly labels the assumptions and limitations. It is not a valuation or income guarantee.</p>
-              </details>
-              <details>
-                <summary>What happens with a custom rollout?<span>+</span></summary>
-                <p>We collect your brand assets, configure and proof your report designs, make the agreed revisions, then activate the workspace once you approve the system.</p>
-              </details>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.finalCta}>
-        <div className={styles.finalCtaOrb} />
-        <div className={styles.sectionInner}>
-          <div className={styles.finalCtaContent}>
-            <p className={styles.kicker}>YOUR NEXT LISTING, BEAUTIFULLY PACKAGED</p>
-            <h2>Put the design bottleneck behind you.</h2>
-            <p>Create a branded preview yourself, or talk to us about building a tailored system for your agency.</p>
-            <div>
-              <Link className={styles.lightButton} href="/signup">Create a report <ArrowRight size={18} /></Link>
-              <a className={styles.ghostButton} href="mailto:hello@staypack.app?subject=StayPack%20demo">Book a conversation</a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <footer className={styles.footer}>
-        <div className={styles.footerInner}>
-          <div className={styles.footerTop}>
+        </section>
+      </main>
+      <footer className="border-t border-base-content/15 bg-base-200">
+        <div className="mx-auto w-full max-w-7xl px-6 sm:px-10 lg:px-14 py-10">
+          <div className="flex flex-col justify-between gap-7 sm:flex-row sm:items-start">
             <div>
               <StayPackLogo href="/" height={25} />
-              <p>Property reports and collateral, beautifully packed in your brand.</p>
+              <p className="mt-4 text-sm text-base-content/75">
+                Property marketing, beautifully together.
+              </p>
             </div>
-            <div className={styles.footerLinks}>
-              <div>
-                <strong>PRODUCT</strong>
-                <a href="#product">Overview</a>
-                <a href="#examples">Examples</a>
-                <a href="#pricing">Pricing</a>
-              </div>
-              <div>
-                <strong>AGENCIES</strong>
-                <a href="#solutions">Self-serve</a>
-                <a href="#solutions">Custom rollout</a>
-                <a href="mailto:hello@staypack.app">Contact</a>
-              </div>
-              <div>
-                <strong>ACCOUNT</strong>
-                <Link href="/login">Log in</Link>
-                <Link href="/signup">Create account</Link>
-              </div>
-            </div>
+            <nav
+              aria-label="Footer navigation"
+              className="flex flex-wrap gap-x-6 gap-y-3 text-sm"
+            >
+              <a href="#product" className="min-h-11 hover:underline">
+                The collection
+              </a>
+              <a href="#pricing" className="min-h-11 hover:underline">
+                Pricing
+              </a>
+              <a
+                href="mailto:hello@staypack.app"
+                className="min-h-11 hover:underline"
+              >
+                Contact
+              </a>
+              <Link href="/login" className="min-h-11 hover:underline">
+                Log in
+              </Link>
+            </nav>
           </div>
-          <div className={styles.footerBottom}>
-            <span>© {new Date().getFullYear()} StayPack</span>
-            <span>Estimated gross STR revenue is indicative only and is not a valuation or income guarantee.</span>
+          <div className="mt-9 flex flex-col justify-between gap-4 border-t border-base-content/15 pt-6 text-xs leading-relaxed text-base-content/65">
+            <p>© {new Date().getFullYear()} StayPack.</p>
+            <p className="max-w-3xl">
+              Estimated gross STR revenue is indicative only, excludes operating
+              costs and is not a valuation or income guarantee. Property imagery
+              and presentation previews on this page are illustrative.
+            </p>
           </div>
         </div>
       </footer>
-    </main>
+    </div>
   );
 }
