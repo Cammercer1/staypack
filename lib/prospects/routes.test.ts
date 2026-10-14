@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, it, vi } from "vitest";
-import SlugPage, { metadata as slugMetadata } from "@/app/(public)/examples/[company]/[property]/page";
+import SlugPage, { generateMetadata } from "@/app/(public)/examples/[company]/[property]/page";
 import TokenPage, { metadata as tokenMetadata } from "@/app/(public)/example/[token]/page";
 import { publishedProspectProposal, publishedProspectProposalBySlug } from "./server";
 import { createProposalFixture } from "@/lib/digital-proposals/fixtures";
@@ -52,6 +52,8 @@ it("rejects unavailable examples and unknown proposal pages", async () => {
 });
 
 it("excludes both public URL formats from indexing and caching", async () => {
+  vi.mocked(publishedProspectProposalBySlug).mockResolvedValue({ id: "example", public_slug: "company/property", snapshot });
+  const slugMetadata = await generateMetadata({ params: Promise.resolve({ company: "company", property: "property" }) });
   for (const metadata of [slugMetadata, tokenMetadata]) expect(metadata.robots).toEqual({ index: false, follow: false });
   const rules = await nextConfig.headers!();
   for (const path of ["/example/:path*", "/examples/:path*"]) {
@@ -61,4 +63,18 @@ it("excludes both public URL formats from indexing and caching", async () => {
       { key: "Cache-Control", value: "private, no-store, max-age=0" },
     ]));
   }
+});
+
+it("uses the published property's branding and photo in shared link previews", async () => {
+  const slug = "aus-vision-realty/57-garling-street-kardinya";
+  vi.mocked(publishedProspectProposalBySlug).mockResolvedValue({ id: "example", public_slug: slug, snapshot });
+  const metadata = await generateMetadata({ params: Promise.resolve({ company: "aus-vision-realty", property: "57-garling-street-kardinya" }) });
+  expect(metadata.title).toEqual({ absolute: `${snapshot.data.property.address} | ${snapshot.data.agency.name}` });
+  expect(metadata.openGraph).toMatchObject({ url: `https://staypack.app/examples/${slug}`, images: [{ url: snapshot.data.property.heroImageUrl }] });
+  expect(metadata.twitter).toMatchObject({ card: "summary_large_image", images: [{ url: snapshot.data.property.heroImageUrl }] });
+});
+
+it("does not expose preview metadata for unavailable examples", async () => {
+  vi.mocked(publishedProspectProposalBySlug).mockResolvedValue(null);
+  await expect(generateMetadata({ params: Promise.resolve({ company: "company", property: "property" }) })).rejects.toThrow("404");
 });
