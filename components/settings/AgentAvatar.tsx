@@ -27,7 +27,6 @@ export function AgentAvatar({
       className={cn(
         "flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-sm font-medium text-foreground ring-1 ring-border/60",
         className,
-        (loading = "eager"),
       )}
     >
       {src && failed !== src ? (
