@@ -6,7 +6,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
-RUN mkdir -p node_modules .next /home/node/.npm \
+RUN mkdir -p node_modules .next .next-local /home/node/.npm \
     && chown -R node:node /workspace /home/node/.npm \
     && git config --system --add safe.directory /workspace
 

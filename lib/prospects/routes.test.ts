@@ -8,6 +8,7 @@ import { createProposalFixture } from "@/lib/digital-proposals/fixtures";
 import { DEFAULT_PROPOSAL_DRAFT } from "@/lib/digital-proposals/template";
 import { BRAND_DEFAULTS } from "@/lib/digital-proposals/brand";
 import nextConfig from "@/next.config";
+import { PHASE_PRODUCTION_BUILD } from "next/constants";
 
 vi.mock("./server", () => ({ publishedProspectProposal: vi.fn(), publishedProspectProposalBySlug: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -55,7 +56,7 @@ it("excludes both public URL formats from indexing and caching", async () => {
   vi.mocked(publishedProspectProposalBySlug).mockResolvedValue({ id: "example", public_slug: "company/property", snapshot });
   const slugMetadata = await generateMetadata({ params: Promise.resolve({ company: "company", property: "property" }) });
   for (const metadata of [slugMetadata, tokenMetadata]) expect(metadata.robots).toEqual({ index: false, follow: false });
-  const rules = await nextConfig.headers!();
+  const rules = await nextConfig(PHASE_PRODUCTION_BUILD).headers!();
   for (const path of ["/example/:path*", "/examples/:path*"]) {
     const headers = rules.find(rule => rule.source === path)?.headers;
     expect(headers).toEqual(expect.arrayContaining([

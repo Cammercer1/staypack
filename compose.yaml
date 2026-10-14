@@ -11,6 +11,8 @@ services:
     environment:
       APP_ENV: development
       NEXT_TELEMETRY_DISABLED: "1"
+      # Leave room for browser tests within Docker Desktop's memory allocation.
+      NODE_OPTIONS: --max-old-space-size=2048
       # Poll once a second: native file events do not reliably cross macOS mounts.
       WATCHPACK_POLLING: "1000"
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
@@ -20,6 +22,7 @@ services:
       - .:/workspace
       - node_modules:/workspace/node_modules
       - next_cache:/workspace/.next
+      - next_dev_cache:/workspace/.next-local
       - npm_cache:/home/node/.npm
     # Check the listener without repeatedly compiling a page or querying Supabase.
     healthcheck:
@@ -36,4 +39,5 @@ services:
 volumes:
   node_modules:
   next_cache:
+  next_dev_cache:
   npm_cache:

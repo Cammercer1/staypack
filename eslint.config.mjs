@@ -9,6 +9,7 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".next-local/**",
     ".netlify/**",
     "playwright-report/**",
     "test-results/**",

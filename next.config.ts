@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 
-const nextConfig: NextConfig = {
+const nextConfig = (phase: string): NextConfig => ({
+  // Netlify moves/cleans .next during packaging; keep the running dev server separate.
+  distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-local" : ".next",
+  ...(phase === PHASE_DEVELOPMENT_SERVER ? { experimental: { webpackMemoryOptimizations: true } } : {}),
   async headers() {
     return ["/proposal/:path*", "/api/proposals/:path*", "/example/:path*", "/examples/:path*", "/embed/str-calculator/:path*", "/api/str-calculator/:path*", "/marketing/str-calculator", "/api/marketing/str-calculator"].map(source => ({ source, headers: [
       { key: "Referrer-Policy", value: "no-referrer" },
@@ -16,6 +20,6 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
     NEXT_PUBLIC_REPORTS_URL: process.env.NEXT_PUBLIC_REPORTS_URL,
   },
-};
+});
 
 export default nextConfig;

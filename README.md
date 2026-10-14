@@ -18,6 +18,8 @@ separate from any host installation. The app runs as the non-root `node` user.
 Container development uses Next.js's supported Webpack mode with one-second
 file polling, so hot reload works across macOS Docker mounts. The regular
 `npm run dev` and production build keep their existing Turbopack defaults.
+Development output uses `.next-local`, separate from production output in
+`.next`, so staging builds cannot remove the running dev server's build files.
 
 ### First start
 
