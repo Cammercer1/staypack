@@ -434,8 +434,7 @@ export function LeaseAppraisalDataStep({
           </p>
         ) : jobProcessing ? (
           <p className="text-sm text-muted-foreground">
-            REA comps can take 1–3 minutes. You can keep this tab open while the
-            appraisal updates.
+            Your appraisal is updating. This may take a few minutes.
           </p>
         ) : jobFailed ? (
           <p className="text-sm text-destructive">

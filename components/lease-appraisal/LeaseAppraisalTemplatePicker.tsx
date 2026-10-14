@@ -64,7 +64,7 @@ export function LeaseAppraisalTemplatePicker({ value, onChange }: Props) {
           <p className="font-medium">{template.label}</p>
           <p className="mt-1 text-sm text-muted-foreground">{template.description}</p>
           <p className="mt-2 text-xs text-muted-foreground">
-            {template.pages} pages · Page 2 always shows REA rent comparables ·{" "}
+            {template.pages} pages · Page 2 always shows rent comparables ·{" "}
             {template.default_blurb_length} blurb
           </p>
         </button>

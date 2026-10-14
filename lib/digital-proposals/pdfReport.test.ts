@@ -6,6 +6,10 @@ import { buildProposalPdfReport, proposalPdfReportSchema, withPdfAgents } from "
 import { createPrintAccessToken } from "@/lib/reports/printAccessToken";
 import { proposalPrintUrl, verifyProposalPrintToken } from "./printAccess";
 import { buildStrTemplatePreview } from "@/lib/reports/templatePreviewDocument";
+import { reportForProposal } from "./fromAppraisal";
+import { proposalSnapshotSchema } from "./workspace";
+import { DEFAULT_PROPOSAL_DRAFT } from "./template";
+import { BRAND_DEFAULTS } from "./brand";
 
 describe("Havenly proposal PDF snapshot", () => {
   function document() {
@@ -24,6 +28,31 @@ describe("Havenly proposal PDF snapshot", () => {
     expect(result.str_enrichment).not.toHaveProperty("comp_pool");
     if (result.str_enrichment?.market_occupancy) expect(result.str_enrichment.market_occupancy).not.toHaveProperty("raw");
     expect(proposalPdfReportSchema.safeParse({ ...result, copy: { ...result.copy, disclaimer: "" } }).success).toBe(false);
+  });
+  it("prepares an estimated STR appraisal without an advertised sale price", () => {
+    const fixture = createLintRegressionFixtures();
+    fixture.listing.listing_url = null;
+    fixture.listing.display_price = null;
+    fixture.listing.advertised_sale_price = null;
+    fixture.report.status = "estimated";
+    fixture.report.template_id = "haven-properties-str";
+    fixture.report.final_report_json = null;
+    fixture.report.ai_copy_json = null;
+    fixture.report.user_overrides_json = {
+      strProperty: { propertyValue: 1240000, weeklyRent: 1155, amenities: [], additionalAmenities: [] },
+    };
+    const before = structuredClone(fixture);
+    const source = reportForProposal({ ...fixture, agencyAgents: [], editable: true });
+    expect(source.property.display_price).toBeNull();
+    const data = proposalFromReport(source);
+    const pdfReport = buildProposalPdfReport(source)!;
+    const snapshot = proposalSnapshotSchema.parse({
+      version: 1, data, pdfReport, draft: DEFAULT_PROPOSAL_DRAFT, brand: BRAND_DEFAULTS, attachments: [],
+    });
+    expect(snapshot.pdfReport?.property.display_price).toBeNull();
+    expect(snapshot.data.property.estimatedValue).toBe(1240000);
+    expect(withPdfAgents(pdfReport, []).property.display_price).toBeNull();
+    expect(fixture).toEqual(before);
   });
   it("keeps only explicitly selected agents through repeated brand application, including no agents", () => {
     const pdf = buildProposalPdfReport(document())!;

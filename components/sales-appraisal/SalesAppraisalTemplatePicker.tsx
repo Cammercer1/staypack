@@ -64,7 +64,7 @@ export function SalesAppraisalTemplatePicker({ value, onChange }: Props) {
           <p className="font-medium">{template.label}</p>
           <p className="mt-1 text-sm text-muted-foreground">{template.description}</p>
           <p className="mt-2 text-xs text-muted-foreground">
-            {template.pages} pages · Page 2 always shows REA sold &amp; for-sale
+            {template.pages} pages · Page 2 always shows sold &amp; for-sale
             comparables · {template.default_blurb_length} blurb
           </p>
         </button>

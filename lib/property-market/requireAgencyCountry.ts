@@ -1,4 +1,5 @@
-import "server-only";
+// Shared with standalone Node workers. The caller supplies the authorized client;
+// this module does not read credentials or depend on Next's server-only marker.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Listing } from "@/lib/types";
 import { assertPropertyCountry } from "./agencyCountry";
