@@ -346,3 +346,76 @@ synthetic; no production records or provider configuration were changed.
 Property searches, imports, saved-property selection and appraisal provider calls enforce the account country on the server. Australian accounts use Domain profiles and Australian address suggestions; US accounts use Google Places restricted to the US and Zillow-backed property profiles/comparables. `RAPIDAPI_US_PROPERTY_KEY` is an optional dedicated US provider credential (otherwise the existing RapidAPI key is used).
 
 Report/proposal snapshots store their own country, currency and rent period. US rentals display monthly USD; Australian rentals remain weekly AUD. Existing weekly database amounts remain weekly internally, with conversion at the input/display boundaries. Changing an account country does not rewrite properties, reports or published proposal versions. Add future countries deliberately to the database constraint, validation and provider routing together.
+
+
+## Embeddable STR calculator
+
+[`20261014104828_str_calculator_widget.sql`](migrations/20261014104828_str_calculator_widget.sql)
+is applied to the connected StayPack database. It adds `str_calculator_widgets`
+and `str_calculator_leads`; it does not enable calculators for existing agencies.
+The application changes still need a deployment before production embeds work.
+
+**Marketing → STR calculator** (`/marketing/str-calculator`) opens on **Leads**.
+The **Embed & settings** tab (`?tab=setup`) contains the preview, activation,
+market and optional phone settings, and iframe code. Both views are URL-backed;
+switching views preserves the lead page and unsaved settings during navigation.
+Agency admins select Australia or the United States and activate the calculator.
+`/embed/str-calculator/[token]` is public and works without account
+cookies. Pausing immediately blocks new submissions; the embed URL stays stable
+when settings are saved. The preview uses a labelled sample and creates no leads.
+The widget reads current agency colour and font settings on each load.
+
+[`20261014113703_str_calculator_optional_phone.sql`](migrations/20261014113703_str_calculator_optional_phone.sql)
+is applied to the connected database. Account admins can turn on **Ask for phone
+number** and save settings without activating a paused calculator. It defaults
+off; when enabled, **Your details** shows an optional phone field. Submitted phone
+numbers appear beside email in the lead list, under the existing agency-member
+RLS policy. They are never sent to AirROI or returned in the public estimate.
+The reservation RPC strips phone data when the setting is off, including if it
+changes while a visitor is completing the form. Existing leads remain unchanged.
+
+Live submissions collect an address, bedrooms, bathrooms, email and explicit contact consent.
+The server saves the enquiry, geocodes a complete street address, then calls the
+standard AirROI calculator once (no extra market occupancy request, scraping or
+report generation). `GOOGLE_MAPS_API_KEY`, `AIRROI_API_KEY` and the Supabase service
+role key are required. The selected bathroom count supports half baths and is saved
+in `input_json` and used in the estimate. Guests default to `max(2, bedrooms * 2)`,
+and the search radius is 2 km; these assumptions are visible
+with the estimate. Original input, raw provider response and displayed estimate
+are stored separately. Failed estimates retain the enquiry for agency follow-up.
+
+Agency members can read only their own lead projection. Raw provider data and
+request fingerprints are service-only. Anonymous clients cannot read either
+table or execute the reservation RPC. The RPC uses a row lock, request IDs and
+keyed hashes to prevent duplicate paid calls and enforce limits across instances:
+100 enquiries per calculator per rolling 24 hours and 5 per client IP per hour.
+Only Netlify's trusted connection-IP header is used in production; other runtimes
+share an `unknown`/local bucket rather than trusting spoofable forwarded headers.
+
+Verification: `supabase/tests/str_calculator.sql` runs rollback-only database
+checks. `docker compose exec app node scripts/verify-str-calculator.mjs` creates
+and removes disposable agencies/users to verify settings, lead isolation, public
+rendering, replay, and pause behaviour without paid calls or email delivery.
+The development-only `/dev/str-calculator` includes sample data; `?view=mobile`
+tests a 320 px iframe. Production builds return 404 for this development page.
+
+### Pricing held for later activation
+
+The agreed allowance is 100 completed estimates per account per month, then US$0.50
+per additional completed estimate. Charging and monthly billing enforcement are
+not enabled in this rollout. Preview results are free and create no usage.
+The existing AUD billing catalogue is not changed by this feature deployment.
+
+Production rollout on 14 October 2026: Netlify deploy
+`6acf72aaa7c66b4d87780f52`, based on production commit
+`63396095f593f8b6f1e892149f4dec141122208a`. The existing production navigation is
+preserved, with STR calculator added under Marketing. The live account was
+verified on both Leads and Embed & settings; its calculator remains inactive.
+The calculator release source is preserved in Git with regression checks for the
+existing production navigation and required routes.
+
+For manual Netlify releases, use `netlify deploy --build --context production`
+to build and upload the adapter output together, verify the draft's styling and
+assets, then promote that exact deploy. A standalone `netlify build` followed by
+`netlify deploy --no-build` using `.next` uploads the restored raw Next.js build,
+not the adapter's prepared public assets.

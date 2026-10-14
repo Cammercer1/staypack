@@ -25,6 +25,7 @@ type GoogleGeocodeResponse = {
   results?: Array<{
     formatted_address: string;
     place_id: string;
+    types?: string[];
     partial_match?: boolean;
     geometry: {
       location: {
@@ -36,7 +37,7 @@ type GoogleGeocodeResponse = {
   error_message?: string;
 };
 
-export async function geocodeAddress(query: string, country: string = "AU"): Promise<GeocodeResult> {
+export async function geocodeAddress(query: string, country: string = "AU", options: { requireStreetAddress?: boolean } = {}): Promise<GeocodeResult> {
   const trimmed = query.trim();
   if (!trimmed) {
     throw new Error("Address is required for geocoding");
@@ -60,7 +61,7 @@ export async function geocodeAddress(query: string, country: string = "AU"): Pro
 
   const response = await fetch(
     `https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`,
-    { cache: "no-store" },
+    { cache: "no-store", ...(options.requireStreetAddress ? { signal: AbortSignal.timeout(10000) } : {}) },
   );
 
   if (!response.ok) {
@@ -77,6 +78,9 @@ export async function geocodeAddress(query: string, country: string = "AU"): Pro
   }
 
   const result = payload.results[0];
+  if (options.requireStreetAddress && !result.types?.some(type => ["street_address", "premise", "subpremise"].includes(type))) {
+    throw new Error("Enter a full street address, including the street number and suburb.");
+  }
   if (result.partial_match) {
     throw new Error("The address only partially matched. Check the unit and street number before requesting an estimate.");
   }

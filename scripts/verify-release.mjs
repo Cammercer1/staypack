@@ -5,6 +5,11 @@ import { pathToFileURL } from "node:url";
 // These are production entry points, not optional preview features. Keep this
 // check in the build so a partial Git release cannot silently remove a workspace.
 export const requiredRoutes = [
+  "/(app)/marketing/str-calculator/page",
+  "/(public)/embed/str-calculator/[token]/page",
+  "/api/marketing/str-calculator/route",
+  "/api/str-calculator/[token]/route",
+  "/api/str-calculator/[token]/address-suggestions/route",
   "/(app)/create/page",
   "/(app)/social/page",
   "/(app)/social/new/page",

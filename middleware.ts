@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const protectedPrefixes = ["/dashboard", "/onboarding", "/reports", "/listings", "/leads", "/settings", "/short-term-rentals", "/appraisals", "/brochures", "/social", "/create"];
+const protectedPrefixes = ["/dashboard", "/onboarding", "/reports", "/listings", "/leads", "/settings", "/short-term-rentals", "/appraisals", "/brochures", "/social", "/create", "/marketing"];
 
 const CANONICAL_PRODUCTION_HOST = "staypack.app";
 const LEGACY_NETLIFY_HOST = "staypack.netlify.app";
@@ -18,6 +18,10 @@ export async function middleware(request: NextRequest) {
 
   // Public proposals perform their own fresh access check; account cookies are irrelevant.
   const pathname = request.nextUrl.pathname;
+  // Embedded calculators do not depend on third-party account cookies.
+  if (pathname.startsWith("/embed/str-calculator/") || pathname.startsWith("/api/str-calculator/")) {
+    return NextResponse.next({ request });
+  }
   if (pathname === "/proposal" || pathname.startsWith("/proposal/") || pathname.startsWith("/api/proposals/")
     || pathname === "/example" || pathname.startsWith("/example/")
     || pathname === "/examples" || pathname.startsWith("/examples/")) {

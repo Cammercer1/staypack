@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import {
+  Calculator,
   FileText,
   House,
   Palmtree,
@@ -40,7 +41,7 @@ const navigationGroups = [
   },
   {
     label: "Marketing",
-    items: [{ href: "/brochures", label: "Brochures", icon: BookOpen }, { href: "/social", label: "Social media", icon: Images }],
+    items: [{ href: "/marketing/str-calculator", label: "STR calculator", icon: Calculator }, { href: "/brochures", label: "Brochures", icon: BookOpen }, { href: "/social", label: "Social media", icon: Images }],
   },
   {
     label: "Agency",
