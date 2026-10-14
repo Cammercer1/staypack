@@ -1,8 +1,9 @@
 "use client";
+import { useAppraisalRoutes } from "@/components/appraisals/AppraisalRoutes";
 
 import { useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
-import { ArrowDown, ArrowUp, Copy, Plus, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Download, Plus, Trash2, Upload } from "lucide-react";
 import type { ProposalDraft, ProposalPage } from "@/lib/digital-proposals/template";
 import { MAX_PROPOSAL_PDF_BYTES, type ProposalWorkspace, type ProposalVersionSummary } from "@/lib/digital-proposals/workspace";
 
@@ -48,6 +49,7 @@ export function ProposalDocumentsEditor({ reportId, form, draft, workspace, onWo
   reportId?: string; form: UseFormReturn<ProposalDraft>; draft: ProposalDraft;
   workspace?: ProposalWorkspace; onWorkspaceChange: (value: Partial<ProposalWorkspace>) => void; onBusyChange?: (busy: boolean) => void;
 }) {
+  const paths = useAppraisalRoutes(reportId);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   async function upload(file?: File) {
@@ -56,7 +58,7 @@ export function ProposalDocumentsEditor({ reportId, form, draft, workspace, onWo
     setBusy(true); onBusyChange?.(true); setMessage("");
     try {
       const body = new FormData(); body.set("file", file);
-      const { attachment } = await proposalFetch<{ attachment: ProposalWorkspace["attachments"][number] }>(`/api/str/appraisals/${reportId}/proposal/attachments`, { method: "POST", body });
+      const { attachment } = await proposalFetch<{ attachment: ProposalWorkspace["attachments"][number] }>(`${paths.api}/proposal/attachments`, { method: "POST", body });
       onWorkspaceChange({ attachments: [...workspace.attachments, attachment] });
       form.setValue("attachmentIds", [...form.getValues("attachmentIds"), attachment.id], { shouldDirty: true });
       setMessage("Document uploaded.");
@@ -67,7 +69,7 @@ export function ProposalDocumentsEditor({ reportId, form, draft, workspace, onWo
     <div><h2 className="font-semibold">Documents</h2><p className="mt-2 text-xs">PDFs appear on the Next steps page.</p></div>
     {workspace && reportId ? <>
       <label className="block text-sm"><span className="flex items-center gap-2"><Upload size={15} />Upload PDF · up to 4 MB</span><input type="file" accept="application/pdf" disabled={busy || workspace.attachments.length >= 50 || draft.attachmentIds.length >= 20} className="du-file-input du-file-input-sm mt-3 w-full" onChange={event => { void upload(event.target.files?.[0]); event.target.value = ""; }} /></label>
-      <ul className="space-y-3">{workspace.attachments.map(item => <li key={item.id} className="flex items-start gap-2 text-sm"><input type="checkbox" aria-label={`Include ${item.name}`} checked={draft.attachmentIds.includes(item.id)} disabled={busy} onChange={event => form.setValue("attachmentIds", event.target.checked ? [...draft.attachmentIds, item.id] : draft.attachmentIds.filter(id => id !== item.id), { shouldDirty: true })} /><a download={item.name} className="break-all underline underline-offset-4" href={`/api/str/appraisals/${reportId}/proposal/attachments/${item.id}`}>{item.name}</a></li>)}</ul>
+      <ul className="space-y-3">{workspace.attachments.map(item => <li key={item.id} className="flex items-start gap-2 text-sm"><input type="checkbox" aria-label={`Include ${item.name}`} checked={draft.attachmentIds.includes(item.id)} disabled={busy} onChange={event => form.setValue("attachmentIds", event.target.checked ? [...draft.attachmentIds, item.id] : draft.attachmentIds.filter(id => id !== item.id), { shouldDirty: true })} /><a download={item.name} className="break-all underline underline-offset-4" href={`${paths.api}/proposal/attachments/${item.id}`}>{item.name}</a></li>)}</ul>
       <p role="status" className="text-xs">{busy ? "Uploading document…" : message}</p>
     </> : <p className="text-sm">Open a saved appraisal to upload documents.</p>}
     <div className="border-t border-base-300 pt-5"><h2 className="font-semibold">Action links</h2><p className="mt-2 text-xs">Add a signing link or another next step.</p></div>
@@ -85,17 +87,18 @@ export function ProposalSharePanel({ reportId, workspace, onSave, onWorkspaceCha
   reportId: string; workspace: ProposalWorkspace; onSave: () => Promise<number | null>;
   onWorkspaceChange: (value: Partial<ProposalWorkspace>) => void; valid: boolean;
 }) {
+  const paths = useAppraisalRoutes(reportId);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   async function preparePdf(version: ProposalVersionSummary) {
     setMessage("Proposal published. Preparing the PDF…");
     try {
-      const { status } = await proposalFetch<{ status: "ready" | "generating" }>(`/api/str/appraisals/${reportId}/proposal/pdf`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ versionId: version.id }) });
-      const refreshed = await proposalFetch<ProposalWorkspace>(`/api/str/appraisals/${reportId}/proposal`);
+      const { status } = await proposalFetch<{ status: "ready" | "generating" }>(`${paths.api}/proposal/pdf`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ versionId: version.id }) });
+      const refreshed = await proposalFetch<ProposalWorkspace>(`${paths.api}/proposal`);
       onWorkspaceChange({ versions: refreshed.versions });
       setMessage(status === "ready" ? "Proposal and PDF ready to share." : "Your digital proposal is live. The PDF is being prepared.");
     } catch (error) {
-      const refreshed = await proposalFetch<ProposalWorkspace>(`/api/str/appraisals/${reportId}/proposal`).catch(() => null);
+      const refreshed = await proposalFetch<ProposalWorkspace>(`${paths.api}/proposal`).catch(() => null);
       if (refreshed) onWorkspaceChange({ versions: refreshed.versions });
       setMessage(error instanceof Error ? error.message : "Your digital proposal is live. Retry the PDF below.");
     }
@@ -105,7 +108,7 @@ export function ProposalSharePanel({ reportId, workspace, onSave, onWorkspaceCha
     try {
       const revision = await onSave();
       if (revision === null) return;
-      const { version } = await proposalFetch<{ version: ProposalVersionSummary }>(`/api/str/appraisals/${reportId}/proposal/publish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision, sourceFingerprint: workspace.sourceFingerprint }) });
+      const { version } = await proposalFetch<{ version: ProposalVersionSummary }>(`${paths.api}/proposal/publish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision, sourceFingerprint: workspace.sourceFingerprint }) });
       onWorkspaceChange({ revision, versions: [version, ...workspace.versions.filter(item => item.id !== version.id)] });
       setMessage("Proposal published. Copy the link below to share it.");
       if (version.pdf_status !== "ready") await preparePdf(version);
@@ -115,7 +118,7 @@ export function ProposalSharePanel({ reportId, workspace, onSave, onWorkspaceCha
   async function revoke(versionId: string) {
     setBusy(true);
     try {
-      const { revokedAt } = await proposalFetch<{ revokedAt: string }>(`/api/str/appraisals/${reportId}/proposal/revoke`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ versionId, linkId: workspace.versions.find(item => item.id === versionId)?.link_id }) });
+      const { revokedAt } = await proposalFetch<{ revokedAt: string }>(`${paths.api}/proposal/revoke`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ versionId, linkId: workspace.versions.find(item => item.id === versionId)?.link_id }) });
       onWorkspaceChange({ versions: workspace.versions.map(item => item.id === versionId ? { ...item, revoked_at: revokedAt } : item) }); setMessage("Share link revoked.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to revoke link."); }
     finally { setBusy(false); }
@@ -128,7 +131,7 @@ export function ProposalSharePanel({ reportId, workspace, onSave, onWorkspaceCha
     {workspace.versions.map(version => <div key={version.id} className="space-y-3 border-t border-base-300 pt-4 text-sm">
       <div className="flex justify-between gap-2"><strong>Published proposal</strong><span>{version.revoked_at ? "Revoked" : "Active"}</span></div>
       <p className="text-xs">{new Date(version.created_at).toLocaleString("en-AU", { timeZone: "Australia/Sydney" })}</p>
-      {!version.revoked_at && <div className="flex flex-wrap gap-2"><a className="du-btn du-btn-sm" target="_blank" rel="noreferrer" href={`/short-term-rentals/appraisals/${reportId}/preview?version=${version.id}`}>Preview</a><button type="button" className="du-btn du-btn-sm" onClick={async () => { try { await navigator.clipboard.writeText(new URL(version.path, window.location.origin).href); setMessage("Link copied."); } catch { setMessage(`Copy this link: ${new URL(version.path, window.location.origin).href}`); } }}><Copy size={14} />Copy link</button><button type="button" disabled={busy} className="du-btn du-btn-sm du-btn-ghost" onClick={() => void revoke(version.id)}>Revoke link</button>{version.pdf_status !== "ready" && <button type="button" disabled={busy} className="du-btn du-btn-sm" onClick={() => { setBusy(true); void preparePdf(version).finally(() => setBusy(false)); }}>{version.pdf_status === "failed" ? "Retry PDF" : "Prepare PDF"}</button>}</div>}
+      {!version.revoked_at && <div className="flex flex-wrap gap-2"><a className="du-btn du-btn-sm" target="_blank" rel="noreferrer" href={`${paths.editor}/preview?version=${version.id}`}>Preview</a><button type="button" className="du-btn du-btn-sm" onClick={async () => { try { await navigator.clipboard.writeText(new URL(version.path, window.location.origin).href); setMessage("Link copied."); } catch { setMessage(`Copy this link: ${new URL(version.path, window.location.origin).href}`); } }}><Copy size={14} />Copy link</button><button type="button" disabled={busy} className="du-btn du-btn-sm du-btn-ghost" onClick={() => void revoke(version.id)}>Revoke link</button>{version.pdf_status === "ready" && <a className="du-btn du-btn-sm" download href={`${version.path.replace(/^\/proposal\//, "/api/proposals/")}/pdf`}><Download size={14} />Download appraisal PDF</a>}{version.pdf_status !== "ready" && <button type="button" disabled={busy} className="du-btn du-btn-sm" onClick={() => { setBusy(true); void preparePdf(version).finally(() => setBusy(false)); }}>{version.pdf_status === "failed" ? "Retry PDF" : "Prepare PDF"}</button>}</div>}
     </div>)}
   </div>;
 }

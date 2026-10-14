@@ -1,4 +1,5 @@
 "use client";
+import { UnsavedListingGuard } from "@/components/listings/UnsavedListingGuard";
 import { AppraisalDataToolbar } from "@/components/appraisals/AppraisalDataToolbar";
 import { ComparableFilters } from "@/components/appraisals/ComparableFilters";
 import { avmPriceSuggestion } from "@/lib/listings/pricing";
@@ -30,13 +31,15 @@ import type { Listing, SalesAppraisalJob } from "@/lib/types";
 const POLL_INTERVAL_MS = 2000;
 
 type Props = {
+  appraisalEndpoint?: string;
+  onDirtyChange?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
   listing: Listing;
   activeJob?: SalesAppraisalJob | null;
   compsPrefetching?: boolean;
   onListingChange: (listing: Listing) => void;
   onJobChange?: (job: SalesAppraisalJob | null) => void;
-  onContinue: () => void;
+  onContinue: (listing?: Listing) => void;
   continueLabel?: string;
 };
 
@@ -45,6 +48,8 @@ type ApiError = {
 };
 
 export function SalesAppraisalDataStep({
+  appraisalEndpoint,
+  onDirtyChange,
   listing,
   activeJob = null,
   compsPrefetching = false,
@@ -54,6 +59,7 @@ export function SalesAppraisalDataStep({
   continueLabel,
   onBusyChange,
 }: Props) {
+  const endpoint = appraisalEndpoint ?? `/api/listings/${listing.id}/sales-appraisal`;
   const parsed = useMemo(() => resolveAppraisalInput(listing), [listing]);
   const pool = useMemo(
     () => (parsed ? orderSalesAppraisalCompPool(parsed) : []),
@@ -95,6 +101,10 @@ export function SalesAppraisalDataStep({
     }
     return [];
   });
+
+  const evidenceDirty = priceMin !== String(appraisal?.priceMin ?? "") || priceMax !== String(appraisal?.priceMax ?? "") || priceMid !== String(appraisal?.priceMidpoint ?? "")
+    || JSON.stringify(selectedIds) !== JSON.stringify(appraisal?.selectedCompListingIds?.length ? appraisal.selectedCompListingIds : defaultSelectedSaleCompListingIds(parsed)) || agentReviewConfirmed !== (agencyGuideReview?.confirmed ?? false);
+  useEffect(() => { onDirtyChange?.(evidenceDirty); }, [evidenceDirty, onDirtyChange]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- sync editable fields when job polling refreshes the listing. */
   useEffect(() => {
@@ -170,7 +180,7 @@ export function SalesAppraisalDataStep({
     async function pollListing() {
       try {
         const response = await fetch(
-          `/api/listings/${listing.id}/sales-appraisal/jobs/${jobId}`,
+          `${endpoint}/jobs/${jobId}`,
           { cache: "no-store" },
         );
         const payload = await response.json();
@@ -234,6 +244,7 @@ export function SalesAppraisalDataStep({
   }, [
     activeJob?.id,
     listing.id,
+    endpoint,
     jobProcessing,
     onJobChange,
     onListingChange,
@@ -255,8 +266,9 @@ export function SalesAppraisalDataStep({
   async function fetchComps(options?: { silent?: boolean }) {
     setFetching(true);
     try {
-      const response = await fetch(`/api/listings/${listing.id}/sales-appraisal/enrich`, {
+      const response = await fetch(`${endpoint}/enrich`, {
         method: "POST",
+        ...(appraisalEndpoint ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expected_updated_at: listing.updated_at }) } : {}),
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -287,8 +299,8 @@ export function SalesAppraisalDataStep({
   async function resetPrice() {
     setSaving(true);
     try {
-      const response = await fetch(`/api/listings/${listing.id}/sales-appraisal/data`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset_price: true }),
+      const response = await fetch(`${endpoint}/data`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset_price: true, ...(appraisalEndpoint ? { expected_updated_at: listing.updated_at } : {}) }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Unable to reset appraisal");
@@ -300,9 +312,9 @@ export function SalesAppraisalDataStep({
   }
 
   useEffect(() => {
-    onBusyChange?.(saving);
+    onBusyChange?.(saving || (Boolean(appraisalEndpoint) && fetching));
     return () => onBusyChange?.(false);
-  }, [saving, onBusyChange]);
+  }, [saving, fetching, appraisalEndpoint, onBusyChange]);
 
   async function saveAndContinue() {
     if (!canContinue) {
@@ -313,11 +325,12 @@ export function SalesAppraisalDataStep({
     setSaving(true);
     try {
       const response = await fetch(
-        `/api/listings/${listing.id}/sales-appraisal/data`,
+        `${endpoint}/data`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            ...(appraisalEndpoint ? { expected_updated_at: listing.updated_at } : {}),
             ...(priceEdited.current ? {
               price_min: parsePrice(priceMin),
               price_max: parsePrice(priceMax),
@@ -339,7 +352,7 @@ export function SalesAppraisalDataStep({
       }
       priceEdited.current = false;
       toast.success("Appraisal data saved");
-      onContinue();
+      onContinue(payload.listing);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Unable to save appraisal data",
@@ -354,6 +367,7 @@ export function SalesAppraisalDataStep({
 
   return (
     <div className="space-y-6">
+      {appraisalEndpoint && <UnsavedListingGuard dirty={evidenceDirty} description="Your evidence changes are unsaved. Continue to proposal to save them." />}
       <AppraisalDataToolbar
         summary={priceSummary}
         selectedCount={selectedIds.length}
@@ -368,7 +382,7 @@ export function SalesAppraisalDataStep({
         continueLabel={continueLabel}
         onContinue={saveAndContinue}
       />
-      <fieldset disabled={saving} className="min-w-0 space-y-6">
+      <fieldset disabled={saving || (Boolean(appraisalEndpoint) && jobProcessing)} className="min-w-0 space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Review appraisal evidence</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -378,7 +392,7 @@ export function SalesAppraisalDataStep({
               : `Review the suggested price range and choose up to six comparable properties. The most relevant recent sales and current listings appear first.`
             : jobProcessing
               ? "Comparable sales are being fetched in the background. This page will update when they are ready."
-              : "Recently sold and for-sale comparables load when you start the appraisal. Adjust the estimated sale price band if needed, then choose featured comps."}
+              : "Fetch recently sold and for-sale comparables to support your appraisal. Adjust the estimated sale price band if needed, then choose featured comps."}
         </p>
       </div>
 

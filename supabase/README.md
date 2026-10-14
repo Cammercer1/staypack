@@ -124,8 +124,8 @@ Apply these migrations after the STR workspace migrations, in order:
 
 ### Account designs and publication
 
-`digital_proposal_assignments` holds one onboarding-owned design per agency:
-`agency_id`, `name`, positive integer `version`, and `defaults` (validated by
+`digital_proposal_assignments` holds one onboarding-owned design per agency and appraisal kind:
+`agency_id`, `kind` (`str`, `lease`, or `sales`), `name`, positive integer `version`, and `defaults` (validated by
 `proposalDraftSchema`). Provision/update assignments using a trusted server or
 admin migration and increment `version` when changing the design. Members can
 read the assignment but cannot write it. Without a row, the base template uses
@@ -264,3 +264,77 @@ Database RLS was exercised using both Cameron's operator identity and the existi
 member identity (zero prospect rows visible to Havenly). Anonymous access and customer
 writes/adoption are denied. Supabase security advisors report no findings on the added
 objects; pre-existing advisor findings were unchanged.
+
+
+## Shared rental and sales proposal workspace
+
+`20261014062925_shared_appraisal_workspace.sql` was applied to production on 14 October 2026
+so the local shared-appraisal branch can use the existing account and data. The
+filename matches the recorded production migration version. All 247 existing
+reports retained identical final JSON and status; STR design defaults and versions
+also retained identical checksums. The application release uses this existing
+migration without reapplying it.
+
+The sidebar exposes all appraisals, short-term rentals, rental appraisals and sales
+appraisals. Rental and sales follow Property → Review evidence → Proposal →
+Customer & share. The listing library supplies the starting property. Customer
+proposals have separate working inputs: changing their photos, description,
+figures or comparables does not edit the shared listing or other customers' work.
+The existing STR editor, branded renderers, example links and version-1 projection
+remain in place. Rental and sales use a typed version-2 projection in the same
+publication, attachment, agent-selection, analytics and revocation infrastructure.
+
+The physical `str_appraisals` table is retained for compatibility with existing
+report/recipient RPCs and deployed writers. Its `kind`, `inputs_json`,
+`input_revision`, `document_json` and `document_revision` columns serve the new
+products. `appraisals` is a security-invoker view over that table, with authenticated
+read access governed by the underlying agency RLS. Legacy rental/sales reports
+are registered and snapshotted by the migration without changing their existing
+report JSON. Registration triggers also cover the legacy generation routes.
+
+`create_appraisal` is idempotent per request UUID and rejects reuse for a different
+property, kind or recipient. Saves compare the expected timestamp. Enrichment
+jobs carry the appraisal ID and source timestamp; workers save only into that
+appraisal and fail on conflicting edits. Property changes invalidate evidence via
+the existing subject fingerprint. Publishing requires a prepared document at the
+current input revision. Existing links can still be viewed/revoked while new
+evidence awaits review. PDFs render only the frozen published document through
+Browserless, using the existing rental/sales print templates.
+
+Brochure routes, editors and renderers are unchanged. The first appraisal remains
+the property's source pointer; subsequent customer appraisals never replace it.
+The first prepared document initializes a missing source report once. Later
+proposal changes update the separate working document and cannot rewrite an
+existing brochure source or historical publication.
+
+Release validation:
+
+- `npm run build` includes navigation regression tests and verifies all 60
+  required creation, appraisal, proposal and marketing routes. Missing routes fail the deploy build.
+- `npm test`, `npm run lint`, and `npx tsc --noEmit` cover the shared code and the
+  existing STR, appraisal and brochure modules.
+- Against a disposable backend, opt in with `APPRAISAL_INTEGRATION_TEST=1` and
+  `STAGING_BASE_URL` to run `lib/appraisals/workspace.live.test.ts` and
+  `tests/staging/appraisal-workspace.spec.ts`. The integration suite seeds synthetic
+  evidence and tests actual worker persistence with the provider boundary mocked.
+  `APPRAISAL_PDF_TEST=1` additionally exercises the configured Browserless server,
+  private storage and PDF download. Never point these fixture tests at production.
+- Run `tests/staging/str-workspace.spec.ts` with `STR_LIVE_TEST=1` against the same
+  disposable backend to verify the existing STR navigation and publishing journey.
+
+Local migration verification replays the schema, skipping only old data-only
+migrations `037`, `040`, `041` that reference production agency UUIDs. Legacy
+three-digit migration names contain duplicate versions; local copies receive
+unique test-only version numbers. Repository and production history stay unchanged. Migration verification also seeds
+legacy STR/rental/sales records before applying the new migration and checks that
+their JSON, publication status and STR assignment survive unchanged.
+
+Verification on 14 October 2026: 1,072 unit/component tests passed (two live suites
+are opt-in); all three desktop/mobile STR, rental and sales browser journeys
+passed against the compiled build. The rental/sales live API suite passed with
+agency RLS, stale saves, background-worker conflicts, publication immutability,
+revocation/archive, and real local Browserless PDF generation/download. Clean
+schema replay, legacy backfill assertions and PostgreSQL schema lint passed.
+TypeScript, the production build and both Netlify worker bundles passed. ESLint
+reported zero errors and 53 existing warnings. External market evidence was
+synthetic; no production records or provider configuration were changed.

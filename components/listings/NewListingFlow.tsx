@@ -231,7 +231,7 @@ export function NewListingFlow({
       } catch {
         /* Saving the listing succeeded even if browser storage is unavailable. */
       }
-      toast.success("Listing created");
+      toast.success("Property saved");
       if (result.geocode_warning) toast.message(result.geocode_warning);
       if (onSaved) await onSaved(result.listing.id);
       else {
@@ -298,7 +298,7 @@ export function NewListingFlow({
     </>
   );
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className="mx-auto max-w-4xl space-y-5 lg:mx-0">
       <UnsavedListingGuard dirty={storageFailed && Boolean(draft) && !saved} />
       <div className="flex items-center gap-3 text-sm">
         <span
@@ -568,7 +568,7 @@ export function NewListingFlow({
               {notices}
               <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border bg-card p-5 sm:flex-row sm:items-center">
                 <p className="max-w-lg text-sm text-muted-foreground">
-                  {onSaved ? "Save this property to your shared library, then continue to the customer details for your STR appraisal." : "Create the property record, then choose an appraisal or marketing document. You can add photos and update details at any time."}
+                  {onSaved ? "Save the property details and continue." : "Create the property record, then choose an appraisal or marketing document. You can add photos and update details at any time."}
                 </p>
                 <Button
                   type="submit"
@@ -580,8 +580,8 @@ export function NewListingFlow({
                   {form.formState.isSubmitting
                     ? "Creating…"
                     : saved
-                      ? "Listing created"
-                      : "Create listing"}
+                      ? (onSaved ? "Property saved" : "Listing created")
+                      : (onSaved ? "Save property and continue" : "Create listing")}
                 </Button>
               </div>
             </form>

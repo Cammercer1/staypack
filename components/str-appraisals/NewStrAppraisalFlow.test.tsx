@@ -5,9 +5,9 @@ import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFix
 import { NewStrAppraisalFlow } from "./NewStrAppraisalFlow";
 
 const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => router }));
+vi.mock("next/navigation", () => ({ useRouter: () => router, useSearchParams: () => new URLSearchParams() }));
 vi.mock("@/components/listings/NewListingFlow", () => ({ NewListingFlow: () => null }));
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
+afterEach(() => { sessionStorage.clear(); cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 it("creates a general draft without asking for a customer or requesting an estimate", async () => {
   const fetcher = vi.fn().mockResolvedValue(Response.json({ report: { id: "new-draft" } }));
@@ -34,4 +34,20 @@ it("prevents duplicate clicks and reuses the request id after a failed creation"
   fireEvent.click(screen.getByRole("button", { name: "Create appraisal" }));
   await waitFor(() => expect(router.push).toHaveBeenCalled());
   expect(JSON.parse(fetcher.mock.calls[0][1].body).request_id).toBe(JSON.parse(fetcher.mock.calls[1][1].body).request_id);
+});
+
+it("reuses the pending creation request after refreshing and clears it on success", async () => {
+  const fetcher = vi.fn().mockRejectedValueOnce(new Error("Connection lost")).mockResolvedValueOnce(Response.json({ report: { id: "recovered-draft" } }));
+  vi.stubGlobal("fetch", fetcher);
+  const fixture = createLintRegressionFixtures().listing;
+  const view = render(<NewStrAppraisalFlow initialListing={fixture} storageKey="refresh-test" kind="lease" />);
+  fireEvent.click(screen.getByRole("button", { name: "Create appraisal" }));
+  await screen.findByRole("alert");
+  const requestId = JSON.parse(fetcher.mock.calls[0][1].body).request_id;
+  view.unmount();
+  render(<NewStrAppraisalFlow initialListing={fixture} storageKey="refresh-test" kind="lease" />);
+  fireEvent.click(screen.getByRole("button", { name: "Create appraisal" }));
+  await waitFor(() => expect(router.push).toHaveBeenCalled());
+  expect(JSON.parse(fetcher.mock.calls[1][1].body).request_id).toBe(requestId);
+  expect(sessionStorage.getItem(`refresh-test:appraisal-request:lease:${fixture.id}`)).toBeNull();
 });

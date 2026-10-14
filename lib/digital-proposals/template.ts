@@ -29,7 +29,7 @@ export const proposalLinkSchema = z.object({
 }).strict();
 
 export const proposalDraftSchema = z.object({
-  version: z.literal(1), templateId: z.enum(["editorial-base", "property-providers", "agency-proposal"]), templateVersion: z.literal(1),
+  version: z.literal(1), templateId: z.enum(["editorial-base", "property-providers", "agency-proposal", "appraisal-base"]), templateVersion: z.literal(1),
   presetId: z.enum(["staypack", "coastal", "studio"]),
   brandOverrides: brandOverridesSchema,
   content: z.object({
@@ -90,8 +90,11 @@ export const BASE_DIGITAL_TEMPLATE = {
 export function validateProposalDraft(input: unknown, data: ProposalData) {
   const parsed = proposalDraftSchema.safeParse(input);
   if (!parsed.success) return { draft: null, errors: parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`) };
-  const errors = Object.entries(parsed.data.content).flatMap(([field, text]) =>
-    resolveTokenText(text, data).unknown.map(key => `${field}: unknown token “${key}”`));
+  const errors: string[] = [];
+  if (data.appraisal && parsed.data.templateId !== "appraisal-base") errors.push("Choose a rental or sales proposal design for this appraisal.");
+  if (data.appraisal && parsed.data.pages.some(page => page.enabled && page.kind === "forecast")) errors.push("Forecast pages are available for short-term rental proposals only.");
+  errors.push(...Object.entries(parsed.data.content).flatMap(([field, text]) =>
+    resolveTokenText(text, data).unknown.map(key => `${field}: unknown token “${key}”`)));
   for (const page of parsed.data.pages) {
     for (const text of [page.title, page.body, ...(page.service ? serviceTokenTexts(page.service) : [])]) errors.push(...resolveTokenText(text, data).unknown.map(key => `${page.title}: unknown token “${key}”`));
   }

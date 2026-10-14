@@ -14,7 +14,7 @@ export async function requireStrWorkspaceAccess() {
 export async function requireStrAppraisalAccess(reportId: string) {
   const context = await requireReportWithListing(reportId);
   const { data, error } = await context.supabase.from("str_appraisals").select("*")
-    .eq("report_id", reportId).eq("agency_id", context.agency.id).maybeSingle();
+    .eq("report_id", reportId).eq("agency_id", context.agency.id).eq("kind", "str").maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("STR appraisal not found");
   return { ...context, appraisal: data as StrAppraisal };

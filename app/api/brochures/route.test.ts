@@ -1,0 +1,14 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { POST } from './route';
+const mocks = vi.hoisted(() => ({ access:vi.fn(), open:vi.fn(), origin:vi.fn(()=>true) }));
+vi.mock('@/lib/auth/requireUser',()=>({requireListingAccess:mocks.access}));
+vi.mock('@/lib/brochures/workspace',async original=>({...await original<typeof import('@/lib/brochures/workspace')>(),openOrCreateBrochure:mocks.open}));
+vi.mock('@/lib/digital-proposals/requestOrigin',()=>({requestOriginAllowed:mocks.origin}));
+vi.mock('next/navigation',()=>({unstable_rethrow:vi.fn()}));
+const id='11111111-1111-4111-8111-111111111111';
+const request=(type='sales_brochure')=>new Request('http://localhost/api/brochures',{method:'POST',body:JSON.stringify({listing_id:id,type})});
+afterEach(()=>{vi.clearAllMocks();mocks.origin.mockReturnValue(true)});
+it('validates brochure type before accessing a property',async()=>{expect((await POST(request('str_report'))).status).toBe(400);expect(mocks.access).not.toHaveBeenCalled()});
+it('does not create a brochure for an inaccessible property',async()=>{mocks.access.mockRejectedValueOnce(new Error('Listing not found'));expect((await POST(request())).status).toBe(400);expect(mocks.open).not.toHaveBeenCalled()});
+it('rejects cross-origin creation',async()=>{mocks.origin.mockReturnValue(false);expect((await POST(request())).status).toBe(403);expect(mocks.access).not.toHaveBeenCalled()});
+it('returns the existing document route after checking property access',async()=>{mocks.access.mockResolvedValue({supabase:{},listing:{id}});mocks.open.mockResolvedValue({id:'brochure',archived:false});const response=await POST(request());expect(response.status).toBe(200);expect(await response.json()).toEqual({id:'brochure',path:'/brochures/brochure'});expect(response.headers.get('cache-control')).toBe('private, no-store')});

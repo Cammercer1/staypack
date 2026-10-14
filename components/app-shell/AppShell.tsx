@@ -5,12 +5,15 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import {
+  FileText,
   House,
   Palmtree,
   Building2,
   LayoutDashboard,
   Menu,
   Palette,
+  BookOpen,
+  Images,
   Plus,
   Users,
   X,
@@ -24,9 +27,20 @@ const navigationGroups = [
     label: "Workspace",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/listings", label: "Listings", icon: House },
-      { href: "/short-term-rentals", label: "Short-Term Rentals", icon: Palmtree },
     ],
+  },
+  {
+    label: "Appraisals",
+    items: [
+      { href: "/appraisals", label: "All appraisals", icon: FileText },
+      { href: "/short-term-rentals", label: "Short-Term Rentals", icon: Palmtree },
+      { href: "/appraisals/rental", label: "Rental appraisals", icon: House },
+      { href: "/appraisals/sales", label: "Sales appraisals", icon: Building2 },
+    ],
+  },
+  {
+    label: "Marketing",
+    items: [{ href: "/brochures", label: "Brochures", icon: BookOpen }, { href: "/social", label: "Social media", icon: Images }],
   },
   {
     label: "Agency",
@@ -47,13 +61,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <StayPackLogo href="/dashboard" height={27} />
       </div>
       <Link
-        href="/listings/new"
+        href="/create"
         prefetch={false}
         onClick={onNavigate}
         className="du-btn du-btn-primary du-btn-sm mt-10 min-h-12 w-full rounded-xl"
       >
         <Plus className="size-4" aria-hidden="true" />
-        New listing
+        Create
       </Link>
       <nav aria-label="Main navigation" className="mt-8 space-y-7">
         {navigationGroups.map((group) => (
@@ -64,7 +78,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <ul className="mt-2 w-full space-y-1">
               {group.items.map(({ href, label, icon: Icon }) => {
                 const active =
-                  pathname === href || pathname.startsWith(`${href}/`);
+                  pathname === href || (href !== "/appraisals" && pathname.startsWith(`${href}/`));
                 return (
                   <li key={href}>
                     <Link

@@ -1,4 +1,5 @@
 "use client";
+import { UnsavedListingGuard } from "@/components/listings/UnsavedListingGuard";
 import { AppraisalDataToolbar } from "@/components/appraisals/AppraisalDataToolbar";
 import { ComparableFilters } from "@/components/appraisals/ComparableFilters";
 import { avmPriceSuggestion } from "@/lib/listings/pricing";
@@ -34,13 +35,15 @@ import type { LeaseAppraisalJob, Listing } from "@/lib/types";
 const POLL_INTERVAL_MS = 2000;
 
 type Props = {
+  appraisalEndpoint?: string;
+  onDirtyChange?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
   listing: Listing;
   activeJob?: LeaseAppraisalJob | null;
   compsPrefetching?: boolean;
   onListingChange: (listing: Listing) => void;
   onJobChange?: (job: LeaseAppraisalJob | null) => void;
-  onContinue: () => void;
+  onContinue: (listing?: Listing) => void;
   continueLabel?: string;
 };
 
@@ -49,6 +52,8 @@ type ApiError = {
 };
 
 export function LeaseAppraisalDataStep({
+  appraisalEndpoint,
+  onDirtyChange,
   listing,
   activeJob = null,
   compsPrefetching = false,
@@ -58,6 +63,7 @@ export function LeaseAppraisalDataStep({
   continueLabel,
   onBusyChange,
 }: Props) {
+  const endpoint = appraisalEndpoint ?? `/api/listings/${listing.id}/lease-appraisal`;
   const parsed = useMemo(() => resolveAppraisalInput(listing), [listing]);
   const pool = useMemo(
     () => (parsed ? orderLeaseAppraisalCompPool(parsed) : []),
@@ -98,6 +104,10 @@ export function LeaseAppraisalDataStep({
     }
     return [];
   });
+
+  const evidenceDirty = weeklyMin !== String(appraisal?.weeklyMin ?? "") || weeklyMax !== String(appraisal?.weeklyMax ?? "") || weeklyMid !== String(appraisal?.weeklyMidpoint ?? "")
+    || JSON.stringify(selectedIds) !== JSON.stringify(appraisal?.selectedCompListingIds?.length ? appraisal.selectedCompListingIds : defaultSelectedCompListingIds(parsed));
+  useEffect(() => { onDirtyChange?.(evidenceDirty); }, [evidenceDirty, onDirtyChange]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- sync editable fields when job polling refreshes the listing. */
   useEffect(() => {
@@ -167,7 +177,7 @@ export function LeaseAppraisalDataStep({
     async function pollListing() {
       try {
         const response = await fetch(
-          `/api/listings/${listing.id}/lease-appraisal/jobs/${jobId}`,
+          `${endpoint}/jobs/${jobId}`,
           { cache: "no-store" },
         );
         const payload = await response.json();
@@ -231,6 +241,7 @@ export function LeaseAppraisalDataStep({
   }, [
     activeJob?.id,
     listing.id,
+    endpoint,
     jobProcessing,
     onJobChange,
     onListingChange,
@@ -252,8 +263,9 @@ export function LeaseAppraisalDataStep({
   async function fetchComps(options?: { silent?: boolean }) {
     setFetching(true);
     try {
-      const response = await fetch(`/api/listings/${listing.id}/lease-appraisal/enrich`, {
+      const response = await fetch(`${endpoint}/enrich`, {
         method: "POST",
+        ...(appraisalEndpoint ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expected_updated_at: listing.updated_at }) } : {}),
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -284,8 +296,8 @@ export function LeaseAppraisalDataStep({
   async function resetPrice() {
     setSaving(true);
     try {
-      const response = await fetch(`/api/listings/${listing.id}/lease-appraisal/data`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset_price: true }),
+      const response = await fetch(`${endpoint}/data`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset_price: true, ...(appraisalEndpoint ? { expected_updated_at: listing.updated_at } : {}) }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Unable to reset appraisal");
@@ -297,9 +309,9 @@ export function LeaseAppraisalDataStep({
   }
 
   useEffect(() => {
-    onBusyChange?.(saving);
+    onBusyChange?.(saving || (Boolean(appraisalEndpoint) && fetching));
     return () => onBusyChange?.(false);
-  }, [saving, onBusyChange]);
+  }, [saving, fetching, appraisalEndpoint, onBusyChange]);
 
   async function saveAndContinue() {
     if (!canContinue) {
@@ -310,11 +322,12 @@ export function LeaseAppraisalDataStep({
     setSaving(true);
     try {
       const response = await fetch(
-        `/api/listings/${listing.id}/lease-appraisal/data`,
+        `${endpoint}/data`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            ...(appraisalEndpoint ? { expected_updated_at: listing.updated_at } : {}),
             ...(priceEdited.current ? {
               weekly_min: parseRent(weeklyMin),
               weekly_max: parseRent(weeklyMax),
@@ -333,7 +346,7 @@ export function LeaseAppraisalDataStep({
       }
       priceEdited.current = false;
       toast.success("Appraisal data saved");
-      onContinue();
+      onContinue(payload.listing);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Unable to save appraisal data",
@@ -348,6 +361,7 @@ export function LeaseAppraisalDataStep({
 
   return (
     <div className="space-y-6">
+      {appraisalEndpoint && <UnsavedListingGuard dirty={evidenceDirty} description="Your evidence changes are unsaved. Continue to proposal to save them." />}
       <AppraisalDataToolbar
         summary={rentSummary}
         selectedCount={selectedIds.length}
@@ -362,7 +376,7 @@ export function LeaseAppraisalDataStep({
         continueLabel={continueLabel}
         onContinue={saveAndContinue}
       />
-      <fieldset disabled={saving} className="min-w-0 space-y-6">
+      <fieldset disabled={saving || (Boolean(appraisalEndpoint) && jobProcessing)} className="min-w-0 space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Review appraisal evidence</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -372,7 +386,7 @@ export function LeaseAppraisalDataStep({
               : `Review the suggested rent range and choose up to ${MAX_LEASE_APPRAISAL_FEATURED_COMPS} comparable rentals. Properties in ${listing.suburb ?? "your suburb"} appear first, followed by nearby areas.`
             : jobProcessing
               ? "Comparable rentals are being fetched in the background. This page will update when they are ready."
-              : "Comparable rentals load when you start the appraisal. Adjust the weekly rent band if needed, then choose featured comps."}
+              : "Fetch comparable rentals to support your appraisal. Adjust the weekly rent band if needed, then choose featured comps."}
         </p>
       </div>
 

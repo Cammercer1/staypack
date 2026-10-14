@@ -1,14 +1,16 @@
 "use client";
+import { useAppraisalRoutes } from "@/components/appraisals/AppraisalRoutes";
 import { useEffect, useState } from "react";
 import { activityLabels, type ActivitySummary } from "@/lib/digital-proposals/activity";
 import { proposalFetch } from "./ProposalWorkspaceControls";
 export function ProposalActivity({ reportId, refreshKey }: { reportId: string; refreshKey?: string }) {
+  const paths = useAppraisalRoutes(reportId);
   const [summary, setSummary] = useState<ActivitySummary | null>(null);
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    void proposalFetch<ActivitySummary>(`/api/str/appraisals/${reportId}/proposal/activity`).then(value => { if (!cancelled) { setSummary(value); setError(""); } }).catch(err => { if (!cancelled) setError(err.message); });
+    void proposalFetch<ActivitySummary>(`${paths.api}/proposal/activity`).then(value => { if (!cancelled) { setSummary(value); setError(""); } }).catch(err => { if (!cancelled) setError(err.message); });
     return () => { cancelled = true; };
   }, [reportId, refreshKey, reload]);
   return <section className="rounded-xl border border-base-300 bg-base-100 p-5 sm:p-7">

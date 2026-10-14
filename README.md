@@ -222,6 +222,46 @@ into `final_report_json`. Numeric listing IDs are decoded without rounding.
 
 Choose **Optional link and QR code** in the preview step. Reports can link to their own online version or a custom website. Brochures and business cards accept a custom URL. Save the choice, then publish the report or brochure to apply it. Business cards apply it when saved. PDF generation waits for pending report/brochure link choices to be published.
 
+### Appraisal and marketing workspaces
+
+The dashboard focuses on appraisals. The global **Create** action offers STR, rental
+and sales appraisals, brochures, and social media posts. All five use the same
+property picker: select an existing property or import/add one, review its details
+and photos, then continue to the chosen editor. Selection persists in the URL;
+unfinished import fields use the same agency/user-scoped session draft. All appraisals, short-term
+rentals, rental appraisals and sales appraisals remain separate navigation entries.
+Published appraisals retain their fixed proposal and downloadable appraisal PDF.
+
+Standalone sales and rental marketing brochures live at `/brochures`. Users can
+choose an existing property or import/add one, review its details and photos, then
+open the existing brochure editor. Property data stays in `listings`; brochure
+documents stay in `collateral_items`. This navigation change requires no additional
+database migration or separate database.
+
+There is one brochure per property and type. Opening it reuses the saved document;
+it never regenerates or replaces its content. Restoring an archived brochure is an
+explicit action. The existing templates, publishing and PDF pipeline are reused.
+`/listings` redirects to Brochures, and legacy property brochure URLs redirect to
+their document or the new creation flow. Individual property and published
+document URLs remain available.
+
+Social media has its own library at `/social` with search and saved design previews.
+Creation reuses the existing `social_posts` collateral for that property. An explicit
+POST initializes a missing design with a conditional write; visiting or refreshing
+an editor never regenerates a saved layout. Legacy property social URLs redirect
+to the canonical editor or creation flow. Social posts need one property photo;
+new brochures retain the five-photo requirement.
+
+Editors expose **Create another for this property**, retaining property identity
+across outputs. Proposal and brochure designs, published snapshots and their PDF
+pipelines are unchanged. Social exports save once, retain completed formats on
+partial failures, and download all three formats as one ZIP to avoid browser
+multiple-download blocking. Failed appraisal creation retries retain their request
+ID through refreshes so an interrupted response cannot create a second draft.
+
+`npm run build` verifies Create, Social media, brochure, appraisal and proposal
+routes. Navigation tests require each destination on desktop and mobile.
+
 Saving a link draft does not change an existing published QR or PDF. New QR images use unique storage paths and encode that document's destination directly. Regenerating copy preserves the choice. Existing documents without link metadata keep their original QR assets until explicitly changed.
 
 Property-page creation, enquiry capture/status editing, and landing-page analytics are retired. The main navigation, dashboard, property library, and workspace focus on reports. Existing public property pages and printed redirects continue working, with agent contact details replacing enquiry forms. Enquiry history is removed from Settings and the old enquiries page returns 404. Source code, database history, and old assets are retained; no database migration is required.

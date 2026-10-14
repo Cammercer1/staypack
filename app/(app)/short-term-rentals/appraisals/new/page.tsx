@@ -15,5 +15,5 @@ export default async function NewStrAppraisalPage({ searchParams }: { searchPara
     if (!data) notFound();
     listing = data as Listing;
   }
-  return <NewStrAppraisalFlow initialListing={listing} storageKey={`staypacks:str-property:${agency.id}:${user.id}`} />;
+  return <NewStrAppraisalFlow initialListing={listing} storageKey={`property-import:${agency.id}:${user.id}`} />;
 }

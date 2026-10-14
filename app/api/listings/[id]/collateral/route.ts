@@ -75,7 +75,7 @@ export async function POST(
       return NextResponse.json({ error: purposeError }, { status: 400 });
     }
 
-    const photoError = collateralPhotoRequirementError(listing);
+    const photoError = collateralPhotoRequirementError(listing, body.type);
     if (photoError) {
       return NextResponse.json({ error: photoError }, { status: 400 });
     }

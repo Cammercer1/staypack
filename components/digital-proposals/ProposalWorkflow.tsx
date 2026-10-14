@@ -1,4 +1,5 @@
 "use client";
+import { useAppraisalRoutes } from "@/components/appraisals/AppraisalRoutes";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Eye, Save } from "lucide-react";
@@ -17,6 +18,7 @@ export const ProposalWorkflow = forwardRef<ProposalWorkflowHandle, {
   reportId: string; stage: "proposal" | "share"; disabled?: boolean; refreshKey?: string;
   onContinue?: () => void; onBusyChange?: (busy: boolean) => void;
 }>(function ProposalWorkflow({ reportId, stage, disabled, refreshKey, onContinue, onBusyChange }, ref) {
+  const paths = useAppraisalRoutes(reportId);
   const [workspace, setWorkspace] = useState<ProposalWorkspace | null>(null);
   const sourceKey = `${reportId}:${refreshKey ?? ""}`;
   const [loadedSourceKey, setLoadedSourceKey] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export const ProposalWorkflow = forwardRef<ProposalWorkflowHandle, {
   const { reset } = form;
   useEffect(() => {
     let cancelled = false;
-    void proposalFetch<ProposalWorkspace>(`/api/str/appraisals/${reportId}/proposal`).then(value => {
+    void proposalFetch<ProposalWorkspace>(`${paths.api}/proposal`).then(value => {
       if (cancelled) return;
       setWorkspace(value);
       setLoadedSourceKey(sourceKey);
@@ -40,14 +42,14 @@ export const ProposalWorkflow = forwardRef<ProposalWorkflowHandle, {
       setMessage("");
     }).catch(error => { if (!cancelled) setLoadError({ key: sourceKey, message: error.message }); });
     return () => { cancelled = true; };
-  }, [reportId, sourceKey, reset]);
+  }, [reportId, sourceKey, reset, paths.api]);
   async function save() {
     if (!workspace?.data || loadedSourceKey !== sourceKey || saving.current) return null;
     const validation = validateProposalDraft(form.getValues(), workspace.data);
     if (!validation.draft) { setMessage(validation.errors.join(" ")); return null; }
     saving.current = true; setBusy(true); onBusyChange?.(true); setMessage("");
     try {
-      const saved = await proposalFetch<{ draft: ProposalDraft; revision: number }>(`/api/str/appraisals/${reportId}/proposal`, {
+      const saved = await proposalFetch<{ draft: ProposalDraft; revision: number }>(`${paths.api}/proposal`, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ draft: validation.draft, revision: workspace.revision }),
       });
       reset(saved.draft); setWorkspace(current => current && ({ ...current, ...saved })); setMessage("Changes saved."); return saved.revision;
@@ -61,7 +63,7 @@ export const ProposalWorkflow = forwardRef<ProposalWorkflowHandle, {
   if (!workspace?.assignment || !workspace.data || !loaded.current || loadedSourceKey !== sourceKey) return <div role="status" className="p-6">{loadError?.key === sourceKey ? loadError.message : "Loading your proposal…"}</div>;
   const validation = validateProposalDraft(draft, workspace.data);
   const preview = <MultiPageProposal data={withProposalAgents(workspace.data, draft.agentIds ?? [], workspace.availableAgents ?? [])} draft={draft} brand={assignmentBrand(workspace.assignment)} previewPdfDownload
-    attachments={workspace.attachments.filter(item => draft.attachmentIds.includes(item.id)).map(item => ({ ...item, href: `/api/str/appraisals/${reportId}/proposal/attachments/${item.id}` }))} />;
+    attachments={workspace.attachments.filter(item => draft.attachmentIds.includes(item.id)).map(item => ({ ...item, href: `${paths.api}/proposal/attachments/${item.id}` }))} />;
   return <section data-theme="staypack-workspace" className="min-w-0 space-y-5 text-base-content">
     <UnsavedListingGuard dirty={form.formState.isDirty} description="Your proposal has unsaved changes. Save them before leaving." />
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -71,6 +73,7 @@ export const ProposalWorkflow = forwardRef<ProposalWorkflowHandle, {
         {stage === "proposal" && <button type="button" disabled={busy || disabled} className="du-btn du-btn-sm min-h-11" onClick={() => void save()}><Save size={16} />Save draft</button>}
       </div>
     </div>
+    {workspace.needsEvidenceReview && <p role="status" className="du-alert du-alert-warning">Evidence has changed. Return to Review evidence and continue to proposal before publishing a new version. Existing links still show their saved version.</p>}
     {message && <p role="status" className="text-sm">{message}</p>}
     {stage === "proposal" && section !== "preview" && <>
       <div role="group" aria-label="Proposal editing" className="flex gap-2"><button type="button" aria-pressed={section === "content"} className="du-btn du-btn-sm min-h-11" onClick={() => setSection("content")}>Content</button><button type="button" aria-pressed={section === "documents"} className="du-btn du-btn-sm min-h-11" onClick={() => setSection("documents")}>Documents & links</button></div>
@@ -87,7 +90,7 @@ export const ProposalWorkflow = forwardRef<ProposalWorkflowHandle, {
     </>}
     {section === "preview" && <div className="mx-auto max-w-5xl overflow-hidden rounded-xl border border-base-300">{validation.draft ? preview : <p className="p-5">{validation.errors.join(" ")}</p>}</div>}
     {stage === "proposal" ? <div className="flex justify-end"><button type="button" className="du-btn du-btn-sm du-btn-primary min-h-12 w-full sm:w-auto" disabled={busy || disabled} onClick={onContinue}>Continue to customer & share</button></div> : <>
-      <div className="rounded-xl border border-base-300 bg-base-100 p-5 sm:p-7"><ProposalSharePanel reportId={reportId} workspace={workspace} onSave={save} onWorkspaceChange={updateWorkspace} valid={Boolean(validation.draft) && !disabled} /></div>
+      <div className="rounded-xl border border-base-300 bg-base-100 p-5 sm:p-7"><ProposalSharePanel reportId={reportId} workspace={workspace} onSave={save} onWorkspaceChange={updateWorkspace} valid={Boolean(validation.draft) && !disabled && !workspace.needsEvidenceReview} /></div>
       <ProposalActivity reportId={reportId} refreshKey={workspace.versions.map(item => item.id).join()} />
     </>}
   </section>;

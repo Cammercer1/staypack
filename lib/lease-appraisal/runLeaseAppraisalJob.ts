@@ -1,3 +1,4 @@
+import { enrichWorkspaceAppraisal } from "@/lib/appraisals/enrichWorkspaceAppraisal";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { enrichListingForLeaseAppraisal } from "@/lib/lease-appraisal/enrichListingForLeaseAppraisal";
 import type { LeaseAppraisalJob, Listing } from "@/lib/types";
@@ -101,11 +102,9 @@ export async function runLeaseAppraisalJob({
       supabase,
       processingJob as LeaseAppraisalJob,
     );
-    const result = await enrichListingForLeaseAppraisal({
-      supabase,
-      listing,
-      requestId: job.id,
-    });
+    const result = typeof job.request_json.appraisal_report_id === "string"
+      ? await enrichWorkspaceAppraisal({ supabase, reportId: job.request_json.appraisal_report_id, agencyId: job.agency_id, kind: "lease", expected: String(job.request_json.appraisal_updated_at) })
+      : await enrichListingForLeaseAppraisal({ supabase, listing, requestId: job.id });
 
     const appraisal = result.parsed.rentalAppraisal;
     const completedAt = new Date().toISOString();

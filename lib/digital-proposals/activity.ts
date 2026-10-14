@@ -15,7 +15,7 @@ export function allowedProposalEvent(event: ProposalEvent, snapshot: ProposalSna
     case "open": return event.target === "proposal";
     case "page": return snapshot.draft.pages.some(page => page.enabled && page.id === event.target);
     case "comparison": return ["annual", "monthly", "yield"].includes(event.target) && snapshot.draft.pages.some(page => page.enabled && page.kind === "comparison");
-    case "comparable": return comparablesByEstimate(snapshot.data).some((_, index) => String(index) === event.target) && snapshot.draft.pages.some(page => page.enabled && page.kind === "evidence");
+    case "comparable": return (snapshot.data.appraisal?.comparables ?? comparablesByEstimate(snapshot.data)).some((_, index) => String(index) === event.target) && snapshot.draft.pages.some(page => page.enabled && page.kind === "evidence");
     case "pdf": return event.target === "proposal";
     case "document": return snapshot.attachments.some(item => item.id === event.target);
     case "action": case "agreement": return snapshot.draft.links.some(link => link.id === event.target && (link.kind === "sign" ? "agreement" : "action") === event.kind);

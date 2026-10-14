@@ -6,7 +6,7 @@ import { verifyProposalPrintToken } from "@/lib/digital-proposals/printAccess";
 import { proposalSnapshotSchema } from "@/lib/digital-proposals/workspace";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Rental appraisal", robots: { index: false, follow: false }, referrer: "no-referrer" as const };
+export const metadata = { title: "Appraisal proposal", robots: { index: false, follow: false }, referrer: "no-referrer" as const };
 
 /** Browserless reads this fixed version. Never rebuild a published PDF from live report inputs. */
 export default async function ProposalPrintPage({ params, searchParams }: {

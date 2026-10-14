@@ -1,5 +1,6 @@
 "use client";
 
+import { CreateAnother } from "@/components/properties/PropertyContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -227,6 +228,7 @@ export function SalesBrochureWizard({
           ) : null}
         </TabsContent>
       </Tabs>
+      {step === "preview" && !busy && <CreateAnother listingId={listing.id} />}
     </div>
   );
 }

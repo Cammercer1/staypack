@@ -1,12 +1,11 @@
+import { appraisalProposalDataSchema, appraisalProposalData } from "./appraisalData";
 import { z } from "zod";
 import { DEFAULT_DISCLAIMER, type FinalReportJson } from "@/lib/types";
 import { seasonalProfileFromReport, seasonalProfileSchema } from "./seasonality";
 import { occupancyProfileFromReport, occupancyProfileSchema } from "./occupancy";
 
-export const assetUrlSchema = z.string().refine(value => {
-  if (value === "" || /^\/(?!\/)/.test(value)) return true;
-  try { return ["https:", "http:"].includes(new URL(value).protocol); } catch { return false; }
-}, "Use a local asset path or an HTTP(S) URL.");
+import { assetUrlSchema } from "./assets";
+export { assetUrlSchema } from "./assets";
 const figure = z.number().finite().nonnegative().nullable();
 export const proposalAgentSchema = z.object({
   name: z.string(), role: z.string(), phone: z.string(), email: z.string(), photoUrl: assetUrlSchema,
@@ -15,7 +14,8 @@ export type ProposalAgent = z.infer<typeof proposalAgentSchema>;
 
 /** Public allowlist. Private customer contact details never enter the template model. */
 export const proposalDataSchema = z.object({
-  version: z.literal(1),
+  version: z.union([z.literal(1), z.literal(2)]),
+  appraisal: appraisalProposalDataSchema.optional(),
   generatedAt: z.iso.datetime(),
   agency: z.object({ name: z.string(), logoUrl: assetUrlSchema }),
   agent: z.object({ name: z.string(), role: z.string() }),
@@ -74,3 +74,8 @@ export function proposalFromReport(report: FinalReportJson, recipientDisplayName
 // Keep authoring imports compatible; the public viewer imports presentation directly.
 export { comparablesByEstimate, comparisonRows, managedScenarioLabel } from "./presentation";
 export type { ComparisonMode, ScenarioId } from "./presentation";
+
+/** Typed rental/sales projection; legacy STR projections remain byte-for-byte compatible. */
+export function proposalFromAppraisalReport(report: FinalReportJson, kind: "lease" | "sales", recipient?: string | null): ProposalData {
+  return proposalDataSchema.parse({ ...proposalFromReport(report, recipient), version: 2, appraisal: appraisalProposalData(report, kind) });
+}

@@ -1,11 +1,11 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
-import { requireStrAppraisalAccess } from "@/lib/str-appraisals/service";
+import { requireAppraisalAccess } from "@/lib/appraisals/workspace";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadAgencyAgentProfiles } from "@/lib/reports/loadReportAgent";
 import { reportForProposal } from "./fromAppraisal";
-import { proposalFromReport } from "./data";
+import { proposalFromReport, proposalFromAppraisalReport } from "./data";
 import { buildProposalPdfReport, withPdfAgents } from "./pdfReport";
 import { proposalAgentOptions, withProposalAgents } from "./agents";
 import { resolveProposalBrand } from "./brand";
@@ -24,20 +24,31 @@ function check(error: { code?: string; message: string } | null) {
   console.error("Proposal database operation failed", error.code);
   throw new ProposalError("Unable to save the proposal. Please try again.", 500);
 }
-export async function proposalContext(reportId: string) {
+export async function requireProposalAppraisalAccess(reportId: string, request?: Request) {
+  const context = await requireAppraisalAccess(reportId);
+  if (!request?.url || !new URL(request.url).pathname.startsWith("/api/appraisals/")) {
+    if (context.appraisal.kind !== "str") throw new ProposalError("STR appraisal not found.", 404);
+  }
+  return context;
+}
+export async function proposalContext(reportId: string, request?: Request) {
   if (!z.uuid().safeParse(reportId).success) throw new ProposalError("Appraisal not found.", 404);
-  const context = await requireStrAppraisalAccess(reportId);
+  const context = await requireProposalAppraisalAccess(reportId, request);
   if (context.report.status === "archived" || context.listing.status === "archived") throw new ProposalError("Restore this appraisal before editing its proposal.", 409);
   const agencyAgents = await loadAgencyAgentProfiles(context.supabase, context.agency.id);
-  const assigned = await context.supabase.from("digital_proposal_assignments").select("name,version,defaults").eq("agency_id", context.agency.id).maybeSingle();
+  const assigned = await context.supabase.from("digital_proposal_assignments").select("name,version,defaults").eq("agency_id", context.agency.id).eq("kind", context.appraisal.kind).maybeSingle();
   check(assigned.error);
-  const assignment = assigned.data ? assignmentSchema.parse(assigned.data) : defaultAssignment(context.agency);
-  const document = reportForProposal({ ...context, agencyAgents, editable: true });
-  const data = proposalFromReport(document, context.appraisal.recipient_mode === "named" ? context.appraisal.recipient_name : null);
+  const assignment = assigned.data ? assignmentSchema.parse(assigned.data) : defaultAssignment(context.agency, context.appraisal.kind);
+  const kind = context.appraisal.kind;
+  if (kind !== "str" && !context.appraisal.document_json) throw new ProposalError("Review the evidence and prepare this proposal before continuing.", 409);
+  const document = kind === "str" ? reportForProposal({ ...context, agencyAgents, editable: true }) : context.appraisal.document_json!;
+  const recipient = context.appraisal.recipient_mode === "named" ? context.appraisal.recipient_name : null;
+  const data = kind === "str" ? proposalFromReport(document, recipient) : proposalFromAppraisalReport(document, kind, recipient);
   const pdfReport = buildProposalPdfReport(document);
   const availableAgents = proposalAgentOptions(agencyAgents, context.agency.id);
-  const sourceFingerprint = createHash("sha256").update(JSON.stringify({ data, assignment, availableAgents, pdfReport })).digest("hex");
-  return { ...context, data, sourceFingerprint, assignment, availableAgents, pdfReport };
+  const needsEvidenceReview = kind !== "str" && context.appraisal.document_revision !== context.appraisal.input_revision;
+  const sourceFingerprint = createHash("sha256").update(JSON.stringify({ data, assignment, availableAgents, pdfReport, ...(kind !== "str" ? { inputRevision: context.appraisal.input_revision, documentRevision: context.appraisal.document_revision } : {}) })).digest("hex");
+  return { ...context, data, sourceFingerprint, assignment, availableAgents, pdfReport, needsEvidenceReview };
 }
 type Context = Awaited<ReturnType<typeof proposalContext>>;
 export async function loadProposalWorkspace(context: Context): Promise<ProposalWorkspace> {
@@ -56,7 +67,7 @@ export async function loadProposalWorkspace(context: Context): Promise<ProposalW
       return { ...version, pdf_status: version.pdf_status as "pending" | "generating" | "ready" | "failed", link_id: link?.id,
         revoked_at: version.revoked_at ?? link?.revoked_at ?? null, path: `/proposal/${link?.token ?? share_token}` };
     }),
-    sourceFingerprint: context.sourceFingerprint, assignment: context.assignment, data: context.data, availableAgents: context.availableAgents,
+    sourceFingerprint: context.sourceFingerprint, assignment: context.assignment, data: context.data, availableAgents: context.availableAgents, needsEvidenceReview: context.needsEvidenceReview,
   };
 }
 async function selectedAttachments(context: Context, ids: string[]) {
@@ -83,12 +94,14 @@ function checkSelectedAgents(context: Context, ids: string[]) {
   if (ids.some(id => !context.availableAgents.some(agent => agent.id === id))) throw new ProposalError("A selected agent is no longer available. Choose an active agent from your account.");
 }
 export async function publishProposal(context: Context, revision: number, sourceFingerprint: string) {
+  if (context.needsEvidenceReview) throw new ProposalError("Review the updated evidence and prepare your proposal before publishing.", 409);
   if (sourceFingerprint !== context.sourceFingerprint) throw new ProposalError("The appraisal changed. Reload the preview before publishing.", 409);
   const workspace = await loadProposalWorkspace(context);
   if (!workspace.draft || workspace.revision !== revision) throw new ProposalError("Save the latest draft before publishing.", 409);
-  const validation = validateProposalDraft(workspace.draft, context.data);
+  const validation = validateProposalDraft(applyAssignment(workspace.draft, context.assignment), context.data);
   if (!validation.draft) throw new ProposalError(validation.errors.join(" "));
-  if (!context.report.final_estimate_json || !context.data.str.market.annualRevenue || context.data.str.market.annualRevenue <= 0) throw new ProposalError("Review a rental estimate before publishing.");
+  if (context.appraisal.kind === "str" && (!context.report.final_estimate_json || !context.data.str.market.annualRevenue || context.data.str.market.annualRevenue <= 0)) throw new ProposalError("Review a rental estimate before publishing.");
+  if (context.data.appraisal && (!(context.data.appraisal.midpoint && context.data.appraisal.midpoint > 0) || !context.data.appraisal.comparables.length)) throw new ProposalError("Review an estimate and comparable evidence before publishing.");
   const draft = applyAssignment(validation.draft, context.assignment);
   checkSelectedAgents(context, draft.agentIds);
   if (draft.pages.some(page => page.enabled && page.kind === "text" && !page.body.trim())) throw new ProposalError("Add content to each enabled text page before publishing.");

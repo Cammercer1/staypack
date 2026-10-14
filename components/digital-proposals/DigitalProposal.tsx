@@ -1,5 +1,6 @@
 "use client";
 
+import { AppraisalSummary, AppraisalComparables } from "./AppraisalSections";
 import { memo, type ComponentType } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
@@ -41,7 +42,7 @@ export function ProposalHero({ data, draft, fullViewport = false }: ProposalTemp
     { Icon: BedDouble, value: data.property.bedrooms, label: "bedrooms" },
     { Icon: Bath, value: data.property.bathrooms, label: "bathrooms" },
     { Icon: CarFront, value: data.property.carSpaces, label: "car spaces" },
-    { Icon: Users, value: data.property.guests, label: "guests" },
+    { Icon: Users, value: data.appraisal ? null : data.property.guests, label: "guests" },
   ].filter(item => item.value !== null).map(({ Icon, value, label }) => <span key={label} className="inline-flex items-center gap-2"><Icon size={18} aria-hidden="true" /><span>{value} <span className="sr-only">{label}</span></span></span>);
 
   if (draft.heroLayout === "overlay") return <section aria-label="Property introduction" className={cn("du-hero relative isolate overflow-hidden bg-slate-950 text-white", fullViewport ? "min-h-dvh w-full" : "-mx-5 mb-10 min-h-[34rem] w-auto @min-[600px]/proposal:-mx-10 @min-[680px]/proposal:mb-16 @min-[680px]/proposal:min-h-[40rem] @min-[900px]/proposal:-mx-14")}>
@@ -86,16 +87,16 @@ export const DigitalProposal = memo(function DigitalProposal({ data, brand, draf
     <div className={cn(immersiveCover ? "relative" : fullViewport ? "mx-auto w-full max-w-[100rem] px-[clamp(1.25rem,5vw,5rem)] pt-[clamp(1.5rem,4vh,3rem)] pb-12" : "px-5 pt-6 @min-[600px]/proposal:px-10 @min-[900px]/proposal:px-14", coverOnly ? "[&>section]:mb-0" : !fullViewport && "pb-8")}>
       <header className={cn("flex flex-wrap items-center justify-between gap-3", immersiveCover ? "absolute inset-x-0 top-0 z-20 px-[clamp(1.5rem,5vw,5rem)] pt-[max(1.5rem,env(safe-area-inset-top))] pb-6 text-white @min-[680px]/proposal:pt-8" : "pb-5", (draft.heroLayout !== "overlay" || (page && page.kind !== "hero")) && "mb-10 border-b border-current/15")}>
         {data.agency.logoUrl ? <Image unoptimized loading="eager" data-proposal-critical-image src={data.agency.logoUrl} alt={data.agency.name} width={160} height={48} className={cn("h-10 max-w-44 object-contain", immersiveCover && "brightness-0 invert")} /> : <span className="font-[family-name:var(--proposal-heading)] text-xl font-semibold">{data.agency.name}</span>}
-        <span className={cn("text-xs", immersiveCover ? "text-white/80" : "text-(--proposal-muted)")}>Rental appraisal · {new Intl.DateTimeFormat("en-AU", { month: "short", year: "numeric", timeZone: "Australia/Sydney" }).format(new Date(data.generatedAt))}</span>
+        <span className={cn("text-xs", immersiveCover ? "text-white/80" : "text-(--proposal-muted)")}>{data.appraisal?.kind === "sales" ? "Sales appraisal" : "Rental appraisal"} · {new Intl.DateTimeFormat("en-AU", { month: "short", year: "numeric", timeZone: "Australia/Sydney" }).format(new Date(data.generatedAt))}</span>
       </header>
       {(!page || page.kind === "hero") && <Hero fullViewport={immersiveCover} data={data} brand={brand} draft={draft} />}
-      {(!page || page.kind === "comparison") && <Comparison key={draft.initialComparisonMode} data={data} brand={brand} draft={draft} />}
+      {(!page || page.kind === "comparison") && (data.appraisal ? <AppraisalSummary data={data} /> : <Comparison key={draft.initialComparisonMode} data={data} brand={brand} draft={draft} />)}
       {page?.kind === "service" && page.service && <ProposalManagementService service={page.service} data={data} motion={draft.motion} />}
       {page && !["hero", "comparison", "service"].includes(page.kind) && <section data-proposal-evidence={page.kind === "evidence" || undefined} className="min-h-80">
         <h1 tabIndex={-1} className="text-balance font-[family-name:var(--proposal-heading)] text-3xl leading-tight @min-[600px]/proposal:text-5xl">{resolveTokenText(page.title, data).text}</h1>
         {page.body && <p className="mt-6 max-w-3xl whitespace-pre-line leading-relaxed [overflow-wrap:anywhere]">{resolveTokenText(page.body, data).text}</p>}
         {page.kind === "forecast" && <YearlyForecast data={data} brand={brand} motion={draft.motion} />}
-        {page.kind === "evidence" && <ComparableListings comparables={comparablesByEstimate(data)} motion={draft.motion} />}
+        {page.kind === "evidence" && (data.appraisal ? <AppraisalComparables data={data} /> : <ComparableListings comparables={comparablesByEstimate(data)} motion={draft.motion} />)}
         {page.kind === "next_steps" && <div className="mt-8 space-y-8">
           {attachments.length > 0 && <div><h2 className="mb-3 text-lg font-semibold">Documents</h2><ul className="divide-y divide-current/15">{attachments.map(item => <li key={item.id}><a download={item.name} href={item.href} onClick={() => track("document", item.id)} className="flex min-h-14 items-center justify-between gap-4 py-3 underline-offset-4 hover:underline" rel="noreferrer"><span className="min-w-0 break-words">{item.name}</span><span className="shrink-0 text-xs">Download PDF</span></a></li>)}</ul></div>}
           {draft.links.length > 0 && <div className="flex flex-wrap gap-3">{draft.links.filter(link => isSafeProposalUrl(link.url)).map(link => <a key={link.id} href={link.url} onClick={() => track(link.kind === "sign" ? "agreement" : "action", link.id)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center justify-center rounded-(--proposal-radius) bg-(--proposal-primary) px-5 py-3 text-center font-medium text-(--proposal-on-primary)">{link.label}<span className="sr-only"> (opens in a new tab)</span></a>)}</div>}

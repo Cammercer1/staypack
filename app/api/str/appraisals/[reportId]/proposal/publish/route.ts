@@ -6,7 +6,7 @@ import { proposalContext, publishProposal } from "@/lib/digital-proposals/server
 import { proposalApiError, proposalRequest } from "@/lib/digital-proposals/http";
 export async function POST(request: Request, { params }: { params: Promise<{ reportId: string }> }) {
   try {
-    const context = await proposalContext((await params).reportId);
+    const context = await proposalContext((await params).reportId, request);
     const body = z.object({ revision: z.number().int().positive(), sourceFingerprint: z.string().length(64) }).strict().parse(await proposalRequest(request));
     const version = await publishProposal(context, body.revision, body.sourceFingerprint);
     // Fill the server cache before the first recipient visits. Never record viewer events here.

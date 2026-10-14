@@ -1,3 +1,4 @@
+import { appraisalPath, type WorkspaceAppraisalKind } from "@/lib/appraisals/workspaceTypes";
 import { hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
 import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
 import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSalesAppraisalReport";
@@ -38,6 +39,7 @@ export function listingDocuments(
   reports: Report[],
   collateral: CollateralItem[],
   strReportIds: string[] = [],
+  appraisalKinds: Record<string, WorkspaceAppraisalKind> = {},
 ): ListingDocument[] {
   const active = reports.filter((r) => r.status !== "archived");
   const documents: ListingDocument[] = active.flatMap((report) => {
@@ -54,9 +56,9 @@ export function listingDocuments(
       id: report.id,
       type,
       name: COLLATERAL_TYPE_META[type].label,
-      status: documentStatus(report.status, stale),
+      status: documentStatus(report.status, appraisalKinds[report.id] ? false : stale),
       updatedAt: report.updated_at,
-      href:
+      href: appraisalKinds[report.id] ? appraisalPath(report.id, appraisalKinds[report.id]) :
         type === "str_report"
           ? `/short-term-rentals/appraisals/${report.id}`
           : `${collateralEditorPath(listing.id, type)}?reportId=${report.id}`,

@@ -1,3 +1,5 @@
+import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
+import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSalesAppraisalReport";
 import { z } from "zod";
 import { strManagementAssumptionsSchema } from "@/lib/reports/strEstimateAdjustments";
 import type { FinalReportJson } from "@/lib/types";
@@ -10,7 +12,7 @@ const blankAgent = { name: "", role_title: "", phone: "", email: "", photo_url: 
 
 /** Frozen, printable fields only. Never retain provider payloads, the unused comp pool or draft links. */
 export const proposalPdfReportSchema = z.object({
-  version: z.string(), template_id: z.literal("haven-properties-str"), generated_at: z.iso.datetime(),
+  version: z.string(), template_id: z.string().refine(id => id === "haven-properties-str" || isLeaseAppraisalTemplateId(id) || isSalesAppraisalTemplateId(id)), generated_at: z.iso.datetime(),
   agent_selection: z.literal("explicit"), agent, agents: z.array(agent).max(2),
   agency: z.object({
     name: z.string(), logo_url: assetUrlSchema, logo_light_url: assetUrlSchema.optional(), logo_dark_url: assetUrlSchema.optional(),
@@ -23,7 +25,7 @@ export const proposalPdfReportSchema = z.object({
   property: z.object({
     address: z.string(), suburb: z.string(), state: z.string(), postcode: z.string(), summary: z.string(), property_type: z.string(),
     bedrooms: z.number(), bathrooms: z.number(), car_spaces: z.number(), accommodates: z.number(), listing_url: assetUrlSchema,
-    hero_image_url: assetUrlSchema, selected_image_urls: z.array(assetUrlSchema), estimated_value: figure.optional(),
+    hero_image_url: assetUrlSchema, selected_image_urls: z.array(assetUrlSchema), estimated_value: figure.optional(), display_price: z.string().optional(), land_area_sqm: figure.optional(), floor_area_sqm: figure.optional(),
   }),
   str: z.object({ annual_revenue: figure, monthly_revenue: figure, weekly_revenue: figure, nightly_rate: figure, occupancy_rate: figure, booked_nights: figure, radius_m: figure }),
   str_scenario: z.object({ basis: z.enum(["market", "adjusted", "management"]),
@@ -31,6 +33,21 @@ export const proposalPdfReportSchema = z.object({
     management: strManagementAssumptionsSchema.extend({ companyName: z.string() }).optional(),
   }).optional(),
   ltr: z.object({ weekly_min: figure, weekly_max: figure, weekly_midpoint: figure, annual_midpoint: figure, difference_before_costs: figure }),
+  sale_estimate: z.object({ price_min: figure, price_max: figure, price_midpoint: figure }).optional(),
+  ltr_enrichment: z.object({ comp_count: z.number(), weekly_range: z.object({ p25: figure, p50: figure, p75: figure }),
+    comps: z.array(z.object({ listing_id: z.string(), name: z.string(), thumbnail_url: assetUrlSchema, listing_url: assetUrlSchema,
+      bedrooms: figure, bathrooms: figure, car_spaces: figure.optional(), property_type: z.string().nullable().optional(), weekly_rent: figure, suburb: z.string().nullable() })).max(6),
+    suburb_market: z.object({ suburb: z.string(), state: z.string(), postcode: figure, property_segment: z.enum(["house", "unit"]),
+      vacancy_rate_pct: figure, population: figure, renter_pct: figure, gross_yield_pct: figure, median_weekly_rent: figure,
+      as_of: z.string().nullable(), source: z.literal("propradar") }).nullable().optional(),
+  }).nullable().optional(),
+  sales_enrichment: z.object({ comp_count: z.number(), sold_comp_count: z.number(), for_sale_comp_count: z.number(),
+    price_range: z.object({ p25: figure, p50: figure, p75: figure }), comps: z.array(z.object({ listing_id: z.string(), name: z.string(),
+      thumbnail_url: assetUrlSchema, listing_url: assetUrlSchema, bedrooms: figure, bathrooms: figure, car_spaces: figure.optional(),
+      property_type: z.string().nullable().optional(), price: figure, price_display: z.string().nullable(), sale_status: z.enum(["sold", "for_sale"]),
+      sold_date: z.string().nullable(), land_area_sqm: figure.optional(), floor_area_sqm: figure.optional(), suburb: z.string().nullable(),
+    })).max(6),
+  }).nullable().optional(),
   copy: z.object({ heading: z.string(), blurb: z.string(), key_metrics_line: z.string(), appeal_points: z.array(z.string()),
     supporting_factors: z.array(z.string()), buyer_checks: z.array(z.string()), methodology_note: z.string(),
     disclaimer: z.string().trim().min(1), comparable_evidence: z.string(), comparable_disclaimer: z.string(), cta: z.string(),
@@ -60,7 +77,7 @@ export const proposalPdfReportSchema = z.object({
 export type ProposalPdfReport = z.infer<typeof proposalPdfReportSchema>;
 
 export function buildProposalPdfReport(document: FinalReportJson): ProposalPdfReport | undefined {
-  if (document.template_id !== "haven-properties-str") return undefined;
+  if (document.template_id !== "haven-properties-str" && !isLeaseAppraisalTemplateId(document.template_id) && !isSalesAppraisalTemplateId(document.template_id)) return undefined;
   const enrichment = document.str_enrichment;
   return proposalPdfReportSchema.parse({ ...document, agent_selection: "explicit", agent: blankAgent, agents: [],
     assets: { qr_code_url: "", pdf_url: "" }, document_link: { mode: "none" },

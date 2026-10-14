@@ -1,5 +1,6 @@
 "use client";
 
+import { UnsavedListingGuard } from "@/components/listings/UnsavedListingGuard";
 import {
   forwardRef,
   useCallback,
@@ -443,6 +444,7 @@ export const GeneratedBrochureCopyEditor = forwardRef<
   if (generating) return <BrochureGenerationStatus />;
   return (
     <section data-theme="staypack-workspace" className="space-y-5">
+      <UnsavedListingGuard dirty={isDirty || saving} description="Your brochure has unsaved changes. Stay to save them, or discard them and leave." />
       <DocumentStepHeader
         title={copy ? "Edit your brochure" : "Create your brochure"}
         description={

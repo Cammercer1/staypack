@@ -6,7 +6,7 @@ import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSal
 export default async function LegacyListingReportPage({ params }: { params: Promise<{ listingId: string; reportId: string }> }) {
   const { listingId, reportId } = await params;
   const { supabase, report, agency } = await requireListingReportAccess(listingId,reportId);
-  const { data: appraisal, error } = await supabase.from("str_appraisals").select("report_id").eq("report_id",reportId).eq("agency_id",agency.id).maybeSingle();
+  const { data: appraisal, error } = await supabase.from("str_appraisals").select("report_id").eq("kind", "str").eq("report_id",reportId).eq("agency_id",agency.id).maybeSingle();
   if (error) throw new Error(error.message);
   if (appraisal) redirect(`/short-term-rentals/appraisals/${reportId}`);
   const { data: collateral } = await supabase.from("collateral_items").select("type").eq("report_id",reportId).eq("agency_id",agency.id).maybeSingle();

@@ -1,4 +1,5 @@
 "use client";
+import { useAppraisalRoutes } from "@/components/appraisals/AppraisalRoutes";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -6,6 +7,7 @@ import { Archive } from "lucide-react";
 import { readPrivateResponse } from "./useRemoteOptions";
 
 export function AppraisalArchiveControl({ reportId, archived = false }: { reportId: string; archived?: boolean }) {
+  const paths = useAppraisalRoutes(reportId);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,8 +16,8 @@ export function AppraisalArchiveControl({ reportId, archived = false }: { report
   async function changeArchive() {
     setBusy(true); setError(null);
     try {
-      await readPrivateResponse(await fetch(`/api/str/appraisals/${reportId}`, { method: archived ? "POST" : "DELETE" }));
-      router.push(archived ? `/short-term-rentals/appraisals/${reportId}` : "/short-term-rentals"); router.refresh();
+      await readPrivateResponse(await fetch(`${paths.api}`, { method: archived ? "POST" : "DELETE" }));
+      router.push(archived ? paths.editor : paths.dashboard); router.refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to update appraisal."); }
     finally { setBusy(false); }
   }

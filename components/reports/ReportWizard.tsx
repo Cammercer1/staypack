@@ -1,5 +1,6 @@
 "use client";
 
+import { CreateAnother, PropertyContext } from "@/components/properties/PropertyContext";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ProposalWorkflow, type ProposalWorkflowHandle } from "@/components/digital-proposals/ProposalWorkflow";
 import { LayoutTemplate } from "lucide-react";
@@ -354,6 +355,7 @@ export function ReportWizard({
         </p>
       ) : null}
       {appraisalActions ? <div inert={disabled}>{appraisalActions}</div> : null}
+      {digitalProposal && <PropertyContext listing={listing} onEdit={() => void handleStepChange("property")} />}
       <Tabs
         value={step}
         onValueChange={(next) => void handleStepChange(String(next))}
@@ -470,6 +472,7 @@ export function ReportWizard({
           ) : null}
         </TabsContent>
       </Tabs>
+      {digitalProposal && step === "preview" && !busy && !childBusy && !customerEditing && <CreateAnother listingId={listing.id} />}
     </div>
   );
 }

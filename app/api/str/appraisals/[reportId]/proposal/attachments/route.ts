@@ -7,7 +7,7 @@ import { isPdf, MAX_PROPOSAL_PDF_BYTES, safeDocumentName } from "@/lib/digital-p
 export async function POST(request: Request, { params }: { params: Promise<{ reportId: string }> }) {
   try {
     sameOrigin(request);
-    const context = await proposalContext((await params).reportId);
+    const context = await proposalContext((await params).reportId, request);
     if (Number(request.headers.get("content-length") ?? 0) > MAX_PROPOSAL_PDF_BYTES + 20000) throw new ProposalError("Choose a PDF under 4 MB.", 413);
     const form = await request.formData();
     const file = form.get("file");

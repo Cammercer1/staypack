@@ -1,6 +1,3 @@
-import Link from "next/link";
-import { Plus } from "lucide-react";
-
 export function WorkspaceHeader({
   eyebrow,
   title,
@@ -23,14 +20,6 @@ export function WorkspaceHeader({
           {description}
         </p>
       </div>
-      <Link
-        href="/listings/new"
-        prefetch={false}
-        className="du-btn du-btn-primary min-h-11 shrink-0 self-start sm:self-auto"
-      >
-        <Plus className="size-4" aria-hidden="true" />
-        New listing
-      </Link>
     </header>
   );
 }

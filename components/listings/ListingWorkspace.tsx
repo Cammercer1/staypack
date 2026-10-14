@@ -39,6 +39,7 @@ import {
   collateralEditorPath,
   collateralOrderForPurpose,
 } from "@/lib/listings/collateralTypes";
+import type { WorkspaceAppraisalKind } from "@/lib/appraisals/workspaceTypes";
 import { listingDocuments } from "@/lib/listings/documents";
 import { toast } from "sonner";
 import type {
@@ -54,6 +55,7 @@ type Props = {
   listing: Listing;
   reports: Report[];
   strReportIds?: string[];
+  appraisalKinds?: Record<string, WorkspaceAppraisalKind>;
   collateral: CollateralItem[];
   agencySlug: string;
   leads: Lead[];
@@ -110,14 +112,14 @@ export function ListingWorkspace({
   reports,
   collateral,
   strReportIds = [],
+  appraisalKinds = {},
 }: Props) {
   const [listing, setListing] = useState(initialListing);
   const [tab, setTab] = useState("documents");
   const [createOpen, setCreateOpen] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [photosDirty, setPhotosDirty] = useState(false);
-  const allDocuments = listingDocuments(listing, reports, collateral, strReportIds);
-  const strDocuments = allDocuments.filter((document) => document.type === "str_report");
+  const allDocuments = listingDocuments(listing, reports, collateral, strReportIds, appraisalKinds);
   const documents = allDocuments.filter((document) => document.type !== "str_report");
   const requirement = getCollateralPhotoRequirement(listing);
   const address = listing.property_address || "Untitled property";
@@ -128,11 +130,11 @@ export function ListingWorkspace({
     >
       <UnsavedListingGuard dirty={detailsDirty || photosDirty} />
       <Link
-        href="/listings"
+        href="/brochures"
         className="inline-flex items-center gap-2 text-sm text-base-content/65 hover:text-primary"
       >
         <ArrowLeft className="size-4" />
-        Listings
+        Brochures
       </Link>
       <header className="space-y-5">
         <div className="flex items-center gap-5">
@@ -181,10 +183,6 @@ export function ListingWorkspace({
         </div>
         <ListingAgentsStrip listing={listing} onUpdated={setListing} />
       </header>
-      <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-base-300 bg-base-100 p-5">
-        <div><h2 className="font-display text-xl">Short-Term Rentals</h2><p className="mt-1 text-sm text-base-content/65">{strDocuments.length} active appraisal{strDocuments.length === 1 ? "" : "s"} for this property. Prepare a separate appraisal for each customer.</p></div>
-        <div className="flex flex-wrap gap-2"><Link href={`/short-term-rentals?listing_id=${listing.id}`} className="du-btn du-btn-sm min-h-11">View appraisals</Link><Link href={`/short-term-rentals/appraisals/new?listing_id=${listing.id}`} className="du-btn du-btn-sm du-btn-outline min-h-11">Create STR appraisal</Link></div>
-      </section>
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList
           variant="line"

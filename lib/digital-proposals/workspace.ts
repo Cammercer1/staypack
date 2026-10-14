@@ -17,6 +17,7 @@ export type ProposalWorkspace = {
   attachments: ProposalAttachment[]; versions: ProposalVersionSummary[]; sourceFingerprint: string;
   assignment?: ProposalAssignment; data?: z.infer<typeof proposalDataSchema>;
   availableAgents?: ProposalAgentOption[];
+  needsEvidenceReview?: boolean;
 };
 export const shareTokenSchema = z.string().regex(/^[a-f0-9]{64}$/);
 export const MAX_PROPOSAL_PDF_BYTES = 4 * 1024 * 1024;

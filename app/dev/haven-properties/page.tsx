@@ -6,7 +6,7 @@ import { requireAgency } from "@/lib/auth/requireUser";
 import { resolvePlaygroundFinalReport } from "@/lib/reports/resolvePlaygroundFinalReport";
 import { resolvePlaygroundReportForListing } from "@/lib/reports/resolvePlaygroundReportForListing";
 
-export const DEFAULT_HAVEN_PLAYGROUND_LISTING_ID =
+const DEFAULT_HAVEN_PLAYGROUND_LISTING_ID =
   "0afd7daa-8da8-49c0-94b6-2820f3971ec8";
 
 export default async function DevHavenPropertiesPage({
