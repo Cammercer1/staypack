@@ -39,11 +39,11 @@ export function ProposalHero({ data, draft, fullViewport = false }: ProposalTemp
   const subtitle = [resolve(draft.content.introduction), recipient].filter(Boolean).join(" ");
   const panorama = draft.heroLayout === "panorama";
   const features = [
-    { Icon: BedDouble, value: data.property.bedrooms, label: "bedrooms" },
-    { Icon: Bath, value: data.property.bathrooms, label: "bathrooms" },
-    { Icon: CarFront, value: data.property.carSpaces, label: "car spaces" },
-    { Icon: Users, value: data.appraisal ? null : data.property.guests, label: "guests" },
-  ].filter(item => item.value !== null).map(({ Icon, value, label }) => <span key={label} className="inline-flex items-center gap-2"><Icon size={18} aria-hidden="true" /><span>{value} <span className="sr-only">{label}</span></span></span>);
+    { Icon: BedDouble, value: data.property.bedrooms, label: "bedroom" },
+    { Icon: Bath, value: data.property.bathrooms, label: "bathroom" },
+    { Icon: CarFront, value: data.property.carSpaces, label: "car space" },
+    { Icon: Users, value: data.appraisal ? null : data.property.guests, label: "guest" },
+  ].filter(item => item.value !== null).map(({ Icon, value, label }) => <span key={label} className="inline-flex items-center gap-2"><Icon size={18} aria-hidden="true" /><span>{value} <span className="sr-only">{label}{value === 1 ? "" : "s"}</span></span></span>);
 
   if (draft.heroLayout === "overlay") return <section aria-label="Property introduction" className={cn("du-hero relative isolate overflow-hidden bg-slate-950 text-white", fullViewport ? "min-h-dvh w-full" : "-mx-5 mb-10 min-h-[34rem] w-auto @min-[600px]/proposal:-mx-10 @min-[680px]/proposal:mb-16 @min-[680px]/proposal:min-h-[40rem] @min-[900px]/proposal:-mx-14")}>
     {data.property.heroImageUrl && <Image unoptimized loading="eager" fetchPriority="high" data-proposal-critical-image src={data.property.heroImageUrl} alt={data.property.address} fill sizes="100vw" className="object-cover" />}

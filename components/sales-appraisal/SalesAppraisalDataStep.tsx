@@ -4,17 +4,14 @@ import { AppraisalDataToolbar } from "@/components/appraisals/AppraisalDataToolb
 import { ComparableFilters } from "@/components/appraisals/ComparableFilters";
 import { UsComparableDetails, UsComparableSearchSummary } from "@/components/appraisals/UsComparableDetails";
 import { avmPriceSuggestion } from "@/lib/listings/pricing";
+import { formatEvidenceDate as formatSoldDate } from "@/lib/appraisals/formatEvidenceDate";
 
 import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Check, Loader2 } from "lucide-react";
+import { Check, House, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   hasSalesAppraisalComps,
 } from "@/lib/sales-appraisal/generateSalesAppraisalForListing";
@@ -73,6 +70,7 @@ export function SalesAppraisalDataStep({
   const jobFailed = activeJob?.status === "failed";
 
   const priceEdited = useRef(false);
+  const selectionEdited = useRef(false);
   const estimate = avmPriceSuggestion(listing, "sale");
   const hasPriceOverride = Boolean(listing.appraisal_overrides_json?.sales);
   const [query, setQuery] = useState("");
@@ -115,12 +113,15 @@ export function SalesAppraisalDataStep({
       setPriceMid(String(appraisal?.priceMidpoint ?? ""));
     }
     setAgentReviewConfirmed(agencyGuideReview?.confirmed ?? false);
-    if (appraisal?.selectedCompListingIds?.length) {
+    if (selectionEdited.current) {
+      const availableIds = new Set(pool.map(saleCompListingId));
+      setSelectedIds(current => current.filter(id => availableIds.has(id)));
+    } else if (appraisal?.selectedCompListingIds?.length) {
       setSelectedIds(appraisal.selectedCompListingIds);
     } else if (parsed && pool.length > 0) {
       setSelectedIds(defaultSelectedSaleCompListingIds(parsed));
     }
-  }, [listing.updated_at, appraisal, agencyGuideReview, parsed, pool.length]);
+  }, [listing.updated_at, appraisal, agencyGuideReview, parsed, pool]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const compRows = useMemo(
@@ -252,16 +253,15 @@ export function SalesAppraisalDataStep({
   ]);
 
   function toggleComp(id: string) {
-    setSelectedIds((current) => {
-      if (current.includes(id)) {
-        return current.filter((item) => item !== id);
-      }
-      if (current.length >= MAX_SALES_APPRAISAL_FEATURED_COMPS) {
-        toast.error(`Select up to ${MAX_SALES_APPRAISAL_FEATURED_COMPS} comparables`);
-        return current;
-      }
-      return [...current, id];
-    });
+    if (selectedIds.includes(id)) {
+      selectionEdited.current = true;
+      setSelectedIds(selectedIds.filter(item => item !== id));
+    } else if (selectedIds.length >= MAX_SALES_APPRAISAL_FEATURED_COMPS) {
+      toast.error(`Select up to ${MAX_SALES_APPRAISAL_FEATURED_COMPS} comparables`);
+    } else {
+      selectionEdited.current = true;
+      setSelectedIds([...selectedIds, id]);
+    }
   }
 
   async function fetchComps(options?: { silent?: boolean }) {
@@ -348,6 +348,7 @@ export function SalesAppraisalDataStep({
       if (!response.ok) {
         throw new Error(payload.error ?? "Unable to save appraisal data");
       }
+      selectionEdited.current = false;
       if (payload.listing) {
         onListingChange(payload.listing);
       }
@@ -367,7 +368,7 @@ export function SalesAppraisalDataStep({
   const fetchingComps = compsPrefetching || fetching || initialCompsProcessing;
 
   return (
-    <div className="space-y-6">
+    <div data-theme="staypack-workspace" className="space-y-5 text-base-content">
       {appraisalEndpoint && <UnsavedListingGuard dirty={evidenceDirty} description="Your evidence changes are unsaved. Continue to proposal to save them." />}
       <AppraisalDataToolbar
         summary={priceSummary}
@@ -383,10 +384,10 @@ export function SalesAppraisalDataStep({
         continueLabel={continueLabel}
         onContinue={saveAndContinue}
       />
-      <fieldset disabled={saving || (Boolean(appraisalEndpoint) && jobProcessing)} className="min-w-0 space-y-6">
+      <fieldset disabled={saving || (Boolean(appraisalEndpoint) && jobProcessing)} className="min-w-0 space-y-5">
       <div>
-        <h2 className="text-lg font-semibold">Review appraisal evidence</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h2 className="text-xl font-semibold tracking-tight">Review appraisal evidence</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-base-content/65">
           {compsReady
             ? refreshingComps
               ? "Comparable sales are refreshing in the background. Current comps remain available while the appraisal updates."
@@ -397,31 +398,32 @@ export function SalesAppraisalDataStep({
         </p>
       </div>
 
-      <div className="surface-card space-y-3 p-4">
+      <div className="rounded-2xl border border-base-300 bg-base-100 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-medium">Comparable sales</p>
           {refreshingComps ? (
-            <Badge variant="secondary">Refreshing</Badge>
+            <span className="du-badge du-badge-sm du-badge-ghost">Refreshing</span>
           ) : compsReady ? (
-            <Badge variant="secondary">Ready</Badge>
+            <span className="du-badge du-badge-sm du-badge-success">Ready</span>
           ) : jobProcessing ? (
-            <Badge variant="secondary">Fetching</Badge>
+            <span className="du-badge du-badge-sm du-badge-ghost">Fetching</span>
           ) : jobFailed ? (
-            <Badge variant="destructive">Failed</Badge>
+            <span className="du-badge du-badge-sm du-badge-error">Failed</span>
           ) : (
-            <Badge variant="outline">{noCompsFound ? "No matches" : "Required"}</Badge>
+            <span className="du-badge du-badge-sm du-badge-outline">{noCompsFound ? "No matches" : "Required"}</span>
           )}
         </div>
 
-        <Button
-          variant="outline"
+        <button
+          type="button"
+          className="du-btn du-btn-sm min-h-11 w-full sm:w-auto"
           onClick={() => void fetchComps()}
           disabled={loading || compsPrefetching || jobProcessing || Boolean(inputError)}
         >
           {compsPrefetching || fetching || jobProcessing ? (
             <>
-              <Loader2 className="animate-spin" />
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               Fetching comps...
             </>
           ) : compsReady ? (
@@ -429,43 +431,45 @@ export function SalesAppraisalDataStep({
           ) : (
             "Fetch sales comps"
           )}
-        </Button>
+        </button>
         </div>
         {refreshingComps ? (
-          <p className="text-sm text-muted-foreground">
+          <p role="status" className="mt-3 text-sm leading-relaxed text-base-content/65">
             The current comps are shown below. The refresh will replace them when
             it finishes.
           </p>
         ) : jobProcessing ? (
-          <p className="text-sm text-muted-foreground">
+          <p role="status" className="mt-3 text-sm leading-relaxed text-base-content/65">
             Your appraisal is updating. This may take a few minutes.
           </p>
         ) : jobFailed ? (
-          <p className="text-sm text-destructive">
+          <p role="alert" className="du-alert du-alert-error mt-3 text-left text-sm">
             {activeJob?.error_message ??
               "Sales comps failed to update. Refresh comps to try again."}
           </p>
         ) : noCompsFound ? (
-          <p role="status" className="text-sm text-muted-foreground">
+          <p role="status" className="mt-3 text-sm leading-relaxed text-base-content/65">
             No suitable comparable sales were found. Check the property details, then try fetching comparables again.
           </p>
         ) : null}
       </div>
 
-      {inputError ? <p role="alert" className="text-sm text-destructive">{inputError}</p> : staleEvidence ? <p role="status" className="text-sm text-muted-foreground">Property details changed. Fetch comparables again to update the appraisal.</p> : null}
+      {inputError ? <p role="alert" className="du-alert du-alert-error text-left text-sm">{inputError}</p> : staleEvidence ? <p role="status" className="du-alert du-alert-warning text-left text-sm">Property details changed. Fetch comparables again to update the appraisal.</p> : null}
 
       <>
-          <div className="surface-card grid gap-4 p-6 sm:grid-cols-3">
-            <div className="sm:col-span-3 space-y-2 text-sm">
-              <p className="font-medium">{hasPriceOverride ? "Your appraisal override" : "Suggested appraisal"}</p>
-              <p className="text-muted-foreground">Edit any amount below. Your saved figures are kept when comparables refresh.</p>
-              {estimate && <p className="text-muted-foreground">Automated estimate: {estimate.display}{estimate.date ? ` · ${estimate.date}` : ""}{estimate.confidence ? ` · ${estimate.confidence} confidence` : ""}. This may be outdated; use your local knowledge.</p>}
-              {hasPriceOverride && <Button type="button" variant="outline" disabled={loading || refreshingComps} onClick={resetPrice}>Use latest suggested appraisal</Button>}
+          <div className="grid gap-5 rounded-2xl border border-base-300 bg-base-100 p-5 sm:grid-cols-3 sm:p-6">
+            <div className="space-y-2 text-sm sm:col-span-3">
+              <h3 className="text-lg font-semibold">{hasPriceOverride ? "Your appraisal override" : "Suggested appraisal"}</h3>
+              <p className="leading-relaxed text-base-content/65">Edit any amount below. Your saved figures are kept when comparables refresh.</p>
+              {estimate && <p className="rounded-xl bg-base-200/60 px-3 py-2.5 text-xs leading-relaxed text-base-content/65">Automated estimate: {estimate.display}{estimate.date ? ` · ${estimate.date}` : ""}{estimate.confidence ? ` · ${estimate.confidence} confidence` : ""}. This may be outdated; use your local knowledge.</p>}
+              {hasPriceOverride && <button type="button" className="du-btn du-btn-sm min-h-11 h-auto w-full py-2 text-wrap sm:w-auto" disabled={loading || refreshingComps} onClick={resetPrice}>Use latest suggested appraisal</button>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="price-min">Price min ($)</Label>
-              <Input
+              <label className="block text-sm font-medium" htmlFor="price-min">Price min ($)</label>
+              <input
+                className="du-input du-input-sm min-h-12 w-full min-w-0 text-base font-medium tabular-nums"
+                inputMode="decimal"
                 id="price-min"
                 type="number"
                 min={0}
@@ -474,8 +478,10 @@ export function SalesAppraisalDataStep({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="price-max">Price max ($)</Label>
-              <Input
+              <label className="block text-sm font-medium" htmlFor="price-max">Price max ($)</label>
+              <input
+                className="du-input du-input-sm min-h-12 w-full min-w-0 text-base font-medium tabular-nums"
+                inputMode="decimal"
                 id="price-max"
                 type="number"
                 min={0}
@@ -484,8 +490,10 @@ export function SalesAppraisalDataStep({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="price-mid">Price midpoint ($)</Label>
-              <Input
+              <label className="block text-sm font-medium" htmlFor="price-mid">Price midpoint ($)</label>
+              <input
+                className="du-input du-input-sm min-h-12 w-full min-w-0 text-base font-medium tabular-nums"
+                inputMode="decimal"
                 id="price-mid"
                 type="number"
                 min={0}
@@ -494,14 +502,14 @@ export function SalesAppraisalDataStep({
               />
             </div>
             {priceSummary ? (
-              <p className="text-sm text-muted-foreground sm:col-span-3">
-                Guide range: <span className="font-medium text-foreground">{priceSummary}</span>
+              <p className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl bg-base-200/60 px-4 py-3 text-sm text-base-content/65 sm:col-span-3">
+                Guide range: <span className="text-lg font-semibold tabular-nums text-base-content">{priceSummary}</span>
               </p>
             ) : null}
             {needsAgentReview ? (
-              <div className="rounded-xl border border-amber-300 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 sm:col-span-3">
+              <div className="du-alert du-alert-warning block text-left text-sm sm:col-span-3">
                 <p className="font-medium">Agent review required</p>
-                <p className="mt-1 text-amber-900/80">
+                <p className="mt-1 text-warning-content/80">
                   The agency guide of{" "}
                   {appraisal?.agencyGuide
                     ? formatSalePriceRange(
@@ -519,20 +527,20 @@ export function SalesAppraisalDataStep({
                   . Review the evidence before continuing.
                 </p>
                 {agencyGuideReview.reasons.length > 0 ? (
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-900/80">
+                  <ul className="mt-2 [list-style-type:disc] space-y-1 pl-5 text-warning-content/80">
                     {agencyGuideReview.reasons.map((reason) => (
                       <li key={reason}>{reason}</li>
                     ))}
                   </ul>
                 ) : null}
-                <label className="mt-3 flex cursor-pointer items-start gap-2 font-medium">
+                <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 rounded-lg bg-base-100/60 p-3 font-medium text-base-content">
                   <input
                     type="checkbox"
                     checked={agentReviewConfirmed}
                     onChange={(event) =>
                       setAgentReviewConfirmed(event.target.checked)
                     }
-                    className="mt-0.5 size-4 accent-primary"
+                    className="du-toggle du-toggle-sm du-toggle-primary mt-0.5 shrink-0"
                   />
                   <span>I have reviewed the agency guide against the comparable evidence.</span>
                 </label>
@@ -540,12 +548,12 @@ export function SalesAppraisalDataStep({
             ) : null}
           </div>
 
-          <div className="surface-card space-y-4 p-6">
+          <div className="space-y-5 rounded-2xl border border-base-300 bg-base-100 p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium">Featured comparables</p>
-              <div className="text-right text-sm text-muted-foreground">
+              <div><h3 className="text-lg font-semibold">Featured comparables</h3><p className="mt-1 text-sm text-base-content/65">Choose the evidence that best supports your appraisal.</p></div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/65 sm:justify-end">
                 <p>{compRows.length} candidates found</p>
-                <p>
+                <p className="du-badge du-badge-sm h-auto min-h-7 py-1">
                   {selectedIds.length} / {MAX_SALES_APPRAISAL_FEATURED_COMPS} selected for the report
                 </p>
               </div>
@@ -553,9 +561,9 @@ export function SalesAppraisalDataStep({
 
             <UsComparableSearchSummary search={appraisal?.usSearch} />
             {discoveryGaps.length > 0 ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+              <div role="status" className="du-alert du-alert-warning block text-left text-sm">
                 <p className="font-medium">Comparable evidence is below target</p>
-                <p className="mt-1 text-amber-900/80">
+                <p className="mt-1 text-warning-content/80">
                   {discoveryGaps.join(" · ")}. Review the candidates carefully or
                   refresh before using the guide range.
                 </p>
@@ -575,15 +583,15 @@ export function SalesAppraisalDataStep({
             ) : null}
 
             {compRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
+              <p role="status" className="rounded-xl border border-dashed border-base-300 bg-base-200/30 p-6 text-center text-sm leading-relaxed text-base-content/65">
                 {fetchingComps ? "Searching for comparables… Results will appear here automatically." : "No comparables available. Fetch comparable evidence to get started."}
               </p>
             ) : visibleCompRows.length === 0 ? (
-              <p role="status" className="text-sm text-muted-foreground">
+              <p role="status" className="rounded-xl border border-dashed border-base-300 bg-base-200/30 p-6 text-center text-sm leading-relaxed text-base-content/65">
                 No comparables match this view. Clear the search or choose All to see more.
               </p>
             ) : (
-              <ul className="grid gap-3 sm:grid-cols-2">
+              <ul className="grid gap-3 md:grid-cols-2">
                 {visibleCompRows.map(({ comp, id }) => {
                   const selected = selectedIds.includes(id);
                   return (
@@ -593,48 +601,53 @@ export function SalesAppraisalDataStep({
                         aria-pressed={selected}
                         onClick={() => toggleComp(id)}
                         className={cn(
-                          "flex w-full gap-3 rounded-xl border p-3 text-left transition-colors",
+                          "du-card du-card-border h-full w-full text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
                           selected
                             ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/40",
+                            : "border-base-300 bg-base-100 hover:border-primary/40 hover:bg-base-200/30",
                         )}
                       >
-                        <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md bg-muted">
+                        <div className="du-card-body grid w-full min-w-0 grid-cols-[4rem_minmax(0,1fr)] gap-3 p-3 sm:grid-cols-[5rem_minmax(0,1fr)] sm:p-4">
+                        <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-base-200 text-base-content/35 sm:size-20">
                           {comp.imageUrl ? (
                             <Image
                               src={comp.imageUrl}
                               alt=""
                               fill
                               className="object-cover"
-                              sizes="96px"
+                              sizes="80px"
                               unoptimized
                             />
-                          ) : null}
+                          ) : <House size={24} aria-hidden="true" />}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <SaleStatusBadge comp={comp} />
                             {comp.propertyType ? (
-                              <Badge
-                                variant="outline"
-                                className="capitalize text-muted-foreground"
+                              <span
+                                className="du-badge du-badge-sm du-badge-outline h-auto min-h-5 py-0.5 text-[10px] capitalize text-base-content/65"
                               >
                                 {comp.propertyType}
-                              </Badge>
+                              </span>
                             ) : null}
                           </div>
-                          <p className="mt-1 line-clamp-2 text-sm font-medium">
+                          <p className="mt-2 break-words text-sm font-medium leading-snug">
                             {comp.address}
                           </p>
-                          <p className="text-xs text-muted-foreground">
-                            {comp.bedrooms ?? "?"} bed · {saleCompPriceLabel(comp)}
+                          <p className="mt-2 text-base font-semibold tabular-nums">{saleCompPriceLabel(comp)}</p>
+                          <p className="mt-0.5 text-xs text-base-content/65">
+                            {comp.bedrooms ?? "?"} bed
                             {comp.suburb ? ` · ${comp.suburb}` : ""}
                           </p>
                           <UsComparableDetails match={comp.usMatch} floorAreaSqm={comp.floorAreaSqm} />
                         </div>
-                        {selected ? (
-                          <Check className="h-5 w-5 shrink-0 text-primary" />
-                        ) : null}
+                        <span className="col-span-2 flex items-center justify-between gap-3 border-t border-base-300/70 pt-2.5 text-xs font-medium">
+                          <span className={selected ? "text-primary" : "text-base-content/65"}>{selected ? "Included in report" : "Select comparable"}</span>
+                          <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-full", selected ? "bg-primary text-primary-content" : "border border-base-300 bg-base-100 text-base-content/55")}>
+                            {selected ? <Check size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
+                          </span>
+                        </span>
+                        </div>
                       </button>
                     </li>
                   );
@@ -653,15 +666,15 @@ export function SalesAppraisalDataStep({
 function SaleStatusBadge({ comp }: { comp: SaleComp }) {
   if (comp.saleStatus === "sold") {
     return (
-      <Badge className="border-transparent bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300">
+      <span className="du-badge du-badge-sm du-badge-success h-auto min-h-5 whitespace-normal py-0.5 text-left text-[10px] leading-snug">
         Recently sold{comp.soldDate ? ` · ${formatSoldDate(comp.soldDate)}` : ""}
-      </Badge>
+      </span>
     );
   }
   return (
-    <Badge className="border-transparent bg-sky-100 text-sky-800 hover:bg-sky-100 dark:bg-sky-950 dark:text-sky-300">
+    <span className="du-badge du-badge-sm du-badge-ghost h-auto min-h-5 py-0.5 text-[10px]">
       For sale
-    </Badge>
+    </span>
   );
 }
 
@@ -670,18 +683,6 @@ function saleCompPriceLabel(comp: SaleComp) {
     return formatSalePriceRange(comp.price, comp.price);
   }
   return comp.priceDisplay?.trim() || "Price undisclosed";
-}
-
-function formatSoldDate(soldDate: string) {
-  const parsed = new Date(soldDate);
-  if (Number.isNaN(parsed.getTime())) {
-    return soldDate;
-  }
-  return parsed.toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 function parsePrice(value: string) {

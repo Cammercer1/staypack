@@ -27,7 +27,7 @@ it("uses account page definitions while preserving selection and order", () => {
   expect(result.pages.some(page => page.id === "unassigned")).toBe(false);
   expect(result.pages.find(page => page.id === "brand-team")).toMatchObject({ id: "brand-team", body: "Brand-owned content" });
   expect(result.content.comparisonTitle).toBe("Brand appraisal heading");
-  expect(result.content.introduction).toBe("My introduction");
+  expect(result.content.introduction).toBe(assignment.defaults.content.introduction);
 });
 
 it("resolves only selected active account agents and freezes public contact fields", () => {

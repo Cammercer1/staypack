@@ -9,12 +9,8 @@ import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Check, Loader2 } from "lucide-react";
+import { Check, House, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   hasLeaseAppraisalComps,
 } from "@/lib/lease-appraisal/generateLeaseAppraisalForListing";
@@ -81,6 +77,7 @@ export function LeaseAppraisalDataStep({
   const jobFailed = activeJob?.status === "failed";
 
   const priceEdited = useRef(false);
+  const selectionEdited = useRef(false);
   const estimate = avmPriceSuggestion(listing, "lease");
   const hasPriceOverride = Boolean(listing.appraisal_overrides_json?.lease);
   const [query, setQuery] = useState("");
@@ -108,7 +105,7 @@ export function LeaseAppraisalDataStep({
     return [];
   });
 
-  const evidenceDirty = weeklyMin !== String(appraisal?.weeklyMin ?? "") || weeklyMax !== String(appraisal?.weeklyMax ?? "") || weeklyMid !== String(appraisal?.weeklyMidpoint ?? "")
+  const evidenceDirty = weeklyMin !== localRent(appraisal?.weeklyMin) || weeklyMax !== localRent(appraisal?.weeklyMax) || weeklyMid !== localRent(appraisal?.weeklyMidpoint)
     || JSON.stringify(selectedIds) !== JSON.stringify(appraisal?.selectedCompListingIds?.length ? appraisal.selectedCompListingIds : defaultSelectedCompListingIds(parsed));
   useEffect(() => { onDirtyChange?.(evidenceDirty); }, [evidenceDirty, onDirtyChange]);
 
@@ -119,12 +116,15 @@ export function LeaseAppraisalDataStep({
       setWeeklyMax(localRent(appraisal?.weeklyMax));
       setWeeklyMid(localRent(appraisal?.weeklyMidpoint));
     }
-    if (appraisal?.selectedCompListingIds?.length) {
+    if (selectionEdited.current) {
+      const availableIds = new Set(pool.map(rentalCompListingId));
+      setSelectedIds(current => current.filter(id => availableIds.has(id)));
+    } else if (appraisal?.selectedCompListingIds?.length) {
       setSelectedIds(appraisal.selectedCompListingIds);
     } else if (parsed && pool.length > 0) {
       setSelectedIds(defaultSelectedCompListingIds(parsed));
     }
-  }, [listing.updated_at, appraisal, parsed, pool.length, localRent]);
+  }, [listing.updated_at, appraisal, parsed, pool, localRent]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const compRows = useMemo(
@@ -251,16 +251,15 @@ export function LeaseAppraisalDataStep({
   ]);
 
   function toggleComp(id: string) {
-    setSelectedIds((current) => {
-      if (current.includes(id)) {
-        return current.filter((item) => item !== id);
-      }
-      if (current.length >= MAX_LEASE_APPRAISAL_FEATURED_COMPS) {
-        toast.error(`Select up to ${MAX_LEASE_APPRAISAL_FEATURED_COMPS} comparables`);
-        return current;
-      }
-      return [...current, id];
-    });
+    if (selectedIds.includes(id)) {
+      selectionEdited.current = true;
+      setSelectedIds(selectedIds.filter(item => item !== id));
+    } else if (selectedIds.length >= MAX_LEASE_APPRAISAL_FEATURED_COMPS) {
+      toast.error(`Select up to ${MAX_LEASE_APPRAISAL_FEATURED_COMPS} comparables`);
+    } else {
+      selectionEdited.current = true;
+      setSelectedIds([...selectedIds, id]);
+    }
   }
 
   async function fetchComps(options?: { silent?: boolean }) {
@@ -344,6 +343,7 @@ export function LeaseAppraisalDataStep({
       if (!response.ok) {
         throw new Error(payload.error ?? "Unable to save appraisal data");
       }
+      selectionEdited.current = false;
       if (payload.listing) {
         onListingChange(payload.listing);
       }
@@ -363,7 +363,7 @@ export function LeaseAppraisalDataStep({
   const fetchingComps = compsPrefetching || fetching || initialCompsProcessing;
 
   return (
-    <div className="space-y-6">
+    <div data-theme="staypack-workspace" className="space-y-5 text-base-content">
       {appraisalEndpoint && <UnsavedListingGuard dirty={evidenceDirty} description="Your evidence changes are unsaved. Continue to proposal to save them." />}
       <AppraisalDataToolbar
         summary={rentSummary}
@@ -379,10 +379,10 @@ export function LeaseAppraisalDataStep({
         continueLabel={continueLabel}
         onContinue={saveAndContinue}
       />
-      <fieldset disabled={saving || (Boolean(appraisalEndpoint) && jobProcessing)} className="min-w-0 space-y-6">
+      <fieldset disabled={saving || (Boolean(appraisalEndpoint) && jobProcessing)} className="min-w-0 space-y-5">
       <div>
-        <h2 className="text-lg font-semibold">Review appraisal evidence</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h2 className="text-xl font-semibold tracking-tight">Review appraisal evidence</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-base-content/65">
           {compsReady
             ? refreshingComps
               ? "Comparable rentals are refreshing in the background. Current comps remain available while the appraisal updates."
@@ -393,31 +393,32 @@ export function LeaseAppraisalDataStep({
         </p>
       </div>
 
-      <div className="surface-card space-y-3 p-4">
+      <div className="rounded-2xl border border-base-300 bg-base-100 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-medium">Comparable rentals</p>
           {refreshingComps ? (
-            <Badge variant="secondary">Refreshing</Badge>
+            <span className="du-badge du-badge-sm du-badge-ghost">Refreshing</span>
           ) : compsReady ? (
-            <Badge variant="secondary">Ready</Badge>
+            <span className="du-badge du-badge-sm du-badge-success">Ready</span>
           ) : jobProcessing ? (
-            <Badge variant="secondary">Fetching</Badge>
+            <span className="du-badge du-badge-sm du-badge-ghost">Fetching</span>
           ) : jobFailed ? (
-            <Badge variant="destructive">Failed</Badge>
+            <span className="du-badge du-badge-sm du-badge-error">Failed</span>
           ) : (
-            <Badge variant="outline">{noCompsFound ? "No matches" : "Required"}</Badge>
+            <span className="du-badge du-badge-sm du-badge-outline">{noCompsFound ? "No matches" : "Required"}</span>
           )}
         </div>
 
-        <Button
-          variant="outline"
+        <button
+          type="button"
+          className="du-btn du-btn-sm min-h-11 w-full sm:w-auto"
           onClick={() => void fetchComps()}
           disabled={loading || compsPrefetching || jobProcessing || Boolean(inputError)}
         >
           {compsPrefetching || fetching || jobProcessing ? (
             <>
-              <Loader2 className="animate-spin" />
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               Fetching comps...
             </>
           ) : compsReady ? (
@@ -425,43 +426,45 @@ export function LeaseAppraisalDataStep({
           ) : (
             "Fetch rental comps"
           )}
-        </Button>
+        </button>
         </div>
         {refreshingComps ? (
-          <p className="text-sm text-muted-foreground">
+          <p role="status" className="mt-3 text-sm leading-relaxed text-base-content/65">
             The current comps are shown below. The refresh will replace them when
             it finishes.
           </p>
         ) : jobProcessing ? (
-          <p className="text-sm text-muted-foreground">
+          <p role="status" className="mt-3 text-sm leading-relaxed text-base-content/65">
             Your appraisal is updating. This may take a few minutes.
           </p>
         ) : jobFailed ? (
-          <p className="text-sm text-destructive">
+          <p role="alert" className="du-alert du-alert-error mt-3 text-left text-sm">
             {activeJob?.error_message ??
               "Rental comps failed to update. Refresh comps to try again."}
           </p>
         ) : noCompsFound ? (
-          <p role="status" className="text-sm text-muted-foreground">
+          <p role="status" className="mt-3 text-sm leading-relaxed text-base-content/65">
             No suitable comparable rentals were found. Check the property details, then try fetching comparables again.
           </p>
         ) : null}
       </div>
 
-      {inputError ? <p role="alert" className="text-sm text-destructive">{inputError}</p> : staleEvidence ? <p role="status" className="text-sm text-muted-foreground">Property details changed. Fetch comparables again to update the appraisal.</p> : null}
+      {inputError ? <p role="alert" className="du-alert du-alert-error text-left text-sm">{inputError}</p> : staleEvidence ? <p role="status" className="du-alert du-alert-warning text-left text-sm">Property details changed. Fetch comparables again to update the appraisal.</p> : null}
 
       <>
-          <div className="surface-card grid gap-4 p-6 sm:grid-cols-3">
-            <div className="sm:col-span-3 space-y-2 text-sm">
-              <p className="font-medium">{hasPriceOverride ? "Your appraisal override" : "Suggested appraisal"}</p>
-              <p className="text-muted-foreground">Edit any amount below. Your saved figures are kept when comparables refresh.</p>
-              {estimate && <p className="text-muted-foreground">Automated estimate: {estimate.display}{estimate.date ? ` · ${estimate.date}` : ""}{estimate.confidence ? ` · ${estimate.confidence} confidence` : ""}. This may be outdated; use your local knowledge.</p>}
-              {hasPriceOverride && <Button type="button" variant="outline" disabled={loading || refreshingComps} onClick={resetPrice}>Use latest suggested appraisal</Button>}
+          <div className="grid gap-5 rounded-2xl border border-base-300 bg-base-100 p-5 sm:grid-cols-3 sm:p-6">
+            <div className="space-y-2 text-sm sm:col-span-3">
+              <h3 className="text-lg font-semibold">{hasPriceOverride ? "Your appraisal override" : "Suggested appraisal"}</h3>
+              <p className="leading-relaxed text-base-content/65">Edit any amount below. Your saved figures are kept when comparables refresh.</p>
+              {estimate && <p className="rounded-xl bg-base-200/60 px-3 py-2.5 text-xs leading-relaxed text-base-content/65">Automated estimate: {estimate.display}{estimate.date ? ` · ${estimate.date}` : ""}{estimate.confidence ? ` · ${estimate.confidence} confidence` : ""}. This may be outdated; use your local knowledge.</p>}
+              {hasPriceOverride && <button type="button" className="du-btn du-btn-sm min-h-11 h-auto w-full py-2 text-wrap sm:w-auto" disabled={loading || refreshingComps} onClick={resetPrice}>Use latest suggested appraisal</button>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="weekly-min">{market.rentPeriod === "month" ? "Monthly" : "Weekly"} min ({market.country === "US" ? "USD" : "$"})</Label>
-              <Input
+              <label className="block text-sm font-medium" htmlFor="weekly-min">{market.rentPeriod === "month" ? "Monthly" : "Weekly"} min ({market.country === "US" ? "USD" : "$"})</label>
+              <input
+                className="du-input du-input-sm min-h-12 w-full min-w-0 text-base font-medium tabular-nums"
+                inputMode="decimal"
                 id="weekly-min"
                 type="number"
                 min={0}
@@ -470,8 +473,10 @@ export function LeaseAppraisalDataStep({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="weekly-max">{market.rentPeriod === "month" ? "Monthly" : "Weekly"} max ({market.country === "US" ? "USD" : "$"})</Label>
-              <Input
+              <label className="block text-sm font-medium" htmlFor="weekly-max">{market.rentPeriod === "month" ? "Monthly" : "Weekly"} max ({market.country === "US" ? "USD" : "$"})</label>
+              <input
+                className="du-input du-input-sm min-h-12 w-full min-w-0 text-base font-medium tabular-nums"
+                inputMode="decimal"
                 id="weekly-max"
                 type="number"
                 min={0}
@@ -480,8 +485,10 @@ export function LeaseAppraisalDataStep({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="weekly-mid">{market.rentPeriod === "month" ? "Monthly" : "Weekly"} midpoint ({market.country === "US" ? "USD" : "$"})</Label>
-              <Input
+              <label className="block text-sm font-medium" htmlFor="weekly-mid">{market.rentPeriod === "month" ? "Monthly" : "Weekly"} midpoint ({market.country === "US" ? "USD" : "$"})</label>
+              <input
+                className="du-input du-input-sm min-h-12 w-full min-w-0 text-base font-medium tabular-nums"
+                inputMode="decimal"
                 id="weekly-mid"
                 type="number"
                 min={0}
@@ -490,18 +497,18 @@ export function LeaseAppraisalDataStep({
               />
             </div>
             {rentSummary ? (
-              <p className="text-sm text-muted-foreground sm:col-span-3">
-                Guide range: <span className="font-medium text-foreground">{rentSummary}</span>
+              <p className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl bg-base-200/60 px-4 py-3 text-sm text-base-content/65 sm:col-span-3">
+                Guide range: <span className="text-lg font-semibold tabular-nums text-base-content">{rentSummary}</span>
               </p>
             ) : null}
           </div>
 
-          <div className="surface-card space-y-4 p-6">
+          <div className="space-y-5 rounded-2xl border border-base-300 bg-base-100 p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium">Featured comparables</p>
-              <div className="text-right text-sm text-muted-foreground">
+              <div><h3 className="text-lg font-semibold">Featured comparables</h3><p className="mt-1 text-sm text-base-content/65">Choose the evidence that best supports your appraisal.</p></div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/65 sm:justify-end">
                 <p>{compRows.length} candidates found</p>
-                <p>
+                <p className="du-badge du-badge-sm h-auto min-h-7 py-1">
                   {selectedIds.length} / {MAX_LEASE_APPRAISAL_FEATURED_COMPS} selected for the report
                 </p>
               </div>
@@ -509,9 +516,9 @@ export function LeaseAppraisalDataStep({
 
             <UsComparableSearchSummary search={appraisal?.usSearch} />
             {discovery && !discovery.targetMet ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+              <div role="status" className="du-alert du-alert-warning block text-left text-sm">
                 <p className="font-medium">Comparable evidence is below target</p>
-                <p className="mt-1 text-amber-900/80">
+                <p className="mt-1 text-warning-content/80">
                   Found {discovery.poolCount}/{discovery.targetCount} candidates,
                   including {discovery.sameSuburbCount}/
                   {discovery.targetSameSuburbCount} in {listing.suburb ?? "the subject suburb"}.
@@ -522,11 +529,11 @@ export function LeaseAppraisalDataStep({
             ) : null}
 
             {compRows.some((row) => row.tier === "upper_band_unit_fallback") ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+              <div role="status" className="du-alert du-alert-warning block text-left text-sm">
                 <p className="font-medium">
                   {compRows.filter((row) => row.tier === "exact").length} exact {formatPropertyType(subjectPropertyType).toLowerCase()} {compRows.filter((row) => row.tier === "exact").length === 1 ? "match" : "matches"}
                 </p>
-                <p className="mt-1 text-amber-900/80">
+                <p className="mt-1 text-warning-content/80">
                   The rent estimate uses the exact matches. Upper-band units are
                   available below only to fill the report&apos;s comparable grid and
                   are clearly marked as secondary evidence.
@@ -547,11 +554,11 @@ export function LeaseAppraisalDataStep({
             ) : null}
 
             {compRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
+              <p role="status" className="rounded-xl border border-dashed border-base-300 bg-base-200/30 p-6 text-center text-sm leading-relaxed text-base-content/65">
                 {fetchingComps ? "Searching for comparables… Results will appear here automatically." : "No comparables available. Fetch comparable evidence to get started."}
               </p>
             ) : visibleCompRows.length === 0 ? (
-              <p role="status" className="text-sm text-muted-foreground">
+              <p role="status" className="rounded-xl border border-dashed border-base-300 bg-base-200/30 p-6 text-center text-sm leading-relaxed text-base-content/65">
                 No comparables match this view. Clear the search or choose All to see more.
               </p>
             ) : (
@@ -582,11 +589,11 @@ export function LeaseAppraisalDataStep({
                     <section key={group.key} className="space-y-3">
                       <div>
                         <p className="text-sm font-medium">{group.title}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-base-content/65">
                           {group.description}
                         </p>
                       </div>
-                      <ul className="grid gap-3 sm:grid-cols-2">
+                      <ul className="grid gap-3 md:grid-cols-2">
                         {group.rows.map(({ comp, id, tier }) => {
                           const selected = selectedIds.includes(id);
                           const propertyType = formatPropertyType(
@@ -599,61 +606,63 @@ export function LeaseAppraisalDataStep({
                                 aria-pressed={selected}
                                 onClick={() => toggleComp(id)}
                                 className={cn(
-                                  "flex w-full gap-3 rounded-xl border p-3 text-left transition-colors",
+                                  "du-card du-card-border h-full w-full text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
                                   selected
-                                    ? "border-primary bg-primary/5 shadow-sm"
-                                    : "border-border hover:border-primary/40",
+                                    ? "border-primary bg-primary/5"
+                                    : "border-base-300 bg-base-100 hover:border-primary/40 hover:bg-base-200/30",
                                 )}
                               >
-                                <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-lg bg-muted">
+                                <div className="du-card-body grid w-full min-w-0 grid-cols-[4rem_minmax(0,1fr)] gap-3 p-3 sm:grid-cols-[5rem_minmax(0,1fr)] sm:p-4">
+                                <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-base-200 text-base-content/35 sm:size-20">
                                   {comp.imageUrl ? (
                                     <Image
                                       src={comp.imageUrl}
                                       alt=""
                                       fill
                                       className="object-cover"
-                                      sizes="112px"
+                                      sizes="80px"
                                       unoptimized
                                     />
-                                  ) : null}
+                                  ) : <House size={24} aria-hidden="true" />}
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-1.5">
-                                    <Badge variant="secondary" className="text-[10px]">
+                                    <span className="du-badge du-badge-sm du-badge-ghost h-auto min-h-5 py-0.5 text-[10px]">
                                       {propertyType}
-                                    </Badge>
+                                    </span>
                                     {tier !== "exact" ? (
-                                      <Badge
-                                        variant="outline"
-                                        className="border-amber-300 bg-amber-50 text-[10px] text-amber-900"
+                                      <span
+                                        className="du-badge du-badge-sm du-badge-warning h-auto min-h-5 whitespace-normal py-0.5 text-[10px]"
                                       >
                                         {tier === "upper_band_unit_fallback"
                                           ? "Secondary fallback"
                                           : "Nearby fallback"}
-                                      </Badge>
+                                      </span>
                                     ) : (
-                                      <Badge variant="outline" className="text-[10px]">
+                                      <span className="du-badge du-badge-sm du-badge-outline h-auto min-h-5 py-0.5 text-[10px]">
                                         Exact type
-                                      </Badge>
+                                      </span>
                                     )}
                                   </div>
-                                  <p className="mt-1 line-clamp-2 text-sm font-medium">
+                                  <p className="mt-2 break-words text-sm font-medium leading-snug">
                                     {comp.address}
                                   </p>
-                                  <p className="mt-1 text-sm font-semibold">
+                                  <p className="mt-2 text-base font-semibold tabular-nums">
                                     {rentRange(comp.weeklyRent, comp.weeklyRent, market)}
                                   </p>
-                                  <p className="mt-0.5 text-xs text-muted-foreground">
+                                  <p className="mt-0.5 text-xs text-base-content/65">
                                     {comp.bedrooms ?? "?"} bed · {comp.bathrooms ?? "?"} bath · {comp.carSpaces ?? "?"} car
                                     {comp.suburb ? ` · ${comp.suburb}` : ""}
                                   </p>
                                   <UsComparableDetails match={comp.usMatch} floorAreaSqm={comp.floorAreaSqm} />
                                 </div>
-                                {selected ? (
-                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                                    <Check className="h-4 w-4" />
+                                <span className="col-span-2 flex items-center justify-between gap-3 border-t border-base-300/70 pt-2.5 text-xs font-medium">
+                                  <span className={selected ? "text-primary" : "text-base-content/65"}>{selected ? "Included in report" : "Select comparable"}</span>
+                                  <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-full", selected ? "bg-primary text-primary-content" : "border border-base-300 bg-base-100 text-base-content/55")}>
+                                    {selected ? <Check size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
                                   </span>
-                                ) : null}
+                                </span>
+                                </div>
                               </button>
                             </li>
                           );

@@ -7,7 +7,7 @@ import {
   type SalesAppraisalCopy,
 } from "@/lib/sales-appraisal/deriveSalesAppraisalCopy";
 import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
-import { SALES_APPRAISAL_COMPARABLE_DISCLAIMER } from "@/lib/sales-appraisal/comparableEvidenceCopy";
+import { resolveSalesAppraisalComparableDisclaimer } from "@/lib/sales-appraisal/salesAppraisalDisclaimer";
 import { reportableSaleLandArea } from "@/lib/sales/reportableSaleArea";
 import {
   PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
@@ -183,10 +183,9 @@ export async function generateSalesAppraisalCopy(
           buyer_checks: fallback.buyer_checks,
           methodology_note: fallback.methodology_note,
           comparable_evidence: fallback.comparable_evidence,
-          comparable_disclaimer:
-            input.agency.default_disclaimer?.trim() ||
-            fallback.comparable_disclaimer ||
-            SALES_APPRAISAL_COMPARABLE_DISCLAIMER,
+          comparable_disclaimer: resolveSalesAppraisalComparableDisclaimer(
+            input.agency.default_disclaimer?.trim() || fallback.comparable_disclaimer,
+          ),
           disclaimer: fallback.disclaimer,
           cta: input.agency.default_cta || fallback.cta,
         };

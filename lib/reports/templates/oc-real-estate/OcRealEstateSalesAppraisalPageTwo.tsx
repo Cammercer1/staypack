@@ -2,6 +2,7 @@ import { DocumentQr } from "@/components/documents/DocumentQr";
 import Image from "next/image";
 import { formatCurrency } from "@/lib/reports/formatters";
 import { reportableSaleArea } from "@/lib/sales/reportableSaleArea";
+import { formatEvidenceDate } from "@/lib/appraisals/formatEvidenceDate";
 import {
   ReportCopyComparableDisclaimer,
   ReportCopyComparableEvidence,
@@ -22,14 +23,7 @@ function statusLabel(comp: SaleCompCard) {
 
 function soldDateLabel(comp: SaleCompCard) {
   if (comp.sale_status !== "sold" || !comp.sold_date?.trim()) return null;
-  const parsed = new Date(comp.sold_date);
-  return Number.isNaN(parsed.getTime())
-    ? comp.sold_date
-    : parsed.toLocaleDateString("en-AU", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
+  return formatEvidenceDate(comp.sold_date);
 }
 
 function OcComparableCard({ comp, currency }: { comp: SaleCompCard; currency?: "AUD" | "USD" }) {

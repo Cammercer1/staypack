@@ -4,7 +4,7 @@ import { brandFromReport, resolveProposalBrand } from "./brand";
 import { DEFAULT_PROPOSAL_DRAFT, proposalDraftSchema, refreshProposalDraftDefaults, type ProposalDraft } from "./template";
 import type { Agency, FinalReportJson } from "@/lib/types";
 
-/** Onboarding-owned configuration. Appraisal users edit content, never renderer/brand settings. */
+/** Onboarding-owned configuration. Appraisal users choose pages, agents and resources; cover copy and design stay account-owned. */
 export const assignmentSchema = z.object({
   name: z.string().min(1).max(120), version: z.number().int().positive(),
   defaults: proposalDraftSchema,
@@ -45,7 +45,7 @@ export function applyAssignment(draft: ProposalDraft | null, assignment: Proposa
     pages.splice(position, 0, { ...page });
   }
   return { ...refreshProposalDraftDefaults(draft), templateId: base.templateId, templateVersion: base.templateVersion,
-    pages, content: { ...draft.content, comparisonTitle: base.content.comparisonTitle, recipientLine: base.content.recipientLine },
+    pages, content: { ...base.content },
     presetId: base.presetId, brandOverrides: base.brandOverrides, heroLayout: base.heroLayout,
     motion: base.motion, presentation: base.presentation, initialComparisonMode: base.initialComparisonMode };
 }

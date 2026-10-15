@@ -1,3 +1,4 @@
+import { resolveSalesAppraisalDisclaimer } from "./salesAppraisalDisclaimer";
 import { marketForCountry } from "@/lib/property-market";
 import { PAGE_ONE_BULLET_COUNT } from "@/lib/copy/pageOneMarketingCopy";
 import {
@@ -184,9 +185,7 @@ export function deriveSalesAppraisalCopy({
     methodology_note: us ? "Current property estimate in USD, with nearby sold properties offered as comparison evidence. The guide is the available automated estimate or agent override, not the last sold or asking price." : parsed.salesAppraisal?.agencyGuide
       ? "The agency’s current marketed guide is retained as the estimated sale price range and reviewed against same-property-type comparables sold within the past 12 months. Current for-sale listings provide additional context; comparable evidence is shown on page 2."
       : "Estimated sale price range from same-property-type REA comparables sold within the past 12 months, matched on beds, baths and parking. The search expands to nearby areas when local evidence is limited; current for-sale listings provide context only. Outliers trimmed; comparable evidence shown on page 2.",
-    disclaimer:
-      agency.default_disclaimer ??
-      "This appraisal is indicative only and does not constitute financial, legal or valuation advice. Vendors should make their own enquiries.",
+    disclaimer: resolveSalesAppraisalDisclaimer(agency.default_disclaimer),
     comparable_evidence,
     comparable_disclaimer: SALES_APPRAISAL_COMPARABLE_DISCLAIMER,
     cta: agency.default_cta || "Contact us to discuss the sales strategy for your property.",

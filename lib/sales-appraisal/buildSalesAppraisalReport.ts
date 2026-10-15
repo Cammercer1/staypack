@@ -1,3 +1,4 @@
+import { resolveSalesAppraisalCopyDisclaimers } from "./salesAppraisalDisclaimer";
 import { marketForCountry } from "@/lib/property-market";
 import { preserveDocumentLink } from "@/lib/documents/documentLink";
 import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
@@ -86,7 +87,7 @@ export function buildSalesAppraisalReport({
         : "";
 
   const address = listing.property_address ?? parsed.address ?? "";
-  const copy =
+  const copy = resolveSalesAppraisalCopyDisclaimers(
     copyOverride ??
     deriveSalesAppraisalCopy({
       agency,
@@ -97,7 +98,7 @@ export function buildSalesAppraisalReport({
       priceMin,
       priceMax,
       featuredComps: salesEnrichment?.comps ?? [],
-    });
+    }));
 
   return {
     ...preserveDocumentLink(report.final_report_json ?? { assets: { qr_code_url: report.qr_code_url ?? "" } }),

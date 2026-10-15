@@ -1,3 +1,4 @@
+import { resolveSalesAppraisalCopyDisclaimers } from "@/lib/sales-appraisal/salesAppraisalDisclaimer";
 import { appraisalProposalDataSchema, appraisalProposalData } from "./appraisalData";
 import { propertyMarketSchema } from "@/lib/property-market/schema";
 import { z } from "zod";
@@ -80,5 +81,6 @@ export type { ComparisonMode, ScenarioId } from "./presentation";
 
 /** Typed rental/sales projection; legacy STR projections remain byte-for-byte compatible. */
 export function proposalFromAppraisalReport(report: FinalReportJson, kind: "lease" | "sales", recipient?: string | null): ProposalData {
-  return proposalDataSchema.parse({ ...proposalFromReport(report, recipient), version: 2, appraisal: appraisalProposalData(report, kind) });
+  const source = kind === "sales" ? { ...report, copy: resolveSalesAppraisalCopyDisclaimers(report.copy) } : report;
+  return proposalDataSchema.parse({ ...proposalFromReport(source, recipient), version: 2, appraisal: appraisalProposalData(source, kind) });
 }

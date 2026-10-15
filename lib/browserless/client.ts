@@ -3,6 +3,16 @@ import { isDevelopment } from "@/lib/env";
 const DEFAULT_BASE_URL = "https://production-sfo.browserless.io";
 const DEFAULT_TIMEOUT_MS = 60_000;
 
+/** Structured metadata lets callers diagnose failures without logging provider response bodies. */
+export class BrowserlessHttpError extends Error {
+  readonly status: number;
+  constructor(status: number, detail: string, context?: "scrape" | "pdf") {
+    super(formatBrowserlessError(status, detail, context));
+    this.name = "BrowserlessHttpError";
+    this.status = status;
+  }
+}
+
 export function getBrowserlessApiKey() {
   return process.env.BROWSERLESS_API_KEY?.trim() ?? "";
 }
@@ -83,7 +93,7 @@ export async function browserlessRequest(
   if (!response.ok) {
     const detail = await response.text();
 
-    throw new Error(formatBrowserlessError(response.status, detail, options?.errorContext));
+    throw new BrowserlessHttpError(response.status, detail, options?.errorContext);
   }
 
   if (options?.responseType === "buffer") {

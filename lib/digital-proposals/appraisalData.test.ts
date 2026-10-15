@@ -7,6 +7,9 @@ import { buildProposalPdfReport, withPdfAgents } from "./pdfReport";
 import { proposalSnapshotSchema } from "./workspace";
 import { BRAND_DEFAULTS } from "./brand";
 import { allowedProposalEvent } from "./activity";
+import { DEFAULT_DISCLAIMER } from "@/lib/types";
+import { SALES_APPRAISAL_DISCLAIMER } from "@/lib/sales-appraisal/salesAppraisalDisclaimer";
+import { SALES_APPRAISAL_COMPARABLE_DISCLAIMER } from "@/lib/sales-appraisal/comparableEvidenceCopy";
 const f = createLintRegressionFixtures();
 describe("typed appraisal proposals", () => {
   it.each(["lease","sales"] as const)("projects %s evidence and freezes a branded PDF without private fields", kind => {
@@ -44,5 +47,26 @@ describe("typed appraisal proposals", () => {
     expect(proposalFromReport(f.report.final_report_json!)).not.toHaveProperty("appraisal");
     expect(proposalFromReport(f.report.final_report_json!).version).toBe(1);
     expect(defaultAssignment(f.agency).defaults.templateId).toBe("editorial-base");
+  });
+
+  it("corrects inherited STR copy for new sales web/PDF versions while preserving published snapshots", () => {
+    const report = structuredClone(f.sales.final_report_json!);
+    report.copy.disclaimer = DEFAULT_DISCLAIMER;
+    report.copy.comparable_disclaimer = DEFAULT_DISCLAIMER;
+    const oldData = { ...proposalFromReport(report), version: 2 as const };
+    const oldPdf = { ...buildProposalPdfReport(report)!, copy: { ...report.copy } };
+    const stored = { version: 1, data: oldData, draft: defaultAssignment(f.agency, "sales").defaults,
+      brand: BRAND_DEFAULTS, attachments: [], pdfReport: oldPdf };
+    expect(proposalFromAppraisalReport(report, "sales").disclaimer).toBe(SALES_APPRAISAL_DISCLAIMER);
+    const nextPdf = buildProposalPdfReport(report)!;
+    expect(nextPdf.copy.disclaimer).toBe(SALES_APPRAISAL_DISCLAIMER);
+    expect(nextPdf.copy.comparable_disclaimer).toBe(SALES_APPRAISAL_COMPARABLE_DISCLAIMER);
+    const frozen = proposalSnapshotSchema.parse(stored);
+    expect(frozen.data.disclaimer).toBe(DEFAULT_DISCLAIMER);
+    expect(frozen.pdfReport!.copy.disclaimer).toBe(DEFAULT_DISCLAIMER);
+    expect(report.copy.disclaimer).toBe(DEFAULT_DISCLAIMER);
+    report.copy.disclaimer = "Custom sales terms.";
+    expect(proposalFromAppraisalReport(report, "sales").disclaimer).toBe("Custom sales terms.");
+    expect(buildProposalPdfReport(report)!.copy.disclaimer).toBe("Custom sales terms.");
   });
 });

@@ -15,6 +15,7 @@ export function usesRoboto(brand: ProposalBrand) {
 
 /** Browserless receives standalone HTML, so font URLs there must be absolute. */
 export function proposalPrintFontUrl(brand: ProposalBrand) {
-  const families = [usesManrope(brand) ? "Manrope" : null, usesMontserrat(brand) ? "Montserrat" : null, usesRoboto(brand) ? "Roboto" : null].filter((family): family is string => family !== null);
+  const configured = [brand.headingFont, brand.bodyFont].map(family => family.split(",")[0].replace(/["']/g, "").trim().toLowerCase());
+  const families = ["Manrope", "Montserrat", "Roboto", "Inter", "Fraunces", "DM Sans"].filter(family => configured.includes(family.toLowerCase()));
   return families.length ? buildGoogleFontStylesheetUrl(families) : null;
 }

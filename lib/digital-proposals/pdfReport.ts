@@ -1,3 +1,4 @@
+import { resolveSalesAppraisalCopyDisclaimers } from "@/lib/sales-appraisal/salesAppraisalDisclaimer";
 import { isLeaseAppraisalTemplateId } from "@/lib/reports/templates/shared/isLeaseAppraisalReport";
 import { isSalesAppraisalTemplateId } from "@/lib/reports/templates/shared/isSalesAppraisalReport";
 import { propertyMarketSchema } from "@/lib/property-market/schema";
@@ -82,7 +83,9 @@ export type ProposalPdfReport = z.infer<typeof proposalPdfReportSchema>;
 export function buildProposalPdfReport(document: FinalReportJson): ProposalPdfReport | undefined {
   if (document.template_id !== "haven-properties-str" && !isLeaseAppraisalTemplateId(document.template_id) && !isSalesAppraisalTemplateId(document.template_id)) return undefined;
   const enrichment = document.str_enrichment;
-  return proposalPdfReportSchema.parse({ ...document, agent_selection: "explicit", agent: blankAgent, agents: [],
+  return proposalPdfReportSchema.parse({ ...document,
+    copy: isSalesAppraisalTemplateId(document.template_id) ? resolveSalesAppraisalCopyDisclaimers(document.copy) : document.copy,
+    agent_selection: "explicit", agent: blankAgent, agents: [],
     assets: { qr_code_url: "", pdf_url: "" }, document_link: { mode: "none" },
     // The digital proposal uses the first six saved selections too.
     str_enrichment: enrichment ? { ...enrichment, comps: enrichment.comps.slice(0, 6) } : null,

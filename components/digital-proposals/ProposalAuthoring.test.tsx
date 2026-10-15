@@ -23,8 +23,9 @@ it("keeps brand pages selectable and reorderable without page text or add contro
   expect((screen.getByLabelText("Include Comparable listings") as HTMLInputElement).checked).toBe(false);
   expect((screen.getByLabelText("Include Our management service") as HTMLInputElement).disabled).toBe(true);
 });
-it("attaches multiple agents and makes room when an agent is removed", () => {
+it("attaches multiple agents from the chooser and makes room when an agent is removed", async () => {
   render(<Editor />);
+  fireEvent.click(screen.getByRole("button", { name: "Choose agents" }));
   fireEvent.click(screen.getByLabelText("Attach Alex"));
   fireEvent.click(screen.getByLabelText("Attach Taylor"));
   expect((screen.getByLabelText("Attach Sam") as HTMLInputElement).disabled).toBe(true);
@@ -32,4 +33,8 @@ it("attaches multiple agents and makes room when an agent is removed", () => {
   expect((screen.getByLabelText("Attach Sam") as HTMLInputElement).disabled).toBe(false);
   fireEvent.click(screen.getByLabelText("Attach Sam"));
   expect((screen.getByLabelText("Attach Sam") as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Add agents" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Remove Sam from proposal" }));
+  expect(screen.queryByRole("button", { name: "Remove Sam from proposal" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Remove Taylor from proposal" })).toBeTruthy();
 });

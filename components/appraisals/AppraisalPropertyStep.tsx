@@ -21,6 +21,7 @@ export const AppraisalPropertyStep = forwardRef<{ save: () => Promise<boolean> }
   async function save() {
     let saved = false;
     await form.handleSubmit(async property => {
+    if (!form.formState.isDirty) { saved = true; return; }
     onBusyChange(true); setError("");
     try { const result = await proposalFetch<{ listing: Listing; appraisal: WorkspaceAppraisal }>(`/api/appraisals/${appraisal.report_id}/property`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ property, expected_updated_at: appraisal.updated_at }) }); form.reset(property); onSaved(result); saved = true; }
     catch(cause) { setError(cause instanceof Error ? cause.message : "Unable to save property details."); }

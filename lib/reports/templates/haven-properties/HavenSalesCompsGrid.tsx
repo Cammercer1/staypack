@@ -4,6 +4,7 @@ import { MAX_SALES_APPRAISAL_FEATURED_COMPS } from "@/lib/sales-appraisal/salesA
 import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
 import { formatNumber } from "@/lib/reports/formatters";
 import { reportableSaleArea } from "@/lib/sales/reportableSaleArea";
+import { formatEvidenceDate } from "@/lib/appraisals/formatEvidenceDate";
 
 export const HAVEN_SALES_FEATURED_COMP_COUNT = MAX_SALES_APPRAISAL_FEATURED_COMPS;
 export const HAVEN_SALES_COMP_IMAGE_ASPECT = "aspect-[5/2]";
@@ -25,14 +26,7 @@ function formatSoldDate(value: string | null) {
   if (!value?.trim()) {
     return null;
   }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-  return parsed.toLocaleDateString("en-AU", {
-    month: "short",
-    year: "numeric",
-  });
+  return formatEvidenceDate(value, false);
 }
 
 function compPriceLabel(comp: SaleCompCard, currency?: "AUD" | "USD") {

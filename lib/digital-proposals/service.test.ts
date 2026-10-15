@@ -7,14 +7,14 @@ import { proposalSnapshotSchema } from "./workspace";
 import { proposalPrintHtml } from "./print";
 import { allowedProposalEvent } from "./activity";
 
-it("upgrades an unavailable service placeholder while preserving later page choices and client content", () => {
+it("upgrades an unavailable service placeholder while preserving later page choices and assigned cover copy", () => {
   const assignment = assignmentSchema.parse(havenly);
   const legacy = structuredClone(DEFAULT_PROPOSAL_DRAFT);
   legacy.content.introduction = "Prepared especially for you";
   legacy.agentIds = [crypto.randomUUID()];
   const updated = applyAssignment(legacy, assignment);
   expect(updated.pages.filter(page => page.enabled).map(page => page.id)).toEqual(["property", "appraisal", "forecast", "evidence", "service", "next-steps"]);
-  expect(updated.content.introduction).toBe(legacy.content.introduction);
+  expect(updated.content.introduction).toBe(assignment.defaults.content.introduction);
   expect(updated.agentIds).toEqual(legacy.agentIds);
   expect(legacy.pages.find(page => page.id === "service")).toMatchObject({ kind: "text", enabled: false, body: "" });
   updated.pages.find(page => page.id === "service")!.enabled = false;

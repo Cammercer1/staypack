@@ -10,8 +10,9 @@ https://www.havenlyproperty.com.au/ (reviewed 12 October 2026). Supporting blue 
 adapted for proposal charts; dark button text keeps the bright blue readable.
 The digital font is self-hosted in `public/fonts`, with its SIL Open Font License alongside it.
 
-Design assignments affect new appraisals and editable previews. `applyAssignment` keeps client content,
-selected agents, documents and links while applying the account design and page definitions.
+Design assignments affect new appraisals and editable previews. `applyAssignment` owns the cover title, subtitle, recipient line and comparison heading through
+`defaults.content`. It preserves selected agents, page order/visibility, documents and links while
+applying the account design and page definitions.
 Published proposals retain the brand and data in their version snapshot until republished.
 
 ## Havenly management service (design version 2)

@@ -30,3 +30,20 @@ it("keeps legacy published Australian rentals weekly", () => {
   expect(html).toContain("per week");
   expect(html).not.toContain("US$");
 });
+
+it.each(["lease", "sales"] as const)("uses singular feature labels for a one-bedroom %s comparable", kind => {
+  const data = proposalFromAppraisalReport(createLintRegressionFixtures()[kind].final_report_json!, kind);
+  data.appraisal!.comparables = [{ ...data.appraisal!.comparables[0], bedrooms: 1, bathrooms: 1 }];
+  const html = renderToStaticMarkup(<AppraisalComparables data={data} />);
+  expect(html).toContain("1 bedroom · 1 bathroom");
+  expect(html).not.toContain("1 bedrooms");
+  expect(html).not.toContain("1 bathrooms");
+});
+
+it.each(["1 Jul 2026", "2026-07-01T00:00:00+10:00"])("keeps the source sale date on the public proposal: %s", soldDate => {
+  const data = proposalFromAppraisalReport(createLintRegressionFixtures().sales.final_report_json!, "sales");
+  data.appraisal!.comparables = [{ ...data.appraisal!.comparables[0], soldDate, status: "sold" }];
+  const html = renderToStaticMarkup(<AppraisalComparables data={data} />);
+  expect(html).toContain("Sold 1 July 2026");
+  expect(html).not.toContain("30 June 2026");
+});

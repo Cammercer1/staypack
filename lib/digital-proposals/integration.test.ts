@@ -12,14 +12,14 @@ const f = createLintRegressionFixtures();
 const data = proposalFromAppraisal({ ...f, agencyAgents: [f.agent] });
 const snapshot = proposalSnapshotSchema.parse({ version: 1, data, draft: DEFAULT_PROPOSAL_DRAFT, brand: BRAND_DEFAULTS, attachments: [] });
 describe("integrated digital proposals", () => {
-  it("keeps account design settings authoritative while preserving editable content", () => {
+  it("keeps account design settings authoritative while enforcing account cover copy", () => {
     const assignment = defaultAssignment(f.agency);
     const attempt = { ...DEFAULT_PROPOSAL_DRAFT, presetId: "studio" as const, brandOverrides: { primary: "#ff0000" }, heroLayout: "split" as const, content: { ...DEFAULT_PROPOSAL_DRAFT.content, introduction: "Prepared with care" } };
     const assigned = applyAssignment(attempt, assignment);
     expect(assigned.presetId).toBe(assignment.defaults.presetId);
     expect(assigned.heroLayout).toBe(assignment.defaults.heroLayout);
     expect(assigned.brandOverrides).toEqual(assignment.defaults.brandOverrides);
-    expect(assigned.content.introduction).toBe("Prepared with care");
+    expect(assigned.content).toEqual(assignment.defaults.content);
   });
   it("uses current editable inputs even when a legacy PDF report is published", () => {
     const published = { ...f.report, status: "published" as const, user_overrides_json: { ...f.report.user_overrides_json, strProperty: { propertyValue: 1234567, weeklyRent: 1234, amenities: [], additionalAmenities: [] } } };

@@ -6,11 +6,8 @@ import { useProposalPageVisible } from "./PreparedProposalPage";
 import { useEffect, useRef } from "react";
 import { rentForPeriod } from "@/lib/property-market";
 import { formatCurrency } from "@/lib/reports/formatters";
+import { formatEvidenceDate as dateLabel } from "@/lib/appraisals/formatEvidenceDate";
 const appraisalMoney = (value: number | null, data: ProposalData, rent = false) => value === null ? "Not available" : formatCurrency(rent ? rentForPeriod(value, data.market) : value, data.market?.currency);
-const dateLabel = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
-};
 export function AppraisalSummary({ data }: { data: ProposalData }) {
   const appraisal = data.appraisal;
   if (!appraisal) return null;
@@ -43,7 +40,7 @@ export function AppraisalComparables({ data }: { data: ProposalData }) {
     <p className="max-w-4xl whitespace-pre-line leading-relaxed text-(--proposal-muted)">{data.appraisal.evidenceNote || (data.appraisal.kind === "sales" ? "Recent sales and current listings provide context for the estimated selling range. Asking prices are shown separately from sold results." : `These selected rental properties provide context for the estimated ${period === "month" ? "monthly" : "weekly"} range.`)}</p>
     <div className="grid gap-6 @min-[680px]/proposal:grid-cols-2 @min-[1100px]/proposal:grid-cols-3">{comps?.map((comp, index) => <article data-comp={index} key={comp.id} className="min-w-0 overflow-hidden rounded-(--proposal-radius) border border-current/15 bg-(--proposal-surface)">
       {comp.imageUrl && <Image unoptimized src={comp.imageUrl} alt={comp.name} width={640} height={420} className="aspect-[16/10] w-full object-cover" />}
-      <div className="space-y-3 p-5"><p className="text-xs uppercase tracking-wider text-(--proposal-muted)">{comp.status === "sold" ? "Sold" : comp.status === "for_sale" ? "For sale · asking price" : "Rental listing"}</p><h2 className="text-lg font-semibold">{comp.name}</h2><p className="text-sm text-(--proposal-muted)">{[comp.bedrooms !== null ? `${comp.bedrooms} bedrooms` : "", comp.bathrooms !== null ? `${comp.bathrooms} bathrooms` : ""].filter(Boolean).join(" · ")}</p><p className="font-[family-name:var(--proposal-heading)] text-2xl">{comp.price !== null ? appraisalMoney(comp.price, data, comp.status === "rental") : comp.priceDisplay || "Price not disclosed"}{comp.status === "rental" && comp.price !== null ? ` / ${period}` : ""}</p>{comp.status === "sold" && comp.soldDate && <p className="text-xs text-(--proposal-muted)">Sold {dateLabel(comp.soldDate)}</p>}</div>
+      <div className="space-y-3 p-5"><p className="text-xs uppercase tracking-wider text-(--proposal-muted)">{comp.status === "sold" ? "Sold" : comp.status === "for_sale" ? "For sale · asking price" : "Rental listing"}</p><h2 className="text-lg font-semibold">{comp.name}</h2><p className="text-sm text-(--proposal-muted)">{[comp.bedrooms !== null ? `${comp.bedrooms} ${comp.bedrooms === 1 ? "bedroom" : "bedrooms"}` : "", comp.bathrooms !== null ? `${comp.bathrooms} ${comp.bathrooms === 1 ? "bathroom" : "bathrooms"}` : ""].filter(Boolean).join(" · ")}</p><p className="font-[family-name:var(--proposal-heading)] text-2xl">{comp.price !== null ? appraisalMoney(comp.price, data, comp.status === "rental") : comp.priceDisplay || "Price not disclosed"}{comp.status === "rental" && comp.price !== null ? ` / ${period}` : ""}</p>{comp.status === "sold" && comp.soldDate && <p className="text-xs text-(--proposal-muted)">Sold {dateLabel(comp.soldDate)}</p>}</div>
     </article>)}</div>
   </div>;
 }

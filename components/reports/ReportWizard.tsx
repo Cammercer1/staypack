@@ -3,9 +3,10 @@
 import { CreateAnother, PropertyContext } from "@/components/properties/PropertyContext";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ProposalWorkflow, type ProposalWorkflowHandle } from "@/components/digital-proposals/ProposalWorkflow";
+import { AppraisalWizardNavigation } from "@/components/appraisals/AppraisalWizardNavigation";
 import { LayoutTemplate } from "lucide-react";
 import { StrPropertyStep, type StrPropertyHandle } from "./StrPropertyStep";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { DocumentGenerationStatus } from "@/components/documents/DocumentGenerationStatus";
 import {
   StrDesignStep,
@@ -361,34 +362,17 @@ export function ReportWizard({
         onValueChange={(next) => void handleStepChange(String(next))}
         className="gap-4"
       >
-        <TabsList
-          aria-label="Report creation steps"
-          className="grid w-full grid-cols-2 gap-1 group-data-horizontal/tabs:h-auto sm:grid-cols-4"
-        >
-          {wizardSteps.map((item, index) => (
-            <TabsTrigger
-              key={item.id}
-              value={item.id}
-              disabled={
-                disabled ||
-                (item.id === "estimate" &&
-                  step !== "property" &&
-                  !report.final_estimate_json) ||
-                (item.id === "design" && !report.final_estimate_json && !report.final_report_json) ||
-                (item.id === "preview" && (digitalProposal ? !report.final_estimate_json : !report.final_report_json))
-              }
-              className="h-auto min-h-12 gap-2 whitespace-normal px-2 py-2 text-xs sm:text-sm"
-            >
-              <span
-                className="flex size-6 shrink-0 items-center justify-center rounded-full border border-current text-xs opacity-60"
-                aria-hidden="true"
-              >
-                {index + 1}
-              </span>
-              {item.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <AppraisalWizardNavigation
+          label="Report creation steps"
+          currentStep={step}
+          steps={wizardSteps.map(item => ({
+            ...item,
+            disabled: disabled ||
+              (item.id === "estimate" && step !== "property" && !report.final_estimate_json) ||
+              (item.id === "design" && !report.final_estimate_json && !report.final_report_json) ||
+              (item.id === "preview" && (digitalProposal ? !report.final_estimate_json : !report.final_report_json)),
+          }))}
+        />
         <TabsContent value="property">
           {progress}
           <div hidden={Boolean(activity)}>
@@ -459,8 +443,8 @@ export function ReportWizard({
           </div>
         </TabsContent>
         <TabsContent value="preview" className="space-y-5">
-          {customerPanel ? <div inert={busy || childBusy}>{customerPanel}</div> : null}
-          {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="share" refreshKey={customerRevision} disabled={customerEditing || busy} onBusyChange={setChildBusy} /> : preview ? (
+          {!digitalProposal && customerPanel ? <fieldset disabled={busy || childBusy} className="min-w-0">{customerPanel}</fieldset> : null}
+          {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="share" refreshKey={customerRevision} customerPanel={customerPanel ? <fieldset disabled={busy || childBusy} className="min-w-0">{customerPanel}</fieldset> : undefined} disabled={customerEditing || busy} onBusyChange={setChildBusy} /> : preview ? (
             <StrReportDeliveryStep
               disabled={customerEditing}
               report={report}

@@ -6,7 +6,7 @@
 /* Opt in per workspace view; omit daisyUI's global base/reset styles. */
 @plugin "daisyui" {
   themes: false;
-  include: radio,skeleton, button, badge, input, select, textarea, range, list, stat, card, alert, menu, hero, file-input, table, carousel, toggle, tab;
+  include: checkbox, radio, skeleton, button, badge, input, select, textarea, range, list, stat, card, alert, menu, hero, file-input, table, carousel, toggle, tab;
   prefix: "du-";
   logs: false;
 }
