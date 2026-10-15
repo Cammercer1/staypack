@@ -1,3 +1,5 @@
+import { estimateForCalculatorReview, calculatorPropertyReviewKey } from "@/lib/str-calculator/propertyReview";
+import { calculatorLeadAddress } from "@/lib/str-calculator/leadAddress";
 import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { invalidateReportPdf, preserveReportImages } from "@/lib/reports/invalidateReportPdf";
@@ -21,16 +23,25 @@ export async function POST(request: Request) {
     const { supabase, agency, report, listing } = await requireReportWithListing(body.report_id);
 
     assertPropertyCountry(agency, listing);
+    if (report.status === "archived" || listing.status === "archived") return NextResponse.json({ error: "Restore this appraisal before continuing." }, { status: 409 });
+    const review = report.user_overrides_json?.calculatorReview;
+    if (review?.status === "pending" && !body.confirm_calculator_property) return NextResponse.json({ error: "Confirm the property details before continuing." }, { status: 409 });
+    let sourceKey = review?.propertyKey;
+    if (body.confirm_calculator_property && !sourceKey) {
+      const { data: lead, error } = await supabase.from("str_calculator_leads").select("address,country").eq("report_id", report.id).eq("agency_id", agency.id).maybeSingle();
+      if (error || !lead) return NextResponse.json({ error: "Calculator enquiry not found for this appraisal." }, { status: 400 });
+      sourceKey = calculatorPropertyReviewKey({ ...calculatorLeadAddress(lead.address, lead.country), country: lead.country });
+    }
 
     let latitude =
-      body.latitude != null ? Number(body.latitude) : listing.latitude;
+      !body.confirm_calculator_property && body.latitude != null ? Number(body.latitude) : listing.latitude;
     let longitude =
-      body.longitude != null ? Number(body.longitude) : listing.longitude;
+      !body.confirm_calculator_property && body.longitude != null ? Number(body.longitude) : listing.longitude;
     let formattedAddress: string | null = null;
 
     if (latitude == null || longitude == null) {
       const geocoded = await geocodeReportAddress({
-        property_address: body.address ?? listing.property_address,
+        property_address: body.confirm_calculator_property ? listing.property_address : body.address ?? listing.property_address,
         suburb: listing.suburb,
         state: listing.state,
         postcode: listing.postcode,
@@ -51,20 +62,25 @@ export async function POST(request: Request) {
       bedrooms,
       body.accommodates ?? listing.accommodates,
     );
-    const { estimate, enrichment: freshEnrichment } = await fetchStrEstimate(
-      { latitude, longitude, bedrooms, bathrooms, accommodates }, listing, report.str_enrichment_json,
-    );
+    const estimateInput = { latitude, longitude, bedrooms, bathrooms, accommodates };
+    const result = body.confirm_calculator_property && sourceKey
+      ? await estimateForCalculatorReview(estimateInput, listing, report, sourceKey)
+      : { ...await fetchStrEstimate(estimateInput, listing, report.str_enrichment_json), reused: false };
+    const { estimate, enrichment: freshEnrichment } = result;
     const initialScenario = !report.original_estimate_json && !report.final_estimate_json && !report.final_report_json && !readStrRateOverride(report)
       ? initialStrManagementScenario(estimate, agency.str_management_presets) : null;
     const rates = readStrRateOverride(report) ?? initialScenario?.rates ?? null;
     const overrides = saveStrRateOverride(report.user_overrides_json, rates, initialScenario?.assumptions ?? report.user_overrides_json?.strManagement);
+    if (body.confirm_calculator_property) overrides.calculatorReview = {
+      status: "verified", propertyKey: calculatorPropertyReviewKey(listing), verifiedAt: new Date().toISOString(),
+    };
     const finalEstimate = rates ? applyStrEstimateAdjustments(estimate, rates) : estimate;
     const retainedIds = report.str_enrichment_json?.selected_comp_ids?.filter((id) =>
       (freshEnrichment.comp_pool ?? freshEnrichment.comps).some((comp) => comp.listing_id === id),
     );
-    const enrichment = retainedIds?.length ? selectStrComps(freshEnrichment, retainedIds) : freshEnrichment;
+    const enrichment = !result.reused && retainedIds?.length ? selectStrComps(freshEnrichment, retainedIds) : freshEnrichment;
 
-    const { error: listingError } = await supabase
+    const { data: savedListing, error: listingError } = await supabase
       .from("listings")
       .update({
         latitude,
@@ -73,8 +89,9 @@ export async function POST(request: Request) {
         bathrooms,
         accommodates,
       })
-      .eq("id", listing.id);
+      .eq("id", listing.id).eq("agency_id", agency.id).eq("updated_at", listing.updated_at).select("*").maybeSingle();
 
+    if (!savedListing && !listingError) return NextResponse.json({ error: "The property changed while evidence was loading. Reload and confirm the latest details." }, { status: 409 });
     if (listingError) {
       return NextResponse.json({ error: listingError.message }, { status: 400 });
     }
@@ -103,13 +120,13 @@ export async function POST(request: Request) {
         original_estimate_json: estimate,
         final_estimate_json: finalEstimate,
         user_overrides_json: { ...overrides, estimateInputs: { bedrooms, bathrooms, accommodates } },
-        pdf_url: null,
-        final_report_json: finalDocument ? invalidateReportPdf(finalDocument) : null,
+        pdf_url: body.confirm_calculator_property && report.status === "published" ? report.pdf_url : null,
+        final_report_json: body.confirm_calculator_property && report.status === "published" ? report.final_report_json : finalDocument ? invalidateReportPdf(finalDocument) : null,
         raw_airbtics_json: null,
         str_enrichment_json: enrichment,
         status: report.status === "published" ? "published" : "estimated",
       })
-      .eq("id", report.id)
+      .eq("id", report.id).eq("agency_id", agency.id).eq("updated_at", report.updated_at)
       .select("*")
       .single();
 

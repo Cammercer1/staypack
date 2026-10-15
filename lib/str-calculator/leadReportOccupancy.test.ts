@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createEmptyListingDraft } from "@/lib/listings/emptyListingDraft";
+import { estimateForCalculatorReview } from "./propertyReview";
+import type { Report } from "@/lib/types";
 import type { Agency } from "@/lib/types";
 
 const mocks = vi.hoisted(() => ({ templates: vi.fn(), admin: vi.fn(), shared: new Map<string, unknown>() }));
@@ -33,7 +36,7 @@ function fixture(country: "AU" | "US" = "AU") {
     id: "b36d1c4d-1e87-4b5e-9ea3-f7c42aae1d51", name: "Managed", mode: "uplift", upliftPercent: 10, isDefault: true,
     assumptions: { unavailableNights: 0, listingStage: "established", rationale: "Professional management" },
   }] } as Agency;
-  const input = { currency: country === "AU" ? "AUD" : "USD", latitude: country === "AU" ? -33.90836 : 34.080734,
+  const input = { currency: country === "AU" ? "AUD" as const : "USD" as const, latitude: country === "AU" ? -33.90836 : 34.080734,
     longitude: country === "AU" ? 151.22473 : -118.37964, bedrooms: 3, bathrooms: 1.5, accommodates: 6, radiusM: 2000 };
   const response = {
     currency: input.currency, revenue: 60000, occupancy: .6, average_daily_rate: 300,
@@ -66,6 +69,14 @@ function database(lead: CalculatorReportLead) {
   });
   return { rpc, from, admin: { from, rpc } as unknown as SupabaseClient,
     draft: () => rpc.mock.calls[0][1].p_draft as Draft };
+}
+
+async function confirm(db: ReturnType<typeof database>, f: ReturnType<typeof fixture>) {
+  const draft = db.draft();
+  const listing = createEmptyListingDraft(draft.property);
+  const report = { original_estimate_json: draft.original_estimate, str_enrichment_json: draft.enrichment } as Report;
+  const result = await estimateForCalculatorReview(f.input, listing, report, draft.overrides.calculatorReview!.propertyKey);
+  draft.enrichment = result.enrichment;
 }
 
 function provider(market: typeof markets.AU, occupancyStatus = 200) {
@@ -120,6 +131,8 @@ describe("calculator lead report market evidence integration", () => {
     const fetcher = provider(f.market);
     await createReportFromCalculatorLead({ leadId: f.lead.id, agency: f.agency, userId: "user-a", admin: db.admin });
 
+    expect(fetcher).not.toHaveBeenCalled();
+    await confirm(db, f);
     const draft = db.draft();
     expectPreservedSeed(draft, seed);
     expect(draft.original_estimate?.raw).toEqual(f.raw);
@@ -149,12 +162,14 @@ describe("calculator lead report market evidence integration", () => {
     const fetcher = provider(f.market);
     const first = database(f.lead);
     await createReportFromCalculatorLead({ leadId: f.lead.id, agency: f.agency, userId: "user-a", admin: first.admin });
+    await confirm(first, f);
     vi.setSystemTime(new Date("2026-10-15T01:00:00Z"));
     const anotherAgency = { ...f.agency, id: "agency-other" };
     const anotherLead = { ...f.lead, id: "lead-other", agency_id: anotherAgency.id };
     const second = database(anotherLead);
     await createReportFromCalculatorLead({ leadId: anotherLead.id, agency: anotherAgency, userId: "user-b", admin: second.admin });
 
+    await confirm(second, f);
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(second.draft().enrichment?.market_occupancy).toMatchObject({ status: "available", cost_cents: 0, fetched_at: now.toISOString() });
     expect(second.draft().enrichment?.cost_cents).toBe(0);
@@ -171,6 +186,8 @@ describe("calculator lead report market evidence integration", () => {
     const fetcher = provider(f.market, 503);
     await createReportFromCalculatorLead({ leadId: f.lead.id, agency: f.agency, userId: "user-a", admin: db.admin });
 
+    expect(fetcher).not.toHaveBeenCalled();
+    await confirm(db, f);
     expectPreservedSeed(db.draft(), seed);
     expect(db.draft().enrichment?.market_occupancy).toMatchObject({ status: "unavailable", unavailable_reason: "request_failed", months: [], cost_cents: 11 });
     expect(db.draft().enrichment?.cost_cents).toBe(11);

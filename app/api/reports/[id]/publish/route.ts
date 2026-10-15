@@ -1,4 +1,5 @@
 import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
+import { calculatorPropertyReviewRequired } from "@/lib/str-calculator/propertyReviewRequired";
 import { NextResponse } from "next/server";
 import { requireReportWithListing } from "@/lib/auth/requireUser";
 import { getReportsUrl } from "@/lib/env";
@@ -14,6 +15,13 @@ export async function POST(
   try {
     const { id } = await params;
     const { supabase, agency, report, listing } = await requireReportWithListing(id);
+
+    if (calculatorPropertyReviewRequired(report, listing)) {
+      return NextResponse.json(
+        { error: "Confirm the property details before publishing this proposal." },
+        { status: 409 },
+      );
+    }
 
     if (!report.final_report_json) {
       return NextResponse.json(

@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
+import { calculatorPropertyReviewRequired } from "@/lib/str-calculator/propertyReviewRequired";
 import { z } from "zod";
 import { requireAppraisalAccess } from "@/lib/appraisals/workspace";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -94,6 +95,7 @@ function checkSelectedAgents(context: Context, ids: string[]) {
   if (ids.some(id => !context.availableAgents.some(agent => agent.id === id))) throw new ProposalError("A selected agent is no longer available. Choose an active agent from your account.");
 }
 export async function publishProposal(context: Context, revision: number, sourceFingerprint: string) {
+  if (calculatorPropertyReviewRequired(context.report, context.listing)) throw new ProposalError("Confirm the property details before publishing this proposal.", 409);
   if (context.needsEvidenceReview) throw new ProposalError("Review the updated evidence and prepare your proposal before publishing.", 409);
   if (sourceFingerprint !== context.sourceFingerprint) throw new ProposalError("The appraisal changed. Reload the preview before publishing.", 409);
   const workspace = await loadProposalWorkspace(context);

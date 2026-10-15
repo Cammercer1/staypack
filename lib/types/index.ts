@@ -448,6 +448,7 @@ export type StrManagementPreset = {
 });
 
 export type StrEstimateOverrides = Partial<StrEstimate> & {
+  calculatorReview?: { status: "pending" | "verified"; propertyKey: string; verifiedAt?: string; detailsPropertyKey?: string };
   strProperty?: import("@/lib/str/propertyInputs").StrPropertyContext;
   strAdjustment?: { nightlyRate: number; occupancyRate: number };
   strManagement?: StrManagementAssumptions;

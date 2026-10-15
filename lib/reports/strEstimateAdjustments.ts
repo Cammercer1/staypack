@@ -183,6 +183,7 @@ export function saveStrRateOverride(
   management: StrManagementAssumptions | null | undefined = overrides?.strManagement,
 ): StrEstimateOverrides {
   return {
+    ...(overrides?.calculatorReview ? { calculatorReview: overrides.calculatorReview } : {}),
     ...(overrides?.estimateInputs ? { estimateInputs: overrides.estimateInputs } : {}),
     ...(overrides?.strProperty ? { strProperty: overrides.strProperty } : {}),
     ...(rates ? { strAdjustment: rates } : {}),

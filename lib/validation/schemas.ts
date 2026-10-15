@@ -238,6 +238,7 @@ export const createListingSchema = updateListingSchema.extend({
 });
 
 export const updateReportSchema = z.object({
+  calculator_property_review: z.boolean().optional(),
   str_property: strPropertyContextSchema.optional(),
   str_adjustment: strAdjustmentSchema.optional(),
   selected_comp_listing_ids: z.array(z.string().min(1)).min(1).max(6).optional(),
@@ -267,6 +268,7 @@ export const scrapeListingSchema = z.object({
 });
 
 export const strEstimateSchema = z.object({
+  confirm_calculator_property: z.boolean().optional(),
   report_id: z.string().uuid(),
   tier: z.enum(["summary", "full"]).default(DEFAULT_AIRBTICS_TIER),
   address: z.string().optional(),

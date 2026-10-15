@@ -9,6 +9,7 @@ import type { StrAppraisal } from "@/lib/str-appraisals/types";
 import type { Agency, Listing, Report } from "@/lib/types";
 
 type Props = {
+  calculatorReview?: boolean;
   initialListing: Listing;
   initialReport: Report;
   agency: Agency;
@@ -16,7 +17,7 @@ type Props = {
   availableTemplates?: TemplatesResponse;
 };
 
-export function ReportEditor({ initialListing, initialReport, agency, availableTemplates, appraisal }: Props) {
+export function ReportEditor({ initialListing, initialReport, agency, availableTemplates, appraisal, calculatorReview }: Props) {
   const [currentAppraisal, setAppraisal] = useState(appraisal);
   const [customerEditing, setCustomerEditing] = useState(false);
   const [listing, setListing] = useState(initialListing);
@@ -24,6 +25,7 @@ export function ReportEditor({ initialListing, initialReport, agency, availableT
 
   return (
     <ReportWizard
+      calculatorReview={calculatorReview}
       initialListing={listing}
       initialReport={report}
       agency={agency}

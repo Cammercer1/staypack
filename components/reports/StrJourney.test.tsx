@@ -659,29 +659,28 @@ describe("evidence before design safeguards", () => {
     await waitTab("Review & share");
   });
 
-  it("opens a calculator-seeded draft and revisits its property without refreshing the estimate", async () => {
+  it("opens a calculator-seeded draft at property verification and confirms before moving to evidence", async () => {
     const { report, listing } = createLintRegressionFixtures();
     const fetchedAt = "2026-10-01T00:00:00.000Z";
     const originalEstimate = reconcileStrEstimate({ ...report.original_estimate_json!, raw: { provider: "airroi", fetched_at: fetchedAt, input: { latitude: -33.8, longitude: 151.2, bedrooms: listing.bedrooms, bathrooms: listing.bathrooms, accommodates: listing.accommodates, radiusM: 2000 } } });
     const enrichment = { ...report.str_enrichment_json!, fetched_at: fetchedAt, cost_cents: 0 };
-    const { fetcher, getReport } = setup(true, { report: {
+    const { fetcher } = setup(true, { report: {
       status: "estimated", pdf_url: null,
       original_estimate_json: originalEstimate, final_estimate_json: originalEstimate,
       str_enrichment_json: enrichment,
-      user_overrides_json: { estimateInputs: { bedrooms: listing.bedrooms!, bathrooms: listing.bathrooms!, accommodates: listing.accommodates! } },
+      user_overrides_json: { calculatorReview: { status: "pending", propertyKey: "source-property" }, estimateInputs: { bedrooms: listing.bedrooms!, bathrooms: listing.bathrooms!, accommodates: listing.accommodates! } },
     } });
 
-    await waitTab("Estimate & evidence");
-    clickTab("Property");
     await waitTab("Property");
-    fireEvent.click(screen.getByRole("button", { name: "Review estimate & evidence" }));
+    expect(screen.getByRole("tab", { name: "Design & content" }).getAttribute("aria-disabled")).toBe("true");
+    const confirm = await screen.findByRole("button", { name: "Confirm property & continue" });
+    await waitFor(() => expect(confirm.matches(":disabled")).toBe(false));
+    fireEvent.click(confirm);
     await waitTab("Estimate & evidence");
 
-    expect(fetcher.mock.calls.some(([url]) => url === "/api/str/estimate" || url.endsWith("generate-copy"))).toBe(false);
-    expect(getReport().original_estimate_json).toEqual(originalEstimate);
-    expect(getReport().final_estimate_json).toEqual(originalEstimate);
-    expect(getReport().str_enrichment_json).toEqual(enrichment);
-    expect(getReport().final_report_json).toBeNull();
+    const confirmation = fetcher.mock.calls.find(([url]) => url === "/api/str/estimate");
+    expect(JSON.parse(String(confirmation?.[1]?.body))).toMatchObject({ confirm_calculator_property: true });
+    expect(fetcher.mock.calls.some(([url]) => url.endsWith("generate-copy"))).toBe(false);
   });
 
   it("opens an existing published report with an old estimate without refreshing or saving it", async () => {

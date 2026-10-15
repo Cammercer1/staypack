@@ -8,6 +8,8 @@ import { z } from "zod";
 import { Popover } from "@base-ui/react/popover";
 import { ArrowRight, RefreshCw, Check, Plus, X, Info, Waves, Snowflake, CarFront, Sparkles, Wallet, BedDouble, Bath, Users } from "lucide-react";
 import { DocumentStepHeader } from "@/components/documents/DocumentStepHeader";
+import { CalculatorPropertyReview, type CalculatorPropertySelection } from "./CalculatorPropertyReview";
+import { calculatorPropertyReviewKey } from "@/lib/str-calculator/propertyReviewIdentity";
 import { avmPriceSuggestion } from "@/lib/listings/pricing";
 import { calculateAccommodates, formatCurrency } from "@/lib/reports/formatters";
 import { calculateStrGrossYield, formatStrGrossYield } from "@/lib/reports/calculateStrYield";
@@ -25,23 +27,28 @@ export type StrPropertyValues = z.infer<typeof propertySchema>;
 export type StrPropertyHandle = { read: () => Promise<{ values: StrPropertyValues; profile: Listing } | null> };
 
 export const StrPropertyStep = forwardRef<StrPropertyHandle, {
-  listing: Listing; report: Report; busy: boolean; onContinue: () => void;
-}>(function StrPropertyStep({ listing, report, busy, onContinue }, ref) {
+  listing: Listing; report: Report; busy: boolean; onContinue: () => void; calculatorReview?: boolean;
+}>(function StrPropertyStep({ listing, report, busy, onContinue, calculatorReview = false }, ref) {
   const market = marketForCountry(listing.country);
-  const savedContext = useRef(strPropertyContextSchema.safeParse(report.user_overrides_json?.strProperty).success);
-  const savedPropertyValue = useRef(report.user_overrides_json?.strProperty?.propertyValue !== undefined);
+  const review = report.user_overrides_json?.calculatorReview;
+  const detailsPropertyKey = review?.detailsPropertyKey ?? review?.propertyKey;
+  const staleSavedContext = calculatorReview && detailsPropertyKey !== undefined && detailsPropertyKey !== calculatorPropertyReviewKey(listing);
+  const savedContext = useRef(!staleSavedContext && strPropertyContextSchema.safeParse(report.user_overrides_json?.strProperty).success);
+  const savedPropertyValue = useRef(!staleSavedContext && report.user_overrides_json?.strProperty?.propertyValue !== undefined);
   const edited = useRef(new Set<string>());
   const latestProfile = useRef(listing);
-  const pending = useRef<Promise<void> | null>(null);
+  const pending = useRef<Promise<Listing | null> | null>(null);
   const [profile, setProfile] = useState(listing);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(calculatorReview);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [addressEditing, setAddressEditing] = useState(false);
+  const [addressUpdated, setAddressUpdated] = useState(false);
   const [additional, setAdditional] = useState("");
   const [amenityError, setAmenityError] = useState<string | null>(null);
   const { register, control, trigger, getValues, setValue, resetField, formState: { errors } } = useForm<StrPropertyValues>({
     resolver: zodResolver(propertySchema), mode: "onChange",
     defaultValues: {
-      ...readStrPropertyContext(listing, report),
+      ...readStrPropertyContext(listing, staleSavedContext ? { user_overrides_json: null } : report),
       bedrooms: listing.bedrooms ?? undefined, bathrooms: listing.bathrooms ?? undefined,
       car_spaces: listing.car_spaces ?? null,
       accommodates: calculateAccommodates(listing.bedrooms, listing.accommodates),
@@ -59,27 +66,39 @@ export const StrPropertyStep = forwardRef<StrPropertyHandle, {
   const valuationBand = profile.scraped_listing_json?.domainAvm?.valuation;
   const otherFeatures = [...new Set(profile.scraped_listing_json?.propertyLookup?.features ?? [])].filter((feature) => !identifyStrAmenity(feature));
 
-  const loadProfile = useCallback((refresh = false) => {
+  const loadProfile = useCallback((refresh = false, selection: CalculatorPropertySelection = {}) => {
     if (pending.current) return pending.current;
     setLoading(true); setProfileError(null);
-    pending.current = reportRequest<{ listing: Listing }>(`/api/listings/${listing.id}/property-profile`, jsonRequest({ refresh }))
-      .then(({ listing: fetched }) => {
+    pending.current = reportRequest<{ listing: Listing; profile_warning?: string; identity_changed?: boolean }>(`/api/listings/${listing.id}/property-profile`, jsonRequest({ refresh, ...(calculatorReview ? { calculatorReview: true, ...selection } : {}) }))
+      .then(({ listing: fetched, profile_warning, identity_changed }) => {
         if (!fetched?.id) throw new Error("Property details are unavailable. You can enter them manually.");
         latestProfile.current = fetched; setProfile(fetched);
+        setProfileError(profile_warning ?? null);
+        setAddressUpdated(Boolean(identity_changed));
+        if (identity_changed) {
+          savedContext.current = false; savedPropertyValue.current = false;
+          // A different home must not inherit value, rent or amenities from the
+          // previous address, including edits made before correcting the match.
+          edited.current.clear();
+          setValue("additionalAmenities", []);
+          setAdditional(""); setAmenityError(null);
+        }
         if (!edited.current.has("car_spaces")) resetField("car_spaces", { defaultValue: fetched.car_spaces ?? null });
         if (!savedPropertyValue.current && !edited.current.has("propertyValue")) resetField("propertyValue", { defaultValue: avmPriceSuggestion(fetched, "sale")?.value ?? null });
         if (!savedContext.current) {
           if (!edited.current.has("weeklyRent")) resetField("weeklyRent", { defaultValue: suggestedWeeklyRent(fetched)?.value ?? null });
           if (!edited.current.has("amenities")) setValue("amenities", importedStrAmenities(fetched));
         }
+        return fetched;
       })
-      .catch((cause) => setProfileError(cause instanceof Error ? cause.message : "Property details are unavailable. You can enter them manually."))
+      .catch((cause) => { setProfileError(cause instanceof Error ? cause.message : "Property details are unavailable. You can enter them manually."); return null; })
       .finally(() => { pending.current = null; setLoading(false); });
     return pending.current;
-  }, [listing.id, resetField, setValue]);
+  }, [listing.id, calculatorReview, resetField, setValue]);
   useEffect(() => { void loadProfile(); }, [loadProfile]);
   useImperativeHandle(ref, () => ({ read: async () => {
     await pending.current;
+    if (addressEditing) return null;
     if (additional.trim() && !addAmenity()) return null;
     if (!await trigger()) return null;
     return { values: propertySchema.parse(getValues()), profile: latestProfile.current };
@@ -117,18 +136,19 @@ export const StrPropertyStep = forwardRef<StrPropertyHandle, {
   const moreAmenities = STR_AMENITIES.filter((item) => !primaryAmenities.includes(item));
 
   return <section data-theme="staypack-workspace" className="space-y-5">
-    <DocumentStepHeader title="Confirm the property" description="Start with the property, its rental potential and the guest experience you’re appraising.">
-      <button type="button" className="du-btn du-btn-sm du-btn-primary min-h-11 h-auto py-3 whitespace-normal" disabled={busy} onClick={onContinue}>
-        {report.final_estimate_json ? "Review estimate & evidence" : "Get estimate & evidence"}<ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+    <DocumentStepHeader title="Confirm the property" description={calculatorReview ? "Check the address, photos and rental details from this enquiry. Confirm the room counts before we prepare the full estimate and market evidence." : "Start with the property, its rental potential and the guest experience you’re appraising."}>
+      <button type="button" className="du-btn du-btn-sm du-btn-primary min-h-11 h-auto py-3 whitespace-normal" disabled={busy || (calculatorReview && (loading || addressEditing))} onClick={onContinue}>
+        {calculatorReview ? "Confirm property & continue" : report.final_estimate_json ? "Review estimate & evidence" : "Get estimate & evidence"}<ArrowRight className="size-4 shrink-0" aria-hidden="true" />
       </button>
     </DocumentStepHeader>
     <fieldset disabled={busy} className="du-card du-card-border min-w-0 bg-base-100">
       <div className="du-card-body gap-5 p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        {calculatorReview ? <CalculatorPropertyReview profile={profile} loading={loading} error={profileError} addressUpdated={addressUpdated} onLookup={(selection) => loadProfile(true, selection)} onEditingChange={setAddressEditing} /> : <><div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0"><h3 className="du-card-title text-base">The property</h3><p className="mt-1 text-sm text-base-content/70">{[listing.property_address?.split(",")[0].trim(), listing.suburb].filter(Boolean).join(", ")}</p></div>
           <button type="button" onClick={() => void loadProfile(true)} disabled={loading} className="du-btn du-btn-sm du-btn-ghost min-h-11"><RefreshCw className={loading ? "size-4 animate-spin motion-reduce:animate-none" : "size-4"} aria-hidden="true" />{loading ? "Checking property…" : "Refresh property details"}</button>
         </div>
-        {profileError ? <p role="status" className="rounded-lg bg-base-200 p-3 text-sm">{profileError} Your own entries are kept.</p> : <p role="status" className="text-xs text-base-content/65">{loading ? "Bringing in estimated value, rental and amenity information. You can keep editing." : "Review imported details and make any corrections below."}</p>}
+        {profileError ? <p role="status" className="rounded-lg bg-base-200 p-3 text-sm">{profileError} Your own entries are kept.</p> : <p role="status" className="text-xs text-base-content/65">{loading ? "Bringing in estimated value, rental and amenity information. You can keep editing." : "Review imported details and make any corrections below."}</p>}</>}
+        {calculatorReview && !loading && profile.scraped_listing_json?.propertyLookup && (profile.scraped_listing_json.bedrooms !== undefined || profile.scraped_listing_json.bathrooms !== undefined) && <p className="rounded-lg bg-base-200 px-3 py-2 text-sm">Property record: {[profile.scraped_listing_json.bedrooms !== undefined ? `${profile.scraped_listing_json.bedrooms} bedroom${profile.scraped_listing_json.bedrooms === 1 ? "" : "s"}` : null, profile.scraped_listing_json.bathrooms !== undefined ? `${profile.scraped_listing_json.bathrooms} bathroom${profile.scraped_listing_json.bathrooms === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ")}. Your enquiry’s room counts are kept below; update them if needed.</p>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
           {([["bedrooms", "Bedrooms", BedDouble], ["bathrooms", "Bathrooms", Bath], ["car_spaces", "Car spaces", CarFront], ["accommodates", "Guest capacity", Users]] as const).map(([field, label, Icon]) => <div key={field} className="min-w-0 space-y-1.5">
             <label htmlFor={`str-${field}`} className="flex min-h-10 items-start gap-1.5 text-sm font-medium sm:min-h-0 sm:items-center"><Icon className="hidden size-4 shrink-0 sm:block" aria-hidden="true" />{label}</label>

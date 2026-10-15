@@ -100,16 +100,16 @@ it("creates a report from a lead and opens the existing appraisal editor", async
   vi.stubGlobal("fetch", fetch);
   render(<StrCalculatorWorkspace {...props} leads={[lead]} total={1} />);
   fireEvent.click(screen.getByRole("button", { name: `Create report for ${lead.address}` }));
-  await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/short-term-rentals/appraisals/new-report"));
+  await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/short-term-rentals/appraisals/new-report?review=property"));
   expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/marketing/str-calculator/leads/lead-1/report", { method: "POST" });
-  expect(screen.getByRole("link", { name: "Open report" }).getAttribute("href")).toBe("/short-term-rentals/appraisals/new-report");
+  expect(screen.getByRole("link", { name: "Open report" }).getAttribute("href")).toBe("/short-term-rentals/appraisals/new-report?review=property");
 });
 
 it("reopens linked reports directly without creating another draft", () => {
   navigation.tab = null;
   const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
   render(<StrCalculatorWorkspace {...props} leads={[{ ...lead, report_id: "saved-report" }]} total={1} />);
-  expect(screen.getByRole("link", { name: "Open report" }).getAttribute("href")).toBe("/short-term-rentals/appraisals/saved-report");
+  expect(screen.getByRole("link", { name: "Open report" }).getAttribute("href")).toBe("/short-term-rentals/appraisals/saved-report?review=property");
   expect(screen.queryByRole("button", { name: /Create report/ })).toBeNull();
   expect(fetch).not.toHaveBeenCalled();
 });
@@ -133,11 +133,12 @@ it("waits for an active estimate but allows a failed enquiry to become a draft",
   expect((screen.getByRole("button", { name: /Create report/ }) as HTMLButtonElement).disabled).toBe(false);
 });
 
-it("keeps the new report accessible and shows missing property evidence instead of silently navigating", async () => {
+it("always takes the user into property verification even if an older server returns warnings", async () => {
   navigation.tab = null;
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ report_id: "new-report", created: true, estimate_reused: true, warnings: ["No property photos were available."] }) }));
   render(<StrCalculatorWorkspace {...props} leads={[lead]} total={1} />);
   fireEvent.click(screen.getByRole("button", { name: `Create report for ${lead.address}` }));
-  expect((await screen.findByRole("alert")).textContent).toContain("No property photos were available.");
+  await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/short-term-rentals/appraisals/new-report?review=property"));
+  expect(screen.queryByRole("alert")).toBeNull();
   expect(screen.getByRole("link", { name: /Open report/ }).getAttribute("href")).toContain("new-report");
 });

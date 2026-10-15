@@ -4,6 +4,7 @@ import { requireReportWithListing } from "@/lib/auth/requireUser";
 import { fetchStrEstimate } from "@/lib/str/estimate";
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/requireUser", () => ({ requireReportWithListing: vi.fn() }));
 vi.mock("@/lib/geocoding", () => ({ geocodeReportAddress: vi.fn(async () => ({ latitude: -33.91, longitude: 151.22, formattedAddress: "Test property" })) }));
 vi.mock("@/lib/str/estimate", () => ({ fetchStrEstimate: vi.fn() }));
@@ -35,6 +36,7 @@ it.each(([null, "summary", "full"] as const).flatMap((tier) => [false, true].map
       }),
       eq: vi.fn(() => query), select: vi.fn(() => query),
       single: vi.fn(async () => ({ data: error ? null : table === "reports" ? report : listing, error })),
+      maybeSingle: vi.fn(async () => ({ data: error ? null : table === "reports" ? report : listing, error })),
     };
     return query;
   }
@@ -72,6 +74,7 @@ it.each(["relative", "uplift"] as const)("applies %s company defaults once and r
       update: vi.fn((body) => { if (table === "reports") report = { ...report, ...body }; return query; }),
       eq: vi.fn(() => query), select: vi.fn(() => query),
       single: vi.fn(async () => ({ data: table === "reports" ? report : f.listing, error: null })),
+      maybeSingle: vi.fn(async () => ({ data: table === "reports" ? report : f.listing, error: null })),
     };
     return query;
   };

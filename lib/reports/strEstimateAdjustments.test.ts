@@ -133,3 +133,24 @@ it("preserves reviewed rent and amenities when applying or clearing rate overrid
   expect(saved.annualRevenue).toBeUndefined();
   expect(saveStrRateOverride(saved, null).strProperty).toEqual(strProperty);
 });
+
+it.each([
+  { status: "pending" as const, propertyKey: "original-property-key" },
+  { status: "verified" as const, propertyKey: "reviewed-property-key", verifiedAt: "2026-10-15T00:00:00.000Z" },
+])("keeps calculator verification when applying management assumptions, editing rates and restoring baseline (%s)", calculatorReview => {
+  const original = { calculatorReview, estimateInputs: { bedrooms: 3, bathrooms: 1.5, accommodates: 6 }, annualRevenue: 999999 };
+  const before = structuredClone(original);
+  const managed = saveStrRateOverride(original, { nightlyRate: 400, occupancyRate: 70 }, {
+    unavailableNights: 21, listingStage: "established", rationale: "Professional management",
+  });
+  const edited = saveStrRateOverride(managed, { nightlyRate: 420, occupancyRate: 65 });
+  const baseline = saveStrRateOverride(edited, null);
+  for (const result of [managed, edited, baseline]) {
+    expect(result.calculatorReview).toEqual(calculatorReview);
+    expect(result.estimateInputs).toEqual(original.estimateInputs);
+    expect(result).not.toHaveProperty("annualRevenue");
+  }
+  expect(baseline).not.toHaveProperty("strAdjustment");
+  expect(baseline).not.toHaveProperty("strManagement");
+  expect(original).toEqual(before);
+});

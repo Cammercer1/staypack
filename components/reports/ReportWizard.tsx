@@ -27,6 +27,7 @@ import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand"
 import { enrichFinalReportMetrics } from "@/lib/reports/enrichFinalReportMetrics";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
 import { calculateAccommodates } from "@/lib/reports/formatters";
+import { calculatorPropertyReviewRequired } from "@/lib/str-calculator/propertyReviewRequired";
 import { strPropertyContextSchema } from "@/lib/str/propertyInputs";
 import { jsonRequest, reportRequest } from "@/lib/reports/reportRequests";
 import type { Agency, AgentProfile, Listing, Report } from "@/lib/types";
@@ -40,6 +41,7 @@ const steps = [
 
 export function ReportWizard({
   initialListing,
+  calculatorReview = false,
   initialReport,
   agency,
   availableTemplates,
@@ -51,6 +53,7 @@ export function ReportWizard({
   onListingChange,
   onReportChange,
 }: {
+  calculatorReview?: boolean;
   initialListing: Listing;
   initialReport: Report;
   agency: Agency;
@@ -66,8 +69,9 @@ export function ReportWizard({
   const [listing, setListing] = useState(initialListing);
   const [report, setReport] = useState(initialReport);
   const reportRef = useRef(initialReport);
+  const [reviewRequested, setReviewRequested] = useState(calculatorReview || calculatorPropertyReviewRequired(initialReport, initialListing));
   const [step, setStep] = useState(
-    initialReport.final_report_json
+    reviewRequested ? "property" : initialReport.final_report_json
       ? "preview"
       : initialReport.final_estimate_json
         ? "estimate"
@@ -139,12 +143,12 @@ export function ReportWizard({
     const property = await propertyRef.current?.read();
     if (!property) return false;
     const { values } = property;
-    if (!listing.property_address?.trim())
+    if (!property.profile.property_address?.trim())
       throw new Error(
         "Add a property address on the listing before getting an estimate.",
       );
     let current = reportRef.current;
-    let currentListing = { ...listing, scraped_listing_json: property.profile.scraped_listing_json };
+    let currentListing = property.profile;
     if (values.car_spaces !== (property.profile.car_spaces ?? null)) {
       const saved = await reportRequest<{ listing: Listing }>(
         `/api/listings/${listing.id}`,
@@ -164,6 +168,7 @@ export function ReportWizard({
         jsonRequest(
           {
             str_property: context,
+            ...(reviewRequested ? { calculator_property_review: true } : {}),
           },
           "PATCH",
         ),
@@ -180,7 +185,7 @@ export function ReportWizard({
       ),
     };
     if (
-      !current.final_estimate_json ||
+      reviewRequested || !current.final_estimate_json ||
       inputs.bedrooms !== values.bedrooms ||
       inputs.bathrooms !== values.bathrooms ||
       inputs.accommodates !== values.accommodates
@@ -190,6 +195,7 @@ export function ReportWizard({
         "/api/str/estimate",
         jsonRequest({
           report_id: current.id,
+          ...(reviewRequested ? { confirm_calculator_property: true } : {}),
           address: currentListing.property_address,
           latitude: currentListing.latitude,
           longitude: currentListing.longitude,
@@ -200,6 +206,7 @@ export function ReportWizard({
       );
       updateListing(result.listing);
       updateReport(result.report);
+      setReviewRequested(false);
       return "review";
     }
     return "saved";
@@ -367,7 +374,7 @@ export function ReportWizard({
           currentStep={step}
           steps={wizardSteps.map(item => ({
             ...item,
-            disabled: disabled ||
+            disabled: disabled || (reviewRequested && item.id !== "property") ||
               (item.id === "estimate" && step !== "property" && !report.final_estimate_json) ||
               (item.id === "design" && !report.final_estimate_json && !report.final_report_json) ||
               (item.id === "preview" && (digitalProposal ? !report.final_estimate_json : !report.final_report_json)),
@@ -378,6 +385,7 @@ export function ReportWizard({
           <div hidden={Boolean(activity)}>
             <StrPropertyStep
               ref={propertyRef}
+              calculatorReview={reviewRequested}
               listing={listing}
               report={report}
               busy={disabled}

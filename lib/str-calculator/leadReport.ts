@@ -2,16 +2,13 @@ import "server-only";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { airroiInputSchema, normaliseAirroiResponse } from "@/lib/airroi/client";
-import { fetchAirroiMarketOccupancy } from "@/lib/airroi/marketOccupancy";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import { countryName, marketForCountry } from "@/lib/property-market";
 import { applyStrEstimateAdjustments, initialStrManagementScenario, saveStrRateOverride } from "@/lib/reports/strEstimateAdjustments";
 import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
 import type { Agency, StrEnrichmentJson, StrEstimate, StrEstimateOverrides } from "@/lib/types";
-import { lookupCalculatorLeadProperty } from "./leadProperty";
-import { createEmptyListingDraft } from "@/lib/listings/emptyListingDraft";
-import { readStrPropertyContext } from "@/lib/str/propertyInputs";
+import { calculatorPropertyReviewKey } from "./propertyReview";
 import { calculatorAssumptions } from "./schema";
 import { calculatorLeadAddress } from "./leadAddress";
 
@@ -44,6 +41,7 @@ export function calculatorLeadReportDraft(lead: CalculatorReportLead, agency: Ag
     latitude: input?.latitude ?? null, longitude: input?.longitude ?? null,
   };
   const overrides: StrEstimateOverrides = {
+    calculatorReview: { status: "pending", propertyKey: calculatorPropertyReviewKey(property) },
     estimateInputs: { bedrooms: property.bedrooms, bathrooms: property.bathrooms, accommodates: property.accommodates },
   };
   const draft: {
@@ -88,45 +86,18 @@ export async function createReportFromCalculatorLead({ leadId, agency, userId, a
   // a saved report's estimates, template or customer details from current settings.
   const draft = lead.report_id ? null : calculatorLeadReportDraft(lead, agency);
   const templateId = draft ? (await resolveAvailableTemplates(agency, "str")).defaultTemplateId : null;
-  let propertyEvidence: Awaited<ReturnType<typeof lookupCalculatorLeadProperty>> | null = null;
-  const warnings: string[] = [];
-  await Promise.all([(async () => {
-    if (draft) {
-      try {
-        propertyEvidence = await lookupCalculatorLeadProperty(draft.property, lead.country);
-        draft.overrides.strProperty = readStrPropertyContext(createEmptyListingDraft({ ...draft.property, ...propertyEvidence }), { user_overrides_json: null });
-        if (!propertyEvidence.hero_image_url) warnings.push("No property photos were available. Add photos in the property editor.");
-        if (!draft.overrides.strProperty.weeklyRent) warnings.push("No rental estimate was available. Enter long-term rent in the property step.");
-      } catch {
-        warnings.push("Property photos and rental data could not be imported. Review the property step before publishing.");
-      }
-    }
-  })(), (async () => {
-    if (draft?.original_estimate && draft.enrichment) {
-      // Complete only this new draft's missing market evidence. The calculator
-      // baseline, comparable pool, selected IDs and original fetch date stay intact.
-      // Provider failures return an unavailable snapshot with the normal fallback.
-      const saved = storedRawSchema.parse(draft.original_estimate.raw);
-      const occupancy = await fetchAirroiMarketOccupancy(saved.input, draft.property);
-      draft.enrichment = { ...draft.enrichment, market_occupancy: occupancy, cost_cents: occupancy.cost_cents };
-    }
-  })()]);
   const result = await admin.rpc("create_str_calculator_lead_report", {
     p_agency_id: agency.id, p_lead_id: leadId, p_user_id: userId, p_template_id: templateId, p_draft: draft,
   });
   if (result.error) throw new CalculatorReportError("Couldn’t create the report. Please try again.", 503);
   const created = z.object({ report_id: z.uuid(), created: z.boolean(), estimate_reused: z.boolean() }).parse(result.data);
-  // Only the caller that created this separate draft may initialise its photos.
-  // A replay (including a concurrent loser) never touches an existing listing.
-  if (created.created && propertyEvidence) {
-    try {
-      const report = await admin.from("reports").select("listing_id").eq("id", created.report_id).eq("agency_id", agency.id).single();
-      const saved = report.data ? await admin.from("listings").update(propertyEvidence)
-        .eq("id", report.data.listing_id).eq("agency_id", agency.id).is("scraped_listing_json", null).is("hero_image_url", null).select("id").maybeSingle() : null;
-      if (report.error || saved?.error || !saved?.data) throw new Error("Property changed or unavailable");
-    } catch {
-      warnings.push("The report was created, but property photos could not be saved. Review the property step before publishing.");
-    }
+  if (created.created && !created.estimate_reused && draft) {
+    // The legacy RPC keeps only estimateInputs on an empty draft. Initialise the
+    // review marker on this new, still-empty report; never backfill old reports.
+    const saved = await admin.from("reports").update({ user_overrides_json: draft.overrides })
+      .eq("id", created.report_id).eq("agency_id", agency.id)
+      .is("original_estimate_json", null).is("final_report_json", null).select("id").maybeSingle();
+    if (saved.error || !saved.data) throw new CalculatorReportError("The draft was created, but verification could not be prepared. Open it from your leads to review the property.", 503);
   }
-  return { ...created, warnings: created.created ? warnings : [] };
+  return created;
 }

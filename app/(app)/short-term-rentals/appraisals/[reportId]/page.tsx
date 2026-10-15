@@ -9,11 +9,13 @@ import { STR_REPORT_LABEL } from "@/lib/listings/collateralTypes";
 import type { Listing, Report } from "@/lib/types";
 
 export default async function ListingReportEditorPage({
-  params,
+  params, searchParams,
 }: {
   params: Promise<{ reportId: string }>;
+  searchParams?: Promise<{ review?: string }>;
 }) {
   const { reportId } = await params;
+  const reviewProperty = (await searchParams)?.review === "property";
   let appraisal;
 
   let agency;
@@ -52,6 +54,7 @@ export default async function ListingReportEditorPage({
 
       {report.status === "archived" && <AppraisalCustomerPanel key={`${appraisal.updated_at}-${report.status}`} initialAppraisal={appraisal} archived />}
       {report.status === "archived" ? <p>This appraisal is archived. Restore it to continue editing. Restoring does not republish its public link.</p> : <ReportEditor
+        calculatorReview={reviewProperty}
         appraisal={appraisal}
         initialListing={listing}
         initialReport={report}

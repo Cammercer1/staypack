@@ -1,4 +1,6 @@
 import { invalidateReportPdf, preserveReportImages } from "@/lib/reports/invalidateReportPdf";
+import { calculatorPropertyReviewRequired } from "@/lib/str-calculator/propertyReviewRequired";
+import { calculatorPropertyReviewKey } from "@/lib/str-calculator/propertyReviewIdentity";
 import { preserveDocumentLink } from "@/lib/documents/documentLink";
 import { NextResponse } from "next/server";
 import { requireReportWithListing } from "@/lib/auth/requireUser";
@@ -92,11 +94,44 @@ export async function PATCH(
     const { id } = await params;
     const { supabase, agency, report: storedReport, listing } = await requireReportWithListing(id);
     const body = updateReportSchema.parse(await request.json());
+    const calculatorPropertyReview = body.calculator_property_review === true;
+    delete body.calculator_property_review;
+    if (calculatorPropertyReview) {
+      if (!body.str_property || Object.keys(body).some(key => key !== "str_property")) {
+        throw new Error("Save calculator property review separately from report content.");
+      }
+      if (!storedReport.user_overrides_json?.calculatorReview) {
+        const { data: lead, error } = await supabase.from("str_calculator_leads").select("id")
+          .eq("report_id", storedReport.id).eq("agency_id", agency.id).maybeSingle();
+        if (error || !lead) return NextResponse.json({ error: "Calculator enquiry not found for this appraisal." }, { status: 400 });
+      }
+    }
+    const preservePublishedSnapshot = calculatorPropertyReview && storedReport.status === "published";
+    if (body.status === "published" && calculatorPropertyReviewRequired(storedReport, listing)) {
+      return NextResponse.json(
+        { error: "Confirm the property details before publishing this proposal." },
+        { status: 409 },
+      );
+    }
+    if (body.user_overrides_json !== undefined) {
+      // Property verification is recorded only by the estimate confirmation flow.
+      // General report edits may neither erase it nor mark a pending review done.
+      delete body.user_overrides_json.calculatorReview;
+      if (storedReport.user_overrides_json?.calculatorReview) {
+        body.user_overrides_json.calculatorReview = storedReport.user_overrides_json.calculatorReview;
+        delete body.user_overrides_json.estimateInputs;
+        if (storedReport.user_overrides_json.estimateInputs) body.user_overrides_json.estimateInputs = storedReport.user_overrides_json.estimateInputs;
+      }
+    }
     const propertyContext = body.str_property;
     delete body.str_property;
     if (propertyContext) {
       if (body.user_overrides_json || body.str_adjustment) throw new Error("Save property details separately from estimate adjustments.");
       body.user_overrides_json = { ...storedReport.user_overrides_json, strProperty: propertyContext };
+      if (calculatorPropertyReview && storedReport.user_overrides_json?.calculatorReview) {
+        body.user_overrides_json.calculatorReview = { ...storedReport.user_overrides_json.calculatorReview,
+          detailsPropertyKey: calculatorPropertyReviewKey(listing) };
+      }
     }
     const adjustment = body.str_adjustment;
     delete body.str_adjustment;
@@ -188,7 +223,7 @@ export async function PATCH(
       if (rebuildResult.error) {
         return rebuildResult.error;
       }
-    } else if ((body.final_estimate_json !== undefined || selectedEnrichment || propertyContext) && savedCopy && resolveReportEstimate(report)) {
+    } else if (!preservePublishedSnapshot && (body.final_estimate_json !== undefined || selectedEnrichment || propertyContext) && savedCopy && resolveReportEstimate(report)) {
       const rebuildResult = await rebuildFinalReportJson({
         supabase,
         agency,
