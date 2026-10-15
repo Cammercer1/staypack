@@ -4,7 +4,7 @@ import { propertyMarketSchema } from "@/lib/property-market/schema";
 import { z } from "zod";
 import { DEFAULT_DISCLAIMER, type FinalReportJson } from "@/lib/types";
 import { seasonalProfileFromReport, seasonalProfileSchema } from "./seasonality";
-import { occupancyProfileFromReport, occupancyProfileSchema } from "./occupancy";
+import { occupancyProfileFromReport, occupancyProfileSchema, occupancyUnavailableMessage } from "./occupancy";
 
 import { assetUrlSchema } from "./assets";
 export { assetUrlSchema } from "./assets";
@@ -34,6 +34,7 @@ export const proposalDataSchema = z.object({
   str: z.object({ market: z.object({ annualRevenue: figure }), managed: z.object({ annualRevenue: figure }) }),
   seasonality: seasonalProfileSchema.nullable().default(null),
   occupancy: occupancyProfileSchema.nullable().default(null),
+  occupancyNotice: z.string().max(600).optional(),
   comparables: z.array(z.object({ name: z.string(), imageUrl: assetUrlSchema, bedrooms: figure, annualRevenue: figure, distanceM: figure })).max(6).default([]),
   disclaimer: z.string().trim().min(1),
 });
@@ -68,6 +69,7 @@ export function proposalFromReport(report: FinalReportJson, recipientDisplayName
     disclaimer: report.copy.disclaimer?.trim() || DEFAULT_DISCLAIMER,
     seasonality: seasonalProfileFromReport(report.str_enrichment?.seasonality),
     occupancy: occupancyProfileFromReport(report.str_enrichment?.market_occupancy),
+    occupancyNotice: occupancyUnavailableMessage(report.str_enrichment?.market_occupancy),
     comparables: (report.str_enrichment?.comps ?? []).slice(0, 6).map(comp => ({
       name: comp.name, imageUrl: safeAsset(comp.thumbnail_url), bedrooms: validFigure(comp.bedrooms),
       annualRevenue: validFigure(comp.annual_revenue), distanceM: validFigure(comp.distance_m),

@@ -132,3 +132,12 @@ it("waits for an active estimate but allows a failed enquiry to become a draft",
   rerender(<StrCalculatorWorkspace {...props} loadedAt={Date.parse(lead.created_at)} leads={[{ ...lead, status: "failed", estimate_json: null }]} total={1} />);
   expect((screen.getByRole("button", { name: /Create report/ }) as HTMLButtonElement).disabled).toBe(false);
 });
+
+it("keeps the new report accessible and shows missing property evidence instead of silently navigating", async () => {
+  navigation.tab = null;
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ report_id: "new-report", created: true, estimate_reused: true, warnings: ["No property photos were available."] }) }));
+  render(<StrCalculatorWorkspace {...props} leads={[lead]} total={1} />);
+  fireEvent.click(screen.getByRole("button", { name: `Create report for ${lead.address}` }));
+  expect((await screen.findByRole("alert")).textContent).toContain("No property photos were available.");
+  expect(screen.getByRole("link", { name: /Open report/ }).getAttribute("href")).toContain("new-report");
+});

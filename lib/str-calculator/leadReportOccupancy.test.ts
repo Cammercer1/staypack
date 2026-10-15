@@ -4,6 +4,8 @@ import type { Agency } from "@/lib/types";
 
 const mocks = vi.hoisted(() => ({ templates: vi.fn(), admin: vi.fn(), shared: new Map<string, unknown>() }));
 vi.mock("server-only", () => ({}));
+// This suite isolates the real occupancy adapter; property imports have their own integration coverage.
+vi.mock("./leadProperty", () => ({ lookupCalculatorLeadProperty: vi.fn().mockRejectedValue(new Error("No property profile")) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.admin }));
 vi.mock("@/lib/templates/resolveAvailableTemplates", () => ({ resolveAvailableTemplates: mocks.templates }));
 // Keep the real market adapter/cache helper, replacing only Next's storage layer.

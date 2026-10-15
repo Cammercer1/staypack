@@ -29,3 +29,13 @@ export function occupancyProfileFromReport(history: StrMarketOccupancy | undefin
 }
 
 export { occupancyMonthLabel } from "./forecastPresentation";
+
+/** Freeze a public-safe explanation on new snapshots; never expose provider diagnostics. */
+export function occupancyUnavailableMessage(history: StrMarketOccupancy | undefined) {
+  if (occupancyProfileFromReport(history)) return undefined;
+  if (history?.unavailable_reason === "insufficient_data") {
+    const locality = history.market?.locality;
+    return `Monthly occupancy history is unavailable${locality ? ` for ${locality}` : " for this market"} with this bedroom count. There is not enough matching market data to show a reliable chart.`;
+  }
+  return "Monthly occupancy history could not be retrieved for this proposal. No occupancy chart has been estimated or substituted.";
+}

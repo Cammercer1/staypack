@@ -45,3 +45,10 @@ it("handles missing revenue or occupancy independently without inventing a flat 
   expect(screen.getByText("Monthly revenue estimates are not available for this appraisal.")).toBeTruthy();
   expect(screen.getByTestId("monthly-occupancy-chart")).toBeTruthy();
 });
+
+it("shows the frozen unavailable explanation for new proposals", () => {
+  const data = { ...createProposalFixture(), occupancy: null, occupancyNotice: "Monthly occupancy history is unavailable for Edgeworth with this bedroom count." };
+  render(<YearlyForecast data={data} brand={BRAND_DEFAULTS} motion={false} />);
+  expect(screen.getByText(data.occupancyNotice)).toBeTruthy();
+  expect(screen.queryByTestId("monthly-occupancy-chart")).toBeNull();
+});

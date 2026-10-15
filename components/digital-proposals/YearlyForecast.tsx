@@ -13,7 +13,7 @@ export function YearlyForecast({ data, brand, motion }: { data: ProposalData; br
       {hasRevenue ? <MonthlyRevenueChart data={data} brand={brand} motion={motion} />
         : <div><h3 className="font-[family-name:var(--proposal-heading)] text-2xl">Revenue through the year</h3><p className="mt-4 text-sm text-(--proposal-muted)">Monthly revenue estimates are not available for this appraisal.</p></div>}
       {data.occupancy ? <MonthlyOccupancyChart occupancy={data.occupancy} brand={brand} motion={motion} />
-        : <div><h3 className="font-[family-name:var(--proposal-heading)] text-2xl">Occupancy</h3><p className="mt-4 text-sm text-(--proposal-muted)">Monthly occupancy history is not available for this market.</p></div>}
+        : <div><h3 className="font-[family-name:var(--proposal-heading)] text-2xl">Occupancy</h3><p className="mt-4 text-sm text-(--proposal-muted)">{data.occupancyNotice ?? "Monthly occupancy history is not available for this market."}</p></div>}
     </div>
     <div className="mt-3 border-t border-current/15 pt-2">
       <ProposalDetailsPopover label="About these figures" title="About these figures" brand={brand}>

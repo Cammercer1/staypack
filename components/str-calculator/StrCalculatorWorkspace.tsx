@@ -60,7 +60,10 @@ export function StrCalculatorWorkspace({ brand, initialWidget, canManage, leads,
       const result = await response.json();
       if (!response.ok || typeof result.report_id !== "string") throw new Error(result.error || "Couldn’t create the report. Please try again.");
       setCreatedReports(previous => ({ ...previous, [lead.id]: result.report_id }));
-      router.push(strAppraisalPath(result.report_id)); router.refresh();
+      if (Array.isArray(result.warnings) && result.warnings.length) {
+        setReportError(result.warnings.join(" ") + " Use Open report to continue.");
+        router.refresh();
+      } else { router.push(strAppraisalPath(result.report_id)); router.refresh(); }
     } catch (cause) { setReportError(cause instanceof Error ? cause.message : "Couldn’t create the report. Please try again."); }
     finally { setCreatingLead(null); }
   }

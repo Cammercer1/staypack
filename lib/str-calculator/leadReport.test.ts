@@ -2,11 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Agency } from "@/lib/types";
 
-const mocks = vi.hoisted(() => ({ templates: vi.fn(), admin: vi.fn(), occupancy: vi.fn() }));
+const mocks = vi.hoisted(() => ({ templates: vi.fn(), admin: vi.fn(), occupancy: vi.fn(), property: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.admin }));
 vi.mock("@/lib/templates/resolveAvailableTemplates", () => ({ resolveAvailableTemplates: mocks.templates }));
 vi.mock("@/lib/airroi/marketOccupancy", () => ({ fetchAirroiMarketOccupancy: mocks.occupancy }));
+vi.mock("./leadProperty", () => ({ lookupCalculatorLeadProperty: mocks.property }));
 import { calculatorLeadReportDraft, createReportFromCalculatorLead, type CalculatorReportLead } from "./leadReport";
 
 const now = Date.parse("2026-10-15T00:00:00.000Z");
@@ -24,12 +25,13 @@ const lead: CalculatorReportLead = { id: "lead-a", agency_id: agency.id, report_
   bedrooms: 3, country: "AU", status: "estimated", input_json: { bathrooms: 1.5 }, original_estimate_json: raw,
   completed_at: "2026-10-14T00:00:00.000Z" };
 
-const marketOccupancy = { status: "available", cost_cents: 11, fetched_at: "2026-10-15T00:00:00Z", months: [{ month: "2026-09", average: 55 }] };
+const marketOccupancy = { label: "Edgeworth · 3-bed entire homes", status: "available", cost_cents: 11, fetched_at: "2026-10-15T00:00:00Z", months: [{ month: "2026-09", average: 55 }] };
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(Date, "now").mockReturnValue(now);
   mocks.templates.mockResolvedValue({ defaultTemplateId: "standard-2-page" });
   mocks.occupancy.mockResolvedValue(marketOccupancy);
+  mocks.property.mockRejectedValue(new Error("No profile"));
 });
 afterEach(() => { vi.restoreAllMocks(); });
 
@@ -122,8 +124,25 @@ describe("calculator lead report orchestration", () => {
     const db = database({ ...lead, report_id: "fedbeef0-607a-4b42-8888-9cc63ab8b89b", original_estimate_json: null });
     await createReportFromCalculatorLead({ leadId: lead.id, agency, userId: "user-a", admin: db.admin });
     expect(mocks.templates).not.toHaveBeenCalled();
+    expect(mocks.property).not.toHaveBeenCalled();
     expect(mocks.occupancy).not.toHaveBeenCalled();
     expect(db.rpc).toHaveBeenCalledWith("create_str_calculator_lead_report", expect.objectContaining({ p_template_id: null, p_draft: null }));
+  });
+  it("does not initialise property evidence when another request already created the report", async () => {
+    const db = database();
+    mocks.property.mockResolvedValue({ hero_image_url: "https://example.com/photo.jpg", selected_image_urls: [], scraped_listing_json: null });
+    db.rpc.mockResolvedValue({ data: { report_id: "fedbeef0-607a-4b42-8888-9cc63ab8b89b", created: false, estimate_reused: true }, error: null });
+    const result = await createReportFromCalculatorLead({ leadId: lead.id, agency, userId: "user-a", admin: db.admin });
+    expect(result.warnings).toEqual([]);
+    expect(db.from).toHaveBeenCalledExactlyOnceWith("str_calculator_leads");
+  });
+  it("returns an actionable warning and the created report link if saving imported photos fails", async () => {
+    const db = database();
+    mocks.property.mockResolvedValue({ hero_image_url: "https://example.com/photo.jpg", selected_image_urls: [], scraped_listing_json: null });
+    db.from.mockImplementation(table => { if (table !== "str_calculator_leads") throw new Error("Unavailable database"); return db.query; });
+    const result = await createReportFromCalculatorLead({ leadId: lead.id, agency, userId: "user-a", admin: db.admin });
+    expect(result.created).toBe(true);
+    expect(result.warnings.join(" ")).toContain("property photos could not be saved");
   });
   it("returns not-found for another agency's lead before any write", async () => {
     const db = database(null);
@@ -146,5 +165,62 @@ describe("calculator lead report orchestration", () => {
     db.rpc.mockResolvedValue({ error: { message: "private database detail" }, data: null });
     await expect(createReportFromCalculatorLead({ leadId: lead.id, agency, userId: "user-a", admin: db.admin })).rejects.toMatchObject({ status: 503, message: "Couldn’t create the report. Please try again." });
     expect(db.rpc).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("enriched lead to published proposal", () => {
+  it.each([true, false])("retains imported photos/rent and cached comparables in the public snapshot (occupancy available: %s)", async available => {
+    const { createLintRegressionFixtures } = await import("@/components/dev/lintRegressionFixtures");
+    const { proposalFromAppraisal } = await import("@/lib/digital-proposals/fromAppraisal");
+    const { proposalSnapshotSchema } = await import("@/lib/digital-proposals/workspace");
+    const { viewerSnapshotSchema } = await import("@/lib/digital-proposals/viewerSnapshot");
+    const { proposalPrintHtml } = await import("@/lib/digital-proposals/print");
+    const { DEFAULT_PROPOSAL_DRAFT } = await import("@/lib/digital-proposals/template");
+    const { BRAND_DEFAULTS } = await import("@/lib/digital-proposals/brand");
+    const f = createLintRegressionFixtures();
+    const photo = "https://example.com/verified-property.jpg";
+    const evidence = { hero_image_url: photo, selected_image_urls: [photo], listing_image_meta: {}, property_type: "house", car_spaces: 1,
+      scraped_listing_json: { images: [photo], domainAvm: { rentalEstimate: { weeklyRent: 850 } } } };
+    mocks.property.mockResolvedValue(evidence);
+    mocks.occupancy.mockResolvedValue({ ...marketOccupancy, status: available ? "available" : "unavailable", months: available ? marketOccupancy.months : [],
+      market: { locality: "Edgeworth" }, unavailable_reason: available ? undefined : "insufficient_data" });
+    let savedDraft: ReturnType<typeof calculatorLeadReportDraft>;
+    let savedEvidence = {};
+    const leadQuery = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: lead }) };
+    const reportQuery = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single: vi.fn().mockResolvedValue({ data: { listing_id: f.listing.id } }) };
+    const listingQuery = { update: vi.fn(value => { savedEvidence = value; return listingQuery; }), eq: vi.fn().mockReturnThis(), is: vi.fn().mockReturnThis(), select: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: { id: f.listing.id } }) };
+    const admin = { from: vi.fn(table => table === "str_calculator_leads" ? leadQuery : table === "reports" ? reportQuery : listingQuery),
+      rpc: vi.fn(async (_name, args) => { savedDraft = args.p_draft; return { data: { report_id: "fedbeef0-607a-4b42-8888-9cc63ab8b89b", created: true, estimate_reused: true } }; }) };
+    const result = await createReportFromCalculatorLead({ leadId: lead.id, agency, userId: "user-a", admin: admin as unknown as SupabaseClient });
+    expect(result.warnings).toEqual([]);
+    expect(savedDraft!.overrides.strProperty?.weeklyRent).toBe(850);
+    const listing = { ...f.listing, ...savedDraft!.property, ...savedEvidence };
+    const report = { ...f.report, status: "estimated" as const, final_report_json: null, original_estimate_json: savedDraft!.original_estimate,
+      final_estimate_json: savedDraft!.final_estimate, user_overrides_json: savedDraft!.overrides, str_enrichment_json: { ...savedDraft!.enrichment!, comps: f.report.str_enrichment_json!.comps } };
+    const data = proposalFromAppraisal({ ...f, agencyAgents: [f.agent], listing, report, editable: true });
+    const snapshot = proposalSnapshotSchema.parse({ version: 1, data, brand: BRAND_DEFAULTS, draft: DEFAULT_PROPOSAL_DRAFT, attachments: [] });
+    const frozen = JSON.stringify(snapshot);
+    const publicSnapshot = viewerSnapshotSchema.parse(JSON.parse(frozen));
+    expect(publicSnapshot.data.property.heroImageUrl).toBe(photo);
+    expect(publicSnapshot.data.property.gallery).toContain(photo);
+    expect(publicSnapshot.data.ltr.weeklyRent).toBe(850);
+    expect(publicSnapshot.data.ltr.annualRent).toBe(44200);
+    expect(publicSnapshot.data.str.market.annualRevenue).toBe(60000);
+    expect(publicSnapshot.data.comparables.length).toBeGreaterThan(0);
+    const html = proposalPrintHtml(publicSnapshot);
+    expect(html).toContain(photo);
+    expect(html).toContain("44,200");
+    if (available) {
+      expect(publicSnapshot.data.occupancy?.months.at(-1)?.average).toBe(55);
+      expect(publicSnapshot.data.occupancyNotice).toBeUndefined();
+      expect(html).toContain("55%");
+    } else {
+      expect(publicSnapshot.data.occupancy).toBeNull();
+      expect(publicSnapshot.data.occupancyNotice).toContain("Edgeworth");
+      expect(html).toContain("not enough matching market data");
+    }
+    listing.hero_image_url = "https://example.com/new.jpg";
+    report.user_overrides_json!.strProperty!.weeklyRent = 1;
+    expect(JSON.stringify(publicSnapshot)).toBe(frozen);
   });
 });
