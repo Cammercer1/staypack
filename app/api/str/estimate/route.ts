@@ -1,5 +1,6 @@
 import { estimateForCalculatorReview, calculatorPropertyReviewKey } from "@/lib/str-calculator/propertyReview";
 import { calculatorLeadAddress } from "@/lib/str-calculator/leadAddress";
+import { canonicalCalculatorSourceKey, loadCanonicalCalculatorLead } from "@/lib/str-calculator/leadCanonicalProperty";
 import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { invalidateReportPdf, preserveReportImages } from "@/lib/reports/invalidateReportPdf";
@@ -27,10 +28,11 @@ export async function POST(request: Request) {
     const review = report.user_overrides_json?.calculatorReview;
     if (review?.status === "pending" && !body.confirm_calculator_property) return NextResponse.json({ error: "Confirm the property details before continuing." }, { status: 409 });
     let sourceKey = review?.propertyKey;
-    if (body.confirm_calculator_property && !sourceKey) {
-      const { data: lead, error } = await supabase.from("str_calculator_leads").select("address,country").eq("report_id", report.id).eq("agency_id", agency.id).maybeSingle();
-      if (error || !lead) return NextResponse.json({ error: "Calculator enquiry not found for this appraisal." }, { status: 400 });
-      sourceKey = calculatorPropertyReviewKey({ ...calculatorLeadAddress(lead.address, lead.country), country: lead.country });
+    if (body.confirm_calculator_property && sourceKey !== calculatorPropertyReviewKey(listing)) {
+      const lead = await loadCanonicalCalculatorLead(agency.id, report.id);
+      if (!lead && !sourceKey) return NextResponse.json({ error: "Calculator enquiry not found for this appraisal." }, { status: 400 });
+      if (lead) sourceKey = canonicalCalculatorSourceKey(lead, report) ?? sourceKey
+        ?? calculatorPropertyReviewKey({ ...calculatorLeadAddress(lead.address, lead.country), country: lead.country });
     }
 
     let latitude =

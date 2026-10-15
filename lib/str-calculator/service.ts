@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { geocodeAddress } from "@/lib/geocoding/google";
 import { fetchAirroiEstimate } from "@/lib/airroi/client";
 import { airroiPropertyKey } from "@/lib/airroi/propertyIdentity";
-import { calculatorLeadAddress } from "./leadAddress";
+import { calculatorLeadAddress, canonicalCalculatorLeadAddress } from "./leadAddress";
 import { marketForCountry } from "@/lib/property-market";
 import type { Agency } from "@/lib/types";
 import { calculatorBrand } from "./brand";
@@ -72,11 +72,13 @@ export async function submitCalculator(token: string, input: CalculatorSubmissio
     if (location.placeId === "mock-place-id") throw new Error("A real property location is required");
     const assumptions = calculatorAssumptions(input.bedrooms);
     const currency = marketForCountry(widget.country).currency;
+    const cacheProperty = canonicalCalculatorLeadAddress(input.address, widget.country, location.formattedAddress)
+      ?? calculatorLeadAddress(input.address, widget.country);
     // Only the standard calculator call: no market enrichment, scraping or report generation.
     const { estimate } = await fetchAirroiEstimate({
       latitude: location.latitude, longitude: location.longitude, bedrooms: input.bedrooms,
       bathrooms: input.bathrooms, accommodates: assumptions.guests, radiusM: assumptions.radiusM, currency,
-    }, airroiPropertyKey({ ...calculatorLeadAddress(input.address, widget.country), country: widget.country }));
+    }, airroiPropertyKey({ ...cacheProperty, country: widget.country }));
     const result = calculatorEstimateSchema.parse({
       annualRevenue: estimate.annualRevenue, monthlyRevenue: estimate.monthlyRevenue,
       nightlyRate: estimate.nightlyRate, occupancyRate: estimate.occupancyRate,

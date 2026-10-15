@@ -115,7 +115,7 @@ it("checks calculator evidence before confirmation and keeps the visitor's room 
   vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((done) => { resolve = done; })));
   const ref = createRef<StrPropertyHandle>();
   render(<StrPropertyStep ref={ref} listing={listing} report={report} busy={false} calculatorReview onContinue={vi.fn()} />);
-  expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).toEqual({ refresh: false, calculatorReview: true });
+  expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).toEqual({ refresh: false, calculatorReview: true, reportId: report.id });
   expect((screen.getByRole("button", { name: "Confirm property & continue" }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText("Checking Domain for photos and rental details…")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Guest capacity"), { target: { value: "7" } });
@@ -126,6 +126,22 @@ it("checks calculator evidence before confirmation and keeps the visitor's room 
   expect((screen.getByLabelText("Bedrooms") as HTMLInputElement).value).toBe("4");
   expect((screen.getByLabelText("Bathrooms") as HTMLInputElement).value).toBe("2");
   await act(async () => { expect((await ref.current!.read())!.values).toMatchObject({ bedrooms: 4, bathrooms: 2, accommodates: 7, weeklyRent: 950 }); });
+});
+
+it("shows an automatic locality correction without discarding edits made while the lookup loads", async () => {
+  const { listing, report } = createLintRegressionFixtures();
+  report.user_overrides_json = null;
+  let resolve!: (response: Response) => void;
+  vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(done => { resolve = done; })));
+  const ref = createRef<StrPropertyHandle>();
+  render(<StrPropertyStep ref={ref} listing={listing} report={report} busy={false} calculatorReview onContinue={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("Long-term rent ($ / week)"), { target: { value: "1400" } });
+  fireEvent.change(screen.getByLabelText("Estimated property value ($)"), { target: { value: "1750000" } });
+  fireEvent.change(screen.getByLabelText("Guest capacity"), { target: { value: "5" } });
+  const corrected = { ...listing, suburb: "Clovelly", postcode: "2031" };
+  await act(async () => resolve(Response.json({ listing: corrected, identity_changed: false, address_corrected: true })));
+  expect(screen.getByText(/Address updated/)).toBeTruthy();
+  await act(async () => { expect((await ref.current!.read())!.values).toMatchObject({ weeklyRent: 1400, propertyValue: 1750000, accommodates: 5 }); });
 });
 
 it("recovers a failed automatic match by selecting the exact property and returns the corrected profile", async () => {
@@ -143,7 +159,7 @@ it("recovers a failed automatic match by selecting the exact property and return
   fireEvent.click(screen.getByRole("button", { name: "Find property" }));
   fireEvent.click(await screen.findByRole("button", { name: /2\/24 Cliffbrook Parade, Coogee NSW 2034/ }));
   await waitFor(() => expect((screen.getByRole("button", { name: "Confirm property & continue" }) as HTMLButtonElement).disabled).toBe(false));
-  expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ refresh: true, calculatorReview: true, candidate });
+  expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ refresh: true, calculatorReview: true, reportId: report.id, candidate });
   expect(screen.getByRole("img", { name: "Property photo 1" }).getAttribute("src")).toBe("https://example.test/corrected.jpg");
   await act(async () => { expect((await ref.current!.read())!.profile).toMatchObject({ property_address: candidate.streetAddress, suburb: candidate.suburb, postcode: candidate.postcode, latitude: null, longitude: null, hero_image_url: "https://example.test/corrected.jpg" }); });
 });
@@ -168,7 +184,7 @@ it("saves a manually corrected address without provider data and clears details 
   for (const [label, value] of [["Street address", "2/24 Cliffbrook Parade"], ["Suburb", "Coogee"], ["State", "NSW"], ["Postcode", "2034"]]) fireEvent.change(screen.getByLabelText(label), { target: { value } });
   fireEvent.click(screen.getByRole("button", { name: "Use this address" }));
   await waitFor(() => expect((screen.getByRole("button", { name: "Confirm property & continue" }) as HTMLButtonElement).disabled).toBe(false));
-  expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ refresh: true, calculatorReview: true, address: { property_address: "2/24 Cliffbrook Parade", suburb: "Coogee", state: "NSW", postcode: "2034" } });
+  expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ refresh: true, calculatorReview: true, reportId: report.id, address: { property_address: "2/24 Cliffbrook Parade", suburb: "Coogee", state: "NSW", postcode: "2034" } });
   expect(screen.getByText("No property photos found")).toBeTruthy();
   expect(screen.getByText(/No matching property profile was found/)).toBeTruthy();
   expect(screen.getByText(/Address updated. Review the refreshed photos/)).toBeTruthy();

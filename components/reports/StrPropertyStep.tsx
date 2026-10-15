@@ -69,12 +69,12 @@ export const StrPropertyStep = forwardRef<StrPropertyHandle, {
   const loadProfile = useCallback((refresh = false, selection: CalculatorPropertySelection = {}) => {
     if (pending.current) return pending.current;
     setLoading(true); setProfileError(null);
-    pending.current = reportRequest<{ listing: Listing; profile_warning?: string; identity_changed?: boolean }>(`/api/listings/${listing.id}/property-profile`, jsonRequest({ refresh, ...(calculatorReview ? { calculatorReview: true, ...selection } : {}) }))
-      .then(({ listing: fetched, profile_warning, identity_changed }) => {
+    pending.current = reportRequest<{ listing: Listing; profile_warning?: string; identity_changed?: boolean; address_corrected?: boolean }>(`/api/listings/${listing.id}/property-profile`, jsonRequest({ refresh, ...(calculatorReview ? { calculatorReview: true, reportId: report.id, ...selection } : {}) }))
+      .then(({ listing: fetched, profile_warning, identity_changed, address_corrected }) => {
         if (!fetched?.id) throw new Error("Property details are unavailable. You can enter them manually.");
         latestProfile.current = fetched; setProfile(fetched);
         setProfileError(profile_warning ?? null);
-        setAddressUpdated(Boolean(identity_changed));
+        setAddressUpdated(Boolean(identity_changed || address_corrected));
         if (identity_changed) {
           savedContext.current = false; savedPropertyValue.current = false;
           // A different home must not inherit value, rent or amenities from the
@@ -94,7 +94,7 @@ export const StrPropertyStep = forwardRef<StrPropertyHandle, {
       .catch((cause) => { setProfileError(cause instanceof Error ? cause.message : "Property details are unavailable. You can enter them manually."); return null; })
       .finally(() => { pending.current = null; setLoading(false); });
     return pending.current;
-  }, [listing.id, calculatorReview, resetField, setValue]);
+  }, [listing.id, report.id, calculatorReview, resetField, setValue]);
   useEffect(() => { void loadProfile(); }, [loadProfile]);
   useImperativeHandle(ref, () => ({ read: async () => {
     await pending.current;

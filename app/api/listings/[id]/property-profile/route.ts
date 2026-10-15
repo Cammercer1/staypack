@@ -8,7 +8,8 @@ import { userFacingPropertyMessage } from "@/lib/listings/userFacingPropertyMess
 import { propertyCandidateSchema } from "@/lib/listings/propertyLookupTypes";
 import { calculatorLeadPropertyEvidence, lookupCalculatorLeadProperty } from "@/lib/str-calculator/leadProperty";
 import { calculatorPropertyReviewKey } from "@/lib/str-calculator/propertyReviewIdentity";
-import type { Listing } from "@/lib/types";
+import { automaticCalculatorAddress, loadCanonicalCalculatorLead } from "@/lib/str-calculator/leadCanonicalProperty";
+import type { Listing, Report } from "@/lib/types";
 
 export const maxDuration = 60;
 const addressSchema = z.object({
@@ -20,6 +21,7 @@ const addressSchema = z.object({
 const inputSchema = z.object({
   refresh: z.boolean().default(false),
   calculatorReview: z.boolean().default(false),
+  reportId: z.uuid().optional(),
   candidate: propertyCandidateSchema.optional(),
   address: addressSchema.optional(),
 }).refine(input => !(input.candidate && input.address), "Choose a property result or enter an address, not both.")
@@ -58,6 +60,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     let cached = false;
     let profileWarning: string | undefined;
     let identityChanged = false;
+    let automaticCorrection = false;
     if (input.calculatorReview) {
       if (input.candidate) {
         assertPropertyCountry(agency, { ...input.candidate, country: input.candidate.country ?? country });
@@ -66,19 +69,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           return NextResponse.json({ error: "Choose a complete property address in your agency's country." }, { status: 400, headers });
         }
       }
-      const address = input.candidate ? addressSchema.parse({ property_address: input.candidate.streetAddress,
+      let address = input.candidate ? addressSchema.parse({ property_address: input.candidate.streetAddress,
         suburb: input.candidate.suburb, state: input.candidate.state, postcode: input.candidate.postcode }) : input.address;
+      if (!address && input.reportId) {
+        const { data: report, error } = await supabase.from("reports")
+          .select("id,status,published_at,final_report_json,user_overrides_json")
+          .eq("id", input.reportId).eq("listing_id", listing.id).eq("agency_id", listing.agency_id).maybeSingle();
+        if (error || !report) throw new Error("Calculator appraisal not found for this property.");
+        const lead = await loadCanonicalCalculatorLead(listing.agency_id, input.reportId);
+        const canonical = lead && automaticCalculatorAddress(lead, listing, report as Report);
+        if (canonical) { address = addressSchema.parse(canonical); automaticCorrection = true; }
+      }
       const expected = { ...listing, ...address };
       assertPropertyCountry(agency, expected);
       identityChanged = Boolean(address && calculatorPropertyReviewKey(listing) !== calculatorPropertyReviewKey(expected));
-      patch = { ...address, ...(identityChanged ? clearedPropertyEvidence() : {}) };
+      // Google's saved locality describes the same unit and coordinates. Keep
+      // user photos/overrides; only manual changes can select a different home.
+      patch = { ...address, ...(identityChanged && !automaticCorrection ? clearedPropertyEvidence() : {}) };
       const reviewed = { ...expected, ...patch };
       try {
         cached = !identityChanged && !input.refresh && !input.candidate && hasFreshPropertyProfile(listing);
         const evidence = cached ? calculatorLeadPropertyEvidence(listing)
           : await lookupCalculatorLeadProperty(reviewed, country, input.candidate);
         patch = { ...patch, ...evidence };
-        if (!identityChanged) {
+        if (!identityChanged || automaticCorrection) {
           // Keep photos already chosen or uploaded during an earlier review.
           if (listing.hero_image_url) patch.hero_image_url = listing.hero_image_url;
           if (listing.selected_image_urls?.length) patch.selected_image_urls = listing.selected_image_urls;
@@ -101,7 +115,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .select("*").maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return NextResponse.json({ error: "The property changed while details were loading. Refresh the page to use the latest details." }, { status: 409, headers });
-    return NextResponse.json({ listing: data, cached, ...(input.calculatorReview ? { identity_changed: identityChanged } : {}),
+    return NextResponse.json({ listing: data, cached, ...(input.calculatorReview ? {
+      identity_changed: identityChanged && !automaticCorrection, address_corrected: identityChanged && automaticCorrection,
+    } : {}),
       ...(profileWarning ? { profile_warning: profileWarning } : {}) }, { headers });
   } catch (error) {
     unstable_rethrow(error);

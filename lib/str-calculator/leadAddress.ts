@@ -1,4 +1,5 @@
 import { usStreetAddress } from "@/lib/us-property/address";
+import { airroiPropertyKey } from "@/lib/airroi/propertyIdentity";
 
 const regions = {
   AU: /^(?:(.+?)\s+)?(ACT|NSW|NT|QLD|SA|TAS|VIC|WA)\s+(\d{4})$/i,
@@ -22,4 +23,17 @@ export function calculatorLeadAddress(address: string, country: "AU" | "US") {
   if (parts.length !== 1 && !(country === "US" && parts.length === 2 && unit.test(parts[1]))) return fallback;
   const street = country === "US" ? usStreetAddress(parts.join(", ")) : parts[0];
   return { property_address: street, suburb, state: region[2].toUpperCase(), postcode: region[3] };
+}
+
+/** A server-saved geocode may correct locality, but must never replace a unit,
+ * street or state. Incomplete or ambiguous addresses still need manual review. */
+export function canonicalCalculatorLeadAddress(address: string, country: "AU" | "US", canonicalAddress: unknown) {
+  if (typeof canonicalAddress !== "string") return null;
+  const submitted = calculatorLeadAddress(address, country);
+  const canonical = calculatorLeadAddress(canonicalAddress, country);
+  if (submitted.state !== canonical.state || !airroiPropertyKey({ ...submitted, country })) return null;
+  const canonicalKey = airroiPropertyKey({ ...canonical, country });
+  if (!canonicalKey || canonicalKey !== airroiPropertyKey({ ...submitted,
+    suburb: canonical.suburb, postcode: canonical.postcode, country })) return null;
+  return canonical;
 }

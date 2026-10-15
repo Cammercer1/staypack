@@ -124,6 +124,25 @@ describe("public calculator service", () => {
     expect(first[1]).not.toBe(second[1]);
     expect(first[0]).toEqual(second[0]);
   });
+  it("uses the canonical property cache key after a safe suburb correction without changing the original enquiry", async () => {
+    const address = "2/24 Cliffbrook Parade, Coogee NSW 2034";
+    const canonical = "Unit 2/24 Cliffbrook Parade, Clovelly NSW 2031, Australia";
+    mocks.geocode.mockResolvedValue({ latitude: -33.9147613, longitude: 151.264161, formattedAddress: canonical, placeId: "real" });
+    const result = await submitCalculator(token, { ...input, address }, "client");
+    const canonicalKey = airroiPropertyKey({ property_address: "2/24 Cliffbrook Parade", suburb: "Clovelly", state: "NSW", postcode: "2031", country: "AU" });
+    expect(mocks.estimate).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ latitude: -33.9147613, longitude: 151.264161 }), canonicalKey);
+    expect(rpc.mock.calls[0][1].p_input.address).toBe(address);
+    expect(result.address).toBe(canonical);
+    expect(update.mock.calls[0][0].original_estimate_json).toEqual(providerRaw);
+    await submitCalculator(token, { ...input, address: canonical }, "another-client");
+    expect(mocks.estimate.mock.calls[1][1]).toBe(canonicalKey);
+  });
+  it("does not move the cache entry to another apartment returned by Google", async () => {
+    mocks.geocode.mockResolvedValue({ latitude: -33.8, longitude: 151.2, formattedAddress: "Unit 3/12 Test Street, Sydney NSW 2000, Australia", placeId: "other-unit" });
+    await submitCalculator(token, { ...input, address: "2/12 Test Street, Sydney NSW 2000" }, "client");
+    expect(mocks.estimate.mock.calls[0][1]).toBe(airroiPropertyKey({ property_address: "2/12 Test Street", suburb: "Sydney", state: "NSW", postcode: "2000", country: "AU" }));
+    expect(mocks.estimate.mock.calls[0][1]).not.toBe(airroiPropertyKey({ property_address: "3/12 Test Street", suburb: "Sydney", state: "NSW", postcode: "2000", country: "AU" }));
+  });
   it("replays a completed request without another paid call", async () => {
     rpc.mockResolvedValue({ data: { id: "lead", fresh: false, status: "estimated", estimate: { annualRevenue: 62400 } } });
     expect(await submitCalculator(token, input, "client")).toEqual({ annualRevenue: 62400 });

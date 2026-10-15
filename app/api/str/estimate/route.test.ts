@@ -8,8 +8,10 @@ import { estimateForCalculatorReview } from "@/lib/str-calculator/propertyReview
 import { calculatorPropertyReviewKey } from "@/lib/str-calculator/propertyReviewIdentity";
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import type { Listing, Report } from "@/lib/types";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/auth/requireUser", () => ({ requireReportWithListing: vi.fn() }));
 vi.mock("@/lib/geocoding", () => ({ geocodeReportAddress: vi.fn() }));
 vi.mock("@/lib/str/estimate", () => ({ fetchStrEstimate: vi.fn() }));
@@ -154,4 +156,25 @@ it("does not overwrite a newer report or return successful verification after it
   expect(response.ok).toBe(false);
   expect(f.getReport()).toEqual(f.before.report);
   expect(f.getReport().user_overrides_json?.calculatorReview?.status).toBe("pending");
+});
+
+it.each([false, true])("uses the canonical source identity only for the exact linked lead evidence (changed raw: %s)", async changed => {
+  const f = confirmationFixture();
+  const report = f.getReport();
+  const submittedKey = calculatorPropertyReviewKey({ ...f.before.listing, suburb: "Coogee", postcode: "2034" });
+  report.user_overrides_json!.calculatorReview!.propertyKey = submittedKey;
+  const raw = { provider: "airroi", input: { latitude: -33.9, longitude: 151.2, bedrooms: 2, bathrooms: 1, accommodates: 4 },
+    response: { annualRevenue: 65322 }, fetched_at: new Date(Date.now() - 86400000).toISOString() };
+  report.original_estimate_json!.raw = { ...raw, response: { annualRevenue: changed ? 70000 : 65322 } };
+  const lead = { address: "2/24 Cliffbrook Parade, Coogee NSW 2034", country: "AU", status: "estimated",
+    estimate_json: { address: "Unit 2/24 Cliffbrook Parade, Clovelly NSW 2031, Australia" }, original_estimate_json: raw };
+  const query = { select: vi.fn(() => query), eq: vi.fn(() => query), maybeSingle: vi.fn(async () => ({ data: lead, error: null })) };
+  const from = vi.fn(() => query);
+  vi.mocked(createAdminClient).mockReturnValue({ from } as unknown as ReturnType<typeof createAdminClient>);
+  expect((await POST(confirmationRequest())).status).toBe(200);
+  expect(estimateForCalculatorReview).toHaveBeenCalledWith(expect.anything(), f.before.listing, expect.anything(), changed ? submittedKey : f.identity);
+  expect(from).toHaveBeenCalledWith("str_calculator_leads");
+  expect(query.eq).toHaveBeenCalledWith("agency_id", f.agency.id);
+  expect(query.eq).toHaveBeenCalledWith("report_id", report.id);
+  expect(geocodeReportAddress).not.toHaveBeenCalled();
 });

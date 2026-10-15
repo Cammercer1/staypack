@@ -6,18 +6,25 @@ import { calculatorLeadPropertyEvidence, lookupCalculatorLeadProperty } from "@/
 import { createEmptyListingDraft } from "@/lib/listings/emptyListingDraft";
 import type { Listing } from "@/lib/types";
 import { POST } from "./route";
+import { createAdminClient } from "@/lib/supabase/admin";
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/auth/requireUser", () => ({ requireListingAccess: vi.fn() }));
 vi.mock("@/lib/domain-avm/refreshPropertyProfile", () => ({ hasFreshPropertyProfile: vi.fn(), refreshPropertyProfile: vi.fn() }));
 vi.mock("@/lib/str-calculator/leadProperty", () => ({ lookupCalculatorLeadProperty: vi.fn(), calculatorLeadPropertyEvidence: vi.fn() }));
 afterEach(() => vi.resetAllMocks());
-function setup(conflict = false, overrides: Partial<Listing> = {}) {
+function setup(conflict = false, overrides: Partial<Listing> = {}, linked?: { report: Record<string, unknown> | null; lead: Record<string, unknown> | null }) {
   const listing = { ...createLintRegressionFixtures().listing, ...overrides };
   let saved: Record<string, unknown> = {};
   const query = { update: vi.fn((data: Record<string, unknown>) => { saved = data; return query; }), eq: vi.fn(() => query), select: vi.fn(() => query), maybeSingle: vi.fn(async () => ({ data: conflict ? null : { ...listing, ...saved }, error: null })) };
-  vi.mocked(requireListingAccess).mockResolvedValue({ listing, agency: { country_code: listing.country === "United States" ? "US" : "AU" }, supabase: { from: () => query } } as unknown as Awaited<ReturnType<typeof requireListingAccess>>);
+  const readQuery = (data: unknown) => { const q = { select: vi.fn(() => q), eq: vi.fn(() => q), maybeSingle: vi.fn(async () => ({ data, error: null })) }; return q; };
+  const reportQuery = readQuery(linked?.report ?? null), leadQuery = readQuery(linked?.lead ?? null);
+  const from = vi.fn((table: string) => table === "reports" ? reportQuery : table === "str_calculator_leads" ? leadQuery : query);
+  vi.mocked(createAdminClient).mockReturnValue({ from } as unknown as ReturnType<typeof createAdminClient>);
+  vi.mocked(requireListingAccess).mockResolvedValue({ listing, agency: { country_code: listing.country === "United States" ? "US" : "AU" }, supabase: { from } } as unknown as Awaited<ReturnType<typeof requireListingAccess>>);
   vi.mocked(refreshPropertyProfile).mockResolvedValue({ ...listing.scraped_listing_json!, domainAvm: undefined, propertyLookup: { source: "domain", matchedAt: new Date().toISOString(), media: [], originalAgents: [] } });
   const post = (body: Record<string, unknown>) => POST(new Request("http://localhost/api/property-profile", { method: "POST", body: JSON.stringify(body) }), { params: Promise.resolve({ id: listing.id }) });
-  return { listing, query, post, request: (refresh = false) => post({ refresh }) };
+  return { listing, query, from, reportQuery, leadQuery, post, request: (refresh = false) => post({ refresh }) };
 }
 it("checks access before provider calls or database writes", async () => {
   const { query, request } = setup();
@@ -170,4 +177,54 @@ it("clears stale evidence when unit-first comma addresses refer to a different h
   expect(await response.json()).toMatchObject({ identity_changed: true, listing: {
     ...corrected, latitude: null, longitude: null, scraped_listing_json: null, hero_image_url: null, selected_image_urls: [],
   } });
+});
+
+const reportId = "b7067c85-6745-48c7-a9f8-e48cdb91d854";
+const canonicalLead = { address: "2/24 Cliffbrook Parade, Coogee NSW 2034", country: "AU", status: "estimated",
+  estimate_json: { address: "Unit 2/24 Cliffbrook Parade, Clovelly NSW 2031, Australia" } };
+const wrongLocality = { ...createEmptyListingDraft(), ...reviewedAddress, suburb: "Coogee", postcode: "2034",
+  latitude: -33.9147613, longitude: 151.264161, bedrooms: 2, bathrooms: 1, accommodates: 4 };
+
+it("automatically looks up the exact canonical unit while retaining its original estimate coordinates and user photos", async () => {
+  const f = setup(false, { ...wrongLocality, hero_image_url: "https://example.test/chosen.jpg", selected_image_urls: ["https://example.test/chosen.jpg"], uploaded_image_urls: ["https://example.test/upload.jpg"] },
+    { report: { status: "estimated", published_at: null, final_report_json: null }, lead: canonicalLead });
+  vi.mocked(lookupCalculatorLeadProperty).mockResolvedValue(importedEvidence);
+  const response = await f.post({ calculatorReview: true, reportId });
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ address_corrected: true, identity_changed: false, listing: {
+    property_address: "Unit 2/24 Cliffbrook Parade", suburb: "Clovelly", postcode: "2031",
+    latitude: wrongLocality.latitude, longitude: wrongLocality.longitude, bedrooms: 2, bathrooms: 1, accommodates: 4,
+    hero_image_url: f.listing.hero_image_url, selected_image_urls: f.listing.selected_image_urls, uploaded_image_urls: f.listing.uploaded_image_urls,
+    scraped_listing_json: importedEvidence.scraped_listing_json,
+  } });
+  expect(lookupCalculatorLeadProperty).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ property_address: "Unit 2/24 Cliffbrook Parade", suburb: "Clovelly", postcode: "2031", latitude: wrongLocality.latitude }), "AU", undefined);
+  expect(f.reportQuery.eq).toHaveBeenCalledWith("id", reportId);
+  expect(f.reportQuery.eq).toHaveBeenCalledWith("listing_id", f.listing.id);
+  expect(f.reportQuery.eq).toHaveBeenCalledWith("agency_id", f.listing.agency_id);
+  expect(f.leadQuery.eq).toHaveBeenCalledWith("report_id", reportId);
+  expect(f.leadQuery.eq).toHaveBeenCalledWith("agency_id", f.listing.agency_id);
+});
+
+it.each([null, { ...canonicalLead, estimate_json: { address: "Unit 1/24 Cliffbrook Parade, Clovelly NSW 2031, Australia" } }])("never invents a canonical address for missing or mismatched lead evidence", async lead => {
+  const f = setup(false, wrongLocality, { report: { status: "estimated" }, lead });
+  vi.mocked(lookupCalculatorLeadProperty).mockResolvedValue(importedEvidence);
+  expect((await f.post({ calculatorReview: true, reportId })).status).toBe(200);
+  expect(lookupCalculatorLeadProperty).toHaveBeenCalledWith(f.listing, "AU", undefined);
+  expect(f.query.update.mock.calls[0][0]).not.toHaveProperty("suburb");
+});
+
+it("rejects a report outside this listing before reading private lead evidence or doing lookup", async () => {
+  const f = setup(false, wrongLocality, { report: null, lead: canonicalLead });
+  expect((await f.post({ calculatorReview: true, reportId })).status).toBe(400);
+  expect(createAdminClient).not.toHaveBeenCalled();
+  expect(lookupCalculatorLeadProperty).not.toHaveBeenCalled();
+  expect(f.query.update).not.toHaveBeenCalled();
+});
+
+it("lets explicit property selection win over automatic correction", async () => {
+  const f = setup(false, wrongLocality, { report: { status: "estimated" }, lead: canonicalLead });
+  vi.mocked(lookupCalculatorLeadProperty).mockResolvedValue(importedEvidence);
+  expect((await f.post({ calculatorReview: true, reportId, candidate: selectedCandidate })).status).toBe(200);
+  expect(createAdminClient).not.toHaveBeenCalled();
+  expect(lookupCalculatorLeadProperty).toHaveBeenCalledWith(expect.objectContaining({ ...reviewedAddress, latitude: null }), "AU", selectedCandidate);
 });
