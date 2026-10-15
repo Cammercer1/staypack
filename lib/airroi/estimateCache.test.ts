@@ -3,7 +3,7 @@ const mocks = vi.hoisted(() => ({ rpc: vi.fn(), signals: [] as AbortSignal[] }))
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({
   rpc: (...args: unknown[]) => ({ abortSignal: (signal: AbortSignal) => { mocks.signals.push(signal); return mocks.rpc(...args); } }),
 }) }));
-import { AIRROI_CACHE_TTL_MS, airroiCalculatorCacheKey, cachedAirroiCalculator, createAirroiCacheStore,
+import { AIRROI_CACHE_TTL_MS, airroiCalculatorCacheKey, airroiCalculatorConfigurationKey, airroiPropertyCalculatorCacheKey, cachedAirroiCalculator, createAirroiCacheStore,
   type AirroiCacheClaim, type AirroiCacheStore } from "./estimateCache";
 
 const input = { latitude: -33.9, longitude: 151.2, bedrooms: 3, bathrooms: 1.5, accommodates: 6, radiusM: 2000, currency: "AUD" as const };
@@ -29,6 +29,48 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-15T00:
 afterEach(() => { vi.useRealTimers(); });
 
 describe("shared calculator cache", () => {
+  it("separates property identity and every estimate configuration from coordinate tolerance", () => {
+    const propertyKey = "a".repeat(64);
+    expect(airroiCalculatorConfigurationKey({ ...input, latitude: -33.90001 })).toBe(airroiCalculatorConfigurationKey(input));
+    for (const change of [{ bedrooms: 4 }, { bathrooms: 2 }, { accommodates: 8 }, { radiusM: 3000 }, { currency: "USD" as const }]) {
+      expect(airroiCalculatorConfigurationKey({ ...input, ...change })).not.toBe(airroiCalculatorConfigurationKey(input));
+    }
+    expect(airroiPropertyCalculatorCacheKey(input, propertyKey)).not.toBe(airroiCalculatorCacheKey(input));
+    expect(airroiPropertyCalculatorCacheKey(input, propertyKey)).not.toBe(airroiPropertyCalculatorCacheKey(input, "b".repeat(64)));
+  });
+  it("sends only hashed property identity and effective provider inputs to the private matching RPC", async () => {
+    const propertyKey = "a".repeat(64);
+    const key = airroiPropertyCalculatorCacheKey(input, propertyKey);
+    mocks.rpc.mockResolvedValue({ data: { status: "claimed", request_key: key, provider_input: input }, error: null });
+    await createAirroiCacheStore({ propertyKey, input: { ...input, ...{ email: "private@example.com", address: "Private address" } } }).claim(key, "owner");
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("claim_airroi_property_calculator_cache", {
+      p_request_key: key, p_legacy_request_key: airroiCalculatorCacheKey(input), p_lease_owner: "owner",
+      p_property_key: propertyKey, p_configuration_key: airroiCalculatorConfigurationKey(input), p_input: input,
+    });
+  });
+  it.each([
+    { ...input, bedrooms: 4 }, { ...input, bathrooms: 2 }, { ...input, accommodates: 8 },
+    { ...input, radiusM: 3000 }, { ...input, currency: "USD" }, { ...input, latitude: -33.901 }, undefined,
+  ])("rejects a mismatched property-cache response before any paid call (%j)", async (providerInput) => {
+    const key = "a".repeat(64);
+    mocks.rpc.mockResolvedValue({ data: { status: "claimed", request_key: key, provider_input: providerInput }, error: null });
+    const fetcher = vi.fn();
+    await expect(cachedAirroiCalculator(key, fetcher, createAirroiCacheStore({ propertyKey: key, input }))).rejects.toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("completes or releases the resolved original row rather than the caller's shifted coordinate key", async () => {
+    const callerKey = "a".repeat(64), originalKey = "b".repeat(64);
+    const store = fakeStore();
+    store.claim.mockResolvedValue({ status: "claimed", request_key: originalKey, provider_input: input });
+    const fetcher = vi.fn().mockResolvedValue(payload);
+    const result = await cachedAirroiCalculator(callerKey, fetcher, store);
+    expect(result).toMatchObject({ request_key: originalKey, provider_input: input });
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith(input);
+    expect(store.complete).toHaveBeenCalledWith(originalKey, expect.any(String), payload);
+    fetcher.mockRejectedValue(new Error("provider timeout"));
+    await expect(cachedAirroiCalculator(callerKey, fetcher, store)).rejects.toThrow("provider timeout");
+    expect(store.fail).toHaveBeenCalledWith(originalKey, expect.any(String));
+  });
   it("keys all effective inputs, without agency data or local comparable ranking", () => {
     const key = airroiCalculatorCacheKey(input);
     expect(key).toMatch(/^[a-f0-9]{64}$/);

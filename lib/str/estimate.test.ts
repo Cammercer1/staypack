@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { fetchStrEstimate } from "./estimate";
 import { fetchAirroiEstimate, normaliseAirroiResponse } from "@/lib/airroi/client";
 import { fetchAirroiMarketOccupancy } from "@/lib/airroi/marketOccupancy";
+import { airroiPropertyKey } from "@/lib/airroi/propertyIdentity";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/airroi/client", async (original) => ({ ...await original<typeof import("@/lib/airroi/client")>(), fetchAirroiEstimate: vi.fn() }));
@@ -73,7 +74,7 @@ it.each([0, 11])("preserves cached calculator provenance and adds only %i cents 
   expect(saved.enrichment.fetched_at).toBe(fetchedAt);
   expect(saved.enrichment.request_id).toBe("original-provider-request");
   expect(saved.estimate.raw).toEqual(estimate.raw);
-  expect(fetchAirroiEstimate).toHaveBeenCalledExactlyOnceWith({ ...input, currency: "AUD", property_type: f.listing.property_type, suburb: f.listing.suburb });
+  expect(fetchAirroiEstimate).toHaveBeenCalledExactlyOnceWith({ ...input, currency: "AUD", property_type: f.listing.property_type, suburb: f.listing.suburb }, airroiPropertyKey(f.listing));
   expect(fetchAirroiMarketOccupancy).toHaveBeenCalledWith(expect.objectContaining(input), f.listing, occupancy);
   expect({ estimate, enrichment }).toEqual(originalProviderResult);
   expect(f.report).toEqual(previousReport);

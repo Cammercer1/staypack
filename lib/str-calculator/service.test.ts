@@ -6,6 +6,7 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.admin }));
 vi.mock("@/lib/geocoding/google", () => ({ geocodeAddress: mocks.geocode }));
 vi.mock("@/lib/airroi/client", () => ({ fetchAirroiEstimate: mocks.estimate }));
 import { loadPublicCalculator, submitCalculator } from "./service";
+import { airroiPropertyKey } from "@/lib/airroi/propertyIdentity";
 
 const token = "6500bfd0-04d8-4919-b458-84e9ec0ce331";
 const input = { address: "12 Test Street, Sydney NSW 2000", bedrooms: 3, bathrooms: 1.5, email: "owner@example.com", consent: true, website: "", requestId: token };
@@ -57,7 +58,8 @@ describe("public calculator service", () => {
     const result = await submitCalculator(token, input, "client-ip");
     expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(mocks.estimate.mock.invocationCallOrder[0]);
     expect(mocks.geocode).toHaveBeenCalledWith(input.address, "AU", { requireStreetAddress: true });
-    expect(mocks.estimate).toHaveBeenCalledExactlyOnceWith({ latitude: -33.8, longitude: 151.2, bedrooms: 3, bathrooms: 1.5, accommodates: 6, radiusM: 2000, currency: "AUD" });
+    expect(mocks.estimate).toHaveBeenCalledExactlyOnceWith({ latitude: -33.8, longitude: 151.2, bedrooms: 3, bathrooms: 1.5, accommodates: 6, radiusM: 2000, currency: "AUD" },
+      airroiPropertyKey({ property_address: "12 Test Street", suburb: "Sydney", state: "NSW", postcode: "2000", country: "AU" }));
     expect(rpc.mock.calls[0][1].p_input).toMatchObject({ bedrooms: 3, bathrooms: 1.5 });
     expect(result.bathrooms).toBe(1.5);
     expect(result).not.toHaveProperty("raw");
@@ -105,13 +107,22 @@ describe("public calculator service", () => {
   it("uses report-compatible guest capacity for larger properties", async () => {
     const result = await submitCalculator(token, { ...input, bedrooms: 10 }, "client");
     expect(rpc.mock.calls[0][1].p_input.guests).toBe(10);
-    expect(mocks.estimate).toHaveBeenCalledWith(expect.objectContaining({ bedrooms: 10, accommodates: 10 }));
+    expect(mocks.estimate).toHaveBeenCalledWith(expect.objectContaining({ bedrooms: 10, accommodates: 10 }), expect.any(String));
     expect(result.guests).toBe(10);
   });
   it("includes bathroom changes in the request fingerprint", async () => {
     await submitCalculator(token, input, "client");
     await submitCalculator(token, { ...input, bathrooms: 2 }, "client");
     expect(rpc.mock.calls[0][1].p_input_hash).not.toBe(rpc.mock.calls[1][1].p_input_hash);
+  });
+  it("keeps the selected apartment identity when Google returns a building-level address", async () => {
+    mocks.geocode.mockResolvedValue({ latitude: -33.8, longitude: 151.2, formattedAddress: input.address, placeId: "building" });
+    await submitCalculator(token, { ...input, address: "2/12 Test Street, Sydney NSW 2000" }, "client");
+    await submitCalculator(token, { ...input, address: "3/12 Test Street, Sydney NSW 2000" }, "client");
+    const [first, second] = mocks.estimate.mock.calls;
+    expect(first[1]).toBe(airroiPropertyKey({ property_address: "2/12 Test Street", suburb: "Sydney", state: "NSW", postcode: "2000", country: "AU" }));
+    expect(first[1]).not.toBe(second[1]);
+    expect(first[0]).toEqual(second[0]);
   });
   it("replays a completed request without another paid call", async () => {
     rpc.mockResolvedValue({ data: { id: "lead", fresh: false, status: "estimated", estimate: { annualRevenue: 62400 } } });

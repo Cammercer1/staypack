@@ -446,6 +446,23 @@ branding, agency adjustments and selected comparables are not shared cache data.
 Browser roles have neither table access nor RPC execution permission. Consumers
 must retain their normal agency authorization and lead reservation checks.
 
+`20261015051750_airroi_property_calculator_cache.sql`, applied on 15 October 2026,
+adds property-aware matching for complete Australian and US addresses. Reports
+and widgets hash the same normalized street/unit, locality, region, postcode and
+country. Matching also requires identical beds, baths, guest capacity, radius
+and currency, with coordinates no more than 50 metres from the original fetch.
+Different units and neighboring addresses remain separate. Ambiguous/incomplete
+addresses use the original exact-coordinate cache. No address or contact text is
+stored in the shared cache: only hashes and effective numeric/provider inputs.
+
+The service-only property claim RPC uses a short transaction lock for matching
+coordinate variants, then retains the normal durable provider lease. Reuse never
+moves the original coordinate anchor or extends expiry. The adapter preserves
+the original effective inputs in `raw.input` and, when coordinates differ, records
+the caller's values separately in `raw.requested_input`. Unassigned legacy rows
+can be adopted only through their matching exact request key; another property's
+identity is never overwritten. No historical report or lead is backfilled.
+
 Each successful fetch is valid for exactly 720 hours (30 days), starting at the
 database completion timestamp. Reads and completion retries never extend the
 expiry. Expired data is never returned, including during provider failures.
@@ -474,12 +491,20 @@ Validation uses an **empty disposable PostgreSQL 17 database**, never Supabase:
 3. Run `tests/airroi_calculator_cache_assertions.sql` with `psql -v ON_ERROR_STOP=1`.
 4. For a Docker database, run
    `python3 supabase/tests/airroi_calculator_cache_concurrency.py CONTAINER`.
+5. Apply `migrations/20261015051750_airroi_property_calculator_cache.sql`, run
+   `tests/airroi_property_calculator_cache_assertions.sql` with `psql -v ON_ERROR_STOP=1`,
+   then `python3 supabase/tests/airroi_property_calculator_cache_concurrency.py CONTAINER`.
 
 Assertions cover fixed expiry, completion retries, stale owners, failures,
 bounded cleanup, browser-role denial and unchanged report/lead/billing sentinels.
 The concurrency test launches twelve independent database sessions and verifies
 one fetch lease followed by twelve cache hits. Scheduled cleanup coverage lives
 in `lib/airroi/calculatorCacheCleanup.test.ts`.
+Property matching tests additionally cover the 50-metre boundary, separate units,
+strict configurations, unchanged anchors, expiry, concurrent coordinate variants,
+and competing properties adopting one legacy row. Adapter integration tests cover
+report-to-widget and widget-to-report reuse, original input provenance and no
+additional calculator request on a cache hit. Billing remains disabled.
 
 ## Calculator lead to report
 
