@@ -16,6 +16,16 @@ describe("report request recovery", () => {
     });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+  it("prepares the saved draft privately when the report already has a public version", async () => {
+    const published = { ...report, status: "published" as const, pdf_url: "previous.pdf" };
+    const ready = { ...published, pdf_url: "saved-draft.pdf" };
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ report: ready }));
+    vi.stubGlobal("fetch", fetcher);
+    expect(await prepareReportPdf(published)).toEqual(ready);
+    expect(fetcher.mock.calls[0][0]).toBe("/api/reports/report/generate-pdf");
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ preview: true });
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
   it("recovers a PDF after an HTML gateway error without rendering twice", async () => {
     vi.useFakeTimers();
     const ready = { ...report, pdf_url: "new.pdf" };

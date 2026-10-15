@@ -1,3 +1,4 @@
+import { preservePublishedReport } from "@/lib/reports/publicationSnapshot";
 import { NextResponse } from "next/server";
 import { requireReportAccess } from "@/lib/auth/requireUser";
 import { documentLinkSchema } from "@/lib/documents/documentLink";
@@ -18,7 +19,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const draft = await createDocumentLinkDraft({ link, agencyId: agency.id, documentId: report.id, reportUrl });
     const { data, error } = await supabase.from("reports").update({
       public_slug: publicSlug,
-      final_report_json: { ...report.final_report_json, document_link_draft: draft },
+      final_report_json: preservePublishedReport(report, {
+        ...report.final_report_json,
+        document_link_draft: draft,
+        assets: { ...report.final_report_json.assets, pdf_url: "" },
+      }),
+      pdf_url: null,
     }).eq("id", report.id).eq("agency_id", agency.id).eq("updated_at", report.updated_at).select("*").maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return NextResponse.json({ error: "This report changed while saving. Reload and try again." }, { status: 409 });

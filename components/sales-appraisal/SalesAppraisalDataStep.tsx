@@ -8,7 +8,7 @@ import { formatEvidenceDate as formatSoldDate } from "@/lib/appraisals/formatEvi
 
 import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import Image from "next/image";
 import { Check, House, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -26,9 +26,12 @@ import type { SaleComp } from "@/lib/sales/types";
 import { cn } from "@/lib/utils";
 import type { Listing, SalesAppraisalJob } from "@/lib/types";
 
+import type { AppraisalStepHandle, AppraisalStepSaveResult } from "@/components/appraisals/appraisalStepHandle";
+
 const POLL_INTERVAL_MS = 2000;
 
 type Props = {
+  ref?: Ref<AppraisalStepHandle>;
   appraisalEndpoint?: string;
   onDirtyChange?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
@@ -46,6 +49,7 @@ type ApiError = {
 };
 
 export function SalesAppraisalDataStep({
+  ref,
   appraisalEndpoint,
   onDirtyChange,
   listing,
@@ -71,12 +75,14 @@ export function SalesAppraisalDataStep({
 
   const priceEdited = useRef(false);
   const selectionEdited = useRef(false);
+  const reviewEdited = useRef(false);
   const estimate = avmPriceSuggestion(listing, "sale");
   const hasPriceOverride = Boolean(listing.appraisal_overrides_json?.sales);
   const [query, setQuery] = useState("");
   const [selectedOnly, setSelectedOnly] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const pollErrorShownRef = useRef(false);
   const jobCompletionToastRef = useRef<string | null>(null);
   const [priceMin, setPriceMin] = useState<string>(
@@ -112,7 +118,7 @@ export function SalesAppraisalDataStep({
       setPriceMax(String(appraisal?.priceMax ?? ""));
       setPriceMid(String(appraisal?.priceMidpoint ?? ""));
     }
-    setAgentReviewConfirmed(agencyGuideReview?.confirmed ?? false);
+    if (!reviewEdited.current) setAgentReviewConfirmed(agencyGuideReview?.confirmed ?? false);
     if (selectionEdited.current) {
       const availableIds = new Set(pool.map(saleCompListingId));
       setSelectedIds(current => current.filter(id => availableIds.has(id)));
@@ -298,18 +304,20 @@ export function SalesAppraisalDataStep({
   }
 
   async function resetPrice() {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       const response = await fetch(`${endpoint}/data`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset_price: true, ...(appraisalEndpoint ? { expected_updated_at: listing.updated_at } : {}) }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Unable to reset appraisal");
+      if (!response.ok || !payload.listing) throw new Error(payload.error ?? "Unable to reset appraisal");
       priceEdited.current = false;
       onListingChange(payload.listing);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to reset appraisal");
-    } finally { setSaving(false); }
+    } finally { savingRef.current = false; setSaving(false); }
   }
 
   useEffect(() => {
@@ -317,12 +325,17 @@ export function SalesAppraisalDataStep({
     return () => onBusyChange?.(false);
   }, [saving, fetching, appraisalEndpoint, onBusyChange]);
 
-  async function saveAndContinue() {
+  useImperativeHandle(ref, () => ({ savePendingEdits: () => saveData(true) }));
+
+  async function saveData(onlyIfDirty = false, continueAfterSave = false): Promise<AppraisalStepSaveResult> {
+    if (savingRef.current) return "failed";
+    if (onlyIfDirty && !evidenceDirty) return "unchanged";
     if (!canContinue) {
       toast.error("Fetch comps and select at least one comparable");
-      return;
+      return "failed";
     }
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const response = await fetch(
@@ -345,7 +358,7 @@ export function SalesAppraisalDataStep({
         },
       );
       const payload = (await response.json()) as ApiError & { listing?: Listing };
-      if (!response.ok) {
+      if (!response.ok || !payload.listing) {
         throw new Error(payload.error ?? "Unable to save appraisal data");
       }
       selectionEdited.current = false;
@@ -353,15 +366,23 @@ export function SalesAppraisalDataStep({
         onListingChange(payload.listing);
       }
       priceEdited.current = false;
+      reviewEdited.current = false;
       toast.success("Appraisal data saved");
-      onContinue(payload.listing);
+      if (continueAfterSave) onContinue(payload.listing);
+      return "saved";
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Unable to save appraisal data",
       );
+      return "failed";
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
+  }
+
+  async function saveAndContinue() {
+    await saveData(false, true);
   }
 
   const loading = fetching || saving;
@@ -537,9 +558,10 @@ export function SalesAppraisalDataStep({
                   <input
                     type="checkbox"
                     checked={agentReviewConfirmed}
-                    onChange={(event) =>
-                      setAgentReviewConfirmed(event.target.checked)
-                    }
+                    onChange={(event) => {
+                      reviewEdited.current = true;
+                      setAgentReviewConfirmed(event.target.checked);
+                    }}
                     className="du-toggle du-toggle-sm du-toggle-primary mt-0.5 shrink-0"
                   />
                   <span>I have reviewed the agency guide against the comparable evidence.</span>

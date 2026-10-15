@@ -559,6 +559,8 @@ export type AiCopyJson = {
 export type { AgencyBrandAdvanced } from "@/lib/branding/advanced";
 
 export type FinalReportJson = import("@/lib/documents/documentLink").DocumentLinkFields & {
+  /** Last public revision while the editable report has unpublished changes. */
+  published_report_json?: FinalReportJson;
   /** An explicit proposal selection (including zero agents) overrides legacy brand defaults. */
   market?: import("@/lib/property-market").PropertyMarket;
   agent_selection?: "explicit";

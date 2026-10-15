@@ -55,6 +55,16 @@ afterEach(() => {
 for (const kind of ["lease", "sales"] as const) {
   const Component =
     kind === "lease" ? LeaseAppraisalCopyEditor : SalesAppraisalCopyEditor;
+  function savedResponse(_url: string, init: RequestInit) {
+    const report = createLintRegressionFixtures()[kind];
+    const { copy } = JSON.parse(String(init.body));
+    return Promise.resolve(Response.json({
+      report: {
+        ...report,
+        final_report_json: { ...report.final_report_json!, copy },
+      },
+    }));
+  }
   function setup() {
     const fixtures = createLintRegressionFixtures();
     const onContinueToPreview = vi.fn();
@@ -78,7 +88,7 @@ for (const kind of ["lease", "sales"] as const) {
   }
   describe(`${kind} save and preview`, () => {
     it("saves edited content and continues with one action", async () => {
-      const fetcher = vi.fn().mockResolvedValue(Response.json({}));
+      const fetcher = vi.fn().mockImplementation(savedResponse);
       vi.stubGlobal("fetch", fetcher);
       const { onContinueToPreview } = setup();
       fireEvent.click(screen.getByRole("button", { name: "Edit heading" }));
@@ -102,7 +112,7 @@ for (const kind of ["lease", "sales"] as const) {
       expect(fetcher).not.toHaveBeenCalled();
     });
     it("flushes a just-typed description before the editor debounce runs", async () => {
-      const fetcher = vi.fn().mockResolvedValue(Response.json({}));
+      const fetcher = vi.fn().mockImplementation(savedResponse);
       vi.stubGlobal("fetch", fetcher);
       const { onContinueToPreview } = setup();
       fireEvent.click(
@@ -122,7 +132,7 @@ for (const kind of ["lease", "sales"] as const) {
       const fetcher = vi
         .fn()
         .mockRejectedValueOnce(new Error("Connection lost"))
-        .mockResolvedValueOnce(Response.json({}));
+        .mockImplementationOnce(savedResponse);
       vi.stubGlobal("fetch", fetcher);
       const { onContinueToPreview } = setup();
       fireEvent.click(screen.getByRole("button", { name: "Edit heading" }));
@@ -138,6 +148,14 @@ for (const kind of ["lease", "sales"] as const) {
       );
       await waitFor(() => expect(onContinueToPreview).toHaveBeenCalledOnce());
       expect(fetcher).toHaveBeenCalledTimes(2);
+    });
+    it("keeps the draft open when a successful response omits the saved report", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({})));
+      const { onContinueToPreview } = setup();
+      fireEvent.click(screen.getByRole("button", { name: "Edit heading" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save & preview" }));
+      await screen.findByText("Your changes couldn’t be saved. Try Save & preview again.");
+      expect(onContinueToPreview).not.toHaveBeenCalled();
     });
   });
 }

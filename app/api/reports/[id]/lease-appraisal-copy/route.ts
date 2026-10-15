@@ -1,3 +1,4 @@
+import { ReportChangedError, preservePublishedReport } from "@/lib/reports/publicationSnapshot";
 import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -108,17 +109,20 @@ export async function PATCH(
       .from("reports")
       .update({
         template_id: templateId,
-        final_report_json: {
+        final_report_json: preservePublishedReport(report, {
           ...finalReportJson,
           assets: { ...finalReportJson.assets, pdf_url: "" },
-        },
+        }),
         pdf_url: null,
         status: report.status === "published" ? report.status : "generated",
         generated_at: new Date().toISOString(),
       })
       .eq("id", report.id)
+      .eq("updated_at", report.updated_at)
       .select("*")
       .single();
+
+    if (error?.code === "PGRST116" || (!error && !savedReport)) throw new ReportChangedError();
 
     if (error || !savedReport) {
       return NextResponse.json(
@@ -134,7 +138,7 @@ export async function PATCH(
         error:
           error instanceof Error ? error.message : "Unable to save appraisal",
       },
-      { status: 400 },
+      { status: error instanceof ReportChangedError ? 409 : 400 },
     );
   }
 }

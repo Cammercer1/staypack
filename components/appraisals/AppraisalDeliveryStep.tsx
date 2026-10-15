@@ -26,7 +26,7 @@ export function AppraisalDeliveryStep({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         ...(action === "pdf"
-          ? { body: JSON.stringify({ preview: report.status !== "published" }) }
+          ? { body: JSON.stringify({ preview: true }) }
           : {}),
       },
     );
@@ -54,6 +54,7 @@ export function AppraisalDeliveryStep({
       publicUrl={report.public_url}
       published={report.status === "published"}
       hasLinkDraft={Boolean(report.final_report_json?.document_link_draft)}
+      allowDraftPdf
       linkPending={linkPending}
       onPreparePdf={() => prepare("pdf")}
       onPublish={() => prepare("publish")}
@@ -65,6 +66,7 @@ export function AppraisalDeliveryStep({
             document={report.final_report_json}
             endpoint={`/api/reports/${report.id}/link`}
             allowReport
+            draftPdf
             disabled={busy}
             onPendingChange={setLinkPending}
             onSaved={(payload) => onReportChange(payload.report as Report)}

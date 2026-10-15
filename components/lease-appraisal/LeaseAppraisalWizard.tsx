@@ -6,6 +6,8 @@ import {
   resolveAppraisalInput,
   appraisalInputError,
 } from "@/lib/appraisals/resolveAppraisalInput";
+import { hasAppraisalReportChanges } from "@/lib/appraisals/hasAppraisalReportChanges";
+import type { AppraisalStepHandle } from "@/components/appraisals/appraisalStepHandle";
 import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
 
 import { AppraisalDeliveryStep } from "@/components/appraisals/AppraisalDeliveryStep";
@@ -65,7 +67,7 @@ export function LeaseAppraisalWizard({
   const [collateral, setCollateral] = useState(initialCollateral);
   const agencyAgents = initialAgencyAgents;
   const [step, setStep] = useState(() =>
-    getInitialStep(
+    hasAppraisalReportChanges(initialListing, initialReport, "lease") ? "copy" : getInitialStep(
       initialListing,
       initialReport,
       initialCollateral,
@@ -76,6 +78,9 @@ export function LeaseAppraisalWizard({
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const copyEditorRef = useRef<LeaseAppraisalCopyEditorHandle>(null);
+  const dataStepRef = useRef<AppraisalStepHandle>(null);
+  const templateStepRef = useRef<AppraisalStepHandle>(null);
+  const navigationPendingRef = useRef(false);
   const [compsPrefetching, setCompsPrefetching] = useState(false);
   const [leaseAppraisalJob, setLeaseAppraisalJob] =
     useState<LeaseAppraisalJob | null>(null);
@@ -149,17 +154,33 @@ export function LeaseAppraisalWizard({
     return resolveFinalReportForDisplay(cached);
   }, [report.final_report_json]);
 
+  const needsReportRebuild = evidenceChanged || hasAppraisalReportChanges(listing, report, "lease");
+
   async function handleStepChange(next: string) {
-    if (next === step || loading || generating) return;
-    if (step === "copy" && copyEditorRef.current) {
-      setLoading(true);
-      try {
+    if (next === step || loading || generating || navigationPendingRef.current) return;
+    navigationPendingRef.current = true;
+    setLoading(true);
+    try {
+      if (step === "copy" && copyEditorRef.current) {
         if (!(await copyEditorRef.current.savePendingEdits())) return;
-      } finally {
-        setLoading(false);
       }
+      const draftStep = step === "data" ? dataStepRef.current
+        : step === "template" ? templateStepRef.current : null;
+      const result = draftStep ? await draftStep.savePendingEdits() : "unchanged";
+      if (result === "failed") return;
+      if (result === "saved") {
+        setEvidenceChanged(true);
+        if (next === "preview") {
+          setStep("copy");
+          toast.info("Changes saved. Review your updated report before sharing.");
+          return;
+        }
+      }
+      setStep(next);
+    } finally {
+      navigationPendingRef.current = false;
+      setLoading(false);
     }
-    setStep(next);
   }
 
   async function continueFromData() {
@@ -228,9 +249,7 @@ export function LeaseAppraisalWizard({
                 (item.id === "preview" &&
                   (!report.final_report_json ||
                     (step !== "copy" &&
-                      (evidenceChanged ||
-                        report.template_id !==
-                          report.final_report_json.template_id)))) ||
+                      needsReportRebuild))) ||
                 (item.id !== "template" && !hasTemplate)
               }
               className="h-auto min-h-12 gap-2 whitespace-normal px-2 py-2 text-xs sm:text-sm"
@@ -249,6 +268,7 @@ export function LeaseAppraisalWizard({
         {!skipTemplateSelection ? (
           <TabsContent value="template">
             <LeaseAppraisalTemplateStep
+              ref={templateStepRef}
               availableTemplates={availableTemplates}
               onBusyChange={setLoading}
               agency={agency}
@@ -266,6 +286,7 @@ export function LeaseAppraisalWizard({
         <TabsContent value="data">
           {hasTemplate ? (
             <LeaseAppraisalDataStep
+              ref={dataStepRef}
               onBusyChange={setLoading}
               listing={listing}
               activeJob={leaseAppraisalJob}
@@ -300,10 +321,7 @@ export function LeaseAppraisalWizard({
             <LeaseAppraisalCopyEditor
               onBusyChange={setLoading}
               ref={copyEditorRef}
-              needsRebuild={
-                evidenceChanged ||
-                report.template_id !== report.final_report_json?.template_id
-              }
+              needsRebuild={needsReportRebuild}
               agency={agency}
               agencyAgents={agencyAgents}
               listing={listing}
@@ -332,7 +350,7 @@ export function LeaseAppraisalWizard({
         </TabsContent>
 
         <TabsContent value="preview">
-          {previewReport ? (
+          {previewReport && !needsReportRebuild ? (
             <AppraisalDeliveryStep
               report={report}
               preview={previewReport}
@@ -342,8 +360,10 @@ export function LeaseAppraisalWizard({
             />
           ) : (
             <StepGate
-              message="Generate your appraisal to review and download it."
-              onBack={() => setStep("data")}
+              message={needsReportRebuild
+                ? "Your evidence or design has changed. Save the updated report before sharing."
+                : "Generate your appraisal to review and download it."}
+              onBack={() => setStep(needsReportRebuild ? "copy" : "data")}
             />
           )}
         </TabsContent>

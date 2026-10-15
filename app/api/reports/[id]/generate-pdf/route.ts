@@ -1,3 +1,4 @@
+import { currentReportSnapshot, preservePublishedReport, publishedReportSnapshot } from "@/lib/reports/publicationSnapshot";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireReportAccess } from "@/lib/auth/requireUser";
@@ -19,9 +20,6 @@ export async function POST(
 
   try {
     const { supabase, agency, report } = await requireReportAccess(id);
-    if (report.final_report_json && "document_link_draft" in report.final_report_json && report.final_report_json.document_link_draft) {
-      return NextResponse.json({ error: "Publish the saved link choice before generating the PDF" }, { status: 409 });
-    }
     const body = generatePdfSchema.parse(await request.json().catch(() => ({})));
     const preview = body.preview === true;
 
@@ -32,7 +30,7 @@ export async function POST(
       );
     }
 
-    if (!report.public_slug && !preview) {
+    if ((report.status !== "published" || !report.public_slug) && !preview) {
       return NextResponse.json(
         { error: "Publish the report before generating a PDF" },
         { status: 400 },
@@ -40,7 +38,7 @@ export async function POST(
     }
 
     const printBase = getPrintRenderBaseUrl().replace(/\/$/, "");
-    const printUrl = report.public_slug
+    const printUrl = !preview && report.public_slug
       ? `${printBase}/${agency.slug}/${report.public_slug}/print`
       : buildPreviewPrintUrl(report.id, printBase);
 
@@ -107,19 +105,30 @@ export async function POST(
 
     const pdfUrl = cacheBustedPdfUrl(publicUrl, cacheVersion);
 
-    const finalReportJson = {
-      ...(report.final_report_json as Record<string, unknown>),
-      assets: {
-        ...((report.final_report_json as { assets?: Record<string, string> })
-          ?.assets ?? {}),
-        pdf_url: pdfUrl,
-      },
+    const sourceDocument = preview
+      ? currentReportSnapshot(report.final_report_json)
+      : publishedReportSnapshot(report.final_report_json);
+    const renderedDocument = {
+      ...sourceDocument,
+      assets: { ...sourceDocument.assets, pdf_url: pdfUrl },
     };
+    // Private PDF preparation must not replace the public revision or publish its link.
+    // A public PDF refresh updates only that revision when an editable draft exists.
+    const finalReportJson = preview
+      ? preservePublishedReport(report, {
+          ...renderedDocument,
+          ...(report.final_report_json.document_link_draft
+            ? { document_link_draft: report.final_report_json.document_link_draft }
+            : {}),
+        })
+      : report.final_report_json.published_report_json
+        ? { ...report.final_report_json, published_report_json: renderedDocument }
+        : renderedDocument;
 
     const { data, error } = await supabase
       .from("reports")
       .update({
-        pdf_url: pdfUrl,
+        pdf_url: !preview && report.final_report_json.published_report_json ? report.pdf_url : pdfUrl,
         final_report_json: finalReportJson,
       })
       .eq("id", report.id)

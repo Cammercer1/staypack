@@ -6,6 +6,8 @@ import {
   resolveAppraisalInput,
   appraisalInputError,
 } from "@/lib/appraisals/resolveAppraisalInput";
+import { hasAppraisalReportChanges } from "@/lib/appraisals/hasAppraisalReportChanges";
+import type { AppraisalStepHandle } from "@/components/appraisals/appraisalStepHandle";
 import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
 
 import { AppraisalDeliveryStep } from "@/components/appraisals/AppraisalDeliveryStep";
@@ -63,7 +65,7 @@ export function SalesAppraisalWizard({
   const [collateral, setCollateral] = useState(initialCollateral);
   const agencyAgents = initialAgencyAgents;
   const [step, setStep] = useState(() =>
-    getInitialSalesAppraisalWizardStep({
+    hasAppraisalReportChanges(initialListing, initialReport, "sales") ? "copy" : getInitialSalesAppraisalWizardStep({
       hasFinalReport: Boolean(initialReport.final_report_json),
       hasTemplate: Boolean(
         initialReport.template_id || initialCollateral.template_id,
@@ -80,6 +82,9 @@ export function SalesAppraisalWizard({
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const copyEditorRef = useRef<SalesAppraisalCopyEditorHandle>(null);
+  const dataStepRef = useRef<AppraisalStepHandle>(null);
+  const templateStepRef = useRef<AppraisalStepHandle>(null);
+  const navigationPendingRef = useRef(false);
   const [compsPrefetching, setCompsPrefetching] = useState(false);
   const [salesAppraisalJob, setSalesAppraisalJob] =
     useState<SalesAppraisalJob | null>(null);
@@ -153,17 +158,33 @@ export function SalesAppraisalWizard({
     return resolveFinalReportForDisplay(cached);
   }, [report.final_report_json]);
 
+  const needsReportRebuild = evidenceChanged || hasAppraisalReportChanges(listing, report, "sales");
+
   async function handleStepChange(next: string) {
-    if (next === step || loading || generating) return;
-    if (step === "copy" && copyEditorRef.current) {
-      setLoading(true);
-      try {
+    if (next === step || loading || generating || navigationPendingRef.current) return;
+    navigationPendingRef.current = true;
+    setLoading(true);
+    try {
+      if (step === "copy" && copyEditorRef.current) {
         if (!(await copyEditorRef.current.savePendingEdits())) return;
-      } finally {
-        setLoading(false);
       }
+      const draftStep = step === "data" ? dataStepRef.current
+        : step === "template" ? templateStepRef.current : null;
+      const result = draftStep ? await draftStep.savePendingEdits() : "unchanged";
+      if (result === "failed") return;
+      if (result === "saved") {
+        setEvidenceChanged(true);
+        if (next === "preview") {
+          setStep("copy");
+          toast.info("Changes saved. Review your updated report before sharing.");
+          return;
+        }
+      }
+      setStep(next as SalesAppraisalWizardStep);
+    } finally {
+      navigationPendingRef.current = false;
+      setLoading(false);
     }
-    setStep(next as SalesAppraisalWizardStep);
   }
 
   async function continueFromData() {
@@ -232,9 +253,7 @@ export function SalesAppraisalWizard({
                 (item.id === "preview" &&
                   (!report.final_report_json ||
                     (step !== "copy" &&
-                      (evidenceChanged ||
-                        report.template_id !==
-                          report.final_report_json.template_id)))) ||
+                      needsReportRebuild))) ||
                 (item.id !== "template" && !hasTemplate)
               }
               className="h-auto min-h-12 gap-2 whitespace-normal px-2 py-2 text-xs sm:text-sm"
@@ -253,6 +272,7 @@ export function SalesAppraisalWizard({
         {!skipTemplateSelection ? (
           <TabsContent value="template">
             <SalesAppraisalTemplateStep
+              ref={templateStepRef}
               availableTemplates={availableTemplates}
               onBusyChange={setLoading}
               agency={agency}
@@ -270,6 +290,7 @@ export function SalesAppraisalWizard({
         <TabsContent value="data">
           {hasTemplate ? (
             <SalesAppraisalDataStep
+              ref={dataStepRef}
               onBusyChange={setLoading}
               listing={listing}
               activeJob={salesAppraisalJob}
@@ -304,10 +325,7 @@ export function SalesAppraisalWizard({
             <SalesAppraisalCopyEditor
               onBusyChange={setLoading}
               ref={copyEditorRef}
-              needsRebuild={
-                evidenceChanged ||
-                report.template_id !== report.final_report_json?.template_id
-              }
+              needsRebuild={needsReportRebuild}
               agency={agency}
               agencyAgents={agencyAgents}
               listing={listing}
@@ -336,7 +354,7 @@ export function SalesAppraisalWizard({
         </TabsContent>
 
         <TabsContent value="preview">
-          {previewReport ? (
+          {previewReport && !needsReportRebuild ? (
             <AppraisalDeliveryStep
               report={report}
               preview={previewReport}
@@ -346,8 +364,10 @@ export function SalesAppraisalWizard({
             />
           ) : (
             <StepGate
-              message="Generate your appraisal to review and download it."
-              onBack={() => setStep("data")}
+              message={needsReportRebuild
+                ? "Your evidence or design has changed. Save the updated report before sharing."
+                : "Generate your appraisal to review and download it."}
+              onBack={() => setStep(needsReportRebuild ? "copy" : "data")}
             />
           )}
         </TabsContent>

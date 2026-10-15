@@ -40,6 +40,7 @@ import { hasLeaseAppraisalSelectedComps } from "@/lib/lease-appraisal/leaseAppra
 import type { LeaseAppraisalCopy } from "@/lib/lease-appraisal/deriveLeaseAppraisalCopy";
 import { isLeaseAppraisalTemplateId } from "@/lib/lease-appraisal/leaseAppraisalTemplates";
 import { marketForCountry, rentRange } from "@/lib/property-market";
+import { normalizeAppraisalCopy } from "@/lib/copy/normalizeAppraisalCopy";
 import { resolveAdvertisedPrice } from "@/lib/listings/pricing";
 import { AppraisalStepHeader } from "@/components/appraisals/AppraisalStepHeader";
 import type {
@@ -137,6 +138,7 @@ export const LeaseAppraisalCopyEditor = forwardRef<
     useState<ReportImageSlot | null>(null);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const saveInFlightRef = useRef<Promise<boolean> | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(
@@ -278,10 +280,19 @@ export const LeaseAppraisalCopyEditor = forwardRef<
     savePendingEdits: () => persistCopy({ silent: true }),
   }));
 
-  async function persistCopy(options?: { silent?: boolean }) {
+  function persistCopy(options?: { silent?: boolean }): Promise<boolean> {
+    if (!saveInFlightRef.current) {
+      saveInFlightRef.current = saveLatestCopy(options).finally(() => {
+        saveInFlightRef.current = null;
+      });
+    }
+    return saveInFlightRef.current;
+  }
+
+  async function saveLatestCopy(options?: { silent?: boolean }) {
     flushPendingEdits();
-    const copyToSave = copyRef.current;
-    const imagesToSave = propertyImagesRef.current;
+    let copyToSave = copyRef.current;
+    let imagesToSave = propertyImagesRef.current;
     if (!copyToSave || !templateId) {
       return true;
     }
@@ -296,31 +307,45 @@ export const LeaseAppraisalCopyEditor = forwardRef<
     setSaving(true);
     setSaveFailed(false);
     try {
-      const response = await fetch(
-        `/api/reports/${report.id}/lease-appraisal-copy`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            copy: copyToSave,
-            template_id: templateId,
-            property_images: imagesToSave ?? undefined,
-          }),
-        },
-      );
-      const payload = (await response.json()) as ApiError & {
-        report?: Report;
-        listing?: Listing;
-      };
+      while (true) {
+        const savedSnapshot = editorSnapshot(copyToSave, imagesToSave);
+        const response = await fetch(
+          `/api/reports/${report.id}/lease-appraisal-copy`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              copy: normalizeAppraisalCopy(copyToSave),
+              template_id: templateId,
+              property_images: imagesToSave ?? undefined,
+            }),
+          },
+        );
+        const payload = (await response.json()) as ApiError & {
+          report?: Report;
+          listing?: Listing;
+        };
 
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Unable to save appraisal");
+        if (!response.ok || !payload.report) {
+          throw new Error(payload.error ?? "Unable to save appraisal");
+        }
+        setLastSavedSnapshot(savedSnapshot);
+        // A slow save must not replace text or photos edited after it started.
+        // Flush inline edits too, then save the newer draft before navigating.
+        flushPendingEdits();
+        if (
+          copyRef.current &&
+          editorSnapshot(copyRef.current, propertyImagesRef.current) !== savedSnapshot
+        ) {
+          copyToSave = copyRef.current;
+          imagesToSave = propertyImagesRef.current;
+          continue;
+        }
+        onReportChange(payload.report);
+        if (payload.listing) onListingChange(payload.listing);
+        if (!options?.silent) toast.success("Appraisal saved");
+        return true;
       }
-      if (payload.report) onReportChange(payload.report);
-      if (payload.listing) onListingChange(payload.listing);
-      setLastSavedSnapshot(editorSnapshot(copyToSave, imagesToSave));
-      if (!options?.silent) toast.success("Appraisal saved");
-      return true;
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Unable to save appraisal",
@@ -670,10 +695,7 @@ export const LeaseAppraisalCopyEditor = forwardRef<
                   onChange={(value) =>
                     updateField(
                       "appeal_points",
-                      value
-                        .split("\n")
-                        .map((line) => line.trim())
-                        .filter(Boolean),
+                      value.split("\n"),
                     )
                   }
                   textarea
@@ -685,10 +707,7 @@ export const LeaseAppraisalCopyEditor = forwardRef<
                   onChange={(value) =>
                     updateField(
                       "supporting_factors",
-                      value
-                        .split("\n")
-                        .map((line) => line.trim())
-                        .filter(Boolean),
+                      value.split("\n"),
                     )
                   }
                   textarea

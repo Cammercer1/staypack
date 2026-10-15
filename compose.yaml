@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile.dev
     init: true
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${STAYPACK_DEV_PORT:-3000}:3000"
     env_file:
       - .env.local
     environment:
@@ -15,9 +15,9 @@ services:
       NODE_OPTIONS: --max-old-space-size=2048
       # Poll once a second: native file events do not reliably cross macOS mounts.
       WATCHPACK_POLLING: "1000"
-      NEXT_PUBLIC_SITE_URL: http://localhost:3000
-      NEXT_PUBLIC_REPORTS_URL: http://localhost:3000
-      QR_CODE_BASE_URL: http://localhost:3000
+      NEXT_PUBLIC_SITE_URL: http://localhost:${STAYPACK_DEV_PORT:-3000}
+      NEXT_PUBLIC_REPORTS_URL: http://localhost:${STAYPACK_DEV_PORT:-3000}
+      QR_CODE_BASE_URL: http://localhost:${STAYPACK_DEV_PORT:-3000}
     volumes:
       - .:/workspace
       - node_modules:/workspace/node_modules

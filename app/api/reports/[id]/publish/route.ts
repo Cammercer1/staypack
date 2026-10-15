@@ -1,4 +1,4 @@
-import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
+import { ReportChangedError, currentReportSnapshot } from "@/lib/reports/publicationSnapshot";
 import { calculatorPropertyReviewRequired } from "@/lib/str-calculator/propertyReviewRequired";
 import { NextResponse } from "next/server";
 import { requireReportWithListing } from "@/lib/auth/requireUser";
@@ -37,7 +37,7 @@ export async function POST(
       publicSlug,
     );
 
-    const finalReportJson = applyDocumentLinkDraft(report.final_report_json);
+    const finalReportJson = currentReportSnapshot(report.final_report_json);
     const qrPublicUrl = finalReportJson.assets.qr_code_url || null;
 
     const { data, error } = await supabase
@@ -52,8 +52,11 @@ export async function POST(
         published_at: new Date().toISOString(),
       })
       .eq("id", report.id)
+      .eq("updated_at", report.updated_at)
       .select("*")
       .single();
+
+    if (error?.code === "PGRST116" || (!error && !data)) throw new ReportChangedError();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
@@ -73,7 +76,7 @@ export async function POST(
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Publish failed" },
-      { status: 400 },
+      { status: error instanceof ReportChangedError ? 409 : 400 },
     );
   }
 }

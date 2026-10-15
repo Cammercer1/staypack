@@ -1,3 +1,4 @@
+import { ReportChangedError } from "@/lib/reports/publicationSnapshot";
 import { NextResponse } from "next/server";
 import { requireReportWithListing } from "@/lib/auth/requireUser";
 import {
@@ -70,7 +71,7 @@ export async function POST(
             ? error.message
             : "Lease appraisal generation failed",
       },
-      { status: 400 },
+      { status: error instanceof ReportChangedError ? 409 : 400 },
     );
   }
 }

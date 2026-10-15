@@ -14,6 +14,8 @@ Branded short-term rental potential reports for real estate agencies. Next.js Ap
 - `npm run container:up` — build/start the Docker development environment at http://localhost:3000
 - `npm run container:down` — stop the Docker development environment
 - With the container running, use `docker compose exec app <command>` for checks so they use Linux dependencies and Node 24.
+- The raw Docker command above is for the primary checkout only. In a worktree, use `STAYPACK_DEV_PORT=3101 node scripts/container.mjs exec app <command>` (with that preview's chosen port). Start previews with `STAYPACK_DEV_PORT=3101 npm run container:up`; the helper isolates the Docker project and verifies its source folder. Port 3000 is reserved for the primary checkout.
+- Run `npm run container:status` before diagnosing an old UI to confirm the checkout, branch, commit and Docker source. Use the same `STAYPACK_DEV_PORT` setting for worktree checks.
 - `npm run dev` — local dev server at http://localhost:3000
 - `npm run build` — production build (runs env verification first)
 - `npm run lint` — ESLint

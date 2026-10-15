@@ -1,3 +1,4 @@
+import { ReportChangedError, preservePublishedReport } from "@/lib/reports/publicationSnapshot";
 import { invalidateReportPdf } from "@/lib/reports/invalidateReportPdf";
 import { calculatorPropertyReviewRequired } from "@/lib/str-calculator/propertyReviewRequired";
 import { NextResponse } from "next/server";
@@ -96,14 +97,17 @@ export async function POST(
       .update({
         template_id: templateId,
         ai_copy_json: copy,
-        final_report_json: invalidateReportPdf(finalReportJson),
+        final_report_json: preservePublishedReport(report, invalidateReportPdf(finalReportJson)),
         pdf_url: null,
         status: report.status === "published" ? "published" : "generated",
         generated_at: new Date().toISOString(),
       })
       .eq("id", report.id)
+      .eq("updated_at", report.updated_at)
       .select("*")
       .single();
+
+    if (error?.code === "PGRST116" || (!error && !data)) throw new ReportChangedError();
 
     if (error) {
       return NextResponse.json(
@@ -114,6 +118,9 @@ export async function POST(
 
     return NextResponse.json({ copy, report: data, listing });
   } catch (error) {
+    if (error instanceof ReportChangedError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     if (error instanceof CopyValidationError) {
       return NextResponse.json(
         { error: error.message, code: error.code },

@@ -1,3 +1,4 @@
+import { ReportChangedError, preservePublishedReport } from "@/lib/reports/publicationSnapshot";
 import { invalidateReportPdf, preserveReportImages } from "@/lib/reports/invalidateReportPdf";
 import { calculatorPropertyReviewRequired } from "@/lib/str-calculator/propertyReviewRequired";
 import { calculatorPropertyReviewKey } from "@/lib/str-calculator/propertyReviewIdentity";
@@ -13,7 +14,7 @@ import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/templates/ids";
 import { assertTemplateGranted } from "@/lib/templates/grants/assertTemplateGranted";
 import { templateGrantErrorResponse } from "@/lib/templates/grants/apiErrors";
 import { aiCopySchema, updateReportSchema, type UpdateReportInput } from "@/lib/validation/schemas";
-import type { Agency, AiCopyJson, Listing, Report } from "@/lib/types";
+import type { Agency, AiCopyJson, FinalReportJson, Listing, Report } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { selectStrComps } from "@/lib/str/comparables";
 import { applyStrEstimateAdjustments, reconcileStrEstimate, saveStrRateOverride } from "@/lib/reports/strEstimateAdjustments";
@@ -257,13 +258,16 @@ export async function PATCH(
         ...(selectedEnrichment ? { str_enrichment_json: selectedEnrichment } : {}),
         ...(adjustment ? { pdf_url: null } : {}),
         ...(body.final_report_json ? {
-          final_report_json: invalidateReportPdf(body.final_report_json),
+          final_report_json: preservePublishedReport(report, invalidateReportPdf(body.final_report_json) as FinalReportJson),
           pdf_url: null,
         } : {}),
       })
       .eq("id", report.id)
+      .eq("updated_at", report.updated_at)
       .select("*")
       .single();
+
+    if (error?.code === "PGRST116" || (!error && !data)) throw new ReportChangedError();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
@@ -273,7 +277,7 @@ export async function PATCH(
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to update report" },
-      { status: 400 },
+      { status: error instanceof ReportChangedError ? 409 : 400 },
     );
   }
 }

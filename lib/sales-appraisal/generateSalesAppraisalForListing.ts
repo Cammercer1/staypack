@@ -1,3 +1,4 @@
+import { ReportChangedError, preservePublishedReport } from "@/lib/reports/publicationSnapshot";
 import { resolveAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveFinalReportForDisplay } from "@/lib/reports/resolveFinalReportForDisplay";
@@ -183,17 +184,20 @@ export async function generateSalesAppraisalReportContent({
     .from("reports")
     .update({
       template_id: resolvedTemplateId,
-      final_report_json: {
+      final_report_json: preservePublishedReport(report, {
         ...finalReportJson,
         assets: { ...finalReportJson.assets, pdf_url: "" },
-      },
+      }),
       pdf_url: null,
       status: preservePublished ? report.status : "generated",
       generated_at: new Date().toISOString(),
     })
     .eq("id", report.id)
+    .eq("updated_at", report.updated_at)
     .select("*")
     .single();
+
+  if (saveError?.code === "PGRST116" || (!saveError && !savedReport)) throw new ReportChangedError();
 
   if (saveError || !savedReport) {
     throw new Error(saveError?.message ?? "Failed to save sales appraisal report");

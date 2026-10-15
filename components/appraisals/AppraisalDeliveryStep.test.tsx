@@ -10,21 +10,22 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppraisalDeliveryStep } from "./AppraisalDeliveryStep";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
+import type { Report } from "@/lib/types";
 
 vi.mock("@/components/reports/FittedReportPreview", () => ({
   FittedReportPreview: () => <div>Report proof</div>,
 }));
 vi.mock("@/components/documents/DocumentLinkEditor", () => ({
-  DocumentLinkEditor: () => null,
+  DocumentLinkEditor: ({ draftPdf }: { draftPdf?: boolean }) => <span>{draftPdf ? "Link applies to draft PDF" : "Link requires publication"}</span>,
 }));
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
 
-function Harness() {
+function Harness({ initialReport }: { initialReport?: Report }) {
   const [report, setReport] = useState(
-    () => createLintRegressionFixtures().lease,
+    () => initialReport ?? createLintRegressionFixtures().lease,
   );
   return (
     <AppraisalDeliveryStep
@@ -38,6 +39,29 @@ function Harness() {
 }
 
 describe("appraisal delivery", () => {
+  it.each(["lease", "sales"] as const)("allows a private %s PDF with saved QR changes while preserving the public report", async (kind) => {
+    const fixture = createLintRegressionFixtures()[kind];
+    const linkDraft = { link: { mode: "custom" as const, url: "https://agency.example/saved-draft" }, target_url: "https://agency.example/saved-draft", qr_code_url: "https://example.test/draft-qr.png" };
+    const report: Report = {
+      ...fixture,
+      status: "published",
+      pdf_url: null,
+      public_url: "https://example.test/appraisal",
+      final_report_json: { ...fixture.final_report_json!, document_link_draft: linkDraft },
+    };
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ report: { ...report, pdf_url: "https://example.test/saved-draft.pdf" } }));
+    vi.stubGlobal("fetch", fetcher);
+    render(<Harness initialReport={report} />);
+    expect(screen.getByText("Link applies to draft PDF")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Prepare PDF" }));
+    await screen.findByRole("link", { name: "Download PDF" });
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher.mock.calls[0][0]).toBe(`/api/reports/${report.id}/generate-pdf`);
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ preview: true });
+    expect(screen.getByText("Published online")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Update online report" })).toBeTruthy();
+  });
+
   it("publishes an online report without starting PDF generation", async () => {
     const report = {
       ...createLintRegressionFixtures().lease,

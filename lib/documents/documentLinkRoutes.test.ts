@@ -7,7 +7,6 @@ import { PATCH as saveReportLink } from "@/app/api/reports/[id]/link/route";
 import { PATCH as saveCollateralLink } from "@/app/api/collateral/[id]/link/route";
 import { POST as publishReport } from "@/app/api/reports/[id]/publish/route";
 import { POST as publishCollateral } from "@/app/api/collateral/[id]/publish/route";
-import { POST as reportPdf } from "@/app/api/reports/[id]/generate-pdf/route";
 import { POST as collateralPdf } from "@/app/api/collateral/[id]/generate-pdf/route";
 import { POST as createLead } from "@/app/api/public/leads/route";
 import { POST as regenerateListingQr } from "@/app/api/listings/[id]/regenerate-qr/route";
@@ -64,7 +63,8 @@ describe("report link API and publication", () => {
     expect(result.status).toBe(200);
     const { report } = await result.json();
     expect(report.final_report_json.assets.qr_code_url).toBe("https://assets.example/legacy.png");
-    expect(report.pdf_url).toBe("https://assets.example/old.pdf");
+    expect(report.pdf_url).toBeNull();
+    expect(report.final_report_json.published_report_json.assets.qr_code_url).toBe("https://assets.example/legacy.png");
     expect(report.final_report_json.document_link_draft.target_url).toBe("https://example.com/one");
     expect(testState.writes[0].filters).toContainEqual(["agency_id", testState.context.agency.id]);
     expect(testState.writes[0].filters).toContainEqual(["updated_at", testState.context.report.updated_at]);
@@ -115,11 +115,6 @@ describe("report link API and publication", () => {
     expect((await saveReportLink(request({ mode: "none" }), params)).status).toBe(400);
     expect(testState.writes).toHaveLength(0);
     expect(mocks.draft).not.toHaveBeenCalled();
-  });
-  it("requires publication before generating a PDF of a saved link edit", async () => {
-    testState.context.report.final_report_json!.document_link_draft = { link: { mode: "none" }, target_url: "", qr_code_url: "" };
-    expect((await reportPdf(request({}), params)).status).toBe(409);
-    expect(mocks.pdf).not.toHaveBeenCalled();
   });
 });
 

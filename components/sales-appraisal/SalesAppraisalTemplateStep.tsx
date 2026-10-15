@@ -2,7 +2,8 @@
 
 import type { TemplatesResponse } from "@/components/templates/useAvailableTemplates";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import type { AppraisalStepHandle, AppraisalStepSaveResult } from "@/components/appraisals/appraisalStepHandle";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppraisalStepHeader } from "@/components/appraisals/AppraisalStepHeader";
@@ -19,6 +20,7 @@ import type {
 } from "@/lib/types";
 
 type Props = {
+  ref?: Ref<AppraisalStepHandle>;
   availableTemplates?: TemplatesResponse;
   onBusyChange?: (busy: boolean) => void;
   agency: Agency;
@@ -36,6 +38,7 @@ type ApiError = {
 };
 
 export function SalesAppraisalTemplateStep({
+  ref,
   agency,
   availableTemplates,
   listing,
@@ -54,6 +57,7 @@ export function SalesAppraisalTemplateStep({
       resolveSalesAppraisalTemplateSelection(null),
   );
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,8 +76,16 @@ export function SalesAppraisalTemplateStep({
     return () => onBusyChange?.(false);
   }, [saving, onBusyChange]);
 
-  async function proceedToAppraisalData() {
-    if (saving || !ready) return;
+  useImperativeHandle(ref, () => ({ savePendingEdits: saveDesign }));
+
+  async function saveDesign(): Promise<AppraisalStepSaveResult> {
+    if (savingRef.current) return "failed";
+    if (selectedTemplateId === report.template_id &&
+      (collateral.report_id !== report.id || selectedTemplateId === collateral.template_id)) {
+      return "unchanged";
+    }
+    if (!ready) return "failed";
+    savingRef.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -101,7 +113,7 @@ export function SalesAppraisalTemplateStep({
         if (collateralPayload.collateral)
           onCollateralChange(collateralPayload.collateral);
       }
-      onContinue();
+      return "saved";
     } catch (err) {
       const message =
         err instanceof Error
@@ -109,9 +121,15 @@ export function SalesAppraisalTemplateStep({
           : "Unable to save design. Try again.";
       setError(message);
       toast.error(message);
+      return "failed";
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
+  }
+
+  async function proceedToAppraisalData() {
+    if (await saveDesign() !== "failed") onContinue();
   }
 
   return (

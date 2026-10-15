@@ -41,6 +41,7 @@ export function StrReportDeliveryStep({
       publicUrl={report.public_url}
       published={report.status === "published"}
       hasLinkDraft={Boolean(report.final_report_json?.document_link_draft)}
+      allowDraftPdf
       linkPending={linkPending}
       pdfProgressText={
         recovering
@@ -68,6 +69,7 @@ export function StrReportDeliveryStep({
             document={report.final_report_json}
             endpoint={`/api/reports/${report.id}/link`}
             allowReport
+            draftPdf
             disabled={busy}
             onPendingChange={setLinkPending}
             onSaved={(payload) => onReportChange(payload.report as Report)}

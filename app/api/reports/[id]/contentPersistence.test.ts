@@ -10,6 +10,7 @@ import {
 import { generateReportCopy } from "@/lib/openai/generateReportCopy";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
 import type { Report } from "@/lib/types";
+import { publishedReportSnapshot } from "@/lib/reports/publicationSnapshot";
 
 vi.mock("@/lib/auth/requireUser", () => ({
   requireReportWithListing: vi.fn(),
@@ -46,7 +47,7 @@ function setup() {
     }),
     eq: vi.fn(() => query),
     select: vi.fn(() => query),
-    single: vi.fn(async () => ({ data: current, error: null })),
+    single: vi.fn(async (): Promise<{ data: Report | null; error: { code: string; message: string } | null }> => ({ data: current, error: null })),
   };
   vi.mocked(requireReportWithListing).mockImplementation(
     async () =>
@@ -114,6 +115,7 @@ describe("STR content persistence", () => {
         report.final_report_json?.document_link,
       );
       expect(getReport().status).toBe("published");
+      expect(publishedReportSnapshot(getReport().final_report_json!)).toEqual(report.final_report_json);
     });
   }
   it("keeps the PDF for a metadata-only change", async () => {
@@ -122,5 +124,15 @@ describe("STR content persistence", () => {
       (await saveReport(request({ user_overrides_json: {} }), params)).status,
     ).toBe(200);
     expect(getReport().pdf_url).toBe("old.pdf");
+  });
+  it.each(["save", "regenerate"] as const)("rejects a stale %s instead of replacing a newer publication", async action => {
+    const { report, query } = setup();
+    query.single.mockResolvedValue({ data: null, error: { code: "PGRST116", message: "No matching version" } });
+    const response = action === "save"
+      ? await saveCopy(request({ copy: report.final_report_json!.copy }), params)
+      : await generateCopy(request({}), params);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: expect.stringContaining("report changed") });
+    expect(query.eq).toHaveBeenCalledWith("updated_at", report.updated_at);
   });
 });

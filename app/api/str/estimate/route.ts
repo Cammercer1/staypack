@@ -4,6 +4,7 @@ import { canonicalCalculatorSourceKey, loadCanonicalCalculatorLead } from "@/lib
 import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import { buildFinalReportJson } from "@/lib/reports/buildFinalReportJson";
 import { invalidateReportPdf, preserveReportImages } from "@/lib/reports/invalidateReportPdf";
+import { preservePublishedReport } from "@/lib/reports/publicationSnapshot";
 import { finalReportCopyToAiCopy } from "@/lib/reports/editable/strReportCopyAdapter";
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import { NextResponse } from "next/server";
@@ -123,7 +124,7 @@ export async function POST(request: Request) {
         final_estimate_json: finalEstimate,
         user_overrides_json: { ...overrides, estimateInputs: { bedrooms, bathrooms, accommodates } },
         pdf_url: body.confirm_calculator_property && report.status === "published" ? report.pdf_url : null,
-        final_report_json: body.confirm_calculator_property && report.status === "published" ? report.final_report_json : finalDocument ? invalidateReportPdf(finalDocument) : null,
+        final_report_json: body.confirm_calculator_property && report.status === "published" ? report.final_report_json : finalDocument ? preservePublishedReport(report, invalidateReportPdf(finalDocument)) : null,
         raw_airbtics_json: null,
         str_enrichment_json: enrichment,
         status: report.status === "published" ? "published" : "estimated",

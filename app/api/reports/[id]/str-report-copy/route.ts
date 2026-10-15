@@ -1,3 +1,4 @@
+import { ReportChangedError, preservePublishedReport } from "@/lib/reports/publicationSnapshot";
 import { invalidateReportPdf } from "@/lib/reports/invalidateReportPdf";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -122,14 +123,17 @@ export async function PATCH(
       .update({
         template_id: templateId,
         ai_copy_json: aiCopy,
-        final_report_json: invalidateReportPdf(finalReportJson),
+        final_report_json: preservePublishedReport(report, invalidateReportPdf(finalReportJson)),
         pdf_url: null,
         status: report.status === "published" ? report.status : "generated",
         generated_at: new Date().toISOString(),
       })
       .eq("id", report.id)
+      .eq("updated_at", report.updated_at)
       .select("*")
       .single();
+
+    if (error?.code === "PGRST116" || (!error && !savedReport)) throw new ReportChangedError();
 
     if (error || !savedReport) {
       return NextResponse.json(
@@ -144,7 +148,7 @@ export async function PATCH(
       {
         error: error instanceof Error ? error.message : "Unable to save report",
       },
-      { status: 400 },
+      { status: error instanceof ReportChangedError ? 409 : 400 },
     );
   }
 }

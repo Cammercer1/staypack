@@ -49,16 +49,19 @@ Development output uses `.next-local`, separate from production output in
 3. Start the app:
 
    ```bash
-   docker compose up --build --detach --wait --wait-timeout 600
+   npm run container:up
    ```
 
    Open [http://localhost:3000](http://localhost:3000). The first start installs
    dependencies with `npm ci`; subsequent starts reuse them unless the package
    manifests or Node runtime changed. The server is exposed only on this computer.
+   Without host Node, use `docker compose up --build --detach --wait --wait-timeout 600`
+   from the primary checkout only.
 
 ### Daily workflow
 
-Run these from this checkout's terminal (including the terminal in Codex):
+These raw Docker commands apply to the primary checkout only. In worktrees, use
+the guarded `container:*` commands described below.
 
 ```bash
 docker compose logs --follow app       # View server logs
@@ -71,7 +74,21 @@ docker compose down                   # Stop; preserve dependency/cache volumes
 
 If Node is installed on your host, the `npm run container:up`, `container:down`,
 `container:logs`, `container:shell`, `container:test`, and `container:lint` aliases
-run the same Docker commands. A host Node installation is otherwise unnecessary.
+run the same Docker commands with a source-folder check. `npm run container:status`
+shows the checkout, branch, commit, Docker project and local URL. Prefer these
+aliases when working with multiple Git worktrees; they refuse to operate on a
+container mounted from a different checkout. A host Node installation is otherwise
+unnecessary for the direct Docker commands in the primary checkout.
+
+Reserve `http://localhost:3000` for the primary checkout. Start a worktree preview
+with an explicit unused port, for example `STAYPACK_DEV_PORT=3101 npm run container:up`.
+Use the same port setting for its other `container:*` commands. Each worktree gets
+its own Docker project and volumes. Avoid bare `docker compose` or **Reopen in
+Container** in worktrees: the default Compose project name is shared by folders
+named `StayPacks`, so it can replace the primary checkout's running container.
+After a feature reaches `main`, update the primary checkout with
+`git fetch origin && git merge --ff-only origin/main`, stop its preview, and remove
+the clean merged worktree. Preserve uncommitted work and private local files first.
 
 Add packages with `docker compose exec app npm install <package>` so the
 manifests update in this checkout and dependencies install inside the container.
@@ -81,8 +98,8 @@ them from the lockfile. After editing `.env.local`, run
 the container environment. After changing `Dockerfile.dev` or the entrypoint,
 rerun the first-start command to rebuild the image.
 
-For VS Code or another editor supporting Dev Containers, use **Reopen in
-Container**. The checked-in `.devcontainer/devcontainer.json` uses the same
+For VS Code or another editor supporting Dev Containers in the primary checkout,
+use **Reopen in Container**. The checked-in `.devcontainer/devcontainer.json` uses the same
 Compose service and starts the dev server automatically.
 
 PDF generation still uses Browserless. A hosted Browserless instance cannot

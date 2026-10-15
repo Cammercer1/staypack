@@ -9,6 +9,7 @@ import { calculatorPropertyReviewKey } from "@/lib/str-calculator/propertyReview
 import { loadAgencyAgentProfiles, loadListingAgentProfile } from "@/lib/reports/loadReportAgent";
 import type { Listing, Report } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { publishedReportSnapshot } from "@/lib/reports/publicationSnapshot";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
@@ -141,6 +142,20 @@ it("keeps an existing published report snapshot and PDF unchanged when confirmin
   expect(f.getReport().published_at).toBe(f.before.report.published_at);
   expect(f.getReport().status).toBe("published");
   expect(f.getReport().user_overrides_json?.calculatorReview?.status).toBe("verified");
+});
+
+it("refreshes a published report's draft estimate without replacing its public revision", async () => {
+  const f = confirmationFixture({ published: true });
+  f.getReport().user_overrides_json!.calculatorReview!.status = "verified";
+  vi.mocked(fetchStrEstimate).mockResolvedValue({
+    estimate: { ...f.before.report.original_estimate_json!, annualRevenue: 150000 },
+    enrichment: f.before.report.str_enrichment_json!,
+  });
+  expect((await POST(request())).status).toBe(200);
+  expect(publishedReportSnapshot(f.getReport().final_report_json!)).toEqual(f.before.report.final_report_json);
+  expect(f.getReport().final_estimate_json?.annualRevenue).toBe(150000);
+  expect(f.getReport().pdf_url).toBeNull();
+  expect(f.getReport().status).toBe("published");
 });
 
 it("does not verify a report when its listing changed during the evidence request", async () => {

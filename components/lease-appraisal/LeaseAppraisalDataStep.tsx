@@ -7,7 +7,7 @@ import { avmPriceSuggestion } from "@/lib/listings/pricing";
 
 import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import Image from "next/image";
 import { Check, House, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -29,9 +29,12 @@ import { resolveRentSubjectPropertyType } from "@/lib/rental/resolveRentSubjectP
 import { cn } from "@/lib/utils";
 import type { LeaseAppraisalJob, Listing } from "@/lib/types";
 
+import type { AppraisalStepHandle, AppraisalStepSaveResult } from "@/components/appraisals/appraisalStepHandle";
+
 const POLL_INTERVAL_MS = 2000;
 
 type Props = {
+  ref?: Ref<AppraisalStepHandle>;
   appraisalEndpoint?: string;
   onDirtyChange?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
@@ -49,6 +52,7 @@ type ApiError = {
 };
 
 export function LeaseAppraisalDataStep({
+  ref,
   appraisalEndpoint,
   onDirtyChange,
   listing,
@@ -84,6 +88,7 @@ export function LeaseAppraisalDataStep({
   const [selectedOnly, setSelectedOnly] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const pollErrorShownRef = useRef(false);
   const jobCompletionToastRef = useRef<string | null>(null);
   const [weeklyMin, setWeeklyMin] = useState<string>(
@@ -296,18 +301,20 @@ export function LeaseAppraisalDataStep({
   }
 
   async function resetPrice() {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       const response = await fetch(`${endpoint}/data`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset_price: true, ...(appraisalEndpoint ? { expected_updated_at: listing.updated_at } : {}) }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Unable to reset appraisal");
+      if (!response.ok || !payload.listing) throw new Error(payload.error ?? "Unable to reset appraisal");
       priceEdited.current = false;
       onListingChange(payload.listing);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to reset appraisal");
-    } finally { setSaving(false); }
+    } finally { savingRef.current = false; setSaving(false); }
   }
 
   useEffect(() => {
@@ -315,12 +322,17 @@ export function LeaseAppraisalDataStep({
     return () => onBusyChange?.(false);
   }, [saving, fetching, appraisalEndpoint, onBusyChange]);
 
-  async function saveAndContinue() {
+  useImperativeHandle(ref, () => ({ savePendingEdits: () => saveData(true) }));
+
+  async function saveData(onlyIfDirty = false, continueAfterSave = false): Promise<AppraisalStepSaveResult> {
+    if (savingRef.current) return "failed";
+    if (onlyIfDirty && !evidenceDirty) return "unchanged";
     if (!canContinue) {
       toast.error("Fetch comps and select at least one comparable");
-      return;
+      return "failed";
     }
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const response = await fetch(
@@ -340,7 +352,7 @@ export function LeaseAppraisalDataStep({
         },
       );
       const payload = (await response.json()) as ApiError & { listing?: Listing };
-      if (!response.ok) {
+      if (!response.ok || !payload.listing) {
         throw new Error(payload.error ?? "Unable to save appraisal data");
       }
       selectionEdited.current = false;
@@ -349,14 +361,21 @@ export function LeaseAppraisalDataStep({
       }
       priceEdited.current = false;
       toast.success("Appraisal data saved");
-      onContinue(payload.listing);
+      if (continueAfterSave) onContinue(payload.listing);
+      return "saved";
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Unable to save appraisal data",
       );
+      return "failed";
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
+  }
+
+  async function saveAndContinue() {
+    await saveData(false, true);
   }
 
   const loading = fetching || saving;

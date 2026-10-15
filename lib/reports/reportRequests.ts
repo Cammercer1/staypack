@@ -52,7 +52,8 @@ export async function prepareReportPdf(
   try {
     const payload = await reportRequest<{ report: Report }>(
       `/api/reports/${report.id}/generate-pdf`,
-      jsonRequest({ preview: report.status !== "published" }),
+      // Editor downloads include saved draft changes, even after publication.
+      jsonRequest({ preview: true }),
     );
     if (!payload.report?.pdf_url)
       throw new ReportRequestError("PDF response was incomplete.", true);

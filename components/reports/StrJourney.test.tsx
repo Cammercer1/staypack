@@ -435,6 +435,21 @@ describe("short-term rental report journey", () => {
       fetcher.mock.calls.filter(([url]) => url.endsWith("publish")),
     ).toHaveLength(1);
   });
+  it("prepares a private PDF with saved link changes without republishing the online report", async () => {
+    const { report } = createLintRegressionFixtures();
+    const linkDraft = { link: { mode: "custom" as const, url: "https://agency.example/updated" }, target_url: "https://agency.example/updated", qr_code_url: "https://example.test/updated-qr.png" };
+    const { fetcher, getReport } = setup(false, { report: {
+      status: "published", pdf_url: null,
+      final_report_json: { ...report.final_report_json!, document_link_draft: linkDraft },
+    } });
+    fireEvent.click(screen.getByRole("button", { name: "Prepare PDF" }));
+    await screen.findByText("PDF ready");
+    const request = fetcher.mock.calls.find(([url]) => url.endsWith("generate-pdf"));
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({ preview: true });
+    expect(getReport().final_report_json?.document_link_draft).toEqual(linkDraft);
+    expect(getReport().status).toBe("published");
+    expect(fetcher.mock.calls.some(([url]) => url.endsWith("publish"))).toBe(false);
+  });
   it("retains the design and saved evidence after generation fails and can retry", async () => {
     const { failures, fetcher, templates, getReport } = setup(true);
     fireEvent.click(screen.getByRole("button", { name: "Get estimate & evidence" }));
