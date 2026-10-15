@@ -51,6 +51,50 @@ it("keeps a newly published version when a failed PDF's refresh is missing that 
   expect(screen.getByText(/Previous versions/).textContent).toContain("(1)");
 });
 
+it.each(["ready", "generating"] as const)("uses refreshed %s PDF status after a gateway error without retrying generation", async status => {
+  const version = { ...pendingVersion, id: "version-2", path: `/proposal/${"b".repeat(64)}` };
+  const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ version }))
+    .mockResolvedValueOnce(new Response("<html>Gateway timeout</html>", { status: 504 }))
+    .mockResolvedValueOnce(Response.json({ versions: [{ ...version, pdf_status: status }, pendingVersion] }));
+  vi.stubGlobal("fetch", fetcher);
+  const onBusyChange = vi.fn();
+  render(<StatefulPanel onBusyChange={onBusyChange} />);
+  fireEvent.click(screen.getByRole("button", { name: "Publish latest changes" }));
+  expect((await screen.findByRole("status")).textContent).toBe(status === "ready"
+    ? "Your proposal and PDF are ready to share." : "Your link is ready. The PDF is still being prepared; check its status below.");
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getByLabelText("Customer share link")).toHaveProperty("value", `${window.location.origin}${version.path}`);
+  expect(screen.getByText(/Previous versions/).textContent).toContain("(1)");
+  if (status === "ready") expect(screen.getByRole("link", { name: "Download PDF" }).getAttribute("href")).toBe(`/api/proposals/${"b".repeat(64)}/pdf`);
+  else expect(screen.getByRole("button", { name: "Check PDF status" }).hasAttribute("disabled")).toBe(false);
+  expect(fetcher).toHaveBeenCalledTimes(3);
+  expect(fetcher.mock.calls[2]).toEqual(["/api/str/appraisals/appraisal/proposal", undefined]);
+  await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
+});
+
+it.each(["ready", "generating"] as const)("uses refreshed %s PDF status after a network interruption", async status => {
+  const fetcher = vi.fn().mockRejectedValueOnce(new TypeError("Failed to fetch"))
+    .mockResolvedValueOnce(Response.json({ versions: [{ ...pendingVersion, pdf_status: status }] }));
+  vi.stubGlobal("fetch", fetcher);
+  render(<StatefulPanel />);
+  fireEvent.click(screen.getByRole("button", { name: "Prepare PDF" }));
+  await screen.findByRole("status");
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(status === "ready" ? screen.getByRole("link", { name: "Download PDF" }) : screen.getByRole("button", { name: "Check PDF status" })).toBeTruthy();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+it.each(["pending", "failed", "unavailable"] as const)("retains a meaningful gateway error when refreshed status is %s", async status => {
+  const fetcher = vi.fn().mockResolvedValueOnce(new Response("<html>Gateway timeout</html>", { status: 504 }))
+    .mockResolvedValueOnce(status === "unavailable" ? new Response("<html>Service unavailable</html>", { status: 503 }) : Response.json({ versions: [{ ...pendingVersion, pdf_status: status }] }));
+  vi.stubGlobal("fetch", fetcher);
+  render(<StatefulPanel />);
+  fireEvent.click(screen.getByRole("button", { name: "Prepare PDF" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("The request timed out. Please try again shortly.");
+  expect(screen.getByRole("button", { name: status === "failed" ? "Retry PDF" : "Prepare PDF" }).hasAttribute("disabled")).toBe(false);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
 it.each([false, true])("publishes and previews through the correct workspace routes (shared=%s)", async shared => {
   const version = { ...pendingVersion, pdf_status: "ready" as const };
   const fetcher = vi.fn().mockResolvedValue(Response.json({ version }));

@@ -66,6 +66,13 @@ export function ProposalSharePanel({ reportId, workspace, onSave, onWorkspaceCha
       if (refreshed) {
         const retained = versions.current.find(item => item.id === version.id) ?? version;
         updateVersions(refreshed.versions.some(item => item.id === version.id) ? refreshed.versions : [retained, ...refreshed.versions]);
+        const current = refreshed.versions.find(item => item.id === version.id);
+        // A gateway response can fail while the server still finishes preparing the PDF.
+        if (current && !current.revoked_at && (current.pdf_status === "ready" || current.pdf_status === "generating")) {
+          setFeedback({ error: false, text: current.pdf_status === "ready"
+            ? "Your proposal and PDF are ready to share." : "Your link is ready. The PDF is still being prepared; check its status below." });
+          return;
+        }
       }
       throw error;
     }
