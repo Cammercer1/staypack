@@ -502,6 +502,12 @@ the creation action itself makes no paid provider requests. Legacy leads without
 provider timestamps use their original completion date. Customer names and
 property photos can be completed in the normal editor.
 
+`20261015024716_str_calculator_lead_report_listing_slug.sql`, also applied on
+15 October 2026, supplies the required unique property slug when creating a new
+draft. This reserves an internal identifier without publishing a property page.
+The disposable database fixture enforces production’s non-null, no-default slug
+requirement and uniqueness within each agency.
+
 The transaction checks agency membership and lead ownership, locks the lead and
 returns its linked report on retries without updating that report. The UI then
 shows Open report. Existing properties, report JSON, publication versions, PDF
@@ -514,7 +520,8 @@ then `tests/str_calculator_lead_reports_fixture.sql`, followed by migrations
 `20261010233726_str_recipient_conflict_http_status.sql`,
 `20261014104828_str_calculator_widget.sql`,
 `20261014113703_str_calculator_optional_phone.sql`, and
-`20261015024032_str_calculator_lead_reports.sql`. Finally run
+`20261015024032_str_calculator_lead_reports.sql`, and
+`20261015024716_str_calculator_lead_report_listing_slug.sql`. Finally run
 `tests/str_calculator_lead_reports.sql` with `psql -v ON_ERROR_STOP=1`.
 These tests check cross-agency denial, original timestamp precision, exact expiry,
 creation retries and byte-for-byte preservation of existing report/property data.

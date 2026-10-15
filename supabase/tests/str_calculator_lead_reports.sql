@@ -60,6 +60,7 @@ begin
   select * into v_saved from public.reports where id=(v_result->>'report_id')::uuid;
   assert v_saved.id <> '40000000-0000-4000-8000-000000000001' and v_saved.listing_id <> '30000000-0000-4000-8000-000000000001', 'Must create an isolated new property/report';
   assert v_saved.created_by=v_user and v_saved.status='estimated', 'Draft ownership/status missing';
+  assert exists(select 1 from public.listings where id=v_saved.listing_id and public_slug ~ '^[0-9a-f]{32}$'), 'New property needs its own collision-resistant public slug';
   assert exists(select 1 from public.listings where id=v_saved.listing_id and property_address='24 Beach Road' and suburb='Bondi' and state='NSW' and postcode='2026'), 'Structured AU locality missing';
   assert v_saved.final_report_json is null and v_saved.pdf_url is null, 'Must not publish or generate a document';
   assert v_saved.original_estimate_json->>'annualRevenue'='60000' and v_saved.final_estimate_json->>'annualRevenue'='66000', 'Baseline and agency scenario must stay separate';
@@ -74,6 +75,7 @@ begin
   assert v_retry->>'report_id'=v_result->>'report_id' and v_retry->>'created'='false', 'Replay must return the same report';
   assert (select to_jsonb(r)=v_edited from public.reports r where id=v_saved.id), 'Replay must not overwrite any edits or publication';
   assert (select count(*)=v_listing_count+1 from public.listings), 'Replay must not create another property';
+  assert (select count(*)=count(distinct (agency_id,public_slug)) from public.listings), 'Draft slugs must be unique within an agency';
   assert (select to_jsonb(r)=v_original_report from public.reports r where id='40000000-0000-4000-8000-000000000001'), 'Existing report changed';
   assert (select to_jsonb(l)=v_original_listing from public.listings l where id='30000000-0000-4000-8000-000000000001'), 'Existing property changed';
 
