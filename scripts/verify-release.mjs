@@ -13,6 +13,7 @@ export const requiredRoutes = [
   "/(app)/marketing/str-calculator/page",
   "/(public)/embed/str-calculator/[token]/page",
   "/api/marketing/str-calculator/route",
+  "/api/marketing/str-calculator/leads/[id]/report/route",
   "/api/str-calculator/[token]/route",
   "/api/str-calculator/[token]/address-suggestions/route",
   "/(app)/create/page",

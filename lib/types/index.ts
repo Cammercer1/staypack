@@ -387,6 +387,8 @@ export type StrEnrichmentJson = {
   fetched_at?: string;
   cost_cents?: number;
   request_id?: string | null;
+  cache_status?: "hit" | "miss";
+  cache_key?: string;
   currency?: "AUD" | "USD";
   estimate_basis?: "p50" | "provider";
   seasonality_basis?: "modelled";

@@ -36,6 +36,9 @@ export async function POST(request: Request) {
         postcode: listing.postcode,
         country: listing.country,
       });
+      if (geocoded.placeId === "mock-place-id") {
+        throw new Error("A real property location is required before requesting an estimate. Configure address lookup and try again.");
+      }
 
       latitude = geocoded.latitude;
       longitude = geocoded.longitude;

@@ -379,7 +379,7 @@ The server saves the enquiry, geocodes a complete street address, then calls the
 standard AirROI calculator once (no extra market occupancy request, scraping or
 report generation). `GOOGLE_MAPS_API_KEY`, `AIRROI_API_KEY` and the Supabase service
 role key are required. The selected bathroom count supports half baths and is saved
-in `input_json` and used in the estimate. Guests default to `max(2, bedrooms * 2)`,
+in `input_json` and used in the estimate. Guests default to `min(10, max(2, bedrooms * 2))`,
 and the search radius is 2 km; these assumptions are visible
 with the estimate. Original input, raw provider response and displayed estimate
 are stored separately. Failed estimates retain the enquiry for agency follow-up.
@@ -431,3 +431,90 @@ RLS and service-only writes were verified remotely. A temporary agency completed
 the local app/Supabase/Stripe sandbox integration check, including usage overages
 and cancellation; its test records were removed afterward. Commercial billing
 remains disabled. See [billing setup and launch requirements](../docs/billing-infrastructure.md).
+
+## Shared calculator estimate cache
+
+`20261015024019_airroi_calculator_cache.sql` adds a dedicated, service-only cache
+and four security-invoker RPCs. It was applied and verified in production on
+15 October 2026 before deploying the server adapter.
+No existing report, lead, publication snapshot or billing record is changed.
+There is no historical backfill or cleanup of original report/lead responses.
+
+The server hashes the effective provider request and shares its raw successful
+response between report generation and embedded calculators. Contact details,
+branding, agency adjustments and selected comparables are not shared cache data.
+Browser roles have neither table access nor RPC execution permission. Consumers
+must retain their normal agency authorization and lead reservation checks.
+
+Each successful fetch is valid for exactly 720 hours (30 days), starting at the
+database completion timestamp. Reads and completion retries never extend the
+expiry. Expired data is never returned, including during provider failures.
+Provider calls run outside database transactions. A 60-second per-key lease
+coalesces concurrent callers across server instances; only its owner can save
+the result, and a failed request enters a 30-second retry cooldown. A crashed
+worker's expired lease can be replaced. Provider timeouts can still have an
+unknown billable outcome; this is not a provider-level exactly-once guarantee.
+
+The scheduled `airroi-calculator-cache-cleanup` Netlify function runs every five
+minutes and deletes only expired dedicated-cache rows and abandoned work older
+than a day. The claim RPC also clears an expired payload when it is requested
+again. The scheduled function requires `NEXT_PUBLIC_SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY`; it remains independent of billing and makes no paid
+provider calls. Cache expiry is immediate; physical row cleanup follows the next
+successful scheduled run. Monitor function failures and cache backlog on rollout.
+
+Per-key hit, fetch-attempt and failure counters support operational cost checks
+while the row exists. They are not customer usage or billing events. Historical
+reports continue to render their saved snapshots, regardless of cache expiry.
+
+Validation uses an **empty disposable PostgreSQL 17 database**, never Supabase:
+
+1. Run `tests/airroi_calculator_cache_fixture.sql`.
+2. Run `migrations/20261015024019_airroi_calculator_cache.sql`.
+3. Run `tests/airroi_calculator_cache_assertions.sql` with `psql -v ON_ERROR_STOP=1`.
+4. For a Docker database, run
+   `python3 supabase/tests/airroi_calculator_cache_concurrency.py CONTAINER`.
+
+Assertions cover fixed expiry, completion retries, stale owners, failures,
+bounded cleanup, browser-role denial and unchanged report/lead/billing sentinels.
+The concurrency test launches twelve independent database sessions and verifies
+one fetch lease followed by twelve cache hits. Scheduled cleanup coverage lives
+in `lib/airroi/calculatorCacheCleanup.test.ts`.
+
+## Calculator lead to report
+
+`20261015024032_str_calculator_lead_reports.sql` adds the private lead's report
+link and the service-only `create_str_calculator_lead_report` RPC. Both calculator
+migrations were applied and verified in production on 15 October 2026 before the
+application release. Existing report snapshots were verified unchanged, and no
+accounts had metering enabled. Commercial billing stays disabled.
+
+Create report creates a separate property draft and STR appraisal in one
+transaction. Completed Australian and US addresses retain their unit/street,
+suburb/city, state and postcode/ZIP for subsequent property lookup. The source
+address remains unchanged on the lead; ambiguous address text is kept intact
+instead of guessing missing fields. Conversion makes no extra address API call.
+It copies a valid estimate only when the original provider fetch is
+less than 720 hours old, retaining its exact timestamp, inputs and full baseline.
+Agency management assumptions apply to the new final estimate only. Expired,
+invalid or incompatible historical inputs produce a draft needing an estimate;
+the creation action itself makes no paid provider requests. Legacy leads without
+provider timestamps use their original completion date. Customer names and
+property photos can be completed in the normal editor.
+
+The transaction checks agency membership and lead ownership, locks the lead and
+returns its linked report on retries without updating that report. The UI then
+shows Open report. Existing properties, report JSON, publication versions, PDF
+links and billing records are not backfilled or rewritten. The new HTTP endpoint
+is included in the production route verification gate.
+
+For disposable PostgreSQL 17 verification, run `tests/str_workspace_fixture.sql`,
+then `tests/str_calculator_lead_reports_fixture.sql`, followed by migrations
+`20261010232632_str_appraisal_workspace.sql`,
+`20261010233726_str_recipient_conflict_http_status.sql`,
+`20261014104828_str_calculator_widget.sql`,
+`20261014113703_str_calculator_optional_phone.sql`, and
+`20261015024032_str_calculator_lead_reports.sql`. Finally run
+`tests/str_calculator_lead_reports.sql` with `psql -v ON_ERROR_STOP=1`.
+These tests check cross-agency denial, original timestamp precision, exact expiry,
+creation retries and byte-for-byte preservation of existing report/property data.

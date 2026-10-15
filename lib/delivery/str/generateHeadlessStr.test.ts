@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { generateHeadlessStrReport } from "./generateHeadlessStr";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchStrEstimate } from "@/lib/str/estimate";
+import { geocodeReportAddress } from "@/lib/geocoding";
 import { generateReportCopy } from "@/lib/openai/generateReportCopy";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
 import type { DeliveryTenant } from "@/lib/delivery/types";
@@ -10,6 +11,24 @@ vi.mock("@/lib/str/estimate", () => ({ fetchStrEstimate: vi.fn() }));
 vi.mock("@/lib/geocoding", () => ({ geocodeReportAddress: vi.fn(async () => ({ latitude: -33.8, longitude: 151.2 })) }));
 vi.mock("@/lib/openai/generateReportCopy", () => ({ generateReportCopy: vi.fn() }));
 afterEach(() => vi.clearAllMocks());
+
+it("stops mock geocoding before fetching or saving a paid estimate during managed delivery", async () => {
+  const f = createLintRegressionFixtures();
+  const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), update: vi.fn(), single: vi.fn().mockResolvedValue({ data: f.report, error: null }) };
+  vi.mocked(createAdminClient).mockReturnValue({
+    from: vi.fn(() => query), rpc: vi.fn().mockResolvedValue({ data: f.report.id, error: null }),
+  } as unknown as ReturnType<typeof createAdminClient>);
+  vi.mocked(geocodeReportAddress).mockResolvedValueOnce({ latitude: -28.0167, longitude: 153.4, formattedAddress: f.listing.property_address!, placeId: "mock-place-id" });
+
+  await expect(generateHeadlessStrReport({
+    tenant: { id: "tenant", slug: "tenant", name: "Tenant", brand: {} } as DeliveryTenant,
+    listingUrl: f.listing.listing_url!, parsed: { address: f.listing.property_address ?? undefined, images: [], agents: [], confidence: "high", warnings: [] },
+    listing: f.listing, agency: f.agency, templateIdOverride: "classic-detailed",
+  })).rejects.toThrow("real property location");
+  expect(fetchStrEstimate).not.toHaveBeenCalled();
+  expect(generateReportCopy).not.toHaveBeenCalled();
+  expect(query.update).not.toHaveBeenCalled();
+});
 
 it.each(["relative", "uplift"] as const)("passes %s company defaults and frozen assumptions into managed delivery copy generation", async (mode) => {
   const f = createLintRegressionFixtures();

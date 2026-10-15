@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Check, Code2, Copy, ExternalLink, Globe, LoaderCircle, Mail, Phone, RefreshCw, RotateCcw, Users } from "lucide-react";
+import { Check, Code2, Copy, ExternalLink, FilePlus2, Globe, LoaderCircle, Mail, Phone, RefreshCw, RotateCcw, Users } from "lucide-react";
 import { StrCalculatorWidget } from "./StrCalculatorWidget";
 import type { CalculatorBrand } from "@/lib/str-calculator/brand";
 import { calculatorMoney, type CalculatorLead, type CalculatorSettings } from "@/lib/str-calculator/schema";
 import { cn } from "@/lib/utils";
+import { strAppraisalPath } from "@/lib/str-appraisals/types";
 
 type Props = {
   brand: CalculatorBrand; initialWidget: CalculatorSettings | null; canManage: boolean;
@@ -28,6 +29,9 @@ export function StrCalculatorWorkspace({ brand, initialWidget, canManage, leads,
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [creatingLead, setCreatingLead] = useState<string | null>(null);
+  const [reportError, setReportError] = useState("");
+  const [createdReports, setCreatedReports] = useState<Record<string, string>>({});
   const settingsChanged = country !== (widget?.country ?? "AU") || askPhone !== (widget?.ask_phone ?? false);
   const embedUrl = widget ? `${baseUrl}/embed/str-calculator/${widget.public_token}` : "";
   const code = embedUrl ? `<iframe\n  src="${embedUrl}"\n  title="Short-term rental revenue calculator"\n  width="100%"\n  height="900"\n  style="border:0; border-radius:16px;"\n  loading="lazy"\n></iframe>` : "";
@@ -46,6 +50,19 @@ export function StrCalculatorWorkspace({ brand, initialWidget, canManage, leads,
   async function copy() {
     try { await navigator.clipboard.writeText(code); setMessage("Embed code copied."); setError(""); }
     catch { setError("Copy isn’t available in this browser. Select and copy the code below."); }
+  }
+
+  async function createReport(lead: CalculatorLead) {
+    if (creatingLead) return;
+    setCreatingLead(lead.id); setReportError("");
+    try {
+      const response = await fetch(`/api/marketing/str-calculator/leads/${lead.id}/report`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok || typeof result.report_id !== "string") throw new Error(result.error || "Couldn’t create the report. Please try again.");
+      setCreatedReports(previous => ({ ...previous, [lead.id]: result.report_id }));
+      router.push(strAppraisalPath(result.report_id)); router.refresh();
+    } catch (cause) { setReportError(cause instanceof Error ? cause.message : "Couldn’t create the report. Please try again."); }
+    finally { setCreatingLead(null); }
   }
 
   return <div data-theme="staypack-workspace" className="min-w-0 space-y-9 text-base-content">
@@ -95,13 +112,15 @@ export function StrCalculatorWorkspace({ brand, initialWidget, canManage, leads,
 
     <section aria-labelledby="calculator-leads-heading" className="min-w-0">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3"><div><h2 id="calculator-leads-heading" className="text-xl font-semibold">Calculator leads</h2><p className="mt-2 text-sm text-base-content/70">Property enquiries captured by your live calculator, newest first.</p></div><button type="button" onClick={() => router.refresh()} className="du-btn du-btn-sm du-btn-ghost min-h-11"><RefreshCw className="size-4" aria-hidden="true" />Refresh leads</button></div>
+      {reportError && <p role="alert" className="du-alert du-alert-error mb-4 text-sm">{reportError}</p>}
       {leads.length ? <div className="max-w-full overflow-x-auto rounded-xl border border-base-300 bg-base-100">
-        <table className="du-table du-table-sm"><caption className="sr-only">Enquiries from your agency’s STR calculator</caption><thead><tr><th scope="col">Property</th><th scope="col">Contact</th><th scope="col">Estimated gross STR revenue</th><th scope="col">Received</th></tr></thead>
-          <tbody>{leads.map(lead => <tr key={lead.id} className="hover:bg-base-200/40">
-            <td className="min-w-48 max-w-72 whitespace-normal py-5"><p className="font-medium">{lead.address}</p><p className="mt-1 text-xs text-base-content/70">{lead.bedrooms === 0 ? "Studio" : `${lead.bedrooms} bedrooms`} · {lead.country}</p></td>
-            <td><div className="flex flex-col items-start gap-2"><a href={`mailto:${lead.email}`} className="inline-flex items-center gap-2 underline underline-offset-4"><Mail className="size-3.5 shrink-0" aria-hidden="true" />{lead.email}</a>{lead.phone && <a href={`tel:${lead.phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-2 underline underline-offset-4"><Phone className="size-3.5 shrink-0" aria-hidden="true" />{lead.phone}</a>}</div></td>
-            <td>{lead.estimate_json ? <><p className="font-medium tabular-nums">{calculatorMoney(lead.estimate_json.annualRevenue, lead.estimate_json.currency)} {lead.estimate_json.currency} / year</p><span className="mt-1 inline-block text-xs text-base-content/70">Estimate delivered</span></> : <span className="du-badge du-badge-sm du-badge-outline">{lead.status === "failed" || loadedAt - Date.parse(lead.created_at) > 120000 ? "Needs follow-up" : "Preparing estimate"}</span>}</td>
-            <td className="whitespace-nowrap text-xs"><time dateTime={lead.created_at}>{new Date(lead.created_at).toLocaleString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Australia/Sydney" })}</time><p className="mt-1 text-base-content/70">Sydney time</p></td>
+        <table className="du-table du-table-sm max-sm:block"><caption className="sr-only">Enquiries from your agency’s STR calculator</caption><thead className="max-sm:sr-only"><tr><th scope="col">Property</th><th scope="col">Contact</th><th scope="col">Estimated gross STR revenue</th><th scope="col">Received</th><th scope="col"><span className="sr-only">Report</span></th></tr></thead>
+          <tbody className="max-sm:block">{leads.map(lead => <tr key={lead.id} className="hover:bg-base-200/40 max-sm:grid max-sm:grid-cols-2 max-sm:gap-x-2 max-sm:p-3">
+            <td className="min-w-48 whitespace-normal py-5 sm:max-w-72 max-sm:col-span-2 max-sm:block max-sm:py-2"><p className="font-medium">{lead.address}</p><p className="mt-1 text-xs text-base-content/70">{lead.bedrooms === 0 ? "Studio" : `${lead.bedrooms} bedrooms`} · {lead.country}</p></td>
+            <td className="max-sm:col-span-2 max-sm:block max-sm:pb-3"><div className="flex flex-col items-start gap-2"><a href={`mailto:${lead.email}`} className="inline-flex items-center gap-2 break-all underline underline-offset-4"><Mail className="size-3.5 shrink-0" aria-hidden="true" />{lead.email}</a>{lead.phone && <a href={`tel:${lead.phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-2 underline underline-offset-4"><Phone className="size-3.5 shrink-0" aria-hidden="true" />{lead.phone}</a>}</div></td>
+            <td className="max-sm:block"><span className="mb-1 block text-xs text-base-content/70 sm:hidden">Estimated gross STR revenue</span>{lead.estimate_json ? <><p className="font-medium tabular-nums">{calculatorMoney(lead.estimate_json.annualRevenue, lead.estimate_json.currency)} {lead.estimate_json.currency} / year</p><span className="mt-1 inline-block text-xs text-base-content/70">Estimate delivered</span></> : <span className="du-badge du-badge-sm du-badge-outline">{lead.status === "failed" || loadedAt - Date.parse(lead.created_at) > 120000 ? "Needs follow-up" : "Preparing estimate"}</span>}</td>
+            <td className="text-xs sm:whitespace-nowrap max-sm:block"><span className="mb-1 block text-base-content/70 sm:hidden">Received</span><time dateTime={lead.created_at}>{new Date(lead.created_at).toLocaleString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Australia/Sydney" })}</time><p className="mt-1 text-base-content/70">Sydney time</p></td>
+            <td className="whitespace-nowrap max-sm:col-span-2 max-sm:block max-sm:pt-3">{(lead.report_id || createdReports[lead.id]) ? <Link href={strAppraisalPath(lead.report_id || createdReports[lead.id])} className="du-btn du-btn-sm du-btn-outline min-h-11 max-sm:w-full">Open report<ExternalLink className="size-4" aria-hidden="true" /></Link> : <button type="button" onClick={() => void createReport(lead)} disabled={creatingLead !== null || (lead.status === "processing" && loadedAt - Date.parse(lead.created_at) <= 120000)} aria-label={`Create report for ${lead.address}`} className="du-btn du-btn-sm du-btn-outline min-h-11 max-sm:w-full">{creatingLead === lead.id ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <FilePlus2 className="size-4" aria-hidden="true" />}{creatingLead === lead.id ? "Creating…" : "Create report"}</button>}</td>
           </tr>)}</tbody>
         </table>
       </div> : <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-base-300 p-8"><Mail className="size-6 text-base-content/60" aria-hidden="true" /><h3 className="text-lg font-medium">Your next property conversation starts here.</h3><p className="max-w-xl text-sm leading-6 text-base-content/70">{total ? "There are no enquiries on this page. Return to the first page to see your latest leads." : "Once a visitor submits your live calculator, their property, contact details and estimate will appear here. Add the calculator to your website to get started."}</p><Link href={total ? pathname : setupHref} className="du-btn du-btn-sm min-h-11">{total ? "View latest leads" : "Set up your calculator"}</Link></div>}

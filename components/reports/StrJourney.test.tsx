@@ -659,6 +659,44 @@ describe("evidence before design safeguards", () => {
     await waitTab("Review & share");
   });
 
+  it("opens a calculator-seeded draft and revisits its property without refreshing the estimate", async () => {
+    const { report, listing } = createLintRegressionFixtures();
+    const fetchedAt = "2026-10-01T00:00:00.000Z";
+    const originalEstimate = reconcileStrEstimate({ ...report.original_estimate_json!, raw: { provider: "airroi", fetched_at: fetchedAt, input: { latitude: -33.8, longitude: 151.2, bedrooms: listing.bedrooms, bathrooms: listing.bathrooms, accommodates: listing.accommodates, radiusM: 2000 } } });
+    const enrichment = { ...report.str_enrichment_json!, fetched_at: fetchedAt, cost_cents: 0 };
+    const { fetcher, getReport } = setup(true, { report: {
+      status: "estimated", pdf_url: null,
+      original_estimate_json: originalEstimate, final_estimate_json: originalEstimate,
+      str_enrichment_json: enrichment,
+      user_overrides_json: { estimateInputs: { bedrooms: listing.bedrooms!, bathrooms: listing.bathrooms!, accommodates: listing.accommodates! } },
+    } });
+
+    await waitTab("Estimate & evidence");
+    clickTab("Property");
+    await waitTab("Property");
+    fireEvent.click(screen.getByRole("button", { name: "Review estimate & evidence" }));
+    await waitTab("Estimate & evidence");
+
+    expect(fetcher.mock.calls.some(([url]) => url === "/api/str/estimate" || url.endsWith("generate-copy"))).toBe(false);
+    expect(getReport().original_estimate_json).toEqual(originalEstimate);
+    expect(getReport().final_estimate_json).toEqual(originalEstimate);
+    expect(getReport().str_enrichment_json).toEqual(enrichment);
+    expect(getReport().final_report_json).toBeNull();
+  });
+
+  it("opens an existing published report with an old estimate without refreshing or saving it", async () => {
+    const { report } = createLintRegressionFixtures();
+    const originalEstimate = { ...report.original_estimate_json!, raw: { provider: "airroi", fetched_at: "2020-01-01T00:00:00.000Z" } };
+    const { fetcher, getReport } = setup(false, { report: { status: "published", original_estimate_json: originalEstimate } });
+    const snapshot = structuredClone(getReport());
+
+    await waitTab("Review & share");
+    expect(getReport()).toEqual(snapshot);
+    expect(getReport().final_report_json).toEqual(snapshot.final_report_json);
+    expect(fetcher.mock.calls.every(([, options]) => !options?.method || options.method === "GET")).toBe(true);
+    expect(fetcher.mock.calls.some(([url]) => url === "/api/str/estimate")).toBe(false);
+  });
+
   it("keeps older generated reports editable when only the original estimate is present", async () => {
     const { fetcher } = setup(false, { report: { final_estimate_json: null } });
     clickTab("Design & content");

@@ -126,6 +126,9 @@ export async function generateHeadlessStrReport({
     postcode: listing.postcode,
     country: listing.country,
   });
+  if (geocoded.placeId === "mock-place-id") {
+    throw new Error("A real property location is required before requesting an estimate. Configure address lookup and try again.");
+  }
 
   const bedrooms = Number(listing.bedrooms ?? 2);
   const bathrooms = Number(listing.bathrooms ?? 1);

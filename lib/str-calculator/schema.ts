@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { calculateAccommodates } from "@/lib/reports/formatters";
 
 export const calculatorFieldsSchema = z.object({
   address: z.string().trim().min(10, "Enter the full street address, suburb and postcode.").max(300),
@@ -23,15 +24,16 @@ export type CalculatorEstimate = z.infer<typeof calculatorEstimateSchema>;
 export type CalculatorLead = {
   id: string; address: string; bedrooms: number; email: string; phone: string | null; country: string;
   status: "processing" | "estimated" | "failed"; estimate_json: CalculatorEstimate | null; created_at: string;
+  report_id?: string | null;
 };
 
 export const CALCULATOR_CONSENT_VERSION = "str-calculator-v2";
 export const calculatorConsent = (agencyName: string, askPhone = false) =>
   `I agree to ${agencyName} receiving my ${askPhone ? "contact" : "email"} and property details and contacting me about this estimate.`;
 
-/** Keep guest capacity and comparable radius simple, and show them with the result. */
+/** Match report defaults so the same property can reuse its calculator estimate. */
 export function calculatorAssumptions(bedrooms: number) {
-  return { guests: Math.max(2, bedrooms * 2), radiusM: 2000 };
+  return { guests: calculateAccommodates(bedrooms), radiusM: 2000 };
 }
 
 export function calculatorMoney(value: number, currency: string) {

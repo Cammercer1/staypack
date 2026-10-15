@@ -1,4 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+const cache = vi.hoisted(() => ({ rpc: vi.fn() }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({
+  rpc: (...args: unknown[]) => ({ abortSignal: () => cache.rpc(...args) }),
+}) }));
 import { fetchAirroiEstimate, normaliseAirroiResponse, parseAirroiJson } from "./client";
 
 export const input = { latitude: -33.90836, longitude: 151.22473, bedrooms: 3, bathrooms: 2, accommodates: 6, property_type: "Apartment", suburb: "Kensington" };
@@ -16,6 +20,23 @@ export const payload = {
   }],
 };
 
+beforeEach(() => {
+  const rows = new Map<string, { response: unknown; request_id: string | null; fetched_at: string; expires_at: string }>();
+  cache.rpc.mockReset().mockImplementation(async (name, args) => {
+    if (name === "claim_airroi_calculator_cache") {
+      const row = rows.get(args.p_request_key);
+      return { data: row ? { status: "hit", ...row } : { status: "claimed" }, error: null };
+    }
+    if (name === "complete_airroi_calculator_cache") {
+      const now = Date.now();
+      const row = { response: args.p_response, request_id: args.p_request_id,
+        fetched_at: new Date(now).toISOString(), expires_at: new Date(now + 30 * 86400000).toISOString() };
+      rows.set(args.p_request_key, row);
+      return { data: row, error: null };
+    }
+    return { data: true, error: null };
+  });
+});
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe("AirROI calculator adapter", () => {
   it("preserves 64-bit IDs before native number rounding, including ID arrays", () => {
@@ -60,6 +81,31 @@ describe("AirROI calculator adapter", () => {
     vi.stubGlobal("fetch", request);
     await expect(fetchAirroiEstimate(input)).rejects.toThrow("credit balance");
     expect(request).toHaveBeenCalledTimes(1);
+  });
+  it("reuses widget data for a report without charging or changing the provider snapshot", async () => {
+    vi.stubEnv("AIRROI_API_KEY", "test-secret");
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), { headers: { "x-request-id": "original" } }));
+    vi.stubGlobal("fetch", request);
+    const { property_type: ignoredType, suburb: ignoredSuburb, ...widgetInput } = input;
+    void ignoredType; void ignoredSuburb;
+    const first = await fetchAirroiEstimate(widgetInput);
+    const snapshot = structuredClone(first);
+    first.enrichment.selected_comp_ids = [];
+    first.estimate.annualRevenue = 1;
+    const report = await fetchAirroiEstimate(input);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(report.enrichment).toMatchObject({ cost_cents: 0, cache_status: "hit", fetched_at: snapshot.enrichment.fetched_at, request_id: "original" });
+    expect(report.estimate.annualRevenue).toBe(snapshot.estimate.annualRevenue);
+    expect(report.enrichment.comps).toHaveLength(1);
+    expect(report.estimate.raw).toMatchObject({ fetched_at: snapshot.enrichment.fetched_at, input, response: payload });
+  });
+  it("does not cache malformed provider results", async () => {
+    vi.stubEnv("AIRROI_API_KEY", "test-secret");
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...payload, revenue: -1 })));
+    vi.stubGlobal("fetch", request);
+    await expect(fetchAirroiEstimate(input)).rejects.toThrow();
+    expect(cache.rpc.mock.calls.map(([name]) => name)).toEqual(["claim_airroi_calculator_cache", "fail_airroi_calculator_cache"]);
+    expect(request).toHaveBeenCalledOnce();
   });
 });
 

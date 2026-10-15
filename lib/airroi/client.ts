@@ -2,6 +2,7 @@ import { z } from "zod";
 import { reconcileStrEstimate } from "@/lib/reports/strEstimateAdjustments";
 import type { StrCompCard, StrEnrichmentJson, StrEstimate } from "@/lib/types";
 import { rankStrComps } from "@/lib/str/comparables";
+import { airroiCalculatorCacheKey, cachedAirroiCalculator } from "./estimateCache";
 
 export const airroiInputSchema = z.object({
   currency: z.enum(["AUD", "USD"]).default("AUD"),
@@ -113,12 +114,23 @@ export async function fetchAirroiEstimate(unparsedInput: AirroiInput) {
   if (!key) throw new Error("STR estimates are not configured. Add AIRROI_API_KEY to the server environment.");
   const url = new URL("https://api.airroi.com/calculator/estimate");
   for (const [name, value] of Object.entries({ lat: input.latitude, lng: input.longitude, bedrooms: input.bedrooms, baths: input.bathrooms, guests: input.accommodates, radius: input.radiusM / 1609.344, room_type: "entire_home", currency: "native" })) url.searchParams.set(name, String(value));
-  const response = await fetch(url, { headers: { "X-API-KEY": key }, cache: "no-store", signal: AbortSignal.timeout(20000) });
-  if (!response.ok) throw new Error(response.status === 403 ? "STR data service rejected the request. Check the API key and credit balance." : `STR data service returned ${response.status}. Try again later.`);
-  const raw = parseAirroiJson(await response.text());
-  const result = normaliseAirroiResponse(raw, input);
-  result.enrichment.fetched_at = new Date().toISOString();
-  result.enrichment.cost_cents = 20;
-  result.enrichment.request_id = response.headers.get("x-request-id");
+  const cacheKey = airroiCalculatorCacheKey(input);
+  const cached = await cachedAirroiCalculator(cacheKey, async () => {
+    const response = await fetch(url, { headers: { "X-API-KEY": key }, cache: "no-store", signal: AbortSignal.timeout(20000) });
+    if (!response.ok) throw new Error(response.status === 403 ? "STR data service rejected the request. Check the API key and credit balance." : `STR data service returned ${response.status}. Try again later.`);
+    const raw = parseAirroiJson(await response.text());
+    // Validate before sharing the provider response with any other request.
+    normaliseAirroiResponse(raw, input);
+    return { response: raw, request_id: response.headers.get("x-request-id") };
+  });
+  // Rank comparables for this caller; cached data never contains agency adjustments.
+  const result = normaliseAirroiResponse(cached.response, input);
+  result.estimate.raw = { provider: "airroi", input, response: cached.response,
+    fetched_at: cached.fetched_at, request_id: cached.request_id };
+  result.enrichment.fetched_at = cached.fetched_at;
+  result.enrichment.cost_cents = cached.cache_status === "hit" ? 0 : 20;
+  result.enrichment.request_id = cached.request_id;
+  result.enrichment.cache_status = cached.cache_status;
+  result.enrichment.cache_key = cacheKey;
   return result;
 }

@@ -13,7 +13,7 @@ export default async function StrCalculatorPage({ searchParams }: { searchParams
   const page = Math.min(10000, Math.max(1, Math.floor(Number(query.page) || 1)));
   const [settings, leads] = await Promise.all([
     supabase.from("str_calculator_widgets").select("id,public_token,enabled,country,ask_phone").eq("agency_id", agency.id).maybeSingle(),
-    supabase.from("str_calculator_leads").select("id,address,bedrooms,email,phone,country,status,estimate_json,created_at", { count: "exact" })
+    supabase.from("str_calculator_leads").select("id,address,bedrooms,email,phone,country,status,estimate_json,created_at,report_id", { count: "exact" })
       .eq("agency_id", agency.id).order("created_at", { ascending: false }).order("id", { ascending: false }).range((page - 1) * 25, page * 25 - 1),
   ]);
   if (settings.error || leads.error) throw new Error("Couldn’t load the STR calculator. Please try again.");

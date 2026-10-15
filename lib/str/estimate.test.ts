@@ -3,6 +3,7 @@ import { fetchStrEstimate } from "./estimate";
 import { fetchAirroiEstimate, normaliseAirroiResponse } from "@/lib/airroi/client";
 import { fetchAirroiMarketOccupancy } from "@/lib/airroi/marketOccupancy";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/airroi/client", async (original) => ({ ...await original<typeof import("@/lib/airroi/client")>(), fetchAirroiEstimate: vi.fn() }));
 vi.mock("@/lib/airroi/marketOccupancy", () => ({ fetchAirroiMarketOccupancy: vi.fn() }));
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
@@ -48,4 +49,32 @@ it("adds broader occupancy evidence and its bounded cost without repricing the s
   expect(saved.enrichment.comp_pool).toEqual(enrichment.comp_pool);
   expect(fetchAirroiEstimate).toHaveBeenCalledOnce();
   expect(fetchAirroiMarketOccupancy).toHaveBeenCalledOnce();
+});
+
+it.each([0, 11])("preserves cached calculator provenance and adds only %i cents of independent occupancy cost", async (occupancyCost) => {
+  const f = createLintRegressionFixtures();
+  const fetchedAt = "2026-10-01T03:00:00.000Z";
+  const input = { latitude: -33.9, longitude: 151.2, bedrooms: 4, bathrooms: 2, accommodates: 8, radiusM: 2000 };
+  const estimate = {
+    ...f.report.original_estimate_json!,
+    raw: { provider: "airroi", input, fetched_at: fetchedAt, request_id: "original-provider-request", response: { revenue: 63639 } },
+  };
+  const enrichment = { ...f.report.str_enrichment_json!, fetched_at: fetchedAt, request_id: "original-provider-request", cost_cents: 0 };
+  const occupancy = { status: "unavailable", cost_cents: occupancyCost } as Awaited<ReturnType<typeof fetchAirroiMarketOccupancy>>;
+  f.report.str_enrichment_json = { ...f.report.str_enrichment_json!, market_occupancy: occupancy };
+  const previousReport = structuredClone(f.report);
+  const originalProviderResult = structuredClone({ estimate, enrichment });
+  vi.mocked(fetchAirroiEstimate).mockResolvedValue({ estimate, enrichment });
+  vi.mocked(fetchAirroiMarketOccupancy).mockResolvedValue(occupancy);
+
+  const saved = await fetchStrEstimate(input, f.listing, f.report.str_enrichment_json);
+
+  expect(saved.enrichment.cost_cents).toBe(occupancyCost);
+  expect(saved.enrichment.fetched_at).toBe(fetchedAt);
+  expect(saved.enrichment.request_id).toBe("original-provider-request");
+  expect(saved.estimate.raw).toEqual(estimate.raw);
+  expect(fetchAirroiEstimate).toHaveBeenCalledExactlyOnceWith({ ...input, currency: "AUD", property_type: f.listing.property_type, suburb: f.listing.suburb });
+  expect(fetchAirroiMarketOccupancy).toHaveBeenCalledWith(expect.objectContaining(input), f.listing, occupancy);
+  expect({ estimate, enrichment }).toEqual(originalProviderResult);
+  expect(f.report).toEqual(previousReport);
 });

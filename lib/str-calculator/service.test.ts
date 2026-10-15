@@ -9,6 +9,14 @@ import { loadPublicCalculator, submitCalculator } from "./service";
 
 const token = "6500bfd0-04d8-4919-b458-84e9ec0ce331";
 const input = { address: "12 Test Street, Sydney NSW 2000", bedrooms: 3, bathrooms: 1.5, email: "owner@example.com", consent: true, website: "", requestId: token };
+const providerFetchedAt = "2026-10-01T00:00:00.000Z";
+const providerRaw = {
+  provider: "airroi", response: "private-provider-data", fetched_at: providerFetchedAt, request_id: "provider-request",
+  input: { latitude: -33.8, longitude: 151.2, bedrooms: 3, bathrooms: 1.5, accommodates: 6, radiusM: 2000, currency: "AUD" },
+};
+function providerResult(costCents = 20) {
+  return { estimate: { annualRevenue: 62400, monthlyRevenue: 5200, nightlyRate: 260, occupancyRate: 65.8, raw: providerRaw }, enrichment: { fetched_at: providerFetchedAt, request_id: "provider-request", cost_cents: costCents } };
+}
 let rpc: ReturnType<typeof vi.fn>;
 let update: ReturnType<typeof vi.fn>;
 let load: ReturnType<typeof vi.fn>;
@@ -21,7 +29,7 @@ beforeEach(() => {
   update = vi.fn().mockImplementation(() => { const chain = { eq: vi.fn(), then: (resolve: (value: unknown) => unknown) => Promise.resolve({ error: null }).then(resolve) }; chain.eq.mockReturnValue(chain); return chain; });
   mocks.admin.mockReturnValue({ from: (table: string) => table === "str_calculator_widgets" ? read : { update }, rpc });
   mocks.geocode.mockResolvedValue({ latitude: -33.8, longitude: 151.2, formattedAddress: input.address, placeId: "real" });
-  mocks.estimate.mockResolvedValue({ estimate: { annualRevenue: 62400, monthlyRevenue: 5200, nightlyRate: 260, occupancyRate: 65.8, raw: { provider: "airroi", response: "private-provider-data" } } });
+  mocks.estimate.mockResolvedValue(providerResult());
 });
 
 describe("public calculator service", () => {
@@ -53,8 +61,52 @@ describe("public calculator service", () => {
     expect(rpc.mock.calls[0][1].p_input).toMatchObject({ bedrooms: 3, bathrooms: 1.5 });
     expect(result.bathrooms).toBe(1.5);
     expect(result).not.toHaveProperty("raw");
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: "estimated", original_estimate_json: { provider: "airroi", response: "private-provider-data" }, estimate_json: result }));
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: "estimated", original_estimate_json: providerRaw, estimate_json: result }));
     expect(JSON.stringify(rpc.mock.calls)).not.toContain("client-ip");
+  });
+  it("retains provider fetch time and exact inputs when a shared cached result creates a new lead", async () => {
+    mocks.estimate.mockResolvedValue(providerResult(0));
+    const startedAt = Date.now();
+
+    const result = await submitCalculator(token, input, "client");
+
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc.mock.calls[0][1]).toMatchObject({
+      p_input: { email: input.email, consent: true, guests: 6, radiusM: 2000 },
+      p_consent_version: "str-calculator-v2",
+    });
+    const saved = update.mock.calls[0][0];
+    expect(saved.original_estimate_json).toEqual(providerRaw);
+    expect(saved.original_estimate_json.fetched_at).toBe(providerFetchedAt);
+    expect(Date.parse(saved.completed_at)).toBeGreaterThanOrEqual(startedAt);
+    expect(saved.completed_at).not.toBe(saved.original_estimate_json.fetched_at);
+    expect(result).not.toHaveProperty("fetched_at");
+    expect(result).not.toHaveProperty("response");
+  });
+  it("captures separate visitors when their calculations reuse the same provider response", async () => {
+    mocks.estimate.mockResolvedValue(providerResult(0));
+    const secondEmail = "another-owner@example.com";
+    await submitCalculator(token, input, "client-one");
+    await submitCalculator(token, { ...input, email: secondEmail, requestId: "82116d24-1d73-4d7c-95b7-ef1be7545f76" }, "client-two");
+
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc.mock.calls[0][1].p_input.email).toBe(input.email);
+    expect(rpc.mock.calls[1][1].p_input.email).toBe(secondEmail);
+    expect(rpc.mock.calls[0][1].p_input_hash).not.toBe(rpc.mock.calls[1][1].p_input_hash);
+    expect(update).toHaveBeenCalledTimes(2);
+    for (const [saved] of update.mock.calls) {
+      expect(saved.original_estimate_json).toEqual(providerRaw);
+    }
+    for (const [request] of mocks.estimate.mock.calls) {
+      expect(request).not.toHaveProperty("email");
+      expect(request).not.toHaveProperty("consent");
+    }
+  });
+  it("uses report-compatible guest capacity for larger properties", async () => {
+    const result = await submitCalculator(token, { ...input, bedrooms: 10 }, "client");
+    expect(rpc.mock.calls[0][1].p_input.guests).toBe(10);
+    expect(mocks.estimate).toHaveBeenCalledWith(expect.objectContaining({ bedrooms: 10, accommodates: 10 }));
+    expect(result.guests).toBe(10);
   });
   it("includes bathroom changes in the request fingerprint", async () => {
     await submitCalculator(token, input, "client");
