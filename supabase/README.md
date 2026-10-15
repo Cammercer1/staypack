@@ -496,17 +496,27 @@ address remains unchanged on the lead; ambiguous address text is kept intact
 instead of guessing missing fields. Conversion makes no extra address API call.
 It copies a valid estimate only when the original provider fetch is
 less than 720 hours old, retaining its exact timestamp, inputs and full baseline.
-Agency management assumptions apply to the new final estimate only. Expired,
-invalid or incompatible historical inputs produce a draft needing an estimate;
-the creation action itself makes no paid provider requests. Legacy leads without
-provider timestamps use their original completion date. Customer names and
-property photos can be completed in the normal editor.
+Agency management assumptions apply to the new final estimate only. For a new
+draft with a reusable baseline, creation fetches the missing market occupancy
+history through the existing market cache before saving the draft atomically.
+It makes no calculator estimate request and preserves the baseline, comparable
+pool, selected comparables and original fetch time. Unavailable market history
+keeps the existing annual benchmark fallback. Expired, invalid or incompatible
+historical inputs produce a draft needing an estimate, without a market request.
+Legacy leads without provider timestamps use their original completion date.
+Customer names and property photos can be completed in the normal editor.
 
 `20261015024716_str_calculator_lead_report_listing_slug.sql`, also applied on
 15 October 2026, supplies the required unique property slug when creating a new
 draft. This reserves an internal identifier without publishing a property page.
 The disposable database fixture enforces production’s non-null, no-default slug
 requirement and uniqueness within each agency.
+
+`20261015025920_str_calculator_lead_report_market_occupancy_cost.sql`, applied on
+15 October 2026, preserves the newly fetched market occupancy cost in the draft
+total while the reused calculator cost stays zero. This is provider cost metadata;
+it does not create billing usage or enable metering. Market evidence retains its
+own timestamp separately from the original calculator timestamp.
 
 The transaction checks agency membership and lead ownership, locks the lead and
 returns its linked report on retries without updating that report. The UI then
@@ -521,7 +531,12 @@ then `tests/str_calculator_lead_reports_fixture.sql`, followed by migrations
 `20261014104828_str_calculator_widget.sql`,
 `20261014113703_str_calculator_optional_phone.sql`, and
 `20261015024032_str_calculator_lead_reports.sql`, and
-`20261015024716_str_calculator_lead_report_listing_slug.sql`. Finally run
+`20261015024716_str_calculator_lead_report_listing_slug.sql`, and
+`20261015025920_str_calculator_lead_report_market_occupancy_cost.sql`. Finally run
 `tests/str_calculator_lead_reports.sql` with `psql -v ON_ERROR_STOP=1`.
 These tests check cross-agency denial, original timestamp precision, exact expiry,
-creation retries and byte-for-byte preservation of existing report/property data.
+creation retries, retained occupancy evidence and costs, and byte-for-byte
+preservation of existing report/property data. `lib/str-calculator/leadReportOccupancy.test.ts`
+exercises the real market adapter with mocked HTTP: AU/US conversion, full
+comparable retention, market cache reuse, unavailable data and existing-report
+replays, with no calculator endpoint calls.

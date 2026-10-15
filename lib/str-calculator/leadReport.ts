@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { airroiInputSchema, normaliseAirroiResponse } from "@/lib/airroi/client";
+import { fetchAirroiMarketOccupancy } from "@/lib/airroi/marketOccupancy";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import { countryName, marketForCountry } from "@/lib/property-market";
@@ -84,6 +85,14 @@ export async function createReportFromCalculatorLead({ leadId, agency, userId, a
   // a saved report's estimates, template or customer details from current settings.
   const draft = lead.report_id ? null : calculatorLeadReportDraft(lead, agency);
   const templateId = draft ? (await resolveAvailableTemplates(agency, "str")).defaultTemplateId : null;
+  if (draft?.original_estimate && draft.enrichment) {
+    // Complete only this new draft's missing market evidence. The calculator
+    // baseline, comparable pool, selected IDs and original fetch date stay intact.
+    // Provider failures return an unavailable snapshot with the normal fallback.
+    const saved = storedRawSchema.parse(draft.original_estimate.raw);
+    const occupancy = await fetchAirroiMarketOccupancy(saved.input, draft.property);
+    draft.enrichment = { ...draft.enrichment, market_occupancy: occupancy, cost_cents: occupancy.cost_cents };
+  }
   const result = await admin.rpc("create_str_calculator_lead_report", {
     p_agency_id: agency.id, p_lead_id: leadId, p_user_id: userId, p_template_id: templateId, p_draft: draft,
   });

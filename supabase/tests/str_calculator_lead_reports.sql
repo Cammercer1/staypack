@@ -11,6 +11,8 @@ declare
   v_lead uuid;
   v_raw jsonb;
   v_draft jsonb;
+  v_market_occupancy jsonb;
+  v_cost_case jsonb;
   v_result jsonb;
   v_retry jsonb;
   v_saved public.reports%rowtype;
@@ -25,13 +27,16 @@ begin
   select to_jsonb(l) into v_original_listing from public.listings l where id='30000000-0000-4000-8000-000000000001';
   select count(*) into v_listing_count from public.listings;
   select count(*) into v_report_count from public.reports;
-  v_raw := jsonb_build_object('provider','airroi','input',jsonb_build_object('currency','AUD','latitude',-33.9,'longitude',151.2,'bedrooms',3,'bathrooms',1.5,'accommodates',6,'radiusM',2000),'response',jsonb_build_object('revenue',60000),'fetched_at',v_fetched);
+  v_raw := jsonb_build_object('provider','airroi','input',jsonb_build_object('currency','AUD','latitude',-33.9,'longitude',151.2,'bedrooms',3,'bathrooms',1.5,'accommodates',6,'radiusM',2000),'response',jsonb_build_object('revenue',60000,'comparables',jsonb_build_array(jsonb_build_object('id','saved-comparable','occupancy',0.67))),'fetched_at',v_fetched);
+  v_market_occupancy := jsonb_build_object('status','ready','source','airroi','market_id','bondi','cost_cents',7,'fetched_at',now(),
+    'monthly',jsonb_build_array(jsonb_build_object('month','2026-01','occupancy',0.7)),
+    'raw',jsonb_build_object('source','market-series','values',jsonb_build_array(0.7,0.6)));
   insert into public.str_calculator_leads(agency_id,widget_id,request_id,input_hash,client_hash,address,bedrooms,email,country,input_json,original_estimate_json,estimate_json,status,consent_version,consent_text,completed_at)
     values(v_agency,'50000000-0000-4000-8000-000000000001',gen_random_uuid(),'hash','client','24 Beach Road, Bondi NSW 2026, Australia',3,'test@example.com','AU','{"bathrooms":1.5}',v_raw,'{"annualRevenue":60000}','estimated','v1','Consent',now()) returning id into v_lead;
   v_draft := jsonb_build_object('source_address','24 Beach Road, Bondi NSW 2026, Australia',
     'property',jsonb_build_object('property_address','24 Beach Road','suburb','Bondi','state','NSW','postcode','2026','country','Australia','bedrooms',3,'bathrooms',1.5,'accommodates',6,'latitude',-33.9,'longitude',151.2),
     'original_estimate',jsonb_build_object('annualRevenue',60000,'raw',v_raw),'final_estimate',jsonb_build_object('annualRevenue',66000,'raw',v_raw),
-    'enrichment',jsonb_build_object('provider','airroi','fetched_at',v_fetched,'cost_cents',20),
+    'enrichment',jsonb_build_object('provider','airroi','fetched_at',v_fetched,'cost_cents',20,'market_occupancy',v_market_occupancy),
     'overrides',jsonb_build_object('estimateInputs',jsonb_build_object('bedrooms',3,'bathrooms',1.5,'accommodates',6)),'fetched_at',v_fetched);
 
   begin
@@ -64,7 +69,10 @@ begin
   assert exists(select 1 from public.listings where id=v_saved.listing_id and property_address='24 Beach Road' and suburb='Bondi' and state='NSW' and postcode='2026'), 'Structured AU locality missing';
   assert v_saved.final_report_json is null and v_saved.pdf_url is null, 'Must not publish or generate a document';
   assert v_saved.original_estimate_json->>'annualRevenue'='60000' and v_saved.final_estimate_json->>'annualRevenue'='66000', 'Baseline and agency scenario must stay separate';
-  assert (v_saved.str_enrichment_json->>'fetched_at')::timestamptz=v_fetched and v_saved.str_enrichment_json->>'cost_cents'='0', 'Reuse must retain precise provenance and incur no provider cost';
+  assert v_saved.original_estimate_json=v_draft->'original_estimate' and v_saved.final_estimate_json=v_draft->'final_estimate', 'Cached calculator estimates and comparables must be retained exactly';
+  assert (v_saved.str_enrichment_json->>'fetched_at')::timestamptz=v_fetched, 'Reuse must retain precise calculator provenance';
+  assert v_saved.str_enrichment_json->>'cost_cents'='7' and v_saved.str_enrichment_json->>'cache_status'='hit', 'Reuse must record only the missing market occupancy cost';
+  assert v_saved.str_enrichment_json->'market_occupancy'=v_market_occupancy, 'Market occupancy snapshot and its own timestamp must be retained exactly';
   assert exists(select 1 from public.str_appraisals where report_id=v_saved.id and agency_id=v_agency), 'New draft must open in the existing STR editor';
   assert (select report_id=v_saved.id from public.str_calculator_leads where id=v_lead), 'Lead must link the draft';
   assert (select count(*)=v_listing_count+1 from public.listings) and (select count(*)=v_report_count+1 from public.reports), 'Only one property/report created';
@@ -74,10 +82,41 @@ begin
   v_retry := public.create_str_calculator_lead_report(v_agency,v_lead,v_user,null,null);
   assert v_retry->>'report_id'=v_result->>'report_id' and v_retry->>'created'='false', 'Replay must return the same report';
   assert (select to_jsonb(r)=v_edited from public.reports r where id=v_saved.id), 'Replay must not overwrite any edits or publication';
+  v_retry := public.create_str_calculator_lead_report(v_agency,v_lead,v_user,'classic-detailed',jsonb_set(v_draft,'{enrichment,market_occupancy}','{"cost_cents":99,"replacement":true}'));
+  assert v_retry->>'report_id'=v_result->>'report_id' and v_retry->>'created'='false', 'A replay with new evidence must return the existing report';
+  assert (select to_jsonb(r)=v_edited from public.reports r where id=v_saved.id), 'Replay must not replace saved evidence, costs, edits or publication';
   assert (select count(*)=v_listing_count+1 from public.listings), 'Replay must not create another property';
   assert (select count(*)=count(distinct (agency_id,public_slug)) from public.listings), 'Draft slugs must be unique within an agency';
   assert (select to_jsonb(r)=v_original_report from public.reports r where id='40000000-0000-4000-8000-000000000001'), 'Existing report changed';
   assert (select to_jsonb(l)=v_original_listing from public.listings l where id='30000000-0000-4000-8000-000000000001'), 'Existing property changed';
+
+  -- Missing, malformed and negative market costs never inherit the caller's
+  -- top-level calculator cost. Cached/legacy clients retain a zero-cost reuse.
+  for v_cost_case in select value from jsonb_array_elements('[
+    {"expected":0},
+    {"market":null,"expected":0},
+    {"market":{"cost_cents":null},"expected":0},
+    {"market":{"cost_cents":-7},"expected":0},
+    {"market":{"cost_cents":"7"},"expected":0},
+    {"market":{"cost_cents":true},"expected":0},
+    {"market":{"cost_cents":{}},"expected":0},
+    {"market":{"cost_cents":[]},"expected":0},
+    {"market":{"cost_cents":0},"expected":0},
+    {"market":{"cost_cents":1.25},"expected":1.25}
+  ]'::jsonb) loop
+    v_draft := jsonb_set(v_draft,'{enrichment}',jsonb_build_object('provider','airroi','fetched_at',v_fetched,'cost_cents',99));
+    if v_cost_case ? 'market' then
+      v_draft := jsonb_set(v_draft,'{enrichment,market_occupancy}',v_cost_case->'market');
+    end if;
+    insert into public.str_calculator_leads(agency_id,widget_id,request_id,input_hash,client_hash,address,bedrooms,email,country,input_json,original_estimate_json,estimate_json,status,consent_version,consent_text,completed_at)
+      values(v_agency,'50000000-0000-4000-8000-000000000001',gen_random_uuid(),'cost-hash','cost-client','24 Beach Road, Bondi NSW 2026, Australia',3,'cost@example.com','AU','{"bathrooms":1.5}',v_raw,'{"annualRevenue":60000}','estimated','v1','Consent',now()) returning id into v_lead;
+    v_result := public.create_str_calculator_lead_report(v_agency,v_lead,v_user,'classic-detailed',v_draft);
+    select * into v_saved from public.reports where id=(v_result->>'report_id')::uuid;
+    assert v_result->>'estimate_reused'='true', 'Cost validation must not discard a valid calculator snapshot';
+    assert v_saved.str_enrichment_json->'cost_cents'=v_cost_case->'expected', 'Only a nonnegative numeric market cost is counted';
+    assert (v_saved.str_enrichment_json->'market_occupancy') is not distinct from (v_cost_case->'market'), 'Cost validation must not mutate nested evidence';
+    assert v_saved.original_estimate_json=v_draft->'original_estimate' and v_saved.final_estimate_json=v_draft->'final_estimate', 'Cost validation must not alter estimates or comparables';
+  end loop;
 
   -- Recent enquiries must not extend expired provider data. The SQL boundary
   -- rejects a stale seed even if an application caller submits one accidentally.

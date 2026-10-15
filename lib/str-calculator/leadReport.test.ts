@@ -1,11 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Agency } from "@/lib/types";
 
-const mocks = vi.hoisted(() => ({ templates: vi.fn(), admin: vi.fn() }));
+const mocks = vi.hoisted(() => ({ templates: vi.fn(), admin: vi.fn(), occupancy: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.admin }));
 vi.mock("@/lib/templates/resolveAvailableTemplates", () => ({ resolveAvailableTemplates: mocks.templates }));
+vi.mock("@/lib/airroi/marketOccupancy", () => ({ fetchAirroiMarketOccupancy: mocks.occupancy }));
 import { calculatorLeadReportDraft, createReportFromCalculatorLead, type CalculatorReportLead } from "./leadReport";
 
 const now = Date.parse("2026-10-15T00:00:00.000Z");
@@ -23,7 +24,14 @@ const lead: CalculatorReportLead = { id: "lead-a", agency_id: agency.id, report_
   bedrooms: 3, country: "AU", status: "estimated", input_json: { bathrooms: 1.5 }, original_estimate_json: raw,
   completed_at: "2026-10-14T00:00:00.000Z" };
 
-beforeEach(() => { vi.clearAllMocks(); mocks.templates.mockResolvedValue({ defaultTemplateId: "standard-2-page" }); });
+const marketOccupancy = { status: "available", cost_cents: 11, fetched_at: "2026-10-15T00:00:00Z", months: [{ month: "2026-09", average: 55 }] };
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.spyOn(Date, "now").mockReturnValue(now);
+  mocks.templates.mockResolvedValue({ defaultTemplateId: "standard-2-page" });
+  mocks.occupancy.mockResolvedValue(marketOccupancy);
+});
+afterEach(() => { vi.restoreAllMocks(); });
 
 describe("calculator lead draft snapshot", () => {
   it("reuses the full fresh baseline and exact inputs with original provenance at zero new provider cost", () => {
@@ -104,17 +112,34 @@ describe("calculator lead report orchestration", () => {
     expect(db.query.eq).toHaveBeenCalledWith("agency_id", agency.id);
     expect(db.rpc).toHaveBeenCalledWith("create_str_calculator_lead_report", expect.objectContaining({ p_agency_id: agency.id, p_lead_id: lead.id, p_user_id: "user-a", p_template_id: "standard-2-page" }));
     expect(db.from).toHaveBeenCalledExactlyOnceWith("str_calculator_leads");
+    expect(mocks.occupancy).toHaveBeenCalledExactlyOnceWith(input, expect.objectContaining({ country: "Australia", state: "NSW", suburb: "Sydney" }));
+    const draft = db.rpc.mock.calls[0][1].p_draft;
+    const baseline = calculatorLeadReportDraft(lead, agency, now);
+    expect(draft).toEqual({ ...baseline, enrichment: { ...baseline.enrichment, market_occupancy: marketOccupancy, cost_cents: 11 } });
+    expect(mocks.occupancy.mock.invocationCallOrder[0]).toBeLessThan(db.rpc.mock.invocationCallOrder[0]);
   });
   it("reopens an existing linked report without recalculating its snapshot or resolving current templates", async () => {
     const db = database({ ...lead, report_id: "fedbeef0-607a-4b42-8888-9cc63ab8b89b", original_estimate_json: null });
     await createReportFromCalculatorLead({ leadId: lead.id, agency, userId: "user-a", admin: db.admin });
     expect(mocks.templates).not.toHaveBeenCalled();
+    expect(mocks.occupancy).not.toHaveBeenCalled();
     expect(db.rpc).toHaveBeenCalledWith("create_str_calculator_lead_report", expect.objectContaining({ p_template_id: null, p_draft: null }));
   });
   it("returns not-found for another agency's lead before any write", async () => {
     const db = database(null);
     await expect(createReportFromCalculatorLead({ leadId: lead.id, agency, userId: "user-a", admin: db.admin })).rejects.toMatchObject({ status: 404 });
     expect(db.rpc).not.toHaveBeenCalled();
+    expect(mocks.occupancy).not.toHaveBeenCalled();
+  });
+  it.each([
+    { ...lead, status: "failed" as const, original_estimate_json: null },
+    { ...lead, original_estimate_json: { ...raw, fetched_at: "2026-09-01T00:00:00Z" } },
+    { ...lead, original_estimate_json: { ...raw, response: { revenue: 60000 } } },
+  ])("does not fetch market evidence when a new draft cannot reuse its baseline", async (value) => {
+    const db = database(value);
+    await createReportFromCalculatorLead({ leadId: lead.id, agency, userId: "user-a", admin: db.admin });
+    expect(mocks.occupancy).not.toHaveBeenCalled();
+    expect(db.rpc.mock.calls[0][1].p_draft.enrichment).toBeNull();
   });
   it("does not retry failed writes or return private database errors", async () => {
     const db = database();
