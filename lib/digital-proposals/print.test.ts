@@ -18,6 +18,25 @@ function fixture(): ProposalSnapshot {
 const render = (snapshot: ProposalSnapshot) => new DOMParser().parseFromString(proposalPrintHtml(snapshot), "text/html");
 
 describe("proposal print pages", () => {
+  it("shows initials when an agent photo is missing or fails to load without losing contact details", () => {
+    const snapshot = fixture();
+    snapshot.data.agents = [
+      { name: "Cameron Mercer", role: "Agent", email: "agent@example.com", phone: "0412345678", photoUrl: "https://example.com/expired.jpg" },
+      { name: "Taylor Lee", role: "Agent", email: "taylor@example.com", phone: "", photoUrl: "" },
+    ];
+    const before = structuredClone(snapshot);
+    const document = render(snapshot);
+    const avatars = [...document.querySelectorAll(".portrait")];
+    expect(avatars.map(node => node.textContent)).toEqual(["CM", "TL"]);
+    const failed = avatars[0].querySelector("img")!;
+    expect(failed.getAttribute("alt")).toBe("");
+    new Function(failed.getAttribute("onerror")!).call(failed);
+    expect(avatars[0].querySelector("img")).toBeNull();
+    expect(avatars[0].textContent).toBe("CM");
+    expect(avatars[1].querySelector("img")).toBeNull();
+    expect(document.querySelector(".contacts")?.textContent).toContain("agent@example.com");
+    expect(snapshot).toEqual(before);
+  });
   it.each(["1 Jul 2026", "2026-07-01T00:00:00+10:00"])("preserves a sold calendar date in the PDF: %s", soldDate => {
     const f = createLintRegressionFixtures();
     const data = proposalFromAppraisalReport(f.sales.final_report_json!, "sales");
