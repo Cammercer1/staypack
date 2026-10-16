@@ -15,6 +15,9 @@ import { applyDocumentLinkDraft, documentLinkSchema } from "@/lib/documents/docu
 import { generateQrCodeDataUrl } from "@/lib/reports/qr";
 import { buildBusinessCardDocument } from "@/lib/collateral/buildBusinessCardDocument";
 import { createPlaygroundSalesBrochureDocument } from "@/lib/collateral/sales-brochure/playgroundFixture";
+import { defaultAssignment } from "@/lib/digital-proposals/assignment";
+import { proposalFromReport } from "@/lib/digital-proposals/data";
+import type { ProposalDraft } from "@/lib/digital-proposals/template";
 import type { Agency, AgentProfile, CollateralItem, LeadWithListing, Listing, Report } from "@/lib/types";
 
 /** Synthetic records only. Never load an account or listing in this playground. */
@@ -95,6 +98,8 @@ export type RegressionFixtures = ReturnType<typeof createLintRegressionFixtures>
 export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: (label: string) => void, draftAppraisal?: "lease" | "sales" | "sales_brochure" | "rental_brochure" | "str") {
   const original = window.fetch;
   const data = structuredClone(fixtures);
+  let proposalDraft: ProposalDraft | null = null;
+  let proposalRevision = 0;
   if (draftAppraisal === "str") data.report = { ...data.report, template_id: null, original_estimate_json: null, user_overrides_json: null, final_estimate_json: null, ai_copy_json: null, final_report_json: null, str_enrichment_json: null, status: "draft" };
   if (draftAppraisal === "lease" || draftAppraisal === "sales") data[draftAppraisal] = { ...data[draftAppraisal], template_id: null, final_report_json: null, status: "draft" };
   if (draftAppraisal === "sales_brochure" || draftAppraisal === "rental_brochure") {
@@ -116,6 +121,21 @@ export function installRegressionMocks(fixtures: RegressionFixtures, onRequest: 
       return Response.json({ templates, default_template_id: templates[0]?.id });
     }
     if (url.pathname === "/api/str/contacts") return Response.json({ contacts: [] });
+    if (url.pathname === "/api/clients") return Response.json({ clients: [], total: 0, page: 1, pageSize: 25 });
+    if (url.pathname === "/api/str/appraisals/mock-report/proposal/activity") return Response.json({ opens: 0, lastOpened: null, items: [] });
+    if (url.pathname === "/api/str/appraisals/mock-report/proposal") {
+      if (method === "PUT") {
+        if (body.revision !== proposalRevision) return Response.json({ error: "Proposal changed. Reload before editing." }, { status: 409 });
+        proposalDraft = body.draft;
+        proposalRevision += 1;
+        return Response.json({ draft: proposalDraft, revision: proposalRevision });
+      }
+      const final = buildFinalReportJson({ agency: data.agency, agencyAgents: [data.agent], listing: data.listing,
+        report: data.report, estimate: data.report.final_estimate_json!, copy: data.report.ai_copy_json ?? getMockAiCopy(data.listing, data.agency) });
+      return Response.json({ assignment: defaultAssignment(data.agency), draft: proposalDraft, revision: proposalRevision,
+        sourceFingerprint: `${data.report.updated_at}:${data.appraisal.updated_at}`, attachments: [], versions: [], availableAgents: [],
+        data: proposalFromReport(final, data.appraisal.recipient_mode === "named" ? data.appraisal.recipient_name : null), needsEvidenceReview: false });
+    }
     if (url.pathname === "/api/str/appraisals/mock-report" && method === "PATCH") {
       if (body.expected_updated_at !== data.appraisal.updated_at) return Response.json({ error: "Customer details have changed. Reload before editing." }, { status: 409 });
       data.appraisal = { ...data.appraisal, recipient_mode: body.recipient.mode, recipient_name: body.recipient.name || null, recipient_email: body.recipient.email || null, recipient_phone: body.recipient.phone || null, updated_at: new Date().toISOString() };

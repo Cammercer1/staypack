@@ -47,17 +47,18 @@ test("brochure copy edits save and survive a preview refresh", async ({ page }) 
   const editable = page.locator('[contenteditable="true"]').first();
   await expect(editable).toBeVisible();
   await editable.fill("Mock saved heading");
-  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await page.getByRole("button", { name: "Save & preview", exact: true }).click();
   await expect(page.getByTestId("mock-requests")).toContainText("PATCH /api/collateral/mock-collateral");
   await expect(editable).toHaveText("Mock saved heading");
 });
 
 test("wizard moves between content and preview without losing its document", async ({ page }) => {
   await openCase(page, "wizard");
-  await expect(page.getByRole("tab", { name: "Preview & publish" })).toBeVisible();
-  await page.getByRole("tab", { name: "Content generation" }).click();
+  await expect(page.getByRole("tab", { name: "Download & share" })).toBeVisible();
+  await page.getByRole("tab", { name: "Edit brochure" }).click();
   await expect(page.locator('[contenteditable="true"]').first()).toBeVisible();
-  await page.getByRole("tab", { name: "Preview & publish" }).click();
+  await page.getByRole("tab", { name: "Download & share" }).click();
+  await page.getByRole("button", { name: "Preview brochure", exact: true }).click();
   await expect(page.locator(".report-page").first()).toBeVisible();
 });
 
@@ -101,17 +102,24 @@ test("landing template selection resets on cancel and persists on save", async (
   await expect(page.getByTestId("mock-requests")).toContainText("PATCH /api/listings/mock-listing");
 });
 
-test("listing agent draft cancels cleanly and edited details save", async ({ page }) => {
+test("listing agent assignments discard cleanly and save", async ({ page }) => {
   await openCase(page, "agents");
-  await page.getByRole("button", { name: /^H Harvey Specter/ }).click();
-  await page.locator("#strip-agent-name").fill("Unsaved name");
-  await closeDialog(page);
-  await page.getByRole("button", { name: /^H Harvey Specter/ }).click();
-  await expect(page.locator("#strip-agent-name")).toHaveValue("Harvey Specter");
-  await page.locator("#strip-agent-name").fill("Mock Updated Agent");
-  await page.getByRole("button", { name: "Save agent" }).click();
-  await expect(page.getByRole("button", { name: /^M Mock Updated Agent/ })).toBeVisible();
+  await page.getByRole("button", { name: "Manage agents", exact: true }).click();
+  await page.getByRole("button", { name: "Remove Harvey Specter from listing", exact: true }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("dialog", { name: "Discard agent changes?" }).getByRole("button", { name: "Discard changes" }).click();
+  await expect(page.getByRole("button", { name: /Harvey Specter$/ })).toBeVisible();
+  await page.getByRole("button", { name: "Manage agents", exact: true }).click();
+  await page.getByRole("button", { name: "Remove Harvey Specter from listing", exact: true }).click();
+  await page.getByRole("button", { name: "Save agents", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Manage listing agents" })).not.toBeVisible();
+  await expect(page.getByRole("button", { name: /Harvey Specter$/ })).toHaveCount(0);
   await expect(page.getByTestId("mock-requests")).toContainText("PATCH /api/listings/mock-listing");
+  await page.getByRole("button", { name: "Manage agents", exact: true }).click();
+  await page.getByRole("dialog", { name: "Manage listing agents" }).getByRole("button", { name: /Harvey Specter/ }).click();
+  await page.getByRole("button", { name: "Save agents", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Manage listing agents" })).not.toBeVisible();
+  await expect(page.getByRole("button", { name: /Harvey Specter$/ })).toBeVisible();
 });
 
 test("unknown-agent dialog resets saved and skipped choices when reopened", async ({ page }) => {
@@ -142,13 +150,13 @@ test("brand dialog cancels and saves, and font search clears stale results", asy
   await page.getByRole("button", { name: "Advanced settings", exact: true }).click();
   await expect(page.locator("#adv_button_bg")).toHaveValue("#123456");
   await closeDialog(page);
-  const search = page.getByPlaceholder("Type 2+ letters to search Google Fonts").first();
+  const search = page.getByPlaceholder("Search Google Fonts…").first();
   await search.fill("Mock");
-  await expect(page.getByRole("button", { name: "Mock Sans", exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Mock Sans", exact: true })).toBeVisible();
   await search.fill("M");
-  await expect(page.getByRole("button", { name: "Mock Sans", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("option", { name: "Mock Sans", exact: true })).toHaveCount(0);
   await search.fill("Mock");
-  await page.getByRole("button", { name: "Mock Sans", exact: true }).click();
+  await page.getByRole("option", { name: "Mock Sans", exact: true }).click();
   await expect(search).toHaveValue("");
 });
 

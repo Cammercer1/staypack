@@ -20,39 +20,53 @@ test.afterEach(async ({ page }) => {
 async function openCase(page: Page, name: string) {
   await page.getByLabel("Test screen").selectOption(name);
 }
+async function openLinkEditor(page: Page) {
+  await page.getByRole("button", { name: "Edit link & QR", exact: true }).click();
+  return page.getByRole("form", { name: "Document link" });
+}
 async function saveCustomLink(page: Page, url: string) {
-  const form = page.getByRole("form", { name: "Document link" });
+  const form = await openLinkEditor(page);
   await form.getByLabel("Destination").selectOption("custom");
   await form.getByLabel("Website URL").fill(url);
   await form.getByRole("button", { name: "Save link choice" }).click();
-  await expect(form.getByRole("button", { name: "Save link choice" })).toBeDisabled();
+  await expect(page.getByRole("dialog", { name: "Link and QR code" })).not.toBeVisible();
+  await expect(page.getByText(url, { exact: true })).toBeVisible();
 }
+const publish = (page: Page) => page.getByRole("button", { name: /^(Publish|Update) online (report|brochure)$/, includeHidden: true });
 
 for (const [screen, id] of [["report-wizard", "mock-report"], ["lease-wizard", "mock-lease"], ["sales-wizard", "mock-sales"]]) {
   test(`${screen}: defaults off, saves a custom destination and publishes it`, async ({ page }) => {
     await openCase(page, screen);
-    const form = page.getByRole("form", { name: "Document link" });
+    await expect(page.getByText("No link or QR code", { exact: true })).toBeVisible();
+    const form = await openLinkEditor(page);
     await expect(form.getByLabel("Destination")).toHaveValue("none");
     await form.getByLabel("Destination").selectOption("custom");
-    await expect(page.getByRole("button", { name: /^Publish (report|appraisal)$/ })).toBeDisabled();
+    await expect(publish(page)).toBeDisabled();
     const url = `https://example.test/${id}`;
-    await saveCustomLink(page, url);
-    await expect(form).toContainText("Saved for the next publication");
-    await page.getByRole("button", { name: /^Publish (report|appraisal)$/ }).click();
+    await form.getByLabel("Website URL").fill(url);
+    await form.getByRole("button", { name: "Save link choice" }).click();
+    await expect(page.getByRole("dialog", { name: "Link and QR code" })).not.toBeVisible();
+    await expect(page.getByText(/Saved for your next (publication|PDF)\./)).toBeVisible();
+    await publish(page).click();
     await expect(page.getByTestId("mock-requests")).toContainText(`PUBLISHED ${id} {"mode":"custom","url":"${url}"}`);
+    await expect(page.getByText(/Saved for your next (publication|PDF)\./)).not.toBeVisible();
+    // Online publication and PDF preparation are separate actions.
+    await expect(page.getByTestId("mock-requests")).not.toContainText(`POST /api/reports/${id}/generate-pdf`);
+    await page.getByRole("button", { name: "Prepare PDF", exact: true }).click();
     await expect(page.getByTestId("mock-requests")).toContainText(`POST /api/reports/${id}/generate-pdf`);
-    await expect(form).not.toContainText("Saved for the next publication");
+    await expect(page.getByRole("link", { name: "Download PDF", exact: true })).toBeVisible();
   });
   test(`${screen}: can choose its own online report then turn QR off`, async ({ page }) => {
     await openCase(page, screen);
-    const form = page.getByRole("form", { name: "Document link" });
+    let form = await openLinkEditor(page);
     await form.getByLabel("Destination").selectOption("report");
     await form.getByRole("button", { name: "Save link choice" }).click();
-    await expect(form).toContainText("Saved for the next publication");
+    await expect(page.getByText("This report online", { exact: true })).toBeVisible();
+    form = await openLinkEditor(page);
     await form.getByLabel("Destination").selectOption("none");
     await form.getByRole("button", { name: "Save link choice" }).click();
-    await expect(form.getByRole("button", { name: "Save link choice" })).toBeDisabled();
-    await page.getByRole("button", { name: /^Publish (report|appraisal)$/ }).click();
+    await expect(page.getByRole("dialog", { name: "Link and QR code" })).not.toBeVisible();
+    await publish(page).click();
     await expect(page.getByTestId("mock-requests")).toContainText(`PUBLISHED ${id} {"mode":"none"}`);
   });
 }
@@ -60,13 +74,14 @@ for (const [screen, id] of [["report-wizard", "mock-report"], ["lease-wizard", "
 test("brochure: custom URL survives publishing and can be removed on republish", async ({ page }) => {
   await openCase(page, "wizard");
   await saveCustomLink(page, "https://example.test/brochure");
-  await page.getByRole("button", { name: /publish brochure/i }).click();
+  await publish(page).click();
   await expect(page.getByTestId("mock-requests")).toContainText('PUBLISHED mock-collateral {"mode":"custom","url":"https://example.test/brochure"}');
-  await expect(page.getByRole("link", { name: "Download asset" })).toBeVisible();
-  const form = page.getByRole("form", { name: "Document link" });
+  await expect(page.getByLabel("Shareable link", { exact: true })).toHaveValue("https://example.test/brochure");
+  const form = await openLinkEditor(page);
   await form.getByLabel("Destination").selectOption("none");
   await form.getByRole("button", { name: "Save link choice" }).click();
-  await page.getByRole("button", { name: /publish brochure/i }).click();
+  await expect(page.getByRole("dialog", { name: "Link and QR code" })).not.toBeVisible();
+  await publish(page).click();
   await expect(page.getByTestId("mock-requests")).toContainText('PUBLISHED mock-collateral {"mode":"none"}');
 });
 
@@ -84,28 +99,33 @@ test("business card has its own destination and no property picker", async ({ pa
   await openCase(page, "business-card");
   await expect(page.getByLabel("Property listing", { exact: true })).toHaveCount(0);
   await saveCustomLink(page, "https://example.test/agent");
-  await expect(page.getByLabel("Website URL")).toHaveValue("https://example.test/agent");
+  const form = await openLinkEditor(page);
+  await expect(form.getByLabel("Website URL")).toHaveValue("https://example.test/agent");
+  await form.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByTestId("mock-requests")).toContainText("PATCH /api/collateral/mock-card");
-  await expect(page.getByLabel("Website URL")).toHaveValue("https://example.test/agent");
+  await expect(page.getByText("https://example.test/agent", { exact: true })).toBeVisible();
 });
 
 test("link editor remains usable on a narrow screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openCase(page, "report-wizard");
   await saveCustomLink(page, "https://example.test/mobile");
-  await expect(page.getByRole("form", { name: "Document link" })).toBeVisible();
-  await expect(page.getByLabel("Website URL")).toHaveValue("https://example.test/mobile");
+  const form = await openLinkEditor(page);
+  await expect(form.getByLabel("Website URL")).toHaveValue("https://example.test/mobile");
+  const bounds = await page.getByRole("dialog", { name: "Link and QR code" }).boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
 });
 
 test("invalid destinations and a failed save keep publishing blocked until a successful retry", async ({ page }) => {
   await openCase(page, "report-wizard");
-  const form = page.getByRole("form", { name: "Document link" });
+  const form = await openLinkEditor(page);
   await form.getByLabel("Destination").selectOption("custom");
   await form.getByLabel("Website URL").fill("javascript:alert(1)");
   await form.getByRole("button", { name: "Save link choice" }).click();
   await expect(form.getByRole("alert")).toContainText("valid http or https");
-  await expect(page.getByRole("button", { name: "Publish report", exact: true })).toBeDisabled();
+  await expect(publish(page)).toBeDisabled();
   await expect(page.getByTestId("mock-requests")).not.toContainText("/link");
   await page.evaluate(() => {
     const mockFetch = window.fetch;
@@ -121,8 +141,9 @@ test("invalid destinations and a failed save keep publishing blocked until a suc
   await form.getByLabel("Website URL").fill("https://example.test/retry");
   await form.getByRole("button", { name: "Save link choice" }).click();
   await expect(form.getByRole("alert")).toContainText("Synthetic save conflict");
-  await expect(page.getByRole("button", { name: "Publish report", exact: true })).toBeDisabled();
+  await expect(publish(page)).toBeDisabled();
   await form.getByRole("button", { name: "Save link choice" }).click();
-  await expect(form).toContainText("Saved for the next publication");
-  await expect(page.getByRole("button", { name: "Publish report", exact: true })).toBeEnabled();
+  await expect(page.getByRole("dialog", { name: "Link and QR code" })).not.toBeVisible();
+  await expect(page.getByText(/Saved for your next (publication|PDF)\./)).toBeVisible();
+  await expect(publish(page)).toBeEnabled();
 });
