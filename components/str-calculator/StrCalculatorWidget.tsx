@@ -141,7 +141,7 @@ export function StrCalculatorWidget({ brand, country, token, preview = false, as
           <p className="mt-2 text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">{calculatorMoney(estimate.annualRevenue, estimate.currency)}<span className="ml-2 text-sm font-normal tracking-normal">{estimate.currency} / year</span></p>
           <p className="mt-2 text-sm text-base-content/75">Approximately {calculatorMoney(estimate.monthlyRevenue, estimate.currency)} per month, before expenses.</p>
         </div>
-        <p className="text-xs leading-5 text-base-content/75">Based on an entire home with {estimate.bedrooms === 0 ? "a studio layout" : `${estimate.bedrooms} bedrooms`}, {estimate.bathrooms} bathroom{estimate.bathrooms === 1 ? "" : "s"}, up to {estimate.guests} guests and comparable properties within approximately 2 km. Actual suitability and local rules need to be checked.</p>
+        <p className="text-xs leading-5 text-base-content/75">Based on an entire home with {estimate.bedrooms === 0 ? "a studio layout" : `${estimate.bedrooms} bedroom${estimate.bedrooms === 1 ? "" : "s"}`}, {estimate.bathrooms} bathroom{estimate.bathrooms === 1 ? "" : "s"}, up to {estimate.guests} guests and comparable properties within approximately 2 km. Actual suitability and local rules need to be checked.</p>
       </div>}
       {!preview && !estimate && <footer className="mt-7 border-t border-base-300 pt-4"><p className="text-xs leading-5 text-base-content/70">Estimate only. Actual performance varies. Revenue is before operating expenses and is not guaranteed.</p></footer>}
     </div>
