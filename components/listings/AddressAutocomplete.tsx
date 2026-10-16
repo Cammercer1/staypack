@@ -144,7 +144,7 @@ export function AddressAutocomplete({ country: requestedCountry, allowListingUrl
         aria-activedescendant={expanded && active >= 0 ? `${id}-suggestion-${active}` : undefined}
         aria-describedby={`${id}-status${error ? ` ${id}-error` : ""}`} value={value} disabled={disabled || resolving}
         autoComplete="off" required minLength={5} maxLength={allowListingUrl ? 2000 : 300}
-        placeholder={compact ? "Property address" : allowListingUrl ? "Type an address or paste a Zillow link…" : "Start typing a property address…"} className={compact ? "min-w-0 grow text-base" : "pr-10"}
+        placeholder={compact ? "Property address" : allowListingUrl ? country === "US" ? "Type an address or paste a Zillow link…" : "Type an address or paste a listing link…" : "Start typing a property address…"} className={compact ? "min-w-0 grow text-base" : "pr-10"}
         onChange={(event) => search(event.target.value)}
         onFocus={() => { focused.current = true; if (suggestions.length) setOpen(true); }}
         onBlur={() => { focused.current = false; setOpen(false); onBlur?.(); }}

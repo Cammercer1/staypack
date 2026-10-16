@@ -489,8 +489,10 @@ function CountryListingFlow({
             </div>
             <p className="text-xs text-muted-foreground">
               {mode === "address"
-                ? country === "US" || pastedUrl
+                ? country === "US"
                   ? "Paste a Zillow home link, or enter the street address, apartment number, city, state and ZIP code."
+                  : pastedUrl
+                  ? "Paste the full Australian property listing link. You’ll review the imported details next."
                   : "Include the unit number, then select an address to find the property."
                 : "Paste the full property listing link. You’ll review the imported details next."}
             </p>
