@@ -28,7 +28,7 @@ export function defaultAssignment(agency: Agency, kind: WorkspaceAppraisalKind =
   } };
 }
 export function applyAssignment(draft: ProposalDraft | null, assignment: ProposalAssignment): ProposalDraft {
-  const base = assignment.defaults;
+  const base = refreshProposalDraftDefaults(assignment.defaults);
   if (!draft) return structuredClone(base);
   const configured = new Map(base.pages.map(page => [page.id, page]));
   const pages = draft.pages.flatMap(page => {

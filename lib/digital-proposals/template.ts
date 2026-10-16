@@ -62,7 +62,10 @@ export type ProposalDraft = z.infer<typeof proposalDraftSchema>;
 /** Refresh retired default copy when opening an editable draft; never mutate published snapshots. */
 export function refreshProposalDraftDefaults(draft: ProposalDraft): ProposalDraft {
   return { ...draft,
-    content: { ...draft.content, comparisonTitle: draft.content.comparisonTitle === "Three ways to see the potential."
+    content: { ...draft.content,
+      introduction: draft.content.introduction === "Short-term rental property report"
+        ? "Short-term rental property appraisal" : draft.content.introduction,
+      comparisonTitle: draft.content.comparisonTitle === "Three ways to see the potential."
       ? "Your rental income potential" : draft.content.comparisonTitle },
     pages: draft.pages.map(page => page.kind === "evidence" && page.title === "Supporting evidence"
     ? { ...page, title: "Comparable listings" } : page) };
@@ -72,7 +75,7 @@ export const DEFAULT_PROPOSAL_DRAFT: ProposalDraft = {
   version: 1, templateId: "editorial-base", templateVersion: 1, presetId: "staypack", brandOverrides: {},
   content: {
     title: "{{property.address}}",
-    introduction: "Short-term rental property report",
+    introduction: "Short-term rental property appraisal",
     recipientLine: "Prepared for {{recipient.displayName}}",
     comparisonTitle: "Your rental income potential",
   },

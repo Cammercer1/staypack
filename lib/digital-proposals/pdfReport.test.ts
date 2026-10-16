@@ -30,6 +30,7 @@ describe("Havenly proposal PDF snapshot", () => {
     expect(snapshot.pdfReport?.recipient).toEqual(snapshot.data.recipient);
     expect(snapshot.pdfReport?.recipient).toEqual({ displayName: "Jordan Taylor" });
     expect(proposalPrintHtml(snapshot)).toContain("Prepared for Jordan Taylor");
+    expect(proposalPrintHtml(snapshot)).toContain(`${kind === "str" ? "Short-term rental property appraisal" : kind === "lease" ? "Lease appraisal" : "Sales appraisal"} Prepared for Jordan Taylor`);
     expect(withPdfAgents(pdfReport, []).recipient).toEqual(data.recipient);
     expect(source).toEqual(original);
     data.recipient!.displayName = "Updated client";

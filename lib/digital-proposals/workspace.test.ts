@@ -9,12 +9,16 @@ describe("proposal pages and documents", () => {
     const legacy = structuredClone(DEFAULT_PROPOSAL_DRAFT);
     legacy.pages[3].title = "Supporting evidence";
     legacy.content.comparisonTitle = "Three ways to see the potential.";
+    legacy.content.introduction = "Short-term rental property report";
     expect(refreshProposalDraftDefaults(legacy).pages[3].title).toBe("Comparable listings");
     expect(refreshProposalDraftDefaults(legacy).content.comparisonTitle).toBe("Your rental income potential");
+    expect(refreshProposalDraftDefaults(legacy).content.introduction).toBe("Short-term rental property appraisal");
     expect(proposalDraftSchema.parse(legacy).pages[3].title).toBe("Supporting evidence");
     expect(proposalDraftSchema.parse(legacy).content.comparisonTitle).toBe("Three ways to see the potential.");
+    expect(proposalDraftSchema.parse(legacy).content.introduction).toBe("Short-term rental property report");
     legacy.pages[3].title = "Selected properties for {{recipient.displayName}}";
     legacy.content.comparisonTitle = "Rental estimates for {{recipient.displayName}}";
+    legacy.content.introduction = "Property report for {{recipient.displayName}}";
     expect(refreshProposalDraftDefaults(legacy)).toEqual(legacy);
   });
   it("accepts the browser-facing host behind a proxy but rejects foreign origins", () => {

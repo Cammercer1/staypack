@@ -4,6 +4,7 @@ import { applyAssignment, assignmentBrand, defaultAssignment } from "./assignmen
 import { createProposalFixture } from "./fixtures";
 import { proposalSnapshotSchema } from "./workspace";
 import { resolveTokenText } from "./tokens";
+import { proposalPrintHtml } from "./print";
 
 const { agency } = createLintRegressionFixtures();
 
@@ -12,9 +13,25 @@ it.each(["str", "lease", "sales"] as const)("uses property and customer tokens i
   const draft = applyAssignment(null, assignment);
   const data = { ...createProposalFixture(), recipient: { displayName: "Jordan Taylor" } };
   expect(resolveTokenText(draft.content.title, data).text).toBe(data.property.address);
-  expect(draft.content.introduction).toBe(kind === "str" ? "Short-term rental property report" : kind === "lease" ? "Lease appraisal" : "Sales appraisal");
+  expect(draft.content.introduction).toBe(kind === "str" ? "Short-term rental property appraisal" : kind === "lease" ? "Lease appraisal" : "Sales appraisal");
   expect(resolveTokenText(draft.content.recipientLine, data).text).toBe("Prepared for Jordan Taylor");
   expect(resolveTokenText(draft.content.recipientLine, { ...data, recipient: null }).text).toBe("");
+});
+
+it("refreshes the retired STR cover wording in new and editable drafts with saved account defaults", () => {
+  const assignment = structuredClone(defaultAssignment(agency));
+  assignment.defaults.content.introduction = "Short-term rental property report";
+  const draft = structuredClone(assignment.defaults);
+  for (const input of [null, draft]) {
+    expect(applyAssignment(input, assignment).content.introduction).toBe("Short-term rental property appraisal");
+  }
+  expect(assignment.defaults.content.introduction).toBe("Short-term rental property report");
+  expect(draft.content.introduction).toBe("Short-term rental property report");
+  const snapshot = proposalSnapshotSchema.parse({ version: 1, data: createProposalFixture(), draft,
+    brand: assignmentBrand(assignment), attachments: [] });
+  expect(snapshot.draft.content.introduction).toBe("Short-term rental property report");
+  expect(proposalPrintHtml(snapshot)).toContain("Short-term rental property report");
+  expect(proposalPrintHtml(snapshot)).not.toContain("Short-term rental property appraisal");
 });
 
 it("enforces client cover copy while retaining draft page choices, contacts and resources", () => {
