@@ -142,7 +142,7 @@ export function buildLeaseAppraisalReport({
       property_type: listing.property_type ?? parsed.propertyType ?? "",
       bedrooms: listing.bedrooms ?? parsed.bedrooms ?? 0,
       bathrooms: listing.bathrooms ?? parsed.bathrooms ?? 0,
-      car_spaces: listing.car_spaces ?? parsed.carSpaces ?? 0,
+      car_spaces: listing.car_spaces ?? parsed.carSpaces ?? null,
       accommodates: calculateAccommodates(
         listing.bedrooms ?? parsed.bedrooms,
         listing.accommodates,

@@ -161,7 +161,7 @@ export function ReportWizard({
     updateListing(currentListing);
     const context = strPropertyContextSchema.parse(values);
     const contextChanged = JSON.stringify(context) !== JSON.stringify(current.user_overrides_json?.strProperty);
-    const parkingSnapshotChanged = current.final_report_json && current.final_report_json.property.car_spaces !== (values.car_spaces ?? 0);
+    const parkingSnapshotChanged = current.final_report_json && current.final_report_json.property.car_spaces !== (values.car_spaces ?? null);
     if (contextChanged || parkingSnapshotChanged) {
       const saved = await reportRequest<{ report: Report }>(
         `/api/reports/${current.id}`,

@@ -298,7 +298,7 @@ export type BrochurePropertySlice = {
   property_type: string;
   bedrooms: number;
   bathrooms: number;
-  car_spaces: number;
+  car_spaces: number | null;
   land_area_sqm: number | null;
   display_price: string;
   hero_image_url: string;

@@ -129,7 +129,7 @@ export function buildFinalReportJson({
       property_type: listing.property_type ?? "",
       bedrooms: listing.bedrooms ?? 0,
       bathrooms: listing.bathrooms ?? 0,
-      car_spaces: listing.car_spaces ?? 0,
+      car_spaces: listing.car_spaces ?? null,
       accommodates: calculateAccommodates(
         listing.bedrooms,
         listing.accommodates,

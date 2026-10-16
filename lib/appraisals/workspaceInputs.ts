@@ -18,7 +18,7 @@ export const appraisalPropertySchema = z.object({
   property_address: z.string().trim().min(1).max(300), suburb: z.string().trim().min(1).max(120),
   state: z.string().trim().min(2).max(30), postcode: z.string().trim().min(3).max(12),
   property_type: z.string().trim().min(1).max(80), bedrooms: z.number().int().min(1).max(50),
-  bathrooms: z.number().min(0).max(50), car_spaces: z.number().int().min(0).max(50),
+  bathrooms: z.number().min(0).max(50), car_spaces: z.number().int().min(0).max(50).nullable(),
   listing_description: z.string().max(12000).nullable().optional(),
   hero_image_url: z.string().url().optional(),
 }).strict();

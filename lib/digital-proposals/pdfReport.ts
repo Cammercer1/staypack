@@ -28,7 +28,7 @@ export const proposalPdfReportSchema = z.object({
   }),
   property: z.object({
     address: z.string(), suburb: z.string(), state: z.string(), postcode: z.string(), summary: z.string(), property_type: z.string(),
-    bedrooms: z.number(), bathrooms: z.number(), car_spaces: z.number(), accommodates: z.number(), listing_url: assetUrlSchema,
+    bedrooms: z.number(), bathrooms: z.number(), car_spaces: z.number().nullable(), accommodates: z.number(), listing_url: assetUrlSchema,
     hero_image_url: assetUrlSchema, selected_image_urls: z.array(assetUrlSchema), estimated_value: figure.optional(), display_price: z.string().nullable().optional(), land_area_sqm: figure.optional(), floor_area_sqm: figure.optional(),
   }),
   str: z.object({ annual_revenue: figure, monthly_revenue: figure, weekly_revenue: figure, nightly_rate: figure, occupancy_rate: figure, booked_nights: figure, radius_m: figure }),

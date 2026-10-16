@@ -615,7 +615,8 @@ export type FinalReportJson = import("@/lib/documents/documentLink").DocumentLin
     property_type: string;
     bedrooms: number;
     bathrooms: number;
-    car_spaces: number;
+    /** Null means unknown; zero means confirmed no car spaces. */
+    car_spaces: number | null;
     accommodates: number;
     listing_url: string;
     hero_image_url: string;

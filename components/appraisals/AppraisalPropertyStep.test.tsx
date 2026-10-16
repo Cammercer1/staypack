@@ -47,3 +47,25 @@ it("retains a changed property after a failed save and retries with the current 
   const body = JSON.parse(mocks.fetch.mock.calls[1][1].body);
   expect(body).toMatchObject({ expected_updated_at: appraisal.updated_at, property: { listing_description: "New description" } });
 });
+
+it.each([null, 0])("keeps parking %s when other appraisal details are edited", async carSpaces => {
+  const listing = { ...fixture.listing, car_spaces: carSpaces };
+  const onContinue = vi.fn();
+  mocks.fetch.mockResolvedValue({ listing, appraisal });
+  render(<AppraisalPropertyStep listing={listing} appraisal={appraisal} onSaved={vi.fn()} onBusyChange={vi.fn()} onContinue={onContinue} />);
+  expect((screen.getByLabelText("Car spaces") as HTMLInputElement).value).toBe(carSpaces === null ? "" : String(carSpaces));
+  fireEvent.change(screen.getByLabelText("Property description"), { target: { value: "Updated property description" } });
+  fireEvent.click(screen.getByRole("button", { name: "Continue to evidence" }));
+  await waitFor(() => expect(onContinue).toHaveBeenCalledOnce());
+  expect(JSON.parse(mocks.fetch.mock.calls[0][1].body).property.car_spaces).toBe(carSpaces);
+});
+
+it("accepts a deliberately cleared parking field as unknown", async () => {
+  const onContinue = vi.fn();
+  mocks.fetch.mockResolvedValue({ listing: { ...fixture.listing, car_spaces: null }, appraisal });
+  render(<AppraisalPropertyStep listing={fixture.listing} appraisal={appraisal} onSaved={vi.fn()} onBusyChange={vi.fn()} onContinue={onContinue} />);
+  fireEvent.change(screen.getByLabelText("Car spaces"), { target: { value: "" } });
+  fireEvent.click(screen.getByRole("button", { name: "Continue to evidence" }));
+  await waitFor(() => expect(onContinue).toHaveBeenCalledOnce());
+  expect(JSON.parse(mocks.fetch.mock.calls[0][1].body).property.car_spaces).toBeNull();
+});
