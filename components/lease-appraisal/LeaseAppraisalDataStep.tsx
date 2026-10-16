@@ -4,6 +4,7 @@ import { AppraisalDataToolbar } from "@/components/appraisals/AppraisalDataToolb
 import { ComparableFilters } from "@/components/appraisals/ComparableFilters";
 import { UsComparableDetails, UsComparableSearchSummary } from "@/components/appraisals/UsComparableDetails";
 import { avmPriceSuggestion } from "@/lib/listings/pricing";
+import { appraisalGuideCopy, rentalGuideComparison } from "@/lib/copy/appraisalGuideCopy";
 
 import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
 
@@ -18,6 +19,7 @@ import {
   MAX_LEASE_APPRAISAL_FEATURED_COMPS,
   defaultSelectedCompListingIds,
   orderLeaseAppraisalCompPool,
+  canonicalRentalCompSelection,
 } from "@/lib/lease-appraisal/leaseAppraisalData";
 import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
 import { marketForCountry, rentForPeriod, rentFromPeriod, rentRange } from "@/lib/property-market";
@@ -102,7 +104,7 @@ export function LeaseAppraisalDataStep({
   );
   const [selectedIds, setSelectedIds] = useState<string[]>(() => {
     if (appraisal?.selectedCompListingIds?.length) {
-      return appraisal.selectedCompListingIds;
+      return canonicalRentalCompSelection(parsed, appraisal.selectedCompListingIds);
     }
     if (parsed) {
       return defaultSelectedCompListingIds(parsed);
@@ -111,7 +113,7 @@ export function LeaseAppraisalDataStep({
   });
 
   const evidenceDirty = weeklyMin !== localRent(appraisal?.weeklyMin) || weeklyMax !== localRent(appraisal?.weeklyMax) || weeklyMid !== localRent(appraisal?.weeklyMidpoint)
-    || JSON.stringify(selectedIds) !== JSON.stringify(appraisal?.selectedCompListingIds?.length ? appraisal.selectedCompListingIds : defaultSelectedCompListingIds(parsed));
+    || JSON.stringify(selectedIds) !== JSON.stringify(appraisal?.selectedCompListingIds?.length ? canonicalRentalCompSelection(parsed, appraisal.selectedCompListingIds) : defaultSelectedCompListingIds(parsed));
   useEffect(() => { onDirtyChange?.(evidenceDirty); }, [evidenceDirty, onDirtyChange]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- sync editable fields when job polling refreshes the listing. */
@@ -125,7 +127,7 @@ export function LeaseAppraisalDataStep({
       const availableIds = new Set(pool.map(rentalCompListingId));
       setSelectedIds(current => current.filter(id => availableIds.has(id)));
     } else if (appraisal?.selectedCompListingIds?.length) {
-      setSelectedIds(appraisal.selectedCompListingIds);
+      setSelectedIds(canonicalRentalCompSelection(parsed, appraisal.selectedCompListingIds));
     } else if (parsed && pool.length > 0) {
       setSelectedIds(defaultSelectedCompListingIds(parsed));
     }
@@ -151,6 +153,12 @@ export function LeaseAppraisalDataStep({
   );
   const otherCompRows = visibleCompRows.filter((row) => row.tier === "other");
   const discovery = appraisal?.discovery;
+  const guideCopy = appraisalGuideCopy("lease", listing, parsed);
+  const guideComparison = rentalGuideComparison(
+    weeklyMin.trim() ? rentFromPeriod(Number(weeklyMin), market) : null,
+    weeklyMax.trim() ? rentFromPeriod(Number(weeklyMax), market) : null,
+    compRows.filter(row => selectedIds.includes(row.id) && row.tier === "exact").map(row => row.comp.weeklyRent),
+  );
 
   const rentSummary = useMemo(() => {
     const min = Number(weeklyMin);
@@ -475,6 +483,7 @@ export function LeaseAppraisalDataStep({
             <div className="space-y-2 text-sm sm:col-span-3">
               <h3 className="text-lg font-semibold">{hasPriceOverride ? "Your appraisal override" : "Suggested appraisal"}</h3>
               <p className="leading-relaxed text-base-content/65">Edit any amount below. Your saved figures are kept when comparables refresh.</p>
+              <p className="leading-relaxed text-base-content/65">{priceEdited.current ? "The rental guide uses your entered figures." : guideCopy.description} Selecting comparables changes the evidence included, not your guide.</p>
               {estimate && <p className="rounded-xl bg-base-200/60 px-3 py-2.5 text-xs leading-relaxed text-base-content/65">Automated estimate: {estimate.display}{estimate.date ? ` · ${estimate.date}` : ""}{estimate.confidence ? ` · ${estimate.confidence} confidence` : ""}. This may be outdated; use your local knowledge.</p>}
               {hasPriceOverride && <button type="button" className="du-btn du-btn-sm min-h-11 h-auto w-full py-2 text-wrap sm:w-auto" disabled={loading || refreshingComps} onClick={resetPrice}>Use latest suggested appraisal</button>}
             </div>
@@ -520,6 +529,7 @@ export function LeaseAppraisalDataStep({
                 Guide range: <span className="text-lg font-semibold tabular-nums text-base-content">{rentSummary}</span>
               </p>
             ) : null}
+            {guideComparison && <p role="status" className="du-alert du-alert-warning text-left text-sm sm:col-span-3">The guide is {guideComparison} all selected matching advertised rents. Review the figures and differences between the properties before publishing.</p>}
           </div>
 
           <div className="space-y-5 rounded-2xl border border-base-300 bg-base-100 p-5 sm:p-6">
@@ -586,7 +596,7 @@ export function LeaseAppraisalDataStep({
                   {
                     key: "exact",
                     title: "Best property-type matches",
-                    description: "These comparables drive the suggested rent range.",
+                    description: "Matching property types to review alongside your guide.",
                     rows: exactCompRows,
                   },
                   {

@@ -1,23 +1,56 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useImperativeHandle, type Ref, type ReactNode } from "react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AppraisalWorkspace } from "./AppraisalWorkspace";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
 import type { WorkspaceAppraisal } from "@/lib/appraisals/workspaceTypes";
 import type { LeaseAppraisalJob } from "@/lib/types";
 import { editAppraisalEvidence } from "@/lib/appraisals/workspaceInputs";
 
+const { savePendingEdits } = vi.hoisted(() => ({ savePendingEdits: vi.fn() }));
+
 vi.mock("next/image", () => ({ default: () => null }));
 vi.mock("@/components/str-appraisals/AppraisalCustomerPanel", () => ({ AppraisalCustomerPanel: () => <button>Edit customer</button> }));
 vi.mock("@/components/str-appraisals/AppraisalArchiveControl", () => ({ AppraisalArchiveControl: () => null }));
 vi.mock("@/components/digital-proposals/ProposalWorkflow", () => ({
   ProposalWorkflow: ({ ref, onBusyChange, customerPanel }: { ref: Ref<{ savePendingEdits: () => Promise<boolean> }>; onBusyChange: (busy: boolean) => void; customerPanel?: ReactNode }) => {
-    useImperativeHandle(ref, () => ({ savePendingEdits: async () => true }));
+    useImperativeHandle(ref, () => ({ savePendingEdits }));
     return <>{customerPanel}<p>Proposal editor</p><button onClick={() => onBusyChange(true)}>Begin publishing</button><button onClick={() => onBusyChange(false)}>Finish publishing</button></>;
   },
 }));
+beforeEach(() => { savePendingEdits.mockReset().mockResolvedValue(true); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+it.each(["lease", "sales"] as const)("%s: saves proposal edits before explicitly refreshing wording without publishing", async kind => {
+  const fixture = createLintRegressionFixtures();
+  const appraisal: WorkspaceAppraisal = { ...fixture.appraisal, kind, inputs_json: { version: 1, listing: fixture.listing }, input_revision: 1, document_revision: 1, document_json: fixture[kind].final_report_json };
+  const events: string[] = [];
+  savePendingEdits.mockImplementation(async () => { events.push("save"); return true; });
+  const fetcher = vi.fn().mockImplementation(async () => {
+    events.push("refresh");
+    return Response.json({ appraisal: { ...appraisal, updated_at: "2026-10-16T01:00:00Z" } });
+  });
+  vi.stubGlobal("fetch", fetcher);
+  render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} archived={false} />);
+  fireEvent.click(screen.getByRole("button", { name: "Refresh proposal wording" }));
+  await waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+  expect(events).toEqual(["save", "refresh"]);
+  expect(fetcher.mock.calls[0][0]).toBe(`/api/appraisals/${appraisal.report_id}/prepare`);
+  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ expected_updated_at: fixture.listing.updated_at, refresh_copy: true });
+});
+
+it("does not refresh wording when pending proposal edits fail to save", async () => {
+  const fixture = createLintRegressionFixtures();
+  const appraisal: WorkspaceAppraisal = { ...fixture.appraisal, kind: "lease", inputs_json: { version: 1, listing: fixture.listing }, input_revision: 1, document_revision: 1, document_json: fixture.lease.final_report_json };
+  savePendingEdits.mockResolvedValue(false);
+  const fetcher = vi.fn();
+  vi.stubGlobal("fetch", fetcher);
+  render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} archived={false} />);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Refresh proposal wording" })); });
+  expect(savePendingEdits).toHaveBeenCalledOnce();
+  expect(fetcher).not.toHaveBeenCalled();
+});
 
 it.each(["lease", "sales"] as const)("%s: disables customer controls for the full sharing operation", async kind => {
   const fixture = createLintRegressionFixtures();

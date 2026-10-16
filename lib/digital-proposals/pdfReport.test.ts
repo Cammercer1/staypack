@@ -25,6 +25,7 @@ describe("Havenly proposal PDF snapshot", () => {
     const original = structuredClone(source);
     const data = kind === "str" ? proposalFromReport(source, "  Jordan Taylor  ") : proposalFromAppraisalReport(source, kind, "  Jordan Taylor  ");
     const pdfReport = buildProposalPdfReport(source, data.recipient?.displayName)!;
+    expect(pdfReport.proposal_print_revision).toBe(kind === "str" ? undefined : 2);
     const snapshot = proposalSnapshotSchema.parse({ version: 1, data, pdfReport,
       draft: defaultAssignment(fixtures.agency, kind).defaults, brand: BRAND_DEFAULTS, attachments: [] });
     expect(snapshot.pdfReport?.recipient).toEqual(snapshot.data.recipient);
@@ -38,6 +39,9 @@ describe("Havenly proposal PDF snapshot", () => {
     expect(snapshot.data.recipient?.displayName).toBe("Jordan Taylor");
     expect(snapshot.pdfReport?.recipient?.displayName).toBe("Jordan Taylor");
     expect(buildProposalPdfReport(source, null)).not.toHaveProperty("recipient");
+    const legacyPdf = { ...pdfReport };
+    delete legacyPdf.proposal_print_revision;
+    expect(proposalPdfReportSchema.parse(legacyPdf)).not.toHaveProperty("proposal_print_revision");
   });
 
   it("keeps client contact details out of printable snapshots and leaves legacy snapshots nameless", () => {

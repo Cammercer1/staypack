@@ -31,7 +31,7 @@ export function ltrEnrichmentFromParsed(listing: ParsedListing): LtrEnrichmentJs
   }));
 
   return {
-    comp_count: Math.max(appraisal?.compCount ?? 0, compPool.length),
+    comp_count: compPool.length || appraisal?.compCount || 0,
     weekly_range: {
       p25: appraisal?.weeklyMin ?? null,
       p50: appraisal?.weeklyMidpoint ?? null,

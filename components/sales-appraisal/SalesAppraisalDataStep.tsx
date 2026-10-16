@@ -1,4 +1,5 @@
 "use client";
+import { appraisalGuideCopy } from "@/lib/copy/appraisalGuideCopy";
 import { UnsavedListingGuard } from "@/components/listings/UnsavedListingGuard";
 import { AppraisalDataToolbar } from "@/components/appraisals/AppraisalDataToolbar";
 import { ComparableFilters } from "@/components/appraisals/ComparableFilters";
@@ -482,6 +483,7 @@ export function SalesAppraisalDataStep({
             <div className="space-y-2 text-sm sm:col-span-3">
               <h3 className="text-lg font-semibold">{hasPriceOverride ? "Your appraisal override" : "Suggested appraisal"}</h3>
               <p className="leading-relaxed text-base-content/65">Edit any amount below. Your saved figures are kept when comparables refresh.</p>
+              <p className="leading-relaxed text-base-content/65">{priceEdited.current ? "The sale price guide uses your entered figures." : appraisalGuideCopy("sales", listing, parsed).description} Selecting comparables changes the evidence included, not your guide.</p>
               {estimate && <p className="rounded-xl bg-base-200/60 px-3 py-2.5 text-xs leading-relaxed text-base-content/65">Automated estimate: {estimate.display}{estimate.date ? ` · ${estimate.date}` : ""}{estimate.confidence ? ` · ${estimate.confidence} confidence` : ""}. This may be outdated; use your local knowledge.</p>}
               {hasPriceOverride && <button type="button" className="du-btn du-btn-sm min-h-11 h-auto w-full py-2 text-wrap sm:w-auto" disabled={loading || refreshingComps} onClick={resetPrice}>Use latest suggested appraisal</button>}
             </div>

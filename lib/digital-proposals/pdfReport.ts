@@ -14,6 +14,7 @@ const blankAgent = { name: "", role_title: "", phone: "", email: "", photo_url: 
 
 /** Frozen, printable fields only. Never retain provider payloads, the unused comp pool or draft links. */
 export const proposalPdfReportSchema = z.object({
+  proposal_print_revision: z.literal(2).optional(),
   market: propertyMarketSchema.optional(),
   recipient: z.object({ displayName: z.string().trim().min(1) }).optional(),
   version: z.string(), template_id: z.string().refine(id => id === "haven-properties-str" || isLeaseAppraisalTemplateId(id) || isSalesAppraisalTemplateId(id)), generated_at: z.iso.datetime(),
@@ -89,6 +90,7 @@ export function buildProposalPdfReport(document: FinalReportJson, recipientDispl
   delete source.recipient;
   const displayName = recipientDisplayName?.trim();
   return proposalPdfReportSchema.parse({ ...source,
+    ...((isLeaseAppraisalTemplateId(document.template_id) || isSalesAppraisalTemplateId(document.template_id)) ? { proposal_print_revision: 2 } : {}),
     ...(displayName ? { recipient: { displayName } } : {}),
     copy: isSalesAppraisalTemplateId(document.template_id) ? resolveSalesAppraisalCopyDisclaimers(document.copy) : document.copy,
     agent_selection: "explicit", agent: blankAgent, agents: [],

@@ -1,10 +1,10 @@
 import { resolveSalesAppraisalDisclaimer } from "./salesAppraisalDisclaimer";
 import { marketForCountry } from "@/lib/property-market";
 import { PAGE_ONE_BULLET_COUNT } from "@/lib/copy/pageOneMarketingCopy";
+import { appraisalGuideCopy } from "@/lib/copy/appraisalGuideCopy";
 import {
   blurbVariantsParagraphsToStored,
   enforceBlurbVariantsParagraphs,
-  variantTextToParagraphs,
 } from "@/lib/copy/blurbVariants";
 import type { LeaseAppraisalCopy } from "@/lib/lease-appraisal/deriveLeaseAppraisalCopy";
 import {
@@ -64,26 +64,6 @@ function deriveHeading(listing: Listing, parsed: ParsedListing) {
   return address || "Property appraisal overview";
 }
 
-function pricePositionLine(
-  soldCompCount: number,
-  forSaleCompCount: number,
-  agencyGuideApplied: boolean,
-) {
-  if (agencyGuideApplied) {
-    return `The estimated price range alongside retains the agency’s current marketed guide, reviewed against recent sold results and current competing listings.`;
-  }
-
-  if (soldCompCount > 0) {
-    return `The estimated price range alongside is drawn from comparable properties sold within the past 12 months and matched to this home's property type, size and location${forSaleCompCount > 0 ? ", with current for-sale listings providing additional market context" : ""}.`;
-  }
-
-  if (forSaleCompCount > 0) {
-    return `The estimated price range alongside reflects comparable properties currently on the market near this home.`;
-  }
-
-  return `Use the estimated price range alongside as a starting point for your selling decision.`;
-}
-
 export type DeriveSalesAppraisalCopyInput = {
   agency: Agency;
   listing: Listing;
@@ -119,35 +99,21 @@ export function deriveSalesAppraisalCopy({
       " ",
     );
 
-  const priceLine = us ? "The current property value estimate should be reviewed against recent local sales and the property’s condition." : pricePositionLine(
-    soldCompCount,
-    forSaleCompCount,
-    Boolean(parsed.salesAppraisal?.agencyGuide),
-  );
+  const guide = appraisalGuideCopy("sales", listing, parsed);
+  const priceLine = guide.description;
   const marketLine =
     soldCompCount > 0
       ? `Recent sold results nearby demonstrate active buyer demand for comparable homes in the area.`
       : "";
 
-  const blurbBody = [propertyLead, priceLine, marketLine].filter(Boolean).join(" ");
   const blurb_variants = blurbVariantsParagraphsToStored(
     enforceBlurbVariantsParagraphs({
-      short: variantTextToParagraphs(blurbBody).slice(0, 1).length
-        ? variantTextToParagraphs(blurbBody).slice(0, 1)
-        : [blurbBody],
-      medium: (() => {
-        const parts = variantTextToParagraphs(blurbBody);
-        if (parts.length >= 2) return parts.slice(0, 2);
-        return [parts[0] ?? blurbBody, priceLine || ""];
-      })(),
-      long: (() => {
-        const parts = variantTextToParagraphs(blurbBody);
-        if (parts.length >= 3) return parts.slice(0, 3);
-        return [propertyLead || blurbBody, priceLine || "", marketLine || ""];
-      })(),
+      short: [propertyLead],
+      medium: [propertyLead, [priceLine, marketLine].filter(Boolean).join(" ")],
+      long: [propertyLead, priceLine, marketLine || "Review the property’s condition and comparable evidence with the agent before setting an asking price."],
     }),
   );
-  const blurb = blurb_variants.medium || blurbBody;
+  const blurb = blurb_variants.medium || propertyLead;
 
   const suburb = listing.suburb ?? parsed.suburb ?? "the area";
   const appeal_points = [
@@ -182,9 +148,7 @@ export function deriveSalesAppraisalCopy({
       "Confirm presentation, styling and campaign inclusions when setting the asking price.",
       "Allow for marketing costs, agent fees and settlement timing when planning the sale.",
     ],
-    methodology_note: us ? "Current property estimate in USD, with nearby sold properties offered as comparison evidence. The guide is the available automated estimate or agent override, not the last sold or asking price." : parsed.salesAppraisal?.agencyGuide
-      ? "The agency’s current marketed guide is retained as the estimated sale price range and reviewed against same-property-type comparables sold within the past 12 months. Current for-sale listings provide additional context; comparable evidence is shown on page 2."
-      : "Estimated sale price range from same-property-type REA comparables sold within the past 12 months, matched on beds, baths and parking. The search expands to nearby areas when local evidence is limited; current for-sale listings provide context only. Outliers trimmed; comparable evidence shown on page 2.",
+    methodology_note: guide.methodology,
     disclaimer: resolveSalesAppraisalDisclaimer(agency.default_disclaimer),
     comparable_evidence,
     comparable_disclaimer: SALES_APPRAISAL_COMPARABLE_DISCLAIMER,

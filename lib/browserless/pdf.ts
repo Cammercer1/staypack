@@ -370,7 +370,11 @@ function buildBrowserlessPdfBody(
       timeout: 90000,
     },
     waitForFunction: {
-      fn: "() => Array.from(document.images).every(image => image.complete)",
+      // New proposal snapshots mark portraits with a visible initials fallback.
+      // This runs on the extracted HTML, without relying on React hydration.
+      fn: html?.includes("data-report-agent-image")
+        ? "() => { const images = Array.from(document.images); for (const image of images) { if (image.complete && !image.naturalWidth && image.hasAttribute('data-report-agent-image')) image.remove(); } return images.every(image => image.complete); }"
+        : "() => Array.from(document.images).every(image => image.complete)",
       timeout: 20000,
     },
   };

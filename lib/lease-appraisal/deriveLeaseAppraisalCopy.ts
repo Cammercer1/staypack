@@ -1,9 +1,9 @@
 import { marketForCountry } from "@/lib/property-market";
 import { PAGE_ONE_BULLET_COUNT } from "@/lib/copy/pageOneMarketingCopy";
+import { appraisalGuideCopy } from "@/lib/copy/appraisalGuideCopy";
 import {
   blurbVariantsParagraphsToStored,
   enforceBlurbVariantsParagraphs,
-  variantTextToParagraphs,
 } from "@/lib/copy/blurbVariants";
 import type { BlurbVariantsStored } from "@/lib/copy/blurbVariantConstants";
 import {
@@ -112,28 +112,6 @@ function suburbContextLine(market: LtrSuburbMarketJson | null | undefined) {
   return parts.length ? `${parts.join("; ")}.` : "";
 }
 
-function rentPositionLine(
-  weeklyMid: number | null,
-  market: LtrSuburbMarketJson | null | undefined,
-  compCount: number,
-) {
-  const median = market?.median_weekly_rent;
-  if (weeklyMid != null && median != null && median > 0) {
-    const pct = Math.round(((weeklyMid - median) / median) * 100);
-    if (Math.abs(pct) >= 8) {
-      const dir = pct > 0 ? "above" : "below";
-      const segment = market?.property_segment === "unit" ? "unit" : "house";
-      return `Compared with similar leases in the area, this sits ${dir} the typical suburb ${segment} rent. See the weekly guide in the panel alongside for the suggested range.`;
-    }
-  }
-
-  if (compCount > 0) {
-    return `The weekly rent guide alongside is drawn from active comparable listings matched to this property’s size and location.`;
-  }
-
-  return `Use the weekly rent guide alongside as a starting point for your leasing decision.`;
-}
-
 export type DeriveLeaseAppraisalCopyInput = {
   agency: Agency;
   listing: Listing;
@@ -152,10 +130,8 @@ export function deriveLeaseAppraisalCopy({
   listing,
   parsed,
   compCount,
-  rentRangeLabel: _rentRangeLabel,
   weeklyMin = null,
   weeklyMax = null,
-  weeklyMid = null,
   suburbMarket = null,
   featuredComps = [],
 }: DeriveLeaseAppraisalCopyInput): LeaseAppraisalCopy {
@@ -173,28 +149,18 @@ export function deriveLeaseAppraisalCopy({
       " ",
     );
 
-  const rentLine = us ? "The monthly rental guide is an indicative estimate to review against local asking rents and the property’s condition." : rentPositionLine(weeklyMid, suburbMarket, compCount);
+  const guide = appraisalGuideCopy("lease", listing, parsed);
+  const rentLine = guide.description;
   const suburbLine = suburbContextLine(suburbMarket ?? parsed.ltrSuburbMarket);
 
-  const blurbBody = [propertyLead, rentLine, suburbLine].filter(Boolean).join(" ");
   const blurb_variants = blurbVariantsParagraphsToStored(
     enforceBlurbVariantsParagraphs({
-      short: variantTextToParagraphs(blurbBody).slice(0, 1).length
-        ? variantTextToParagraphs(blurbBody).slice(0, 1)
-        : [blurbBody],
-      medium: (() => {
-        const parts = variantTextToParagraphs(blurbBody);
-        if (parts.length >= 2) return parts.slice(0, 2);
-        return [parts[0] ?? blurbBody, rentLine || ""];
-      })(),
-      long: (() => {
-        const parts = variantTextToParagraphs(blurbBody);
-        if (parts.length >= 3) return parts.slice(0, 3);
-        return [propertyLead || blurbBody, rentLine || "", suburbLine || ""];
-      })(),
+      short: [propertyLead],
+      medium: [propertyLead, [rentLine, suburbLine].filter(Boolean).join(" ")],
+      long: [propertyLead, rentLine, suburbLine || "Review the property’s condition, inclusions and comparable evidence with the agent before setting the rent."],
     }),
   );
-  const blurb = blurb_variants.medium || blurbBody;
+  const blurb = blurb_variants.medium || propertyLead;
 
   const suburb = listing.suburb ?? parsed.suburb ?? "the area";
   const appeal_points = [
@@ -228,8 +194,7 @@ export function deriveLeaseAppraisalCopy({
       "Confirm body corporate, furnishing and inclusions when setting achievable rent.",
       "Allow for vacancy, letting fees and condition when underwriting cashflow.",
     ],
-    methodology_note: us ? "Monthly rent in USD. The guide uses the available automated property estimate or the agent’s appraisal override. Nearby active asking rents provide comparison evidence; no achieved lease price is implied." :
-      "Weekly rent range from comparable REA lease listings matched on beds, baths and parking. Suburb metrics from PropRadar. Outliers trimmed; median and interquartile range shown on page 2.",
+    methodology_note: guide.methodology,
     disclaimer: resolveLeaseAppraisalDisclaimer(agency.default_disclaimer),
     comparable_evidence,
     comparable_disclaimer: LEASE_APPRAISAL_COMPARABLE_DISCLAIMER,

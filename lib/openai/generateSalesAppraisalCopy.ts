@@ -9,6 +9,7 @@ import {
 import { formatSalePriceRange } from "@/lib/sales/computeSalePriceBand";
 import { resolveSalesAppraisalComparableDisclaimer } from "@/lib/sales-appraisal/salesAppraisalDisclaimer";
 import { reportableSaleLandArea } from "@/lib/sales/reportableSaleArea";
+import { appraisalMarketingCopyIssues } from "@/lib/copy/appraisalMarketingCopyValidation";
 import {
   PAGE_ONE_MARKETING_COPY_JSON_CONTRACT,
   PAGE_ONE_COPY_MAX_ATTEMPTS,
@@ -29,7 +30,7 @@ Inputs include the REA listing description, recently sold comparable evidence, c
 Rules:
 - Australian English, confident but conservative — no hype, no guaranteed prices.
 - heading: one engaging line drawn from the listing (feature or positioning), not the street address alone.
-- Blurbs: rewrite listing_description; weave in how the home sits against recent sold results without dollar amounts (the range is in the sidebar). Provide three lengths per the contract — short (1 paragraph), medium (2 paragraphs), long (3 paragraphs). Each length must add detail; do not repeat the same paragraph across all three.
+- Blurbs: rewrite listing_description using only supported property features. The reviewed sale range and comparable evidence are presented separately. Do not infer elevation from flooring, high ceilings or a building's size. Provide three lengths per the contract — short (1 paragraph), medium (2 paragraphs), long (3 paragraphs). Each length must add detail; do not repeat the same paragraph across all three.
 - bullets: exactly four short feature bullets drawn from the listing (layout, location, parking, amenities, etc.).
 - Do not mention OpenAI, AI, Domain or other property-data providers. Use neutral wording such as property estimates and comparable evidence.
 - Character limits in copy_limits are strict maximums. Stay under every limit — over-limit responses are rejected and rewritten.
@@ -171,6 +172,11 @@ export async function generateSalesAppraisalCopy(
       const parsedAttempt = pageOneMarketingCopyAiSchema.safeParse(raw);
       if (parsedAttempt.success) {
         const pageOne = pageOneFromAiShape(parsedAttempt.data);
+        const copyIssues = appraisalMarketingCopyIssues(pageOne, "sales", input.listing.listing_description ?? input.parsed.description);
+        if (copyIssues.length > 0) {
+          validationErrors = { copy: copyIssues };
+          continue;
+        }
 
         return {
           ...fallback,

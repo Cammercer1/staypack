@@ -1,4 +1,5 @@
 import type { SaleCompCard } from "@/lib/types";
+import { appraisalSubjectFeatures } from "@/lib/copy/appraisalSubjectFeatures";
 
 export const SALES_APPRAISAL_COMPARABLE_DISCLAIMER =
   "Comparable evidence is based on publicly available sold results and current advertisements at the time of preparation. Price guides for active listings may differ from final sale prices. This appraisal is intended as a market guide only and does not constitute a formal valuation or price guarantee.";
@@ -23,35 +24,6 @@ function propertyTypePhrase(beds: number, propertyType?: string) {
     return `${beds}-bedroom houses`;
   }
   return `${beds}-bedroom ${normalized} properties`;
-}
-
-function subjectFeaturePhrase(description: string, bathrooms: number, carSpaces: number) {
-  const desc = description.toLowerCase();
-  const features: string[] = [];
-
-  if (/\bnorth[- ]?facing\b/.test(desc) || desc.includes("north facing")) {
-    features.push("north-facing aspect");
-  }
-  if (/\bview|skyline|ocean\b/.test(desc)) {
-    features.push("views");
-  }
-  if (/\b(level|floor|high)\b/.test(desc) && /\b\d{1,2}(st|nd|rd|th)?\b/.test(desc)) {
-    features.push("elevated position");
-  } else if (desc.includes("level") || desc.includes("floor")) {
-    features.push("elevated position");
-  }
-  if (bathrooms >= 2) {
-    features.push("two bathrooms");
-  }
-  if (carSpaces >= 1) {
-    features.push("secure car space");
-  }
-
-  if (!features.length) {
-    return "";
-  }
-
-  return features.slice(0, 4).join(", ");
 }
 
 export type DeriveSaleComparableEvidenceInput = {
@@ -104,10 +76,7 @@ export function deriveSaleComparableEvidence({
 
   const para1 = `To support the appraisal range, ${reviewLead}. The strongest comparable results transacted ${compRangePhrase}, with pricing influenced by views, building quality, parking, amenities and proximity to local lifestyle drawcards in ${suburb}.`;
 
-  const features = subjectFeaturePhrase(description, bathrooms, carSpaces);
-  const featuresLead = features
-    ? `Given the subject property's ${features}, `
-    : "Given the subject property's configuration and location, ";
+  const features = appraisalSubjectFeatures(description, bathrooms, carSpaces);
 
   const appraisalRange =
     priceMin != null && priceMax != null
@@ -116,7 +85,7 @@ export function deriveSaleComparableEvidence({
         : `an estimated sale price range of ${formatAud(priceMin)} to ${formatAud(priceMax)}`
       : "the indicated price range";
 
-  const para2 = `${featuresLead}${appraisalRange} is considered reasonable in the current market.`;
+  const para2 = `The appraisal indicates ${appraisalRange}. Review this guide against the selected sale evidence and the subject property's ${features ? `${features}, ` : ""}condition and location.`;
 
   return `${para1}\n\n${para2}`;
 }

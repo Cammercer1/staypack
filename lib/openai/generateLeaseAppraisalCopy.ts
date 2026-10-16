@@ -6,7 +6,7 @@ import {
   deriveLeaseAppraisalCopy,
   type LeaseAppraisalCopy,
 } from "@/lib/lease-appraisal/deriveLeaseAppraisalCopy";
-import { isDevelopment } from "@/lib/env";
+import { appraisalMarketingCopyIssues } from "@/lib/copy/appraisalMarketingCopyValidation";
 import { LEASE_APPRAISAL_COMPARABLE_DISCLAIMER } from "@/lib/lease-appraisal/comparableEvidenceCopy";
 import { resolveLeaseAppraisalComparableDisclaimer } from "@/lib/lease-appraisal/leaseAppraisalDisclaimer";
 import {
@@ -24,12 +24,12 @@ const SYSTEM_PROMPT = `You write page-1 copy for an Australian long-term rental 
 
 The page header already says "Rental appraisal" — never use that phrase as the heading.
 
-Inputs include the REA listing description, rent comparable range, and suburb statistics. Use them.
+Use the supplied property description and verified property features for the marketing copy. The reviewed rental guide and comparable evidence are presented separately.
 
 Rules:
 - Australian English, confident but conservative — no hype, no guaranteed income.
 - heading: one engaging line drawn from the listing (feature or positioning), not the street address alone.
-- Blurbs: rewrite listing_description; weave in how rent sits vs the suburb without dollar amounts (range is in the sidebar). Provide three lengths per the contract — short (1 paragraph), medium (2 paragraphs), long (3 paragraphs). Each length must add detail; do not repeat the same paragraph across all three.
+- Blurbs: rewrite listing_description using only supported property features. Do not claim a rent level, yield, income, rental demand or position relative to the market. Do not infer elevation from flooring, high ceilings or a building's size. Provide three lengths per the contract — short (1 paragraph), medium (2 paragraphs), long (3 paragraphs). Each length must add detail; do not repeat the same paragraph across all three.
 - bullets: exactly four short feature bullets drawn from the listing (layout, location, parking, amenities, etc.).
 - Do not mention OpenAI, AI, Domain or other property-data providers. Use neutral wording such as property estimates and comparable evidence.
 - Character limits in copy_limits are strict maximums. Stay under every limit — over-limit responses are rejected and rewritten.
@@ -165,6 +165,11 @@ export async function generateLeaseAppraisalCopy(
       const parsedAttempt = pageOneMarketingCopyAiSchema.safeParse(raw);
       if (parsedAttempt.success) {
         const pageOne = pageOneFromAiShape(parsedAttempt.data);
+        const copyIssues = appraisalMarketingCopyIssues(pageOne, "lease", input.listing.listing_description ?? input.parsed.description);
+        if (copyIssues.length > 0) {
+          validationErrors = { copy: copyIssues };
+          continue;
+        }
 
         return {
           ...fallback,

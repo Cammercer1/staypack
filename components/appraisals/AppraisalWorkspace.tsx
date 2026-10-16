@@ -34,11 +34,15 @@ export function AppraisalWorkspace({ initialAppraisal, initialListing, initialJo
   const evidenceChanged = useCallback((next: Listing) => {
     setListing(next); setAppraisal(current => ({ ...current, updated_at: next.updated_at, document_revision: next.updated_at === current.updated_at ? current.document_revision : null }));
   }, []);
-  async function prepare(next?: Listing) {
+  async function prepare(next?: Listing, refreshCopy = false) {
     setGenerating(true); setError("");
-    try { const result = await proposalFetch<{ appraisal: WorkspaceAppraisal }>(`/api/appraisals/${appraisal.report_id}/prepare`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expected_updated_at: next?.updated_at ?? listing.updated_at }) }); setAppraisal(result.appraisal); setListing(current => ({ ...current, updated_at: result.appraisal.updated_at })); setStep("proposal"); }
+    try { const result = await proposalFetch<{ appraisal: WorkspaceAppraisal }>(`/api/appraisals/${appraisal.report_id}/prepare`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expected_updated_at: next?.updated_at ?? listing.updated_at, ...(refreshCopy ? { refresh_copy: true } : {}) }) }); setAppraisal(result.appraisal); setListing(current => ({ ...current, updated_at: result.appraisal.updated_at })); setStep("proposal"); }
     catch(cause) { setError(cause instanceof Error ? cause.message : "Unable to prepare proposal."); }
     finally { setGenerating(false); }
+  }
+  async function refreshCopy() {
+    if (busy || generating || editingCustomer || !(await workflow.current?.savePendingEdits())) return;
+    await prepare(undefined, true);
   }
   return <AppraisalRoutes><div data-theme="staypack-workspace" className="space-y-6 text-base-content">
     <PropertyContext listing={listing} onEdit={archived ? undefined : () => void changeStep("property")} />
@@ -51,6 +55,7 @@ export function AppraisalWorkspace({ initialAppraisal, initialListing, initialJo
       {step === "evidence" && <fieldset disabled={generating} className="min-w-0">{appraisal.kind === "lease" ? <LeaseAppraisalDataStep appraisalEndpoint={`/api/appraisals/${appraisal.report_id}/evidence`} listing={listing} activeJob={job} onDirtyChange={setEvidenceDirty} onJobChange={setJob} onListingChange={evidenceChanged} onBusyChange={setBusy} onContinue={next => void prepare(next)} continueLabel="Continue to proposal" /> : <SalesAppraisalDataStep appraisalEndpoint={`/api/appraisals/${appraisal.report_id}/evidence`} listing={listing} activeJob={job} onDirtyChange={setEvidenceDirty} onJobChange={setJob} onListingChange={evidenceChanged} onBusyChange={setBusy} onContinue={next => void prepare(next)} continueLabel="Continue to proposal" />}</fieldset>}
 
       {(step === "proposal" || step === "share") && <ProposalWorkflow ref={workflow} reportId={appraisal.report_id} stage={step === "share" ? "share" : "proposal"} refreshKey={appraisal.updated_at} disabled={editingCustomer || generating} onBusyChange={setBusy} onContinue={() => void changeStep("share")} />}
+      {step === "proposal" && <div className="flex flex-wrap items-center gap-3 text-sm"><button type="button" className="du-btn du-btn-sm min-h-11" disabled={busy || generating || editingCustomer} onClick={() => void refreshCopy()}>Refresh proposal wording</button><span className="text-base-content/65">Rebuild the wording from your saved property details and evidence.</span></div>}
       {step === "share" && !busy && !generating && !editingCustomer && <CreateAnother listingId={listing.id} sourceReportId={appraisal.report_id} />}
       <div inert={busy || generating || editingCustomer}><AppraisalArchiveControl reportId={appraisal.report_id} /></div>
     </>}

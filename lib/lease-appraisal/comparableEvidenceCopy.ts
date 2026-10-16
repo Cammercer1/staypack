@@ -1,4 +1,6 @@
 import { propertyTypeFamily } from "@/lib/rental/computeRentBand";
+import { appraisalSubjectFeatures } from "@/lib/copy/appraisalSubjectFeatures";
+import { rentalGuideComparison } from "@/lib/copy/appraisalGuideCopy";
 import type { LtrRentalCompCard } from "@/lib/types";
 
 export const LEASE_APPRAISAL_COMPARABLE_DISCLAIMER =
@@ -24,36 +26,6 @@ function propertyTypePhrase(beds: number, propertyType?: string) {
     return `${beds}-bedroom houses`;
   }
   return `${beds}-bedroom ${normalized} properties`;
-}
-
-function subjectFeaturePhrase(description: string, bathrooms: number, carSpaces: number) {
-  const desc = description.toLowerCase();
-  const features: string[] = [];
-
-  if (/\bnorth[- ]?facing\b/.test(desc) || desc.includes("north facing")) {
-    features.push("north-facing aspect");
-  }
-  if (/\b(view|views|skyline|ocean)\b/.test(desc)) {
-    features.push("views");
-  }
-  if (/\b(level|floor)\s+\d{1,2}\b|\btop floor\b|\bupper level\b|\bhigh-rise\b/.test(desc)) {
-    features.push("elevated position");
-  }
-  if (bathrooms >= 2) {
-    features.push("two bathrooms");
-  }
-  if (carSpaces >= 1) {
-    const secureParking =
-      /\bsecure\b.{0,30}\b(car|parking|garage|carport)\b/.test(desc) ||
-      /\b(car|parking|garage|carport)\b.{0,30}\bsecure\b/.test(desc);
-    features.push(secureParking ? "secure parking" : "off-street parking");
-  }
-
-  if (!features.length) {
-    return "";
-  }
-
-  return features.slice(0, 4).join(", ");
 }
 
 export type DeriveComparableEvidenceInput = {
@@ -121,10 +93,7 @@ export function deriveComparableEvidence({
 
   const para1 = `To support the appraisal range, ${reviewLead}.${fallbackContext} The strongest exact-type comparable properties are currently advertised ${compRangePhrase}, with pricing influenced by condition, layout, parking, local amenities and transport access.`;
 
-  const features = subjectFeaturePhrase(description, bathrooms, carSpaces);
-  const featuresLead = features
-    ? `Given the subject property's ${features}, `
-    : "Given the subject property's configuration and location, ";
+  const features = appraisalSubjectFeatures(description, bathrooms, carSpaces);
 
   const appraisalRange =
     weeklyMin != null && weeklyMax != null
@@ -133,7 +102,11 @@ export function deriveComparableEvidence({
         : `a weekly rental range of ${formatAudWeekly(weeklyMin)} to ${formatAudWeekly(weeklyMax)}`
       : "the indicated weekly rent range";
 
-  const para2 = `${featuresLead}${appraisalRange} is considered reasonable in the current market.`;
+  const outsideSelected = rentalGuideComparison(weeklyMin, weeklyMax, rents);
+  const comparison = outsideSelected
+    ? `The guide is ${outsideSelected} the selected advertised rents; review the differences between the properties before relying on it.`
+    : "Selected advertised rents provide context and do not establish an achieved rent for this property.";
+  const para2 = `The appraisal indicates ${appraisalRange}. ${comparison} Review the subject property's ${features ? `${features}, ` : ""}condition, inclusions and location when setting the rent.`;
 
   return `${para1}\n\n${para2}`;
 }

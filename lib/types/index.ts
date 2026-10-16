@@ -563,6 +563,8 @@ export type FinalReportJson = import("@/lib/documents/documentLink").DocumentLin
   published_report_json?: FinalReportJson;
   /** Frozen public display name only. Private client contact details never belong in a report. */
   recipient?: { displayName: string };
+  /** Frozen opt-in for revised proposal PDF presentation; absent on legacy snapshots. */
+  proposal_print_revision?: 2;
   /** An explicit proposal selection (including zero agents) overrides legacy brand defaults. */
   market?: import("@/lib/property-market").PropertyMarket;
   agent_selection?: "explicit";

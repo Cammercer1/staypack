@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { deriveComparableEvidence } from "@/lib/lease-appraisal/comparableEvidenceCopy";
 
 describe("deriveComparableEvidence", () => {
+  it.each([[540, 590, "below"], [900, 950, "above"]] as const)("acknowledges a guide wholly outside the selected asking rents", (weeklyMin, weeklyMax, direction) => {
+    const copy = deriveComparableEvidence({ suburb: "Manly", bedrooms: 1, bathrooms: 1, compCount: 30,
+      weeklyMin, weeklyMax, featuredComps: [630, 650, 730, 750, 780, 850].map(weekly_rent => ({ weekly_rent })) });
+    expect(copy).toContain(`The guide is ${direction} the selected advertised rents`);
+    expect(copy).toContain("review the differences between the properties");
+    expect(copy).not.toContain("reasonable in the current market");
+  });
+
   it("keeps location factors generic and does not infer elevation from flooring", () => {
     const copy = deriveComparableEvidence({
       suburb: "Gilberton",

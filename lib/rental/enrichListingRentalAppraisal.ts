@@ -41,7 +41,6 @@ import { resolveRentSubjectPropertyType } from "@/lib/rental/resolveRentSubjectP
 import {
   fillLeaseAppraisalCompSelection,
 } from "@/lib/lease-appraisal/leaseAppraisalData";
-import { rentalCompListingId } from "@/lib/lease-appraisal/rentalCompIds";
 import {
   positionLeaseAppraisal,
   subjectFromParsedListing,
@@ -559,16 +558,9 @@ export async function enrichListingRentalAppraisal(
       ...withSuburb,
       rentalComps: comps,
     };
-    const bandFeaturedIds = band.featuredComps.map((comp) =>
-      rentalCompListingId(comp, Math.max(0, comps.indexOf(comp))),
-    );
-    const selectedCompListingIds = fillLeaseAppraisalCompSelection(
-      compSelectionBase,
-      [
-        ...bandFeaturedIds,
-        ...(positioned.selectedCompListingIds ?? []),
-      ],
-    );
+    // The displayed evidence should favour nearby, matching properties rather
+    // than preselecting only adverts that agree with the automated estimate.
+    const selectedCompListingIds = fillLeaseAppraisalCompSelection(compSelectionBase);
 
     const displayPrice = formatWeeklyRentRange(band.weeklyMin, band.weeklyMax);
 

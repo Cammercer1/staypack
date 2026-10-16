@@ -50,18 +50,30 @@ function AgentBlock({
   agent,
   compact = false,
   photoClassName,
+  printPortraitFallback = false,
 }: {
   agent: FooterAgent;
   compact?: boolean;
   photoClassName?: string;
+  printPortraitFallback?: boolean;
 }) {
   const defaultPhotoClass = compact
     ? "h-20 w-[4.5rem] shrink-0 object-cover object-top"
     : "h-24 w-20 shrink-0 object-cover object-top";
+  const initials = agent.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase() || "?";
 
   return (
     <div className="flex min-w-0 items-center gap-3">
-      {agent.photo_url ? (
+      {printPortraitFallback ? (
+        <span data-report-agent-portrait aria-label={agent.name} className={`relative flex items-center justify-center overflow-hidden bg-neutral-100 font-semibold text-neutral-700 ${photoClassName ?? defaultPhotoClass}`}>
+          <span aria-hidden="true">{initials}</span>
+          {agent.photo_url ? (
+            // Browserless removes failed marked images after loading the frozen HTML.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img data-report-agent-image src={agent.photo_url} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
+          ) : null}
+        </span>
+      ) : agent.photo_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={agent.photo_url}
@@ -125,6 +137,7 @@ export function ClassicAgentFooter({ report, compact = false }: Props) {
                 agent={agent}
                 compact={multiAgent}
                 photoClassName={havenPhotoClass}
+                printPortraitFallback={report.proposal_print_revision === 2}
               />
             ))}
           </div>
