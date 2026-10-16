@@ -18,6 +18,37 @@ function fixture() {
 }
 
 describe("appraisal guide copy", () => {
+  it.each(["lease", "sales"] as const)("keeps a complete Tower Street sentence in the %s fallback instead of a clipped second sentence", kind => {
+    const input = fixture();
+    const first = "A lifestyle of elegance, luxury and convenience beckons in this immaculate Art Deco apartment that is nestled in a park-side cul-de-sac within moments to all Manly’s action.";
+    input.parsed.description = `${first} Comfortably spacious, graced with character and refurbished with stylish contemporary finishes, it is hushed away from the hustle and bustle yet only a few minutes stroll from Manly’s beaches, the wharf and cosmopolitan eateries.`;
+    const copy = kind === "lease"
+      ? deriveLeaseAppraisalCopy({ ...input, compCount: 30, rentRangeLabel: "$540–$590", weeklyMin: 540, weeklyMax: 590 })
+      : deriveSalesAppraisalCopy({ ...input, soldCompCount: 26, forSaleCompCount: 4, priceMin: 835000, priceMax: 925000 });
+    expect(copy.blurb_variants?.short).toBe(first);
+    expect(copy.blurb_variants?.medium?.split("\n\n")[0]).toBe(first);
+    expect(copy.blurb_variants?.long?.split("\n\n")[0]).toBe(first);
+    expect(copy.blurb).not.toContain("hu…");
+  });
+
+  it.each(["lease", "sales"] as const)("shortens an oversized first %s sentence only at a word boundary", kind => {
+    const input = fixture();
+    input.parsed.description = `${Array.from({ length: 60 }, () => "beautiful").join(" ")}.`;
+    const copy = kind === "lease"
+      ? deriveLeaseAppraisalCopy({ ...input, compCount: 30, rentRangeLabel: "$540–$590" })
+      : deriveSalesAppraisalCopy({ ...input, soldCompCount: 26, forSaleCompCount: 4 });
+    expect(copy.blurb_variants?.short?.length).toBeLessThanOrEqual(280);
+    expect(copy.blurb_variants?.short).toMatch(/\bbeautiful…$/);
+  });
+
+  it("uses a neutral review instruction when suburb rental statistics are absent", () => {
+    const input = fixture();
+    delete input.parsed.ltrSuburbMarket;
+    const copy = deriveLeaseAppraisalCopy({ ...input, compCount: 30, rentRangeLabel: "$540–$590", suburbMarket: null });
+    expect(copy.appeal_points).toContain("Review local demand, condition and inclusions before setting the rent.");
+    expect(JSON.stringify(copy)).not.toContain("Suburb rental fundamentals support");
+  });
+
   it("attributes the saved sale estimate to automated evidence, not a different advertised guide", () => {
     const input = fixture();
     const before = structuredClone(input);

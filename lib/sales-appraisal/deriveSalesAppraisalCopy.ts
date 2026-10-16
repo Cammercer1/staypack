@@ -29,14 +29,18 @@ function firstSentences(text: string, maxSentences = 2, maxChars = 340) {
     return "";
   }
 
-  const parts = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [cleaned];
-  const joined = parts.slice(0, maxSentences).join(" ").trim();
-
-  if (joined.length <= maxChars) {
-    return joined;
+  const parts = (cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [cleaned]).map(part => part.trim());
+  const sentences: string[] = [];
+  for (const part of parts.slice(0, maxSentences)) {
+    if ([...sentences, part].join(" ").length > maxChars) break;
+    sentences.push(part);
   }
+  if (sentences.length) return sentences.join(" ");
 
-  return `${joined.slice(0, maxChars - 1).trim()}…`;
+  // Only shorten when the first sentence alone cannot fit, and never split a word.
+  const prefix = parts[0]!.slice(0, maxChars - 1);
+  const boundary = prefix.lastIndexOf(" ");
+  return boundary > 0 ? `${prefix.slice(0, boundary).trimEnd()}…` : "";
 }
 
 function deriveHeading(listing: Listing, parsed: ParsedListing) {
