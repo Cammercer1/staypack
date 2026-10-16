@@ -106,3 +106,36 @@ assert outcomes.count("created") == 1 and outcomes.count("duplicate") == 11, out
 assert query(f"select count(*) from public.agency_contacts where agency_id='{agency}' and lower(btrim(email))='{email}';") == "1"
 query(f"delete from public.agency_contacts where agency_id='{agency}' and lower(btrim(email))='{email}';")
 print("PASS 12 REPEATABLE READ inserts with mixed-case/whitespace emails created one client; unique index rejected 11")
+
+# Save contact and Create report race on the same lead row; both must agree on
+# one person and one report, including duplicate button clicks from other tabs.
+widget = query(f"select id from public.str_calculator_widgets where agency_id='{agency}';")
+created_widget = not widget
+if created_widget:
+    widget = str(uuid.uuid4())
+    query(f"insert into public.str_calculator_widgets(id,agency_id,enabled) values('{widget}','{agency}',true);")
+lead = str(uuid.uuid4())
+email = f"save-contact-{uuid.uuid4()}@example.test"
+query(f"""set role service_role;
+insert into public.str_calculator_leads(id,agency_id,widget_id,request_id,input_hash,client_hash,address,bedrooms,email,full_name,country,input_json,consent_version,consent_text)
+values('{lead}','{agency}','{widget}',gen_random_uuid(),'hash','client','2/24 Cliffbrook Parade, Coogee NSW 2034',2,'{email}','Lead Client','AU','{{}}','v3','Consent');
+""")
+def save_contact(number):
+    if number % 2:
+        convert(number)
+    return query(f"set role service_role; select public.save_calculator_enquiry_contact('{agency}','10000000-0000-4000-8000-000000000001','{lead}','{{\"mode\":\"named\",\"name\":\"Lead Client\",\"email\":\"{email}\"}}')#>>'{{contact,id}}';")
+with ThreadPoolExecutor(max_workers=12) as pool:
+    contacts = list(pool.map(save_contact, range(12)))
+assert len(set(contacts)) == 1, contacts
+assert query(f"select count(*) from public.agency_contacts where agency_id='{agency}' and email='{email}';") == "1"
+report = query(f"select report_id from public.str_calculator_leads where id='{lead}';")
+assert query(f"select contact_id from public.str_appraisals where report_id='{report}';") == contacts[0]
+listing = query(f"select listing_id from public.reports where id='{report}';")
+query(f"""delete from public.str_calculator_leads where id='{lead}';
+delete from public.collateral_items where report_id='{report}';
+delete from public.reports where id='{report}';
+delete from public.listings where id='{listing}';
+delete from public.agency_contacts where agency_id='{agency}' and email='{email}';""")
+if created_widget:
+    query(f"delete from public.str_calculator_widgets where id='{widget}';")
+print("PASS 12 concurrent Save contact / Create report requests share one contact and report")

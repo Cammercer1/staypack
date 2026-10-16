@@ -21,21 +21,21 @@ export function AppraisalCustomerPanel({ initialAppraisal, archived, onEditingCh
   return <Dialog open={editing} onOpenChange={next => { if (!saving) changeEditing(next); }}>
     <section data-theme="staypack-workspace" aria-labelledby={headingId} className="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border border-base-300 bg-base-100 p-4 text-base-content">
       <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-base-200 text-primary">{named ? <UserRound className="size-5" aria-hidden="true" /> : <UsersRound className="size-5" aria-hidden="true" />}</span>
-      <div className="min-w-0 flex-1"><h2 id={headingId} className="text-xs text-base-content/60">Client · Prepared for</h2><p className="break-words font-medium">{named ? appraisal.recipient_name : appraisal.client_review_required ? appraisal.client_pending_json?.reason === "identity_conflict" ? "Review client details" : "Add client name" : "No named client"}</p>
+      <div className="min-w-0 flex-1"><h2 id={headingId} className="text-xs text-base-content/60">Contact · Prepared for</h2><p className="break-words font-medium">{named ? appraisal.recipient_name : appraisal.client_review_required ? appraisal.client_pending_json?.reason === "identity_conflict" ? "Review contact details" : "Add contact name" : "No named contact"}</p>
         {(appraisal.recipient_email || appraisal.recipient_phone || appraisal.client_pending_json?.email) && <p className="break-all text-xs text-base-content/65">{[appraisal.recipient_email || appraisal.client_pending_json?.email, appraisal.recipient_phone || appraisal.client_pending_json?.phone].filter(Boolean).join(" · ")}</p>}
         {appraisal.client_review_required && <p className="mt-1 text-xs text-base-content/65">Review the calculator enquiry details before sharing.</p>}
       </div>
       {!archived && <DialogTrigger render={<button type="button" className="du-btn du-btn-sm du-btn-ghost min-h-11" />}>
-        {named ? <Pencil className="size-4" aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}{named ? "Change client" : "Add client"}
+        {named ? <Pencil className="size-4" aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}{named ? "Change contact" : "Add contact"}
       </DialogTrigger>}
       {archived && <AppraisalArchiveControl reportId={appraisal.report_id} archived />}
     </section>
     <DialogContent data-theme="staypack-workspace" showCloseButton={false} className="max-h-[90dvh] gap-0 overflow-y-auto rounded-2xl bg-base-100 p-0 text-base-content sm:max-w-xl">
       <div className="flex items-start justify-between gap-4 border-b border-base-300 px-5 py-5 sm:px-6">
-        <div><DialogTitle className="text-xl">{named ? "Change client" : "Add client"}</DialogTitle><DialogDescription className="mt-2 text-base-content/65">Choose who this proposal is prepared for.</DialogDescription></div>
-        <button type="button" aria-label="Close client details" disabled={saving} onClick={() => changeEditing(false)} className="du-btn du-btn-sm du-btn-ghost du-btn-square min-h-11 min-w-11"><X className="size-5" aria-hidden="true" /></button>
+        <div><DialogTitle className="text-xl">{named ? "Change contact" : "Add contact"}</DialogTitle><DialogDescription className="mt-2 text-base-content/65">Choose who this proposal is prepared for.</DialogDescription></div>
+        <button type="button" aria-label="Close contact details" disabled={saving} onClick={() => changeEditing(false)} className="du-btn du-btn-sm du-btn-ghost du-btn-square min-h-11 min-w-11"><X className="size-5" aria-hidden="true" /></button>
       </div>
-      {editing && <div className="p-5 sm:p-6"><RecipientForm initialValues={{ mode: "named", contact_id: appraisal.contact_id || "", name: appraisal.recipient_name || appraisal.client_pending_json?.name || "", email: appraisal.recipient_email || appraisal.client_pending_json?.email || "", phone: appraisal.recipient_phone || appraisal.client_pending_json?.phone || "" }} submitLabel="Save client details" onCancel={() => changeEditing(false)} onSubmit={async recipient => {
+      {editing && <div className="p-5 sm:p-6"><RecipientForm initialValues={{ mode: "named", contact_id: appraisal.contact_id || "", name: appraisal.recipient_name || appraisal.client_pending_json?.name || "", email: appraisal.recipient_email || appraisal.client_pending_json?.email || "", phone: appraisal.recipient_phone || appraisal.client_pending_json?.phone || "" }} submitLabel="Save contact details" onCancel={() => changeEditing(false)} onSubmit={async recipient => {
         setSaving(true);
         try {
           const result = await readPrivateResponse(await fetch(paths.api, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipient, expected_updated_at: appraisal.updated_at }) }));

@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { loadRecipientFromSource } from "./sourceRecipient";
+import { loadRecipientFromContact, loadRecipientFromSource } from "./sourceRecipient";
 
 const id = "10000000-0000-4000-8000-000000000001";
 function fixture(data: unknown, contact: unknown = { id: "client" }) {
@@ -51,4 +51,22 @@ it("does not expose inaccessible report recipients and ignores malformed ids", a
   mock.from.mockClear();
   expect(await loadRecipientFromSource(mock.supabase, "agency", "invalid")).toBeNull();
   expect(mock.from).not.toHaveBeenCalled();
+});
+
+
+it("starts a report from an explicit contact selection without touching a report", async () => {
+  const mock = fixture(null, { id: "canonical", name: "Saved Person", email: "person@example.test", phone: null });
+  expect(await loadRecipientFromContact(mock.supabase, "agency", id)).toEqual({ mode: "named", contact_id: "canonical", name: "Saved Person", email: "person@example.test", phone: "" });
+  expect(mock.rpc).toHaveBeenCalledWith("get_agency_client", { p_agency_id: "agency", p_client_id: id });
+  expect(mock.from).not.toHaveBeenCalled();
+});
+
+it("rejects archived, inaccessible and invalid contact selections", async () => {
+  const archived = fixture(null, { id, archived_at: "2026-10-16" });
+  expect(await loadRecipientFromContact(archived.supabase, "agency", id)).toBeNull();
+  const missing = fixture(null, null);
+  expect(await loadRecipientFromContact(missing.supabase, "agency", id)).toBeNull();
+  missing.rpc.mockClear();
+  expect(await loadRecipientFromContact(missing.supabase, "agency", "invalid")).toBeNull();
+  expect(missing.rpc).not.toHaveBeenCalled();
 });

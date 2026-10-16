@@ -673,3 +673,43 @@ Assertions cover merge retries, stale edits, alias tampering, agency isolation,
 archived email collisions, STR/lease/sales carry-through and unchanged historical
 rows. Application validation passed 1,911 unit tests, TypeScript, lint (no errors)
 and the production build including all 74 required routes.
+
+## Contacts and calculator enquiries
+
+`20261016020354_contacts_and_calculator_enquiries.sql` separates the calculator
+inbox from the saved Contacts directory. It was applied on 16 October 2026 before
+the UI release. `/contacts` is the directory; old `/clients?client=...` links
+redirect while preserving the selected contact. Existing private API/RPC names
+remain compatible.
+
+A new calculator enquiry never creates a contact. The insert trigger only links
+an active canonical contact when the same-agency normalized email, name and any
+supplied phone details agree. It does not edit contact data. Missing/conflicting
+identities stay unlinked for review. There is no historical backfill.
+
+**Save contact** uses an authenticated, service-only RPC that checks membership,
+locks the enquiry and resolves an explicitly selected or newly entered contact.
+Retries reuse its saved association. Saving creates no property or report and
+never rewrites submitted enquiry details or an existing report recipient. A
+subsequent Create report uses the saved contact for the new draft; archived
+contacts require review. Existing report retries still return immediately.
+
+Enquiry progress is separate from estimate delivery: New enquiry, Contact saved,
+Draft created, Report published, Report unpublished or Report archived. Publication
+is derived from actual proposal link/report state. Contact history counts all
+reports, including merged aliases, separately as draft, published and archived;
+the 50-row history limit does not limit totals. Contacts with zero reports can
+start STR, lease or sales reports with their details already selected.
+
+The migration changes functions and adds one insert trigger. It does not update
+historical report/recipient rows, versions, public links, PDFs, properties or
+billing. All new functions use security invoker with explicit grants and agency
+checks; public visitors cannot call directory or enquiry RPCs.
+
+The disposable SQL runner includes `contacts_enquiries_assertions.sql` for
+no automatic contact creation, Save contact idempotency, reviewed identity
+carry-through, progress, ownership and immutable publications. The concurrency
+runner adds twelve simultaneous Save contact/Create report requests. The opt-in
+`tests/staging/client-setup.spec.ts` exercises desktop/mobile saving, old URL
+redirects, automatic linking, all three report pickers, publication and public/
+print recipient snapshots in a disposable tenant, without paid provider calls.

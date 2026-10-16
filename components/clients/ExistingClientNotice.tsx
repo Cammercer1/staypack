@@ -21,13 +21,13 @@ export function ExistingClientNotice({ email, excludeId, onSelect, onView, previ
   const matches = valid ? (previewClients ?? remote.data).filter(client => client.id !== excludeId && client.email?.trim().toLowerCase() === normalizedEmail) : [];
   if (!matches.length) return null;
   return <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4" aria-live="polite">
-    <p className="text-sm font-medium">A saved client already uses this email.</p>
+    <p className="text-sm font-medium">A saved contact already uses this email.</p>
     {matches.map((client: MatchingClient) => <div key={client.id} className="flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0"><p className="break-words text-sm font-medium">{client.name}{client.archived_at && <span className="du-badge du-badge-sm ml-2">Archived</span>}</p><p className="break-all text-xs text-base-content/65">{[client.email, client.phone].filter(Boolean).join(" · ")}</p></div>
-      {onView ? <button type="button" className="du-btn du-btn-sm min-h-11" onClick={() => onView(client.id)}>View existing client</button>
-        : client.archived_at ? <Link href={`/clients?client=${encodeURIComponent(client.id)}`} className="du-btn du-btn-sm min-h-11">View archived client</Link>
-        : onSelect && <button type="button" className="du-btn du-btn-sm min-h-11" onClick={() => onSelect(client)}>Use existing client</button>}
+      {onView ? <button type="button" className="du-btn du-btn-sm min-h-11" onClick={() => onView(client.id)}>View existing contact</button>
+        : client.archived_at ? <Link href={`/contacts?contact=${encodeURIComponent(client.id)}`} className="du-btn du-btn-sm min-h-11">View archived contact</Link>
+        : onSelect && <button type="button" className="du-btn du-btn-sm min-h-11" onClick={() => onSelect(client)}>Use existing contact</button>}
     </div>)}
-    <p className="text-xs text-base-content/65">{matches.some((client: MatchingClient) => client.archived_at) ? "Restore archived clients in the Clients directory before using them on a new report." : "Select the saved client to keep their history together."}</p>
+    <p className="text-xs text-base-content/65">{matches.some((client: MatchingClient) => client.archived_at) ? "Restore archived contacts in the Contacts directory before using them on a new report." : "Select the saved contact to keep their history together."}</p>
   </div>;
 }

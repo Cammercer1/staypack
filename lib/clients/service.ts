@@ -7,7 +7,7 @@ import type { Client, ClientDetail, ClientListResult } from "./types";
 export const CLIENT_PAGE_SIZE = 30;
 
 export class ClientError extends Error {
-  constructor(message: string, readonly status = 400) { super(message); }
+  constructor(message: string, readonly status = 400) { super(message.replace(/\bClient\b/g, "Contact").replace(/\bclient\b/g, "contact").replace(/\bclients\b/g, "contacts")); }
 }
 
 function throwDatabaseError(error: { message: string; code?: string }) {
@@ -45,6 +45,6 @@ export async function updateClient(supabase: SupabaseClient, agencyId: string, c
 export async function loadClient(supabase: SupabaseClient, agencyId: string, clientId: string) {
   const { data, error } = await supabase.rpc("get_agency_client", { p_agency_id: agencyId, p_client_id: clientId });
   if (error) throwDatabaseError(error);
-  if (!data) throw new ClientError("Client not found.", 404);
+  if (!data) throw new ClientError("Contact not found.", 404);
   return data as ClientDetail;
 }

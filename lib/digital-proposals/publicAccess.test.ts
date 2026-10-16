@@ -22,3 +22,9 @@ it("still authenticates and protects the appraisal workspace", async () => {
   expect(response.headers.get("location")).toContain("/login?redirectTo=");
   expect(createClient).toHaveBeenCalledTimes(1);
 });
+
+it.each(["/contacts", "/clients"])("requires authentication for %s", async path => {
+  createClient.mockReturnValue({ auth: { getUser: async () => ({ data: { user: null } }) } });
+  const response = await middleware(new NextRequest(`https://staypack.app${path}`));
+  expect(response.headers.get("location")).toBe(`https://staypack.app/login?redirectTo=${encodeURIComponent(path)}`);
+});

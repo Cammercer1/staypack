@@ -11,7 +11,7 @@ import type { Listing } from "../../lib/types";
 
 // Explicit opt-in, disposable tenant only. Provider/AI outputs are seeded fixtures;
 // no estimate, property lookup, prepare, PDF generation, billing or email endpoint is called.
-test("clients: calculator handoff, shared recipients and immutable published STR/lease/sales proposals", async ({ context, browser, baseURL }, testInfo) => {
+test("contacts: calculator handoff, shared recipients and immutable published STR/lease/sales proposals", async ({ context, browser, baseURL }, testInfo) => {
   test.skip(process.env.CLIENT_SETUP_LIVE_TEST !== "1", "Requires CLIENT_SETUP_LIVE_TEST=1, migrated database and backend credentials.");
   test.setTimeout(300_000);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -23,9 +23,11 @@ test("clients: calculator handoff, shared recipients and immutable published STR
   let userId: string | undefined;
   const visitor = await browser.newContext({ baseURL });
   const page = await visitor.newPage();
+  const staff = await context.newPage();
   const unexpectedRequests: string[] = [];
   const browserErrors: string[] = [];
   page.on("pageerror", error => browserErrors.push(error.message));
+  staff.on("pageerror", error => browserErrors.push(error.message));
   await visitor.route(/\/api\/.*(?:estimate|generate-copy|property-profile|\/prepare|\/pdf)(?:\?|$)/, async route => {
     unexpectedRequests.push(route.request().url());
     await route.abort();
@@ -41,14 +43,14 @@ test("clients: calculator handoff, shared recipients and immutable published STR
     return payload as T;
   };
   const headers = { Origin: baseURL! };
-  const clientName = "Jordan Client QA";
-  const privateEmail = `private-client-${agencyId}@example.com`;
+  const clientName = "Jordan Contact QA";
+  const privateEmail = `private-contact-${agencyId}@example.com`;
   const privatePhone = "0412345678";
   const published: { kind: "str" | "lease" | "sales"; reportId: string; version: ProposalVersionSummary; frozen: unknown }[] = [];
   try {
-    const email = `client-setup-${agencyId}@example.com`, password = `${randomUUID()}Aa1!`;
+    const email = `contact-setup-${agencyId}@example.com`, password = `${randomUUID()}Aa1!`;
     userId = check(await admin.auth.admin.createUser({ email, password, email_confirm: true })).user!.id;
-    check(await admin.from("agencies").insert({ id: agencyId, name: "Client Setup QA", slug: `client-setup-${agencyId}`, country_code: "AU", report_template_id: "haven-properties-str" }));
+    check(await admin.from("agencies").insert({ id: agencyId, name: "Contact Setup QA", slug: `contact-setup-${agencyId}`, country_code: "AU", report_template_id: "haven-properties-str" }));
     check(await admin.from("agency_members").insert({ agency_id: agencyId, user_id: userId, role: "owner" }));
     check(await admin.from("account_template_grants").insert({ agency_id: agencyId, template_id: "haven-properties-str", product: "str", is_default: true }));
     const cookies: { name: string; value: string }[] = [];
@@ -75,7 +77,45 @@ test("clients: calculator handoff, shared recipients and immutable published STR
       input_json: { address, bedrooms: 3, bathrooms: 2, full_name: clientName, email: privateEmail, phone: privatePhone, consent: true },
       original_estimate_json: raw, status: "estimated", completed_at: fetchedAt,
       estimate_json: { annualRevenue: 60000, monthlyRevenue: 5000, nightlyRate: 300, occupancyRate: 60, currency: "AUD", address, bedrooms: 3, bathrooms: 2, guests: 6 },
-      consent_version: "client-setup-qa", consent_text: "Synthetic integration fixture; no person will be contacted." }));
+      consent_version: "contact-setup-qa", consent_text: "Synthetic integration fixture; no person will be contacted." }));
+    // New enquiries are an inbox, not automatic contacts. Save via the actual UI.
+    expect((await json<ClientListResult>(context.request.get("/api/clients"))).total).toBe(0);
+    await staff.goto("/marketing/str-calculator");
+    await expect(staff.getByText("New enquiry", { exact: true })).toBeVisible();
+    await staff.getByRole("button", { name: `Save contact for ${clientName}` }).click();
+    const saveDialog = staff.getByRole("dialog", { name: "Save contact", exact: true });
+    await expect(saveDialog.getByLabel("Contact name", { exact: true })).toHaveValue(clientName);
+    await saveDialog.getByRole("button", { name: "Save contact", exact: true }).click();
+    await expect(staff.getByText("Contact saved", { exact: true })).toBeVisible();
+    const savedContact = (await json<ClientListResult>(context.request.get("/api/clients"))).clients[0];
+    const zero = await json<ClientDetail>(context.request.get(`/api/clients/${savedContact.id}`));
+    expect(zero.reportCounts).toEqual({ draft: 0, published: 0, archived: 0 });
+    expect(zero.leadsTotal).toBe(1);
+    expect(check(await admin.from("reports").select("id").eq("agency_id", agencyId))).toHaveLength(0);
+    await staff.screenshot({ path: testInfo.outputPath("enquiry-contact-saved-desktop.png"), fullPage: true });
+    await staff.setViewportSize({ width: 390, height: 844 });
+    await staff.screenshot({ path: testInfo.outputPath("enquiry-contact-saved-mobile.png"), fullPage: true });
+    await staff.goto(`/clients?client=${savedContact.id}`);
+    await expect(staff).toHaveURL(new RegExp(`/contacts\\?contact=${savedContact.id}`));
+    const contactDialog = staff.getByRole("dialog", { name: clientName, exact: true });
+    await expect(contactDialog.getByText("No reports yet.", { exact: true })).toBeVisible();
+    await expect(contactDialog.getByText("0 drafts · 0 published", { exact: true })).toBeVisible();
+    await staff.screenshot({ path: testInfo.outputPath("saved-contact-mobile.png"), fullPage: true });
+    await contactDialog.getByText("Create report", { exact: true }).click();
+    const strLink = contactDialog.getByRole("link", { name: "Short-term rental", exact: true });
+    await expect(strLink).toHaveAttribute("href", `/short-term-rentals/appraisals/new?contact_id=${savedContact.id}`);
+    for (const path of [`/short-term-rentals/appraisals/new?contact_id=${savedContact.id}`, `/appraisals/new?kind=lease&contact_id=${savedContact.id}`, `/appraisals/new?kind=sales&contact_id=${savedContact.id}`]) {
+      await staff.goto(path);
+      await expect(staff.getByText(clientName, { exact: true })).toBeVisible();
+    }
+    await staff.setViewportSize({ width: 1440, height: 1000 });
+    // A second property enquiry from the same person links without creating a contact.
+    const repeatLeadId = randomUUID();
+    check(await admin.from("str_calculator_leads").insert({ id: repeatLeadId, agency_id: agencyId, widget_id: widgetId,
+      request_id: randomUUID(), input_hash: `qa-${repeatLeadId}`, client_hash: `qa-${repeatLeadId}`,
+      address: "3/24 QA Parade, Sydney NSW 2000", bedrooms: 3, country: "AU", email: privateEmail.toUpperCase(), phone: privatePhone, full_name: clientName,
+      input_json: {}, status: "failed", consent_version: "contacts-enquiries-qa", consent_text: "Synthetic fixture." }));
+    expect(check(await admin.from("str_calculator_leads").select("contact_id").eq("id", repeatLeadId).single()).contact_id).toBe(savedContact.id);
     const leadPath = `/api/marketing/str-calculator/leads/${leadId}/report`;
     const first = await json<{ report_id: string; created: boolean; estimate_reused: boolean }>(context.request.post(leadPath, { headers }));
     expect(first.created).toBe(true);
@@ -85,22 +125,24 @@ test("clients: calculator handoff, shared recipients and immutable published STR
     const appraisal = check(await admin.from("str_appraisals").select("*").eq("agency_id", agencyId).eq("report_id", first.report_id).single());
     expect(appraisal).toMatchObject({ recipient_mode: "named", recipient_name: clientName, recipient_email: privateEmail,
       client_review_required: false, client_pending_json: null, client_source_lead_id: leadId });
-    expect(appraisal.contact_id).toBeTruthy();
+    expect(appraisal.contact_id).toBe(savedContact.id);
+    await staff.goto("/marketing/str-calculator");
+    await expect(staff.getByText("Draft created", { exact: true })).toBeVisible();
     const clients = await json<ClientListResult>(context.request.get(`/api/clients?q=${encodeURIComponent(privateEmail)}`));
     expect(clients.total).toBe(1);
     const client = clients.clients[0];
     expect(client.id).toBe(appraisal.contact_id);
     expect(client.name).toBe(clientName);
     expect((await context.request.post("/api/clients", { headers, data: { name: clientName, email: privateEmail.toUpperCase(), phone: privatePhone } })).status()).toBe(409);
-    const manual = await json<{ client: Client }>(context.request.post("/api/clients", { headers, data: { name: "Manual Client QA", email: `manual-${agencyId}@example.com`, phone: "" } }));
-    expect(manual.client.name).toBe("Manual Client QA");
+    const manual = await json<{ client: Client }>(context.request.post("/api/clients", { headers, data: { name: "Manual Contact QA", email: `manual-${agencyId}@example.com`, phone: "" } }));
+    expect(manual.client.name).toBe("Manual Contact QA");
 
     // Seed reviewed property/evidence only on this new report. Keep its cached estimate intact.
     const report = check(await admin.from("reports").select("*").eq("id", first.report_id).eq("agency_id", agencyId).single());
     expect(report.original_estimate_json.raw.response).toEqual(raw.response);
     expect(report.str_enrichment_json.cost_cents).toBe(0);
     const photos = fixture.listing.selected_image_urls!;
-    check(await admin.from("listings").update({ hero_image_url: photos[0], selected_image_urls: photos, uploaded_image_urls: photos, property_type: "house", listing_description: "Synthetic property for client integration QA." }).eq("id", report.listing_id).eq("agency_id", agencyId));
+    check(await admin.from("listings").update({ hero_image_url: photos[0], selected_image_urls: photos, uploaded_image_urls: photos, property_type: "house", listing_description: "Synthetic property for contact integration QA." }).eq("id", report.listing_id).eq("agency_id", agencyId));
     const listing = check(await admin.from("listings").select("*").eq("id", report.listing_id).eq("agency_id", agencyId).single()) as Listing;
     check(await admin.from("reports").update({ ai_copy_json: fixture.report.ai_copy_json,
       user_overrides_json: { ...report.user_overrides_json, calculatorReview: { status: "verified", propertyKey: calculatorPropertyReviewKey(listing) } },
@@ -116,7 +158,7 @@ test("clients: calculator handoff, shared recipients and immutable published STR
       expect(current).toMatchObject({ recipient_name: clientName, contact_id: client.id });
       // Avoid the paid AI prepare route: seed its deterministic fixture document.
       const document = structuredClone(fixture[kind].final_report_json!);
-      document.agency.name = "Client Setup QA";
+      document.agency.name = "Contact Setup QA";
       document.property.address = listing.property_address!;
       check(await admin.from("str_appraisals").update({ document_json: document, document_revision: current.input_revision }).eq("report_id", created.report.id).eq("agency_id", agencyId));
       reports.push({ kind, reportId: created.report.id });
@@ -136,16 +178,22 @@ test("clients: calculator handoff, shared recipients and immutable published STR
       await page.goto(version.path);
       await expect(page.getByText(`Prepared for ${clientName}`).first()).toBeVisible();
       expect(await page.locator("body").innerText()).not.toContain(privateEmail);
-      await page.screenshot({ path: testInfo.outputPath(`${kind}-client-proposal.png`), fullPage: true });
+      await page.screenshot({ path: testInfo.outputPath(`${kind}-contact-proposal.png`), fullPage: true });
       expect((await visitor.request.get(`/proposal/print/${version.id}`)).status()).toBe(404);
       await page.goto(proposalPrintUrl(version.id, baseURL!));
       await expect(page.locator("[data-report-recipient]")).toHaveText(`Prepared for ${clientName}`);
       expect(await page.locator("body").innerText()).not.toContain(privatePhone);
-      await page.locator(".report-page").first().screenshot({ path: testInfo.outputPath(`${kind}-client-print.png`) });
+      await page.locator(".report-page").first().screenshot({ path: testInfo.outputPath(`${kind}-contact-print.png`) });
     }
 
     const detail = await json<ClientDetail>(context.request.get(`/api/clients/${client.id}`));
     expect(detail.reportsTotal).toBe(3);
+    expect(detail.reportCounts).toEqual({ draft: 0, published: 3, archived: 0 });
+    await staff.goto("/marketing/str-calculator");
+    await expect(staff.getByText("Report published", { exact: true })).toBeVisible();
+    await staff.screenshot({ path: testInfo.outputPath("published-enquiry-desktop.png"), fullPage: true });
+    await staff.goto(`/contacts?contact=${client.id}`);
+    await expect(staff.getByText("0 drafts · 3 published", { exact: true })).toBeVisible();
     expect(detail.leads.map(lead => lead.id)).toContain(leadId);
     const edited = await json<{ client: Client }>(context.request.patch(`/api/clients/${client.id}`, { headers, data: {
       name: "Updated Directory Name", email: privateEmail, phone: privatePhone, archived: false, expected_updated_at: detail.client.updated_at,

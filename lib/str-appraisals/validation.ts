@@ -17,7 +17,7 @@ export const recipientSchema = z.object({
   phone: z.string().trim().max(50),
 }).superRefine((value, ctx) => {
   if (value.mode === "general") return;
-  if (!value.name) ctx.addIssue({ code: "custom", path: ["name"], message: "Enter the client's name." });
+  if (!value.name) ctx.addIssue({ code: "custom", path: ["name"], message: "Enter the contact's name." });
   if (value.email && !z.email().safeParse(value.email).success)
     ctx.addIssue({ code: "custom", path: ["email"], message: "Enter a valid email address." });
   if (value.phone && !normalizeRecipientPhone(value.phone))

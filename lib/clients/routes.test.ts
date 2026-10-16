@@ -63,7 +63,7 @@ it("returns conflict for duplicate identities and stale edits", async () => {
   mocks.rpc.mockResolvedValue({ data: null, error: { code: "PT409", message: "Select the existing client." } });
   const response = await POST(request({ name: "Jordan", email: "jordan@example.test" }));
   expect(response.status).toBe(409);
-  expect(await response.json()).toEqual({ error: "Select the existing client." });
+  expect(await response.json()).toEqual({ error: "Select the existing contact." });
 });
 
 it("loads scoped client history and returns 404 for an inaccessible client", async () => {

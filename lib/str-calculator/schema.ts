@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { calculateAccommodates } from "@/lib/reports/formatters";
+import type { ReportActivity } from "./enquiryProgress";
 
 export const calculatorFieldsSchema = z.object({
   full_name: z.string().trim().min(1, "Enter your full name.").max(200, "Use 200 characters or fewer."),
@@ -28,6 +29,7 @@ export type CalculatorLead = {
   full_name?: string | null; contact_id?: string | null;
   status: "processing" | "estimated" | "failed"; estimate_json: CalculatorEstimate | null; created_at: string;
   report_id?: string | null;
+  report_activity?: ReportActivity | null;
 };
 
 export const CALCULATOR_CONSENT_VERSION = "str-calculator-v3";

@@ -37,6 +37,8 @@ files = [
     "tests/client_merge_reviewed_merges.sql",
     "migrations/20261016002520_client_email_unique_index.sql",
     "tests/client_merge_assertions.sql",
+    "migrations/20261016020354_contacts_and_calculator_enquiries.sql",
+    "tests/contacts_enquiries_assertions.sql",
 ]
 for name in files:
     sql = (root / "supabase" / name).read_text()

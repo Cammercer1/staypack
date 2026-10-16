@@ -11,7 +11,7 @@ vi.mock("@/components/properties/PropertyStartFlow", () => ({ PropertyStartFlow:
 vi.mock("@/lib/clients/sourceRecipient", () => ({ loadRecipientFromSource: async (_db: unknown, _agency: string, id: string) => ({ mode: "named", name: id === "source-a" ? "Jordan Taylor" : "Sam Taylor", email: "", phone: "" }) }));
 afterEach(cleanup);
 
-it.each(["str", "lease", "sales"] as const)("resets the selected client when navigation changes the explicit source report for %s", async kind => {
+it.each(["str", "lease", "sales"] as const)("resets the selected contact when navigation changes the explicit source report for %s", async kind => {
   async function page(source: string) {
     return kind === "str" ? NewStrAppraisalPage({ searchParams: Promise.resolve({ source_report_id: source }) }) : NewAppraisalPage({ searchParams: Promise.resolve({ kind, source_report_id: source }) });
   }

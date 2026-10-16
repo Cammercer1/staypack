@@ -24,6 +24,8 @@ export type ClientLead = {
   status: string;
   created_at: string;
   report_id: string | null;
+  contact_id?: string | null;
+  report_activity?: import("@/lib/str-calculator/enquiryProgress").ReportActivity | null;
 };
 export type ClientDetail = {
   client: Client;
@@ -31,6 +33,7 @@ export type ClientDetail = {
   leads: ClientLead[];
   reportsTotal: number;
   leadsTotal: number;
+  reportCounts: { draft: number; published: number; archived: number };
 };
 
 export type PendingClient = {

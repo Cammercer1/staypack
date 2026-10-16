@@ -13,8 +13,7 @@ export default async function StrCalculatorPage({ searchParams }: { searchParams
   const page = Math.min(10000, Math.max(1, Math.floor(Number(query.page) || 1)));
   const [settings, leads] = await Promise.all([
     supabase.from("str_calculator_widgets").select("id,public_token,enabled,country,ask_phone").eq("agency_id", agency.id).maybeSingle(),
-    supabase.from("str_calculator_leads").select("id,address,bedrooms,full_name,contact_id,email,phone,country,status,estimate_json,created_at,report_id", { count: "exact" })
-      .eq("agency_id", agency.id).order("created_at", { ascending: false }).order("id", { ascending: false }).range((page - 1) * 25, page * 25 - 1),
+    supabase.rpc("list_calculator_enquiries", { p_agency_id: agency.id, p_page: page, p_page_size: 25 }),
   ]);
   if (settings.error || leads.error) throw new Error("Couldn’t load the STR calculator. Please try again.");
   // Match the local environment during development; published embeds use the canonical origin.
@@ -22,5 +21,5 @@ export default async function StrCalculatorPage({ searchParams }: { searchParams
   // This uncached server request stamps the snapshot once; the client receives a stable value.
   // eslint-disable-next-line react-hooks/purity
   const loadedAt = Date.now();
-  return <StrCalculatorWorkspace brand={calculatorBrand(agency)} initialWidget={settings.data as CalculatorSettings | null} canManage={["owner", "admin"].includes(role)} leads={(leads.data ?? []) as CalculatorLead[]} total={leads.count ?? 0} page={page} baseUrl={baseUrl} loadedAt={loadedAt} />;
+  return <StrCalculatorWorkspace brand={calculatorBrand(agency)} initialWidget={settings.data as CalculatorSettings | null} canManage={["owner", "admin"].includes(role)} leads={(leads.data?.leads ?? []) as CalculatorLead[]} total={leads.data?.total ?? 0} page={page} baseUrl={baseUrl} loadedAt={loadedAt} />;
 }

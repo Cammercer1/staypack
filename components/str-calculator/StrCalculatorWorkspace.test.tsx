@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StrCalculatorWorkspace } from "./StrCalculatorWorkspace";
 import type { CalculatorBrand } from "@/lib/str-calculator/brand";
 
 const navigation = vi.hoisted(() => ({ tab: "setup" as string | null, push: vi.fn(), refresh: vi.fn() }));
+vi.mock("@/components/listings/UnsavedListingGuard", () => ({ UnsavedListingGuard: () => null }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: navigation.refresh, push: navigation.push }), usePathname: () => "/marketing/str-calculator", useSearchParams: () => ({ get: (key: string) => key === "tab" ? navigation.tab : null }) }));
 const brand: CalculatorBrand = { name: "Test Agency", logo: "", primary: "#095b42", onPrimary: "#ffffff", background: "#ffffff", text: "#172b26", surface: "#ffffff", heading_font_family: "fraunces", body_font_family: "inter", heading_font_file_url: null, body_font_file_url: null };
 const widget = { id: "widget", public_token: "token", enabled: false, country: "AU" as const, ask_phone: false };
@@ -15,9 +16,9 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 it("opens on leads with a direct route to setup for a new account", () => {
   navigation.tab = null;
   render(<StrCalculatorWorkspace {...props} initialWidget={null} />);
-  expect(screen.getByRole("heading", { name: "Calculator leads" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Calculator enquiries" })).toBeTruthy();
   expect(screen.queryByRole("combobox", { name: "Property address" })).toBeNull();
-  expect(screen.getByRole("link", { name: "Leads 0" }).getAttribute("aria-current")).toBe("page");
+  expect(screen.getByRole("link", { name: "Enquiries 0" }).getAttribute("aria-current")).toBe("page");
   expect(screen.getByRole("link", { name: "Set up your calculator" }).getAttribute("href")).toBe("/marketing/str-calculator?tab=setup");
 });
 
@@ -28,10 +29,10 @@ it("keeps lead pagination in navigation and separates the two views", () => {
   expect(screen.getByRole("link", { name: "Next" }).getAttribute("href")).toBe("/marketing/str-calculator?page=3");
   navigation.tab = "setup";
   rerender(<StrCalculatorWorkspace {...props} page={2} total={60} />);
-  expect(screen.getByRole("link", { name: "Leads 60" }).getAttribute("href")).toBe("/marketing/str-calculator?page=2");
+  expect(screen.getByRole("link", { name: "Enquiries 60" }).getAttribute("href")).toBe("/marketing/str-calculator?page=2");
   expect(screen.getByRole("link", { name: "Embed & settings" }).getAttribute("aria-current")).toBe("page");
   expect(screen.getByLabelText("Embed code")).toBeTruthy();
-  expect(screen.queryByRole("heading", { name: "Calculator leads" })).toBeNull();
+  expect(screen.queryByRole("heading", { name: "Calculator enquiries" })).toBeNull();
 });
 
 it("preserves unsaved settings when moving between views", () => {
@@ -141,4 +142,47 @@ it("always takes the user into property verification even if an older server ret
   await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/short-term-rentals/appraisals/new-report?review=property"));
   expect(screen.queryByRole("alert")).toBeNull();
   expect(screen.getByRole("link", { name: /Open report/ }).getAttribute("href")).toContain("new-report");
+});
+
+it("saves an enquiry as a contact without creating a report or leaving the inbox", async () => {
+  navigation.tab = null;
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => init?.method === "POST"
+    ? Response.json({ contact: { id: "saved-person", name: "Jordan Taylor" } })
+    : Response.json({ clients: [] }));
+  vi.stubGlobal("fetch", fetcher);
+  render(<StrCalculatorWorkspace {...props} leads={[lead]} total={1} />);
+  expect(screen.getByText("New enquiry")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: `Save contact for ${lead.email}` }));
+  const dialog = screen.getByRole("dialog", { name: "Save contact" });
+  fireEvent.change(within(dialog).getByLabelText("Contact name"), { target: { value: "Jordan Taylor" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save contact" }));
+  await screen.findByText("Jordan Taylor saved to Contacts.");
+  expect(screen.getByText("Contact saved")).toBeTruthy();
+  expect(screen.getByRole("link", { name: "View contact" }).getAttribute("href")).toBe("/contacts?contact=saved-person");
+  expect(screen.getByText(lead.address)).toBeTruthy();
+  expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST").map(([url]) => url)).toEqual(["/api/marketing/str-calculator/leads/lead-1/contact"]);
+  expect(navigation.push).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: /Create report/ })).toBeTruthy();
+});
+
+it("shows report publication independently from estimate delivery and contact saving", () => {
+  navigation.tab = null;
+  render(<StrCalculatorWorkspace {...props} leads={[{ ...lead, report_id: "published", contact_id: "person", report_activity: "published" }]} total={1} />);
+  expect(screen.getByText("Report published")).toBeTruthy();
+  expect(screen.getByText("Estimate delivered")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Save contact/ })).toBeNull();
+  expect(screen.getByRole("link", { name: "View contact" })).toBeTruthy();
+});
+
+it("keeps entered contact details when saving fails and offers a retry", async () => {
+  navigation.tab = null;
+  vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockImplementation(async (_url, init) => init?.method === "POST" ? Response.json({ error: "Select the existing contact." }, { status: 409 }) : Response.json({ clients: [] })));
+  render(<StrCalculatorWorkspace {...props} leads={[{ ...lead, full_name: "Jordan Taylor" }]} total={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Save contact for Jordan Taylor" }));
+  const dialog = screen.getByRole("dialog", { name: "Save contact" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save contact" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("Select the existing contact");
+  expect(within(dialog).getByLabelText("Contact name")).toHaveProperty("value", "Jordan Taylor");
+  expect(screen.getByText("New enquiry")).toBeTruthy();
+  expect(navigation.push).not.toHaveBeenCalled();
 });

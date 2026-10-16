@@ -2,7 +2,7 @@ import { z } from "zod";
 import { normalizeRecipientPhone } from "@/lib/str-appraisals/validation";
 
 export const clientSchema = z.object({
-  name: z.string().trim().min(1, "Enter the client's name.").max(200),
+  name: z.string().trim().min(1, "Enter the contact's name.").max(200),
   email: z.string().trim().max(254).default(""),
   phone: z.string().trim().max(50).default(""),
 }).superRefine((value, ctx) => {

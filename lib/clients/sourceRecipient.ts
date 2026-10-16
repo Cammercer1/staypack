@@ -3,6 +3,16 @@ import { z } from "zod";
 import { generalRecipient, type RecipientValues } from "@/lib/str-appraisals/validation";
 import type { ClientDetail, PendingClient } from "./types";
 
+/** An explicit directory selection starts a new report with the saved contact. */
+export async function loadRecipientFromContact(supabase: SupabaseClient, agencyId: string, contactId: string): Promise<RecipientValues | null> {
+  if (!z.uuid().safeParse(contactId).success) return null;
+  const { data, error } = await supabase.rpc("get_agency_client", { p_agency_id: agencyId, p_client_id: contactId });
+  if (error && error.code !== "PT404") throw new Error(error.message);
+  const contact = (data as ClientDetail | null)?.client;
+  if (!contact || contact.archived_at) return null;
+  return { mode: "named", contact_id: contact.id, name: contact.name, email: contact.email || "", phone: contact.phone || "" };
+}
+
 /** Explicit report lineage only: the property's other recipients are never inferred. */
 export async function loadRecipientFromSource(supabase: SupabaseClient, agencyId: string, sourceReportId: string): Promise<RecipientValues | null> {
   if (!z.uuid().safeParse(sourceReportId).success) return null;

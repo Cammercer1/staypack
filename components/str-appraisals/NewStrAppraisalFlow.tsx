@@ -24,7 +24,7 @@ export function NewStrAppraisalFlow({ initialListing, initialRecipient = general
     const parsed = recipientSchema.safeParse(recipient);
     if (!parsed.success) {
       setClientErrors(Object.fromEntries(parsed.error.issues.map(issue => [String(issue.path[0]), issue.message])));
-      throw new Error("Check the client details before creating the appraisal.");
+      throw new Error("Check the contact details before creating the appraisal.");
     }
     setClientErrors({}); setCreating(true);
     try {
