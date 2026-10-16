@@ -88,7 +88,7 @@ export function ReportWizard({
   const [previewAgency, setPreviewAgency] = useState(agency);
   const [canManageStrDefaults, setCanManageStrDefaults] = useState(false);
   const proposalRef = useRef<ProposalWorkflowHandle>(null);
-  const wizardSteps = digitalProposal ? steps.map(item => ({ ...item, label: ({ estimate: "Rental appraisal", design: "Proposal", preview: "Customer & share" } as Record<string, string>)[item.id] ?? item.label })) : steps;
+  const wizardSteps = digitalProposal ? steps.map(item => ({ ...item, label: ({ estimate: "Rental appraisal", design: "Proposal", preview: "Review & share" } as Record<string, string>)[item.id] ?? item.label })) : steps;
   const designRef = useRef<StrDesignHandle>(null);
   const estimateRef = useRef<StrEstimateHandle>(null);
   const copyRef = useRef<StrCopyEditorHandle>(null);
@@ -364,6 +364,7 @@ export function ReportWizard({
       ) : null}
       {appraisalActions ? <div inert={disabled}>{appraisalActions}</div> : null}
       {digitalProposal && <PropertyContext listing={listing} onEdit={() => void handleStepChange("property")} />}
+      {customerPanel ? <fieldset disabled={busy || childBusy} className="min-w-0">{customerPanel}</fieldset> : null}
       <Tabs
         value={step}
         onValueChange={(next) => void handleStepChange(String(next))}
@@ -416,7 +417,7 @@ export function ReportWizard({
         <TabsContent value="design">
           {progress}
           <div hidden={Boolean(activity)}>
-            {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="proposal" disabled={busy} onBusyChange={setChildBusy} onContinue={() => void handleStepChange("preview")} /> : choosingDesign ? (
+            {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="proposal" refreshKey={customerRevision} disabled={customerEditing || busy} onBusyChange={setChildBusy} onContinue={() => void handleStepChange("preview")} /> : choosingDesign ? (
               <StrDesignStep
                 ref={designRef}
                 agency={previewAgency}
@@ -451,8 +452,7 @@ export function ReportWizard({
           </div>
         </TabsContent>
         <TabsContent value="preview" className="space-y-5">
-          {!digitalProposal && customerPanel ? <fieldset disabled={busy || childBusy} className="min-w-0">{customerPanel}</fieldset> : null}
-          {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="share" refreshKey={customerRevision} customerPanel={customerPanel ? <fieldset disabled={busy || childBusy} className="min-w-0">{customerPanel}</fieldset> : undefined} disabled={customerEditing || busy} onBusyChange={setChildBusy} /> : preview ? (
+          {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="share" refreshKey={customerRevision} disabled={customerEditing || busy} onBusyChange={setChildBusy} /> : preview ? (
             <StrReportDeliveryStep
               disabled={customerEditing}
               report={report}
@@ -464,7 +464,7 @@ export function ReportWizard({
           ) : null}
         </TabsContent>
       </Tabs>
-      {digitalProposal && step === "preview" && !busy && !childBusy && !customerEditing && <CreateAnother listingId={listing.id} />}
+      {digitalProposal && step === "preview" && !busy && !childBusy && !customerEditing && <CreateAnother listingId={listing.id} sourceReportId={report.id} />}
     </div>
   );
 }

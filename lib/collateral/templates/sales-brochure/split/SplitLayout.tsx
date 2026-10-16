@@ -1,3 +1,4 @@
+import { ReportPreparedFor } from "@/lib/reports/templates/shared/ReportPreparedFor";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import type { FinalReportJson } from "@/lib/types";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
@@ -218,6 +219,7 @@ export function SplitContentColumn({
           </p>
         ) : null}
 
+        <ReportPreparedFor report={report} className="text-[0.75rem] leading-snug" />
         <Editable
           as="h1"
           path="copy.heading"

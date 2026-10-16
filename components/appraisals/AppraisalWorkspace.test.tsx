@@ -23,7 +23,7 @@ it.each(["lease", "sales"] as const)("%s: disables customer controls for the ful
   const fixture = createLintRegressionFixtures();
   const appraisal: WorkspaceAppraisal = { ...fixture.appraisal, kind, inputs_json: { version: 1, listing: fixture.listing }, input_revision: 1, document_revision: 1, document_json: fixture[kind].final_report_json };
   render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} archived={false} />);
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "4. Customer & share" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "4. Review & share" })); });
   const customer = screen.getByRole("button", { name: "Edit customer" });
   expect(customer.matches(":disabled")).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Begin publishing" }));

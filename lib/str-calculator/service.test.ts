@@ -34,11 +34,19 @@ beforeEach(() => {
 });
 
 describe("public calculator service", () => {
+  it("keeps client names on the lead without exposing them to the estimate service or public result", async () => {
+    const result = await submitCalculator(token, { ...input, full_name: "Jordan Taylor" }, "client");
+    expect(rpc.mock.calls[0][1].p_input.full_name).toBe("Jordan Taylor");
+    expect(mocks.estimate.mock.calls[0][0]).not.toHaveProperty("full_name");
+    expect(result).not.toHaveProperty("full_name");
+    await submitCalculator(token, { ...input, full_name: "Alex Taylor" }, "client");
+    expect(rpc.mock.calls[0][1].p_input_hash).not.toBe(rpc.mock.calls[1][1].p_input_hash);
+  });
   it("stores an optional phone only when the account asks for it and never sends it to AirROI", async () => {
     load.mockResolvedValue({ data: { id: "widget", agency_id: "agency", public_token: token, enabled: true, country: "AU", ask_phone: true, agency: { name: "Test Agency" } }, error: null });
     const result = await submitCalculator(token, { ...input, phone: "0412 345 678" }, "client");
     expect(rpc.mock.calls[0][1].p_input.phone).toBe("0412 345 678");
-    expect(rpc.mock.calls[0][1].p_consent_text).toContain("contact and property details");
+    expect(rpc.mock.calls[0][1].p_consent_text).toContain("name, email, phone and property details");
     expect(mocks.estimate.mock.calls[0][0]).not.toHaveProperty("phone");
     expect(result).not.toHaveProperty("phone");
     await submitCalculator(token, input, "client");
@@ -75,7 +83,7 @@ describe("public calculator service", () => {
     expect(rpc).toHaveBeenCalledOnce();
     expect(rpc.mock.calls[0][1]).toMatchObject({
       p_input: { email: input.email, consent: true, guests: 6, radiusM: 2000 },
-      p_consent_version: "str-calculator-v2",
+      p_consent_version: "str-calculator-v3",
     });
     const saved = update.mock.calls[0][0];
     expect(saved.original_estimate_json).toEqual(providerRaw);

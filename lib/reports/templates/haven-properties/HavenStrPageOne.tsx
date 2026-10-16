@@ -1,3 +1,4 @@
+import { ReportPreparedFor } from "@/lib/reports/templates/shared/ReportPreparedFor";
 import { formatNumber } from "@/lib/reports/formatters";
 import { getReportBrandColours } from "@/lib/reports/brandColours";
 import { resolveHeroGalleryImages } from "@/lib/reports/templates/classic/ClassicHeroGallery";
@@ -137,6 +138,7 @@ export function HavenStrPageOne({ report }: { report: FinalReportJson }) {
           >
             {report.property.address}
           </h1>
+          <ReportPreparedFor report={report} className="mt-2 text-[0.8rem] leading-snug text-white/90" />
           {HAVEN_BRAND.heroSubheadline ? (
             <p
               className="mt-2 text-[0.9rem] font-medium leading-snug text-white/90"

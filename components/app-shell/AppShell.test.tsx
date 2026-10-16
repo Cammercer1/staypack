@@ -17,6 +17,7 @@ it("keeps the STR workspace discoverable and active from an appraisal", () => {
   expect(link.getAttribute("href")).toBe("/short-term-rentals");
   expect(link.getAttribute("aria-current")).toBe("page");
   for (const [name, href] of [["All appraisals", "/appraisals"], ["Rental appraisals", "/appraisals/rental"], ["Sales appraisals", "/appraisals/sales"]]) expect(within(nav).getByRole("link", { name }).getAttribute("href")).toBe(href);
+  expect(within(nav).getByRole("link", { name: "Clients" }).getAttribute("href")).toBe("/clients");
   expect(within(nav).queryByRole("link", { name: "Listings" })).toBeNull();
   expect(within(nav).getByRole("link", { name: "Brochures" }).getAttribute("href")).toBe("/brochures");
   expect(within(nav).getByRole("link", { name: "STR calculator" }).getAttribute("href")).toBe("/marketing/str-calculator");
@@ -28,6 +29,7 @@ it("includes STR in the mobile navigation too", async () => {
   render(<AppShell>Appraisal</AppShell>);
   fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
   const dialog = await screen.findByRole("dialog", { name: "Workspace navigation" });
+  expect(within(dialog).getByRole("link", { name: "Clients" }).getAttribute("href")).toBe("/clients");
   expect(within(dialog).getByRole("link", { name: "STR calculator" }).getAttribute("href")).toBe("/marketing/str-calculator");
   expect(within(dialog).getByRole("link", { name: "Social media" }).getAttribute("href")).toBe("/social");
   expect(within(dialog).getByRole("link", { name: "Short-Term Rentals" }).getAttribute("href")).toBe("/short-term-rentals");

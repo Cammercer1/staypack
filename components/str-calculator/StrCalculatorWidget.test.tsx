@@ -12,6 +12,7 @@ async function fillJourney() {
   fireEvent.click(screen.getByRole("button", { name: "Increase bathrooms" }));
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   await screen.findByLabelText("Email address");
+  fireEvent.change(screen.getByLabelText("Full name"), { target: { value: "Jordan Taylor" } });
   fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "owner@example.com" } });
 }
 it("requires valid steps and explicit consent, then previews without an estimate call", async () => {
@@ -40,6 +41,18 @@ it("lets visitors skip the phone field when the account enables it", async () =>
   fireEvent.click(screen.getByRole("checkbox"));
   fireEvent.click(screen.getByRole("button", { name: "View sample estimate" }));
   await screen.findByText("Your property’s STR potential.");
+});
+
+it("asks for a full name before delivering the estimate", async () => {
+  const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+  render(<StrCalculatorWidget brand={brand} country="AU" preview />);
+  await fillJourney();
+  fireEvent.change(screen.getByLabelText("Full name"), { target: { value: "   " } });
+  fireEvent.click(screen.getByRole("checkbox"));
+  fireEvent.click(screen.getByRole("button", { name: "View sample estimate" }));
+  await screen.findByText("Enter your full name.");
+  expect(screen.queryByText("Your property’s STR potential.")).toBeNull();
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 it("validates optional phone numbers and includes a valid number in the lead submission", async () => {
@@ -103,7 +116,7 @@ it("preserves property data when going back and keeps a retry's request ID", asy
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   const first = JSON.parse(fetch.mock.calls[0][1].body);
   expect(JSON.parse(fetch.mock.calls[1][1].body).requestId).toBe(first.requestId);
-  expect(first).toMatchObject({ bedrooms: 3, bathrooms: 1.5, email: "owner@example.com", consent: true });
+  expect(first).toMatchObject({ full_name: "Jordan Taylor", bedrooms: 3, bathrooms: 1.5, email: "owner@example.com", consent: true });
 });
 
 it("adjusts bathrooms in half steps within the provider limits, independently of bedrooms", () => {

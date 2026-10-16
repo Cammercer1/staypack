@@ -51,3 +51,28 @@ it("reuses the pending creation request after refreshing and clears it on succes
   expect(JSON.parse(fetcher.mock.calls[1][1].body).request_id).toBe(requestId);
   expect(sessionStorage.getItem(`refresh-test:appraisal-request:lease:${fixture.id}`)).toBeNull();
 });
+
+it.each(["str", "lease", "sales"] as const)("carries an explicit source client snapshot into a new %s report", async kind => {
+  const fetcher = vi.fn().mockResolvedValue(Response.json({ report: { id: "new-draft" } }));
+  vi.stubGlobal("fetch", fetcher);
+  const recipient = { mode: "named" as const, contact_id: "00000000-0000-4000-8000-000000000001", name: "Jordan Taylor", email: "jordan@example.com", phone: "0412345678" };
+  render(<NewStrAppraisalFlow kind={kind} initialRecipient={recipient} initialListing={createLintRegressionFixtures().listing} storageKey="source" />);
+  expect(screen.getByText("Jordan Taylor")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Create appraisal" }));
+  await waitFor(() => expect(router.push).toHaveBeenCalled());
+  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({ kind, recipient });
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+
+it("blocks an old nameless lead until the client name is completed", async () => {
+  const fetcher = vi.fn().mockResolvedValue(Response.json({ report: { id: "new-draft" } }));
+  vi.stubGlobal("fetch", fetcher);
+  render(<NewStrAppraisalFlow initialRecipient={{ mode: "named", name: "", email: "jordan@example.com", phone: "" }} initialListing={createLintRegressionFixtures().listing} storageKey="old-lead" />);
+  fireEvent.click(screen.getByRole("button", { name: "Create appraisal" }));
+  await screen.findByText("Check the client details before creating the appraisal.");
+  expect(fetcher).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("Client name"), { target: { value: "Jordan Taylor" } });
+  fireEvent.click(screen.getByRole("button", { name: "Create appraisal" }));
+  await waitFor(() => expect(router.push).toHaveBeenCalled());
+  expect(JSON.parse(fetcher.mock.calls[0][1].body).recipient).toMatchObject({ name: "Jordan Taylor", email: "jordan@example.com" });
+});

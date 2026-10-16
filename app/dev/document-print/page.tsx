@@ -11,9 +11,9 @@ import { applyStrEstimateAdjustments, saveStrRateOverride } from "@/lib/reports/
 export const metadata = { title: "Synthetic document print check", robots: { index: false, follow: false } };
 
 /** Synthetic records only. This route never reads or writes an account or property. */
-export default async function DocumentPrintCheck({ searchParams }: { searchParams: Promise<{ kind?: string; template?: string; qr?: string; provider?: string; scenario?: string }> }) {
+export default async function DocumentPrintCheck({ searchParams }: { searchParams: Promise<{ kind?: string; template?: string; qr?: string; provider?: string; scenario?: string; client?: string }> }) {
   if (process.env.NODE_ENV !== "development" && process.env.STAYPACK_REGRESSION_PREVIEW !== "1") notFound();
-  const { kind = "str", template, qr, provider, scenario } = await searchParams;
+  const { kind = "str", template, qr, provider, scenario, client } = await searchParams;
   const fixture = createLintRegressionFixtures();
   const link = qr === "on" ? { mode: "custom" as const, url: `https://example.test/${kind}` } : { mode: "none" as const };
   const asset = link.mode === "custom" ? await generateQrCodeDataUrl(link.url) : "";
@@ -27,6 +27,7 @@ export default async function DocumentPrintCheck({ searchParams }: { searchParam
   }
   const base = kind === "lease" ? fixture.lease : kind === "sales" ? fixture.sales : fixture.report;
   const document: FinalReportJson = { ...base.final_report_json!, template_id: template ?? base.template_id ?? "classic-detailed", document_link: link, assets: { qr_code_url: asset, pdf_url: "" } };
+  if (client === "short" || client === "long") document.recipient = { displayName: client === "short" ? "Jordan Taylor" : "Alexandra Catherine Montgomery-Wellington and Benjamin Christopher Montgomery-Wellington, trustees for the Montgomery-Wellington Family Property Investment Trust and Residential Property Portfolio Ltd" };
   if (kind === "str" && provider === "airroi" && fixture.report.str_enrichment_json) {
     const annual = document.str.annual_revenue ?? 60000;
     document.str = { ...document.str, occupancy_rate: fixture.report.final_estimate_json?.occupancyRate ?? 72 };
@@ -43,7 +44,7 @@ export default async function DocumentPrintCheck({ searchParams }: { searchParam
     const rates = { nightlyRate: preset.nightlyRate, occupancyRate: preset.occupancyRate };
     const estimate = applyStrEstimateAdjustments(fixture.report.original_estimate_json!, rates);
     const managed = buildFinalReportJson({ agency: fixture.agency, agencyAgents: [fixture.agent], listing: fixture.listing, report: { ...fixture.report, template_id: document.template_id, str_enrichment_json: document.str_enrichment ?? null, user_overrides_json: saveStrRateOverride(null, rates, preset.assumptions) }, estimate, copy: fixture.report.ai_copy_json! });
-    return <ReportPreview report={{ ...managed, document_link: link, assets: document.assets }} printMode />;
+    return <ReportPreview report={{ ...managed, document_link: link, assets: document.assets, recipient: document.recipient }} printMode />;
   }
   return <ReportPreview report={document} printMode />;
 }

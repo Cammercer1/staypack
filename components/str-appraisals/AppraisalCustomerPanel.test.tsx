@@ -19,21 +19,22 @@ const appraisal: StrAppraisal = {
 
 it("opens customer editing in a dialog and discards cancelled changes without changing the summary", async () => {
   const onEditingChange = vi.fn();
-  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ contacts: [] }));
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ clients: [] }));
   vi.stubGlobal("fetch", fetcher);
   render(<AppraisalCustomerPanel initialAppraisal={appraisal} archived={false} onEditingChange={onEditingChange} />);
-  expect(screen.getByText("General appraisal")).toBeTruthy();
-  expect(screen.queryByLabelText("Customer name")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Add customer" }));
-  expect(screen.getByRole("dialog", { name: "Add customer" })).toBeTruthy();
+  expect(screen.getByText("No named client")).toBeTruthy();
+  expect(screen.queryByLabelText("Client name")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Add client" }));
+  expect(screen.getByRole("dialog", { name: "Add client" })).toBeTruthy();
   expect(onEditingChange).toHaveBeenLastCalledWith(true);
-  fireEvent.change(screen.getByLabelText("Customer name"), { target: { value: "Unsaved customer" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add new client" }));
+  fireEvent.change(screen.getByLabelText("Client name"), { target: { value: "Unsaved customer" } });
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(onEditingChange).toHaveBeenLastCalledWith(false);
   expect(fetcher.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);
-  fireEvent.click(screen.getByRole("button", { name: "Add customer" }));
-  expect((screen.getByLabelText("Customer name") as HTMLInputElement).value).toBe("");
+  fireEvent.click(screen.getByRole("button", { name: "Add client" }));
+  expect(screen.getByRole("combobox", { name: "Search clients" })).toBeTruthy();
 });
 
 it.each([false, true])("keeps editing active during a save and uses the correct workspace route (shared=%s)", async shared => {
@@ -42,16 +43,17 @@ it.each([false, true])("keeps editing active during a save and uses the correct 
   let finishSave: (response: Response) => void = () => {};
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_input, init) => init?.method === "PATCH"
     ? new Promise<Response>(resolve => { finishSave = resolve; })
-    : Response.json({ contacts: [] }));
+    : Response.json({ clients: [] }));
   vi.stubGlobal("fetch", fetcher);
   const panel = <AppraisalCustomerPanel initialAppraisal={appraisal} archived={false} onEditingChange={onEditingChange} onSaved={onSaved} />;
   render(shared ? <AppraisalRoutes>{panel}</AppraisalRoutes> : panel);
-  fireEvent.click(screen.getByRole("button", { name: "Add customer" }));
-  fireEvent.change(screen.getByLabelText("Customer name"), { target: { value: "Jordan Taylor" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add client" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add new client" }));
+  fireEvent.change(screen.getByLabelText("Client name"), { target: { value: "Jordan Taylor" } });
   fireEvent.change(screen.getByLabelText("Email (optional)"), { target: { value: "jordan@example.com" } });
-  fireEvent.click(screen.getByRole("button", { name: "Save customer details" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save client details" }));
   await waitFor(() => expect((screen.getByRole("button", { name: "Saving…" }) as HTMLButtonElement).disabled).toBe(true));
-  expect((screen.getByRole("button", { name: "Close customer details" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "Close client details" }) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
   expect(screen.getByRole("dialog")).toBeTruthy();
   expect(onEditingChange).toHaveBeenLastCalledWith(true);
@@ -60,7 +62,7 @@ it.each([false, true])("keeps editing active during a save and uses the correct 
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(onSaved).toHaveBeenCalledWith(saved);
   expect(onEditingChange).toHaveBeenLastCalledWith(false);
-  const summary = within(screen.getByRole("region", { name: "Customer" }));
+  const summary = within(screen.getByRole("region", { name: "Client · Prepared for" }));
   expect(summary.getByText("Jordan Taylor")).toBeTruthy();
   expect(summary.getByText("jordan@example.com")).toBeTruthy();
   const request = fetcher.mock.calls.find(([, init]) => init?.method === "PATCH");
@@ -73,26 +75,27 @@ it("preserves entered details and keeps publishing paused when a save fails", as
   const onEditingChange = vi.fn();
   vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockImplementation(async (_input, init) => init?.method === "PATCH"
     ? Response.json({ error: "This appraisal changed. Reload before saving." }, { status: 409 })
-    : Response.json({ contacts: [] })));
+    : Response.json({ clients: [] })));
   render(<AppraisalCustomerPanel initialAppraisal={appraisal} archived={false} onEditingChange={onEditingChange} />);
-  fireEvent.click(screen.getByRole("button", { name: "Add customer" }));
-  fireEvent.change(screen.getByLabelText("Customer name"), { target: { value: "Jordan Taylor" } });
-  fireEvent.click(screen.getByRole("button", { name: "Save customer details" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add client" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add new client" }));
+  fireEvent.change(screen.getByLabelText("Client name"), { target: { value: "Jordan Taylor" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save client details" }));
   expect((await screen.findByRole("alert")).textContent).toContain("This appraisal changed");
-  expect((screen.getByLabelText("Customer name") as HTMLInputElement).value).toBe("Jordan Taylor");
+  expect((screen.getByLabelText("Client name") as HTMLInputElement).value).toBe("Jordan Taylor");
   expect(onEditingChange).toHaveBeenLastCalledWith(true);
-  expect((screen.getByRole("button", { name: "Close customer details" }) as HTMLButtonElement).disabled).toBe(false);
+  expect((screen.getByRole("button", { name: "Close client details" }) as HTMLButtonElement).disabled).toBe(false);
 });
 
 it("keeps archived customer details readable and retains the restore action", () => {
   render(<AppraisalCustomerPanel initialAppraisal={{ ...appraisal, recipient_mode: "named", recipient_name: "Jordan Taylor" }} archived />);
   expect(screen.getByText("Jordan Taylor")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Edit customer" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Change client" })).toBeNull();
   expect(screen.getByRole("button", { name: "Restore appraisal" })).toBeTruthy();
 });
 
 it("inherits the workspace publishing lock without opening the customer dialog", () => {
   render(<fieldset disabled><AppraisalCustomerPanel initialAppraisal={appraisal} archived={false} /></fieldset>);
-  expect(screen.getByRole("button", { name: "Add customer" }).matches(":disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Add client" }).matches(":disabled")).toBe(true);
   expect(screen.queryByRole("dialog")).toBeNull();
 });

@@ -3,7 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { creationOptions, creationPath } from "@/lib/properties/creation";
 import { CreationIllustration } from "./CreationIllustration";
 
-export function CreateOptions({ listingId, appraisalsOnly = false }: { listingId?: string; appraisalsOnly?: boolean }) {
+export function CreateOptions({ listingId, sourceReportId, appraisalsOnly = false }: { listingId?: string; sourceReportId?: string; appraisalsOnly?: boolean }) {
   return <div className="space-y-8">
     {(appraisalsOnly ? ["Appraisals"] : ["Appraisals", "Marketing"]).map(group => <section key={group} aria-label={group}>
       <div className="mb-4 flex items-center gap-4">
@@ -13,7 +13,7 @@ export function CreateOptions({ listingId, appraisalsOnly = false }: { listingId
       <ul className={group === "Appraisals" ? "grid gap-4 md:grid-cols-3" : "grid gap-4 sm:grid-cols-2"}>
         {creationOptions.filter(option => option.group === group).map(option => <li key={option.id} className="min-w-0">
           <Link
-            href={creationPath(option.path, listingId)}
+            href={`${creationPath(option.path, listingId)}${sourceReportId && option.group === "Appraisals" ? `${creationPath(option.path, listingId).includes("?") ? "&" : "?"}source_report_id=${encodeURIComponent(sourceReportId)}` : ""}`}
             aria-labelledby={`create-${option.id}-title`}
             aria-describedby={`create-${option.id}-description`}
             className={group === "Appraisals"

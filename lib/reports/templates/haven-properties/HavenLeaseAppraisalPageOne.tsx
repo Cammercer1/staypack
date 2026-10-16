@@ -1,3 +1,4 @@
+import { ReportPreparedFor } from "@/lib/reports/templates/shared/ReportPreparedFor";
 import { Bath, BedDouble, Car } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getReportBrandColours } from "@/lib/reports/brandColours";
@@ -161,6 +162,7 @@ export function HavenLeaseAppraisalPageOne({ report }: { report: FinalReportJson
             >
               {heroAddressLine}
             </h1>
+            <ReportPreparedFor report={report} className="mt-2 text-[0.8rem] leading-snug text-white/90" />
             {showHeroLocation ? (
               <p
                 className="mt-1 text-[0.8rem] font-medium text-white/90"

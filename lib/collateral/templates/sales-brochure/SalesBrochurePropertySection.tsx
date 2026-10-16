@@ -1,5 +1,7 @@
 "use client";
 
+import { ReportPreparedFor } from "@/lib/reports/templates/shared/ReportPreparedFor";
+
 import { Bath, BedDouble, Car, Ruler } from "lucide-react";
 import { Editable } from "@/components/collateral/sales-brochure/inline/Editable";
 import { useEditableContext } from "@/components/collateral/sales-brochure/inline/EditableContext";
@@ -88,6 +90,7 @@ export function SalesBrochurePropertySection({
           >
             {property.address}
           </h2>
+          <ReportPreparedFor report={report} />
           {property.suburb ? (
             <p className="mt-1 text-sm text-neutral-500">
               {[property.suburb, property.state, property.postcode]

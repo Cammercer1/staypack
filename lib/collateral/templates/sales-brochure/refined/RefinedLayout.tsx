@@ -1,3 +1,4 @@
+import { ReportPreparedFor } from "@/lib/reports/templates/shared/ReportPreparedFor";
 import { DocumentQr } from "@/components/documents/DocumentQr";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import { resolveBrochureBrandBand } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureBrandBand";
@@ -60,8 +61,10 @@ function resolveRefinedImages(document: BrochureDocumentJson) {
 
 export function RefinedHeader({
   document,
+  report,
 }: {
   document: BrochureDocumentJson;
+  report?: FinalReportJson;
 }) {
   const specs = formatSpecsLine(document);
   const band = resolveBrochureBrandBand(document.agency);
@@ -87,6 +90,7 @@ export function RefinedHeader({
           >
             {document.property.address}
           </h1>
+          <ReportPreparedFor report={report} />
           <div
             className="mt-2 h-px w-full max-w-[280px]"
             style={{ backgroundColor: band.text, opacity: 0.4 }}
@@ -467,7 +471,7 @@ export function RefinedSpread({
 }) {
   return (
     <>
-      <RefinedHeader document={document} />
+      <RefinedHeader document={document} report={report} />
       <RefinedBody document={document} />
       <RefinedFooterImage document={document} />
       {showAgentBar ? <RefinedAgentBar document={document} report={report} /> : null}

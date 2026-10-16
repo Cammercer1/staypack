@@ -15,6 +15,7 @@ const blankAgent = { name: "", role_title: "", phone: "", email: "", photo_url: 
 /** Frozen, printable fields only. Never retain provider payloads, the unused comp pool or draft links. */
 export const proposalPdfReportSchema = z.object({
   market: propertyMarketSchema.optional(),
+  recipient: z.object({ displayName: z.string().trim().min(1) }).optional(),
   version: z.string(), template_id: z.string().refine(id => id === "haven-properties-str" || isLeaseAppraisalTemplateId(id) || isSalesAppraisalTemplateId(id)), generated_at: z.iso.datetime(),
   agent_selection: z.literal("explicit"), agent, agents: z.array(agent).max(2),
   agency: z.object({
@@ -80,10 +81,15 @@ export const proposalPdfReportSchema = z.object({
 });
 export type ProposalPdfReport = z.infer<typeof proposalPdfReportSchema>;
 
-export function buildProposalPdfReport(document: FinalReportJson): ProposalPdfReport | undefined {
+export function buildProposalPdfReport(document: FinalReportJson, recipientDisplayName?: string | null): ProposalPdfReport | undefined {
   if (document.template_id !== "haven-properties-str" && !isLeaseAppraisalTemplateId(document.template_id) && !isSalesAppraisalTemplateId(document.template_id)) return undefined;
   const enrichment = document.str_enrichment;
-  return proposalPdfReportSchema.parse({ ...document,
+  const source = { ...document };
+  // The draft recipient is authoritative; switching to a general report must clear an old name.
+  delete source.recipient;
+  const displayName = recipientDisplayName?.trim();
+  return proposalPdfReportSchema.parse({ ...source,
+    ...(displayName ? { recipient: { displayName } } : {}),
     copy: isSalesAppraisalTemplateId(document.template_id) ? resolveSalesAppraisalCopyDisclaimers(document.copy) : document.copy,
     agent_selection: "explicit", agent: blankAgent, agents: [],
     assets: { qr_code_url: "", pdf_url: "" }, document_link: { mode: "none" },

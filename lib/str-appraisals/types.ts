@@ -17,6 +17,9 @@ export type StrAppraisal = {
   recipient_email: string | null;
   recipient_phone: string | null;
   recipient_phone_e164: string | null;
+  client_source_lead_id?: string | null;
+  client_review_required?: boolean;
+  client_pending_json?: import("@/lib/clients/types").PendingClient | null;
   source: "manual" | "legacy" | "managed_delivery";
   created_at: string;
   updated_at: string;

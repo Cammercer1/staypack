@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
 import { applyHavenBrandKitToReport } from "@/lib/branding/kits/haven";
-import { proposalFromReport } from "./data";
+import { proposalFromReport, proposalFromAppraisalReport } from "./data";
+import { defaultAssignment } from "./assignment";
+import { proposalPrintHtml } from "./print";
 import { buildProposalPdfReport, proposalPdfReportSchema, withPdfAgents } from "./pdfReport";
 import { createPrintAccessToken } from "@/lib/reports/printAccessToken";
 import { proposalPrintUrl, verifyProposalPrintToken } from "./printAccess";
@@ -16,6 +18,49 @@ describe("Havenly proposal PDF snapshot", () => {
     const fixture = createLintRegressionFixtures();
     return buildStrTemplatePreview({ agency: fixture.agency, listing: fixture.listing, report: fixture.report, agencyAgents: [], templateId: "haven-properties-str" });
   }
+  it.each(["str", "lease", "sales"] as const)("freezes matching client names in new %s web and PDF snapshots", kind => {
+    const fixtures = createLintRegressionFixtures();
+    const source = kind === "str" ? document() : structuredClone(fixtures[kind].final_report_json!);
+    source.recipient = { displayName: "Previous recipient" };
+    const original = structuredClone(source);
+    const data = kind === "str" ? proposalFromReport(source, "  Jordan Taylor  ") : proposalFromAppraisalReport(source, kind, "  Jordan Taylor  ");
+    const pdfReport = buildProposalPdfReport(source, data.recipient?.displayName)!;
+    const snapshot = proposalSnapshotSchema.parse({ version: 1, data, pdfReport,
+      draft: defaultAssignment(fixtures.agency, kind).defaults, brand: BRAND_DEFAULTS, attachments: [] });
+    expect(snapshot.pdfReport?.recipient).toEqual(snapshot.data.recipient);
+    expect(snapshot.pdfReport?.recipient).toEqual({ displayName: "Jordan Taylor" });
+    expect(proposalPrintHtml(snapshot)).toContain("Prepared for Jordan Taylor");
+    expect(withPdfAgents(pdfReport, []).recipient).toEqual(data.recipient);
+    expect(source).toEqual(original);
+    data.recipient!.displayName = "Updated client";
+    source.recipient.displayName = "Edited source";
+    expect(snapshot.data.recipient?.displayName).toBe("Jordan Taylor");
+    expect(snapshot.pdfReport?.recipient?.displayName).toBe("Jordan Taylor");
+    expect(buildProposalPdfReport(source, null)).not.toHaveProperty("recipient");
+  });
+
+  it("keeps client contact details out of printable snapshots and leaves legacy snapshots nameless", () => {
+    const pdf = buildProposalPdfReport(document())!;
+    expect(pdf).not.toHaveProperty("recipient");
+    const parsed = proposalPdfReportSchema.parse({ ...pdf,
+      recipient: { displayName: "Jordan Taylor", email: "private@example.com", phone: "0412345678", contact_id: "private-id" },
+      recipient_email: "private@example.com", recipient_phone: "0412345678" });
+    expect(parsed.recipient).toEqual({ displayName: "Jordan Taylor" });
+    expect(JSON.stringify(parsed)).not.toContain("private@example.com");
+    expect(parsed).not.toHaveProperty("recipient_phone");
+    const draft = structuredClone(DEFAULT_PROPOSAL_DRAFT);
+    draft.content.introduction = "Short-term rental proposal";
+    draft.content.recipientLine = "prepared for {{recipient.displayName}}";
+    const stored = { version: 1, data: proposalFromReport(document(), "Previously published client"), pdfReport: pdf,
+      draft, brand: BRAND_DEFAULTS, attachments: [] };
+    const before = JSON.stringify(stored);
+    const legacy = proposalSnapshotSchema.parse(stored);
+    expect(legacy.pdfReport).not.toHaveProperty("recipient");
+    expect(legacy.draft.content.introduction).toBe("Short-term rental proposal");
+    expect(legacy.draft.content.recipientLine).toBe("prepared for {{recipient.displayName}}");
+    expect(JSON.stringify(stored)).toBe(before);
+  });
+
   it("freezes the branded report and strips private and unused inputs", () => {
     const source = document();
     const result = buildProposalPdfReport({ ...source, document_link_draft: { link: { mode: "custom", url: "https://private.test" }, target_url: "https://private.test", qr_code_url: "private" } })!;

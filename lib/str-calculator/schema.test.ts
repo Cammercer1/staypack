@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { calculatorAssumptions, calculatorSettingsSchema, calculatorSubmissionSchema } from "./schema";
+import { calculatorAssumptions, calculatorFieldsSchema, calculatorSettingsSchema, calculatorSubmissionSchema } from "./schema";
 import { calculateAccommodates } from "@/lib/reports/formatters";
 
 const input = { address: "12 Test Street, Sydney NSW 2000", bedrooms: 3, bathrooms: 1.5, email: "OWNER@example.com", consent: true, requestId: "6500bfd0-04d8-4919-b458-84e9ec0ce331" };
 describe("calculator submissions", () => {
+  it("collects a name in new forms while allowing old open embeds to finish", () => {
+    expect(calculatorFieldsSchema.safeParse(input).success).toBe(false);
+    expect(calculatorFieldsSchema.parse({ ...input, full_name: "  Jordan Taylor  " }).full_name).toBe("Jordan Taylor");
+    expect(calculatorSubmissionSchema.safeParse(input).success).toBe(true);
+    for (const full_name of ["", "  ", "x".repeat(201)]) {
+      expect(calculatorSubmissionSchema.safeParse({ ...input, full_name }).success).toBe(false);
+    }
+  });
   it("normalizes lead input and requires explicit consent", () => {
     expect(calculatorSubmissionSchema.parse({ ...input, email: " OWNER@example.com " })).toMatchObject({ bathrooms: 1.5, email: "owner@example.com", website: "" });
     expect(calculatorSubmissionSchema.safeParse({ ...input, consent: false }).success).toBe(false);

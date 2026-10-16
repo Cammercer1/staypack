@@ -74,7 +74,7 @@ export const ProposalWorkflow = forwardRef<ProposalWorkflowHandle, {
   return <section data-theme="staypack-workspace" className="min-w-0 space-y-5 text-base-content">
     <UnsavedListingGuard dirty={form.formState.isDirty} description="Your proposal has unsaved changes. Save them before leaving." />
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h2 className="text-xl font-semibold">{stage === "proposal" ? "Your proposal" : "Customer & share"}</h2><p className="mt-1 text-sm text-base-content/65">{stage === "proposal" ? "Choose your agents and arrange the pages your customer will see." : "Check your customer details, then publish and share your proposal."}</p></div>
+      <div><h2 className="text-xl font-semibold">{stage === "proposal" ? "Your proposal" : "Review & share"}</h2><p className="mt-1 text-sm text-base-content/65">{stage === "proposal" ? "Choose your agents and arrange the pages your client will see." : "Check your client details, then publish and share your proposal."}</p></div>
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={busy || sharing || disabled} className="du-btn du-btn-sm min-h-11" onClick={() => setSection(section === "preview" ? "content" : "preview")}><Eye size={16} aria-hidden="true" />{section === "preview" ? "Close preview" : "Preview proposal"}</button>
         {stage === "proposal" && <button type="button" disabled={busy || disabled} className="du-btn du-btn-sm min-h-11" onClick={() => void save()}><Save size={16} />Save draft</button>}

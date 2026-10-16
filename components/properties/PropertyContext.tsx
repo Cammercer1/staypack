@@ -15,8 +15,8 @@ export function PropertyContext({ listing, editHref, onEdit }: {
   </div>;
 }
 
-export function CreateAnother({ listingId }: { listingId: string }) {
+export function CreateAnother({ listingId, sourceReportId }: { listingId: string; sourceReportId?: string }) {
   return <div data-theme="staypack-workspace" className="border-t border-base-300 pt-5 text-base-content">
-    <Link href={`/create?listing_id=${encodeURIComponent(listingId)}`} className="du-btn du-btn-sm min-h-11">Create another for this property</Link>
+    <Link href={`/create?listing_id=${encodeURIComponent(listingId)}${sourceReportId ? `&source_report_id=${encodeURIComponent(sourceReportId)}` : ""}`} className="du-btn du-btn-sm min-h-11">Create another for this property</Link>
   </div>;
 }

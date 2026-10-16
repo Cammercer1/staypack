@@ -72,8 +72,8 @@ export const DEFAULT_PROPOSAL_DRAFT: ProposalDraft = {
   version: 1, templateId: "editorial-base", templateVersion: 1, presetId: "staypack", brandOverrides: {},
   content: {
     title: "{{property.address}}",
-    introduction: "Short-term rental proposal",
-    recipientLine: "prepared for {{recipient.displayName}}",
+    introduction: "Short-term rental property report",
+    recipientLine: "Prepared for {{recipient.displayName}}",
     comparisonTitle: "Your rental income potential",
   },
   heroLayout: "overlay", initialComparisonMode: "annual", motion: true,

@@ -1,3 +1,4 @@
+import { ReportPreparedFor } from "@/lib/reports/templates/shared/ReportPreparedFor";
 import { isLightColour } from "@/lib/branding/contrast";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
 import { resolveBrochureBrandBand } from "@/lib/collateral/templates/sales-brochure/shared/resolveBrochureBrandBand";
@@ -137,7 +138,7 @@ function BelleStatStrip({
   );
 }
 
-function BelleHero({ document }: { document: BrochureDocumentJson }) {
+function BelleHero({ document, report }: { document: BrochureDocumentJson; report: FinalReportJson }) {
   const { hero } = resolveBellePhotos(document);
   const logoUrl = getAgencyLogoUrl(document.agency, "dark");
   const headline = document.copy.heading?.trim() || document.property.address;
@@ -203,6 +204,7 @@ function BelleHero({ document }: { document: BrochureDocumentJson }) {
         >
           {document.property.address}
         </h1>
+        <ReportPreparedFor report={report} className="mt-2 text-[0.8rem] leading-snug text-white/90" />
         {headline !== document.property.address ? (
           <Editable
             as="p"
@@ -414,7 +416,7 @@ export function BellePageOneSpread({
 }) {
   return (
     <>
-      <BelleHero document={document} />
+      <BelleHero document={document} report={report} />
       <BelleStatStrip document={document} report={report} />
       <BelleBody document={document} report={report} />
       <BelleFooterBand document={document} />

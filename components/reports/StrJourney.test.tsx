@@ -733,12 +733,12 @@ describe("evidence before design safeguards", () => {
     expect(screen.getByText("Archive").closest("[inert]")).toBeTruthy();
   });
 
-  it("shows customer details only at review and keeps archive available on property", async () => {
+  it("keeps client details available throughout the report and archive available on property", async () => {
     const { fetcher } = setup();
     expect(screen.getByText("Customer details panel")).toBeTruthy();
     clickTab("Property");
     await waitTab("Property");
-    expect(screen.queryByText("Customer details panel")).toBeNull();
+    expect(screen.getByText("Customer details panel")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
     clickTab("Review & share");
     await waitTab("Review & share");

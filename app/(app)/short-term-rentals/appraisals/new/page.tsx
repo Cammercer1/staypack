@@ -1,12 +1,13 @@
+import { loadRecipientFromSource } from "@/lib/clients/sourceRecipient";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { NewStrAppraisalFlow } from "@/components/str-appraisals/NewStrAppraisalFlow";
 import { requireStrWorkspaceAccess } from "@/lib/str-appraisals/service";
 import type { Listing } from "@/lib/types";
 
-export default async function NewStrAppraisalPage({ searchParams }: { searchParams: Promise<{ listing_id?: string }> }) {
+export default async function NewStrAppraisalPage({ searchParams }: { searchParams: Promise<{ listing_id?: string; source_report_id?: string }> }) {
   const { supabase,agency,user } = await requireStrWorkspaceAccess();
-  const { listing_id } = await searchParams;
+  const { listing_id, source_report_id } = await searchParams;
   let listing: Listing | null = null;
   if (listing_id) {
     if (!z.string().uuid().safeParse(listing_id).success) notFound();
@@ -15,5 +16,6 @@ export default async function NewStrAppraisalPage({ searchParams }: { searchPara
     if (!data) notFound();
     listing = data as Listing;
   }
-  return <NewStrAppraisalFlow initialListing={listing} storageKey={`property-import:${agency.id}:${user.id}`} />;
+  const recipient = source_report_id ? await loadRecipientFromSource(supabase, agency.id, source_report_id) : null;
+  return <NewStrAppraisalFlow key={`str:${listing_id ?? ""}:${source_report_id ?? ""}`} initialRecipient={recipient ?? undefined} initialListing={listing} storageKey={`property-import:${agency.id}:${user.id}`} />;
 }

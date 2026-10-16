@@ -1,3 +1,4 @@
+import { ReportPreparedFor } from "@/lib/reports/templates/shared/ReportPreparedFor";
 import { DocumentQr } from "@/components/documents/DocumentQr";
 import { Bath, BedDouble, Car } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -326,6 +327,7 @@ export function MinimalistPageOne({
           >
             {document.property.address}
           </p>
+          <ReportPreparedFor report={report} className="text-[0.75rem] leading-snug" />
 
           {headline ? (
             <Editable

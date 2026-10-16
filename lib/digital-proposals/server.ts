@@ -45,7 +45,7 @@ export async function proposalContext(reportId: string, request?: Request) {
   const document = kind === "str" ? reportForProposal({ ...context, agencyAgents, editable: true }) : context.appraisal.document_json!;
   const recipient = context.appraisal.recipient_mode === "named" ? context.appraisal.recipient_name : null;
   const data = kind === "str" ? proposalFromReport(document, recipient) : proposalFromAppraisalReport(document, kind, recipient);
-  const pdfReport = buildProposalPdfReport(document);
+  const pdfReport = buildProposalPdfReport(document, data.recipient?.displayName);
   const availableAgents = proposalAgentOptions(agencyAgents, context.agency.id);
   const needsEvidenceReview = kind !== "str" && context.appraisal.document_revision !== context.appraisal.input_revision;
   const sourceFingerprint = createHash("sha256").update(JSON.stringify({ data, assignment, availableAgents, pdfReport, ...(kind !== "str" ? { inputRevision: context.appraisal.input_revision, documentRevision: context.appraisal.document_revision } : {}) })).digest("hex");
@@ -96,6 +96,7 @@ function checkSelectedAgents(context: Context, ids: string[]) {
 }
 export async function publishProposal(context: Context, revision: number, sourceFingerprint: string) {
   if (calculatorPropertyReviewRequired(context.report, context.listing)) throw new ProposalError("Confirm the property details before publishing this proposal.", 409);
+  if (context.appraisal?.client_review_required) throw new ProposalError("Confirm the client details before publishing this proposal.", 409);
   if (context.needsEvidenceReview) throw new ProposalError("Review the updated evidence and prepare your proposal before publishing.", 409);
   if (sourceFingerprint !== context.sourceFingerprint) throw new ProposalError("The appraisal changed. Reload the preview before publishing.", 409);
   const workspace = await loadProposalWorkspace(context);

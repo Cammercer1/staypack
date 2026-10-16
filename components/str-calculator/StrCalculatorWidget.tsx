@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, ArrowRight, Bath, BedDouble, Check, LoaderCircle, Mail, MapPin, Minus, Phone, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bath, BedDouble, Check, LoaderCircle, Mail, MapPin, Minus, Phone, Plus, UserRound } from "lucide-react";
 import { BrandFontLoader } from "@/components/settings/BrandFontLoader";
 import { AddressAutocomplete } from "@/components/listings/AddressAutocomplete";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,7 @@ export function StrCalculatorWidget({ brand, country, token, preview = false, as
   const [addressResolving, setAddressResolving] = useState(false);
   const requestRef = useRef<{ id: string; values: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
-  const form = useForm<CalculatorFields>({ resolver: zodResolver(calculatorFieldsSchema), defaultValues: { address: "", bedrooms: 2, bathrooms: 1, email: "", phone: "", consent: false, website: "" } });
+  const form = useForm<CalculatorFields>({ resolver: zodResolver(calculatorFieldsSchema), defaultValues: { address: "", bedrooms: 2, bathrooms: 1, full_name: "", email: "", phone: "", consent: false, website: "" } });
   const { register, handleSubmit, trigger, getValues, formState: { errors, isSubmitting } } = form;
 
   useEffect(() => { if (step > 0 || estimate) heading.current?.focus({ preventScroll: true }); }, [step, estimate]);
@@ -79,7 +79,7 @@ export function StrCalculatorWidget({ brand, country, token, preview = false, as
           {step === 0 ? "What could your property earn?" : "Your details."}
         </h2>
         <p className="mt-3 text-sm leading-6 text-base-content/75">
-          {step === 0 ? "Explore your estimated gross STR revenue in three simple steps." : "Enter your email to view your estimated gross STR revenue."}
+          {step === 0 ? "Explore your estimated gross STR revenue in three simple steps." : "Enter your details to view your estimated gross STR revenue."}
         </p>
         {step > 0 && <div className="mt-5 flex gap-2 border-y border-base-300 py-3 text-sm">
           <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><p className="min-w-0 break-words">{getValues("address")}<span className="mt-1 block text-xs text-base-content/70">{getValues("bedrooms") === 0 ? "Studio" : `${getValues("bedrooms")} bedroom${getValues("bedrooms") === 1 ? "" : "s"}`} · {getValues("bathrooms")} bathroom{getValues("bathrooms") === 1 ? "" : "s"}</span></p>
@@ -103,6 +103,12 @@ export function StrCalculatorWidget({ brand, country, token, preview = false, as
               </div>} />)}
             </div>}
             {step === 1 && <>
+              <div><label htmlFor={`${id}-name`} className={cn(contactInputClass, errors.full_name ? "du-input-error border-error focus-within:ring-error/10" : "border-base-300/80 hover:border-base-content/25 focus-within:border-primary focus-within:ring-primary/10")}>
+                <UserRound className="size-4.5 shrink-0 text-base-content/60 group-focus-within:text-base-content" aria-hidden="true" />
+                <input id={`${id}-name`} aria-label="Full name" type="text" autoComplete="name" placeholder="Full name" {...register("full_name")} aria-invalid={Boolean(errors.full_name)} aria-describedby={errors.full_name ? `${id}-name-error` : undefined} className="min-w-0 grow text-base" maxLength={200} />
+                </label>
+                {errors.full_name && <p id={`${id}-name-error`} role="alert" className="mt-2 text-xs text-error">{errors.full_name.message}</p>}
+              </div>
               <div><label htmlFor={`${id}-email`} className={cn(contactInputClass, errors.email ? "du-input-error border-error focus-within:ring-error/10" : "border-base-300/80 hover:border-base-content/25 focus-within:border-primary focus-within:ring-primary/10")}>
                 <Mail className="size-4.5 shrink-0 text-base-content/60 group-focus-within:text-base-content" aria-hidden="true" />
                 <input id={`${id}-email`} aria-label="Email address" type="email" autoComplete="email" placeholder="Email address" {...register("email")} aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? `${id}-email-error` : undefined} className="min-w-0 grow text-base" maxLength={254} />

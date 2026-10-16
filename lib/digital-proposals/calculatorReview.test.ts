@@ -36,3 +36,18 @@ it.each(["property_address", "bedrooms", "bathrooms", "accommodates"] as const)(
   await expect(publishProposal(context, 1, "current")).rejects.toMatchObject({ status: 409, message: "Confirm the property details before publishing this proposal." });
   expect(from).not.toHaveBeenCalled();
 });
+
+
+it("requires client confirmation before publishing a new calculator proposal", async () => {
+  const { report, listing } = createLintRegressionFixtures();
+  const from = vi.fn();
+  const context = { report, listing, appraisal: { client_review_required: true }, supabase: { from }, sourceFingerprint: "current" } as unknown as Parameters<typeof publishProposal>[0];
+  await expect(publishProposal(context, 1, "current")).rejects.toMatchObject({ status: 409, message: "Confirm the client details before publishing this proposal." });
+  expect(from).not.toHaveBeenCalled();
+});
+
+it.each([false, undefined])("preserves legacy publish guards when client review is %s", async clientReviewRequired => {
+  const { report, listing } = createLintRegressionFixtures();
+  const context = { report, listing, appraisal: { client_review_required: clientReviewRequired }, sourceFingerprint: "current" } as unknown as Parameters<typeof publishProposal>[0];
+  await expect(publishProposal(context, 1, "outdated")).rejects.toMatchObject({ status: 409, message: "The appraisal changed. Reload the preview before publishing." });
+});

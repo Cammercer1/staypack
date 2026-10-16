@@ -12,7 +12,7 @@ import { ProposalWorkflow, type ProposalWorkflowHandle } from "@/components/digi
 import { proposalFetch } from "@/components/digital-proposals/ProposalWorkspaceControls";
 import { AppraisalCustomerPanel } from "@/components/str-appraisals/AppraisalCustomerPanel";
 import { AppraisalArchiveControl } from "@/components/str-appraisals/AppraisalArchiveControl";
-const steps = [ ["property", "Property"], ["evidence", "Review evidence"], ["proposal", "Proposal"], ["share", "Customer & share"] ] as const;
+const steps = [ ["property", "Property"], ["evidence", "Review evidence"], ["proposal", "Proposal"], ["share", "Review & share"] ] as const;
 type Step = typeof steps[number][0];
 export function AppraisalWorkspace({ initialAppraisal, initialListing, initialJob = null, archived }: { initialJob?: LeaseAppraisalJob | null; initialAppraisal: WorkspaceAppraisal; initialListing: Listing; archived: boolean }) {
   const [appraisal, setAppraisal] = useState(initialAppraisal);
@@ -43,14 +43,15 @@ export function AppraisalWorkspace({ initialAppraisal, initialListing, initialJo
   return <AppraisalRoutes><div data-theme="staypack-workspace" className="space-y-6 text-base-content">
     <PropertyContext listing={listing} onEdit={archived ? undefined : () => void changeStep("property")} />
     {archived ? <><AppraisalCustomerPanel initialAppraisal={appraisal} archived /><p>This appraisal is archived. Restore it to continue editing. Existing share links remain revoked.</p></> : <>
+      <fieldset disabled={busy || generating} className="min-w-0"><AppraisalCustomerPanel key={appraisal.updated_at} initialAppraisal={appraisal} archived={false} onEditingChange={setEditingCustomer} onSaved={saved => { setAppraisal(current => ({ ...current, ...saved })); setListing(current => ({ ...current, updated_at: saved.updated_at })); }} /></fieldset>
       <AppraisalWizardNavigation label="Appraisal steps" currentStep={step} onStepChange={next => void changeStep(next as Step)} steps={steps.map(([id, label]) => ({ id, label, disabled: busy || generating || editingCustomer || ((id === "proposal" || id === "share") && !hasDocument) }))} />
       {error && <p role="alert" className="du-alert du-alert-error">{error}</p>}
       {generating && <p role="status" className="du-alert">Preparing your proposal from the reviewed evidence…</p>}
       {step === "property" && <AppraisalPropertyStep ref={propertyStep} key={appraisal.report_id} listing={listing} appraisal={appraisal} onBusyChange={setBusy} onSaved={result => { setListing(result.listing); setAppraisal(result.appraisal); }} onContinue={() => setStep("evidence")} />}
       {step === "evidence" && <fieldset disabled={generating} className="min-w-0">{appraisal.kind === "lease" ? <LeaseAppraisalDataStep appraisalEndpoint={`/api/appraisals/${appraisal.report_id}/evidence`} listing={listing} activeJob={job} onDirtyChange={setEvidenceDirty} onJobChange={setJob} onListingChange={evidenceChanged} onBusyChange={setBusy} onContinue={next => void prepare(next)} continueLabel="Continue to proposal" /> : <SalesAppraisalDataStep appraisalEndpoint={`/api/appraisals/${appraisal.report_id}/evidence`} listing={listing} activeJob={job} onDirtyChange={setEvidenceDirty} onJobChange={setJob} onListingChange={evidenceChanged} onBusyChange={setBusy} onContinue={next => void prepare(next)} continueLabel="Continue to proposal" />}</fieldset>}
 
-      {(step === "proposal" || step === "share") && <ProposalWorkflow ref={workflow} reportId={appraisal.report_id} stage={step === "share" ? "share" : "proposal"} customerPanel={step === "share" ? <fieldset disabled={busy || generating} className="min-w-0"><AppraisalCustomerPanel initialAppraisal={appraisal} archived={false} onEditingChange={setEditingCustomer} onSaved={saved => { setAppraisal(current => ({ ...current, ...saved })); setListing(current => ({ ...current, updated_at: saved.updated_at })); }} /></fieldset> : undefined} refreshKey={appraisal.updated_at} disabled={editingCustomer || generating} onBusyChange={setBusy} onContinue={() => void changeStep("share")} />}
-      {step === "share" && !busy && !generating && !editingCustomer && <CreateAnother listingId={listing.id} />}
+      {(step === "proposal" || step === "share") && <ProposalWorkflow ref={workflow} reportId={appraisal.report_id} stage={step === "share" ? "share" : "proposal"} refreshKey={appraisal.updated_at} disabled={editingCustomer || generating} onBusyChange={setBusy} onContinue={() => void changeStep("share")} />}
+      {step === "share" && !busy && !generating && !editingCustomer && <CreateAnother listingId={listing.id} sourceReportId={appraisal.report_id} />}
       <div inert={busy || generating || editingCustomer}><AppraisalArchiveControl reportId={appraisal.report_id} /></div>
     </>}
   </div></AppraisalRoutes>;

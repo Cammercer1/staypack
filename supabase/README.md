@@ -565,3 +565,69 @@ preservation of existing report/property data. `lib/str-calculator/leadReportOcc
 exercises the real market adapter with mocked HTTP: AU/US conversion, full
 comparable retention, market cache reuse, unavailable data and existing-report
 replays, with no calculator endpoint calls.
+
+## Shared clients and calculator carry-through
+
+`20261015234716_client_directory_and_calculator_carry_through.sql` adds the private
+Clients directory API and lead-to-client association. It was applied and recorded
+in StayPack on 16 October 2026, before deploying the client UI. Existing `agency_contacts` are reused; existing
+reports, proposal snapshots, PDF links and legacy duplicate contacts are not
+backfilled or rewritten. Billing is not changed or enabled by this migration.
+
+The calculator reservation RPC keeps its existing signature and accepts a nullable
+`full_name`, so already-open embeds can still submit. Report creation resolves a
+client from the saved lead within the same transaction. A unique, consistent email
+match can be reused; name/phone conflicts, ambiguous email matches and archived
+contacts require account review. Public input never updates a matched directory
+record. Legacy nameless leads retain their email/phone in private pending metadata.
+New proposals cannot publish until the account supplies/selects a client or
+explicitly chooses general use. An existing linked report is returned before any
+client resolution, so retries never change its saved recipient.
+
+Recipient snapshots remain independent of directory edits. All three appraisal
+kinds share the same recipient RPC and agency-scoped search. Directory writes use
+optimistic concurrency; advisory locks plus a table trigger prevent duplicate
+active email records during simultaneous report/lead creation and direct writes.
+Existing duplicate emails are left intact and must be resolved by explicit client
+selection. Private client history returns the newest 50 linked reports and
+calculator enquiries, with total counts.
+
+The one security-definer function lives in the non-exposed `client_private`
+schema. It checks the authenticated actor's agency membership (or service role)
+and only updates the contact link on the source lead already linked to that same
+report and agency. It cannot rewrite contact details, report data or estimates.
+All client-facing RPCs remain security invoker under existing agency RLS.
+
+Validation uses a new **empty disposable PostgreSQL 17 Docker container**, never a
+Supabase project:
+
+```sh
+docker run --name staypack-clients-qa -e POSTGRES_PASSWORD=clients-disposable -d postgres:17-alpine
+python3 supabase/tests/client_directory_run.py staypack-clients-qa
+python3 supabase/tests/client_directory_concurrency.py staypack-clients-qa
+```
+
+The runner creates the fresh `client_directory_qa` database and fails if it already
+exists. It applies the exact dependency migrations and verifies agency isolation,
+name/phone capture, legacy review, duplicate/conflict handling, client history,
+archive/edit behavior and unchanged report/publication snapshots. It also runs the
+existing calculator-cache-to-report regression. Three concurrency cases each use
+12 independent sessions: client resolution, direct inserts and Create report.
+Remove only the disposable QA container when finished. Route and source-recipient
+unit coverage is in `lib/clients/`.
+
+The opt-in `CLIENT_SETUP_LIVE_TEST=1` Playwright test in
+`tests/staging/client-setup.spec.ts` creates and removes a disposable account. It
+checks actual calculator report conversion and retries, client search and edits,
+STR/lease/sales publication, public covers and signed print routes. Provider and
+AI output is synthetic; it makes no paid provider or PDF-generation calls and
+sends no messages. Changing the directory client is verified not to change any
+of those published snapshots. Run against a migrated preview using
+`STAGING_BASE_URL` and the preview's Supabase environment credentials.
+
+Release checks passed: 1,903 unit tests, production build, TypeScript, lint (no
+errors), SQL isolation/concurrency checks and the live publication flow above.
+The 262 pre-existing report records and 28 proposal versions retained identical
+snapshot/PDF checksums after migration and QA. Billing remains disabled, with no
+metered accounts or usage events. The existing navigation is retained with one
+Clients link added.

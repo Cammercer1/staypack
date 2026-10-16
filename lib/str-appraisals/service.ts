@@ -6,6 +6,7 @@ import type { Agency, Listing, Report } from "@/lib/types";
 import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
 import { appraisalStatuses, type AgencyContact, type StrAppraisal, type StrAppraisalRow } from "./types";
 import { generalRecipient, recipientPayload, type AppraisalQuery, type RecipientValues } from "./validation";
+import { listClients } from "@/lib/clients/service";
 
 /** Product entitlement seam: all existing agency members retain STR access. */
 export async function requireStrWorkspaceAccess() {
@@ -22,12 +23,8 @@ export async function requireStrAppraisalAccess(reportId: string) {
 }
 
 export async function loadAgencyContacts(supabase: SupabaseClient, agencyId: string, search = "") {
-  let query = supabase.from("agency_contacts").select("id,name,email,phone")
-    .eq("agency_id", agencyId).is("archived_at", null).order("name").limit(30);
-  if (search.trim()) query = query.ilike("name", `%${search.trim().replace(/[%_\\]/g, "\\$&")}%`);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return (data ?? []) as AgencyContact[];
+  const { clients } = await listClients(supabase, agencyId, { q: search, page: 1, archived: "active" });
+  return clients as AgencyContact[];
 }
 
 export async function createStrAppraisal({ supabase, agency, listing, requestId, recipient = generalRecipient, templateId, source = "manual" }: {

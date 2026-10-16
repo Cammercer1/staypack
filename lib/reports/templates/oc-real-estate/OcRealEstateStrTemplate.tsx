@@ -1,3 +1,4 @@
+import { ReportPreparedFor } from "@/lib/reports/templates/shared/ReportPreparedFor";
 import Image from "next/image";
 import { BrandFontLoader } from "@/components/settings/BrandFontLoader";
 import { ReportEditableImage } from "@/components/reports/inline/ReportEditableImage";
@@ -117,8 +118,9 @@ export function OcRealEstateStrPageOne({
         >
           {address}
         </p>
+        <ReportPreparedFor report={report} className="mt-1 text-[0.75rem] leading-snug" />
 
-        <div className="mt-[27px] grid h-[292px] grid-cols-[minmax(0,1fr)_300px] gap-8">
+        <div className={report.recipient ? "mt-[8px] grid h-[292px] grid-cols-[minmax(0,1fr)_300px] gap-8" : "mt-[27px] grid h-[292px] grid-cols-[minmax(0,1fr)_300px] gap-8"}>
           <div data-testid="oc-str-page-one-copy" className="overflow-hidden pr-3">
             <ReportCopyBlurb
               blurb={report.copy.blurb}

@@ -1,3 +1,4 @@
+import { ReportPreparedFor } from "@/lib/reports/templates/shared/ReportPreparedFor";
 import { Bath, BedDouble, Car, Ruler } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getAgencyLogoUrl } from "@/lib/branding/logos";
@@ -189,7 +190,7 @@ export function GalleryPhotoMosaic({ document }: { document: BrochureDocumentJso
   );
 }
 
-export function GalleryInfoBar({ document }: { document: BrochureDocumentJson }) {
+export function GalleryInfoBar({ document, report }: { document: BrochureDocumentJson; report?: FinalReportJson }) {
   const { property } = document;
 
   const specs: { id: string; icon: LucideIcon; value: string }[] = [];
@@ -235,6 +236,7 @@ export function GalleryInfoBar({ document }: { document: BrochureDocumentJson })
           </div>
         ) : null}
       </div>
+      <ReportPreparedFor report={report} className="mb-3 text-[0.75rem] leading-snug" />
       <div className="border-b border-neutral-300" />
     </div>
   );
@@ -388,7 +390,7 @@ export function GalleryPageOneSpread({
   return (
     <>
       <GalleryPhotoMosaic document={document} />
-      <GalleryInfoBar document={document} />
+      <GalleryInfoBar document={document} report={report} />
       <GalleryDetailsRow document={document} report={report} />
       <GalleryBottomBar document={document} />
       {document.copy.disclaimer?.trim() ? (

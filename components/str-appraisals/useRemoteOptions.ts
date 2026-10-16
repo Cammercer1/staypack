@@ -9,25 +9,20 @@ export async function readPrivateResponse(response: Response) {
 }
 
 export function useRemoteOptions<T>(url: string, key: string, enabled = true) {
-  const [data, setData] = useState<T[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(enabled);
+  const [result, setResult] = useState<{ url: string; data: T[]; error: string | null; loading: boolean }>({ url: "", data: [], error: null, loading: false });
   useEffect(() => {
     if (!enabled) return;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
-      setLoading(true);
-      setError(null);
+      setResult({ url, data: [], error: null, loading: true });
       try {
-        const result = await readPrivateResponse(await fetch(url, { signal: controller.signal, cache: "no-store" }));
-        if (!controller.signal.aborted) setData(result[key] ?? []);
+        const payload = await readPrivateResponse(await fetch(url, { signal: controller.signal, cache: "no-store" }));
+        if (!controller.signal.aborted) setResult({ url, data: payload[key] ?? [], error: null, loading: false });
       } catch (cause) {
-        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Unable to load options.");
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) setResult({ url, data: [], error: cause instanceof Error ? cause.message : "Unable to load options.", loading: false });
       }
     }, 250);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [url, key, enabled]);
-  return { data, error, loading };
+  return enabled && result.url === url ? result : { data: [] as T[], error: null, loading: enabled };
 }

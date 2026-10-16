@@ -12,8 +12,8 @@ it.each(["str", "lease", "sales"] as const)("uses property and customer tokens i
   const draft = applyAssignment(null, assignment);
   const data = { ...createProposalFixture(), recipient: { displayName: "Jordan Taylor" } };
   expect(resolveTokenText(draft.content.title, data).text).toBe(data.property.address);
-  expect(draft.content.introduction).toBe(kind === "str" ? "Short-term rental proposal" : kind === "lease" ? "Rental appraisal" : "Sales appraisal");
-  expect(resolveTokenText(draft.content.recipientLine, data).text).toBe("prepared for Jordan Taylor");
+  expect(draft.content.introduction).toBe(kind === "str" ? "Short-term rental property report" : kind === "lease" ? "Lease appraisal" : "Sales appraisal");
+  expect(resolveTokenText(draft.content.recipientLine, data).text).toBe("Prepared for Jordan Taylor");
   expect(resolveTokenText(draft.content.recipientLine, { ...data, recipient: null }).text).toBe("");
 });
 

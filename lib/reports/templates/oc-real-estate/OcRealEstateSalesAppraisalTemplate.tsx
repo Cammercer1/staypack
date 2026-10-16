@@ -1,3 +1,4 @@
+import { ReportPreparedFor } from "@/lib/reports/templates/shared/ReportPreparedFor";
 import { formatCurrency } from "@/lib/reports/formatters";
 import Image from "next/image";
 import { BrandFontLoader } from "@/components/settings/BrandFontLoader";
@@ -143,8 +144,9 @@ export function OcRealEstateSalesAppraisalPageOne({
         >
           {address}
         </p>
+        <ReportPreparedFor report={report} className="mt-1 text-[0.75rem] leading-snug" />
 
-        <div className="mt-[27px] grid h-[292px] grid-cols-[minmax(0,1fr)_300px] gap-8">
+        <div className={report.recipient ? "mt-[8px] grid h-[292px] grid-cols-[minmax(0,1fr)_300px] gap-8" : "mt-[27px] grid h-[292px] grid-cols-[minmax(0,1fr)_300px] gap-8"}>
           <div data-testid="oc-concept-copy" className="overflow-hidden pr-3">
             <div data-testid="oc-concept-opening-paragraph">
               <ReportCopyBlurb

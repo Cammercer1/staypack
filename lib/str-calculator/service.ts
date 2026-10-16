@@ -42,7 +42,7 @@ export async function submitCalculator(token: string, input: CalculatorSubmissio
   const admin = createAdminClient();
   const { requestId } = input;
   const phone = widget.ask_phone ? input.phone?.trim() : undefined;
-  const fields = { address: input.address, bedrooms: input.bedrooms, bathrooms: input.bathrooms, email: input.email, consent: input.consent, ...(phone ? { phone } : {}) };
+  const fields = { address: input.address, bedrooms: input.bedrooms, bathrooms: input.bathrooms, email: input.email, consent: input.consent, ...(input.full_name ? { full_name: input.full_name } : {}), ...(phone ? { phone } : {}) };
   const { data: reservation, error } = await admin.rpc("reserve_str_calculator_lead", {
     p_token: token, p_request_id: requestId,
     p_input_hash: fingerprint(JSON.stringify({ ...fields, country: widget.country })),

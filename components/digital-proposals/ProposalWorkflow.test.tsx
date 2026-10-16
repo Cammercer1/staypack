@@ -69,7 +69,7 @@ it("shows resolved account cover copy without editable heading or subtitle input
   const cover = await screen.findByRole("group", { name: "Proposal introduction" });
   expect(cover.textContent).toContain(`A home at ${source.data!.property.address}`);
   expect(cover.textContent).toContain(`A proposal from ${source.data!.agency.name}`);
-  expect(cover.textContent).toContain("prepared for Jordan Taylor");
+  expect(cover.textContent).toContain("Prepared for Jordan Taylor");
   expect(cover.textContent).not.toContain("{{");
   expect(screen.queryByLabelText("Heading")).toBeNull();
   expect(screen.queryByLabelText("Subtitle")).toBeNull();

@@ -1,12 +1,11 @@
 "use client";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, LockKeyhole, Mail, Phone, Search, UserRound, UsersRound } from "lucide-react";
+import { Loader2, LockKeyhole } from "lucide-react";
 import { recipientSchema, type RecipientValues } from "@/lib/str-appraisals/validation";
-import type { AgencyContact } from "@/lib/str-appraisals/types";
 import { UnsavedListingGuard } from "@/components/listings/UnsavedListingGuard";
-import { useRemoteOptions } from "./useRemoteOptions";
+import { ClientPicker } from "@/components/clients/ClientPicker";
 
 export function RecipientForm({ initialValues, onSubmit, submitLabel, onCancel }: {
   initialValues: RecipientValues;
@@ -14,63 +13,25 @@ export function RecipientForm({ initialValues, onSubmit, submitLabel, onCancel }
   submitLabel: string;
   onCancel?: () => void;
 }) {
-  const id = useId();
   const form = useForm<RecipientValues>({ resolver: zodResolver(recipientSchema), defaultValues: initialValues, mode: "onBlur" });
-  const mode = useWatch({ control: form.control, name: "mode" });
-  const contactId = useWatch({ control: form.control, name: "contact_id" });
-  const [contactSearch, setContactSearch] = useState("");
+  const values = useWatch({ control: form.control }) as RecipientValues;
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const contacts = useRemoteOptions<AgencyContact>(`/api/str/contacts?q=${encodeURIComponent(contactSearch)}`, "contacts", mode === "named");
   async function save(values: RecipientValues) {
     setError(null);
     try { await onSubmit(values); setSaved(true); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save customer details."); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save client details."); }
   }
-  return (
-    <form data-theme="staypack-workspace" onSubmit={form.handleSubmit(save)} noValidate className="space-y-5 text-base-content">
-      <UnsavedListingGuard dirty={form.formState.isDirty && !form.formState.isSubmitting && !saved} description="Your customer details have unsaved changes. Stay to save them, or discard them and leave." />
-      <fieldset disabled={form.formState.isSubmitting} className="space-y-5">
-        <legend className="sr-only">Customer details</legend>
-        <div>
-          <label htmlFor={`${id}-mode`} className="mb-2 block text-sm font-medium">Appraisal audience</label>
-          <select id={`${id}-mode`} aria-label="Appraisal audience" className="du-select du-select-sm min-h-11 w-full" {...form.register("mode")}>
-            <option value="named">A specific customer</option><option value="general">General appraisal — no named customer</option>
-          </select>
-        </div>
-        {mode === "named" && <>
-          <div className="space-y-2 rounded-xl bg-base-200/50 p-4">
-            <label htmlFor={`${id}-contact-search`} className="block text-sm font-medium">Find an existing customer <span className="font-normal text-base-content/60">(optional)</span></label>
-            <div className="du-input du-input-sm min-h-11 w-full"><Search className="size-4 shrink-0 text-base-content/55" aria-hidden="true" /><input id={`${id}-contact-search`} aria-label="Find an existing customer (optional)" type="search" value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} placeholder="Search customer names" className="min-w-0" /></div>
-            <label htmlFor={`${id}-contact`} className="sr-only">Existing customer</label>
-            <select id={`${id}-contact`} aria-label="Existing customer" value={contactId || ""} className="du-select du-select-sm min-h-11 w-full" onChange={(event) => {
-              const contact = contacts.data.find((item) => item.id === event.target.value);
-              form.setValue("contact_id", event.target.value, { shouldDirty: true });
-              if (contact) for (const field of ["name", "email", "phone"] as const) form.setValue(field, contact[field] || "", { shouldDirty: true, shouldValidate: true });
-            }}>
-              <option value="">Enter customer details below</option>
-              {contactId && !contacts.data.some((item) => item.id === contactId) && <option value={contactId}>Current customer</option>}
-              {contacts.data.map((contact) => <option key={contact.id} value={contact.id}>{contact.name}{contact.email ? ` · ${contact.email}` : ""}</option>)}
-            </select>
-            <p className="text-xs text-base-content/65" role="status">{contacts.loading ? "Loading customers…" : contacts.error || "Select a customer or enter new details below."}</p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {([{ name: "name", label: "Customer name", type: "text", autoComplete: "name", icon: UserRound }, { name: "email", label: "Email (optional)", type: "email", autoComplete: "email", icon: Mail }, { name: "phone", label: "Phone (optional)", type: "tel", autoComplete: "tel", icon: Phone }] as const).map((field) => <div key={field.name} className={field.name === "name" ? "sm:col-span-2" : ""}>
-              <label htmlFor={`${id}-${field.name}`} className="mb-2 block text-sm font-medium">{field.label}</label>
-              <div className={form.formState.errors[field.name] ? "du-input du-input-sm du-input-error min-h-11 w-full" : "du-input du-input-sm min-h-11 w-full"}><field.icon className="size-4 shrink-0 text-base-content/55" aria-hidden="true" /><input id={`${id}-${field.name}`} aria-label={field.label} type={field.type} autoComplete={field.autoComplete} maxLength={field.name === "name" ? 200 : field.name === "email" ? 254 : 50} aria-invalid={Boolean(form.formState.errors[field.name])} aria-describedby={`${id}-${field.name}-hint`} className="min-w-0" {...form.register(field.name)} /></div>
-              <p id={`${id}-${field.name}-hint`} className="mt-1 text-xs text-error-content" role={form.formState.errors[field.name] ? "alert" : undefined}>{form.formState.errors[field.name]?.message}</p>
-            </div>)}
-          </div>
-          <p className="text-xs text-base-content/65">Australian numbers are accepted locally. For other countries, include the + country code. Editing these details applies to this appraisal.</p>
-        </>}
-        {mode === "general" && <div className="flex items-start gap-3 rounded-xl bg-base-200/50 p-4"><UsersRound className="mt-0.5 size-5 shrink-0 text-base-content/65" aria-hidden="true" /><div><p className="text-sm font-medium">Keep this appraisal general</p><p className="mt-1 text-sm text-base-content/65">No customer name will appear on the proposal. You can add a customer later.</p></div></div>}
-      </fieldset>
-      <p className="flex items-start gap-2 text-xs leading-relaxed text-base-content/65"><LockKeyhole className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{mode === "named" && "The customer name appears on the proposal. "}Email and phone stay private to your agency. Saving does not send a message.</span></p>
-      {error && <div role="alert" className="du-alert du-alert-error">{error}</div>}
-      <div className="flex flex-wrap justify-end gap-2 border-t border-base-300 pt-5">
-        {onCancel && <button type="button" onClick={onCancel} disabled={form.formState.isSubmitting} className="du-btn du-btn-sm du-btn-ghost min-h-11">Cancel</button>}
-        <button type="submit" disabled={form.formState.isSubmitting} className="du-btn du-btn-sm du-btn-primary min-h-11">{form.formState.isSubmitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}{form.formState.isSubmitting ? "Saving…" : submitLabel}</button>
-      </div>
-    </form>
-  );
+  return <form data-theme="staypack-workspace" onSubmit={form.handleSubmit(save)} noValidate className="space-y-5 text-base-content">
+    <UnsavedListingGuard dirty={form.formState.isDirty && !form.formState.isSubmitting && !saved} description="Your client details have unsaved changes. Stay to save them, or discard them and leave." />
+    <fieldset disabled={form.formState.isSubmitting} className="min-w-0"><legend className="sr-only">Client details</legend>
+      <ClientPicker initiallyOpen value={values} onChange={next => { for (const field of ["mode", "contact_id", "name", "email", "phone"] as const) form.setValue(field, next[field], { shouldDirty: true, shouldValidate: form.formState.isSubmitted }); }} errors={{ name: form.formState.errors.name?.message, email: form.formState.errors.email?.message, phone: form.formState.errors.phone?.message }} />
+    </fieldset>
+    <p className="flex items-start gap-2 text-xs leading-relaxed text-base-content/65"><LockKeyhole className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>The client name appears on the proposal. Email and phone stay private to your agency. Saving does not send a message.</span></p>
+    {error && <div role="alert" className="du-alert du-alert-error">{error}</div>}
+    <div className="flex flex-wrap justify-end gap-2 border-t border-base-300 pt-5">
+      {onCancel && <button type="button" onClick={onCancel} disabled={form.formState.isSubmitting} className="du-btn du-btn-sm du-btn-ghost min-h-11">Cancel</button>}
+      <button type="submit" disabled={form.formState.isSubmitting} className="du-btn du-btn-sm du-btn-primary min-h-11">{form.formState.isSubmitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}{form.formState.isSubmitting ? "Saving…" : submitLabel}</button>
+    </div>
+  </form>;
 }

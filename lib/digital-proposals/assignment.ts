@@ -14,7 +14,7 @@ export function defaultAssignment(agency: Agency, kind: WorkspaceAppraisalKind =
   if (kind !== "str") return { name: `${agency.name} ${kind === "lease" ? "rental" : "sales"} proposal`, version: 1, defaults: {
     ...DEFAULT_PROPOSAL_DRAFT, templateId: "appraisal-base", heroLayout: "overlay",
     brandOverrides: brandFromReport(agency as unknown as FinalReportJson["agency"]),
-    content: { ...DEFAULT_PROPOSAL_DRAFT.content, introduction: kind === "lease" ? "Rental appraisal" : "Sales appraisal", comparisonTitle: kind === "lease" ? "Your rental appraisal" : "Your sales appraisal" },
+    content: { ...DEFAULT_PROPOSAL_DRAFT.content, introduction: kind === "lease" ? "Lease appraisal" : "Sales appraisal", comparisonTitle: kind === "lease" ? "Your rental appraisal" : "Your sales appraisal" },
     pages: [
       { id: "property", kind: "hero", title: "Your property", body: "", enabled: true },
       { id: "appraisal", kind: "comparison", title: kind === "lease" ? "Rental appraisal" : "Sales appraisal", body: "", enabled: true },

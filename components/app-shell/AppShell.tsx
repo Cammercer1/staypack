@@ -29,6 +29,7 @@ const navigationGroups = [
     label: "Workspace",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/clients", label: "Clients", icon: Users },
     ],
   },
   {

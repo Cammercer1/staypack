@@ -1,3 +1,4 @@
+import { ReportPreparedFor } from "@/lib/reports/templates/shared/ReportPreparedFor";
 import { BrochureBlurbContent } from "@/lib/collateral/templates/sales-brochure/shared/BrochureBlurbContent";
 import { getPropertyHighlights } from "@/lib/collateral/sales-brochure/propertyHighlights";
 import { getCollateralPageFormat } from "@/lib/collateral/pageFormat";
@@ -58,6 +59,7 @@ export function EditorialPageOneSpread({
       <div className="grid min-h-0 flex-1 grid-cols-[1.5fr_0.9fr] gap-12 overflow-hidden px-10 py-7">
         {/* Narrative column */}
         <div className="flex min-h-0 flex-col gap-6 overflow-hidden">
+          <ReportPreparedFor report={report} className="text-[0.8rem] leading-snug" />
           <EditorialKicker>The Residence</EditorialKicker>
           <BrochureBlurbContent
             document={document}
