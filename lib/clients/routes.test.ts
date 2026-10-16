@@ -36,6 +36,14 @@ it("normalizes new private client details and ignores caller-supplied agency ide
   });
 });
 
+it("supports lookup of a full-length client email without truncating it", async () => {
+  const email = `${"a".repeat(64)}@${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(61)}`;
+  expect(email.length).toBe(254);
+  mocks.rpc.mockResolvedValue({ data: { clients: [], total: 0 }, error: null });
+  expect((await GET(new Request(`http://localhost/api/clients?q=${encodeURIComponent(email)}&archived=all`))).status).toBe(200);
+  expect(mocks.rpc).toHaveBeenCalledWith("list_agency_clients", expect.objectContaining({ p_search: email, p_archived: "all", p_agency_id: "authorized-agency" }));
+});
+
 it("requires valid names, contact details and update timestamps before writing", async () => {
   expect((await POST(request({ name: "", email: "not-email" }))).status).toBe(400);
   expect((await POST(request({ name: "Jordan", phone: "unknown" }))).status).toBe(400);

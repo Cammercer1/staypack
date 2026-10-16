@@ -5,6 +5,7 @@ import { Check, Mail, Phone, Plus, Search, UserRound } from "lucide-react";
 import type { RecipientValues } from "@/lib/str-appraisals/validation";
 import type { AgencyContact } from "@/lib/str-appraisals/types";
 import { useRemoteOptions } from "@/components/str-appraisals/useRemoteOptions";
+import { ExistingClientNotice } from "./ExistingClientNotice";
 
 type Errors = Partial<Record<"name" | "email" | "phone", string>>;
 export function ClientDetailsFields({ value, onChange, errors = {} }: { value: RecipientValues; onChange: (value: RecipientValues) => void; errors?: Errors }) {
@@ -66,6 +67,7 @@ export function ClientPicker({ value, onChange, errors, initiallyOpen = false, p
       </div> : <div className="space-y-3 rounded-xl border border-base-300 bg-base-100 p-4">
         <div className="flex items-center justify-between gap-2"><p className="font-medium">{value.contact_id ? "Details for this report" : "New client"}</p><button type="button" className="du-btn du-btn-sm du-btn-ghost min-h-11" onClick={() => setEditing(false)}>Search clients</button></div>
         <ClientDetailsFields value={value} onChange={onChange} errors={errors} />
+        {!value.contact_id && <ExistingClientNotice email={value.email} onSelect={choose} previewClients={previewClients} />}
         <p className="text-xs text-base-content/60">{value.contact_id ? "These changes apply to this report. Edit the Clients directory to update the saved client." : "This client will be saved when you continue."}</p>
       </div>}
       <button type="button" className="du-btn du-btn-sm du-btn-ghost min-h-11" onClick={() => { onChange({ mode: "general", name: "", email: "", phone: "", contact_id: "" }); restoreFocus.current = true; setOpen(false); setEditing(false); }}>No named client</button>

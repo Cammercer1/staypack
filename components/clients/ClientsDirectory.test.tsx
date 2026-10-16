@@ -42,6 +42,21 @@ it("retains new details when duplicate detection rejects saving and confirms uns
   expect(screen.getByLabelText("Client name")).toHaveProperty("value", "Jordan Taylor");
 });
 
+it("opens a matching saved client before a duplicate is submitted", async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async url => String(url).includes("?")
+    ? Response.json({ clients: [client], total: 1, page: 1, pageSize: 30 })
+    : Response.json({ client, reports: [], reportsTotal: 0, leads: [], leadsTotal: 0 }));
+  vi.stubGlobal("fetch", fetcher);
+  render(<ClientsDirectory />);
+  fireEvent.click(screen.getByRole("button", { name: "Add client" }));
+  fireEvent.change(screen.getByLabelText("Client name"), { target: { value: "Jordan New" } });
+  fireEvent.change(screen.getByLabelText("Email (optional)"), { target: { value: " JORDAN@EXAMPLE.COM " } });
+  fireEvent.click(await screen.findByRole("button", { name: "View existing client" }));
+  expect(await screen.findByRole("dialog", { name: "Jordan Taylor" })).toBeTruthy();
+  expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST" || init?.method === "PATCH")).toBe(false);
+  expect(fetcher.mock.calls.some(([url]) => String(url).includes("q=jordan%40example.com&archived=all"))).toBe(true);
+});
+
 it("searches email and pages results without leaving the directory", async () => {
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async url => Response.json({ clients: [client], total: 32, page: String(url).includes("page=2") ? 2 : 1, pageSize: 30 }));
   vi.stubGlobal("fetch", fetcher);

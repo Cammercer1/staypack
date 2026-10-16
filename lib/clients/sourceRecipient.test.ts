@@ -5,9 +5,9 @@ import { loadRecipientFromSource } from "./sourceRecipient";
 const id = "10000000-0000-4000-8000-000000000001";
 function fixture(data: unknown, contact: unknown = { id: "client" }) {
   const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), is: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data, error: null }) };
-  const contactQuery = { ...query, maybeSingle: vi.fn().mockResolvedValue({ data: contact, error: null }) };
-  const from = vi.fn((table: string) => table === "str_appraisals" ? query : contactQuery);
-  return { supabase: { from } as unknown as SupabaseClient, query, contactQuery, from };
+  const from = vi.fn().mockReturnValue(query);
+  const rpc = vi.fn().mockResolvedValue({ data: contact ? { client: contact } : null, error: null });
+  return { supabase: { from, rpc } as unknown as SupabaseClient, query, from, rpc };
 }
 
 it("carries the source report snapshot instead of inferring a client from a property", async () => {
@@ -24,8 +24,25 @@ it("preserves pending legacy lead details so the new report asks for its missing
 });
 
 it("keeps archived client snapshot details without selecting an archived directory record", async () => {
-  const mock = fixture({ recipient_mode: "named", contact_id: "archived", recipient_name: "Saved name" }, null);
+  const mock = fixture({ recipient_mode: "named", contact_id: "archived", recipient_name: "Saved name" }, { id: "archived", archived_at: "2026-10-16T00:00:00Z" });
   expect(await loadRecipientFromSource(mock.supabase, "agency", id)).toEqual({ mode: "named", contact_id: "", name: "Saved name", email: "", phone: "" });
+});
+
+it("uses a merged client's canonical identity while retaining the source report snapshot", async () => {
+  const source = { recipient_mode: "named", contact_id: "merged-client", recipient_name: "Report name", recipient_email: "saved@example.test", recipient_phone: "0400000001" };
+  const mock = fixture(source, { id: "canonical-client", name: "Directory name", email: "current@example.test", phone: "0411111111", archived_at: null });
+  expect(await loadRecipientFromSource(mock.supabase, "agency", id)).toEqual({ mode: "named", contact_id: "canonical-client", name: "Report name", email: "saved@example.test", phone: "0400000001" });
+  expect(mock.rpc).toHaveBeenCalledWith("get_agency_client", { p_agency_id: "agency", p_client_id: "merged-client" });
+  expect(source.contact_id).toBe("merged-client");
+  expect(mock.from.mock.calls.flat()).toEqual(["str_appraisals"]);
+});
+
+it("retains saved details if the linked client no longer exists, but surfaces lookup failures", async () => {
+  const mock = fixture({ recipient_mode: "named", contact_id: "missing", recipient_name: "Saved name" });
+  mock.rpc.mockResolvedValueOnce({ data: null, error: { code: "PT404", message: "Client not found" } });
+  expect(await loadRecipientFromSource(mock.supabase, "agency", id)).toEqual({ mode: "named", contact_id: "", name: "Saved name", email: "", phone: "" });
+  mock.rpc.mockResolvedValueOnce({ data: null, error: { code: "42501", message: "Agency access required" } });
+  await expect(loadRecipientFromSource(mock.supabase, "agency", id)).rejects.toThrow("Agency access required");
 });
 
 it("does not expose inaccessible report recipients and ignores malformed ids", async () => {

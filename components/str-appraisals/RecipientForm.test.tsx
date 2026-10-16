@@ -43,6 +43,19 @@ it("selects an existing client by keyboard and submits the full identity snapsho
   await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ mode: "named", contact_id: contact.id, name: contact.name, email: contact.email, phone: contact.phone }));
 });
 
+it("offers the existing client for a normalized email without overwriting their saved details", async () => {
+  const contact = { id: "00000000-0000-4000-8000-000000000001", name: "Jordan Taylor", email: "jordan@example.com", phone: "0412345678" };
+  contacts.data = [contact];
+  const onSubmit = vi.fn().mockResolvedValue(undefined);
+  render(<RecipientForm initialValues={{ mode: "named", name: "Jordan New", email: " JORDAN@EXAMPLE.COM ", phone: "0400000000" }} onSubmit={onSubmit} submitLabel="Save client" />);
+  expect(screen.getByText("A saved client already uses this email.")).toBeTruthy();
+  expect(screen.getByLabelText("Client name")).toHaveProperty("value", "Jordan New");
+  fireEvent.click(screen.getByRole("button", { name: "Use existing client" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save client" }));
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ mode: "named", contact_id: contact.id, name: contact.name, email: contact.email, phone: contact.phone }));
+  expect(contacts.data[0]).toEqual(contact);
+});
+
 it("validates new clients and explicitly clears identity for no named client", async () => {
   const onSubmit = vi.fn().mockResolvedValue(undefined);
   render(<RecipientForm initialValues={{ mode: "named", name: "", email: "", phone: "" }} onSubmit={onSubmit} submitLabel="Create appraisal" />);

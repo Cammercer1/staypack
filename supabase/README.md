@@ -631,3 +631,45 @@ The 262 pre-existing report records and 28 proposal versions retained identical
 snapshot/PDF checksums after migration and QA. Billing remains disabled, with no
 metered accounts or usage events. The existing navigation is retained with one
 Clients link added.
+
+## Client merges and unique email addresses
+
+Apply `20261016002517_client_merge_and_email_identity.sql` first. Review any
+same-agency duplicate email groups and merge only confirmed duplicates through
+`merge_agency_clients` with the service role, explicit source/target IDs and both
+current `updated_at` values. Then apply
+`20261016002520_client_email_unique_index.sql`. The index intentionally fails if
+unreviewed duplicates remain; migrations never guess which client to keep.
+Production applies both phases and the explicitly authorised merge in one
+transaction, recording each migration only after its statements succeed.
+
+A merged contact is retained as an immutable, archived alias. Directory results
+show only the canonical client, and client history includes reports and leads
+linked to either ID. Existing reports, recipient snapshots, properties, leads,
+published versions, public links and PDFs are not rewritten. Selecting an old
+client ID or creating another report from an older appraisal resolves the current
+client while retaining that appraisal's saved recipient details.
+
+A unique index enforces one nonblank, trimmed, case-insensitive email per agency
+across active and archived canonical clients. Accounts remain separate, and
+clients without email are allowed. Archiving does not free an email for a second
+record; restore the existing client instead. The shared picker and directory show
+exact email matches with an explicit action to use or view the saved client.
+Public calculator inputs still cannot overwrite directory details. Billing
+configuration and usage are unaffected.
+
+Both migrations were applied and recorded on 16 October 2026, with the reviewed
+Cameron Mercer duplicate merged in the same transaction. Live checks confirm one
+canonical client, combined history, duplicate creation rejected with HTTP 409,
+and old selections/calculator identity resolving to that client. No billing was
+enabled.
+
+`client_directory_run.py` now also runs the merge fixtures/assertions and both
+migration phases in a fresh disposable `staypack-clients-qa*` PostgreSQL 17
+container. `client_directory_concurrency.py` checks four independent 12-session
+cases, including repeatable-read transactions that all start with an empty
+snapshot: exactly one insert succeeds and the unique index rejects the other 11.
+Assertions cover merge retries, stale edits, alias tampering, agency isolation,
+archived email collisions, STR/lease/sales carry-through and unchanged historical
+rows. Application validation passed 1,911 unit tests, TypeScript, lint (no errors)
+and the production build including all 74 required routes.

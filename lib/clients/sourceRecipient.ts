@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { generalRecipient, type RecipientValues } from "@/lib/str-appraisals/validation";
-import type { PendingClient } from "./types";
+import type { ClientDetail, PendingClient } from "./types";
 
 /** Explicit report lineage only: the property's other recipients are never inferred. */
 export async function loadRecipientFromSource(supabase: SupabaseClient, agencyId: string, sourceReportId: string): Promise<RecipientValues | null> {
@@ -18,10 +18,11 @@ export async function loadRecipientFromSource(supabase: SupabaseClient, agencyId
   if (data.recipient_mode !== "named") return { ...generalRecipient };
   let contactId = data.contact_id as string | null;
   if (contactId) {
-    const { data: contact, error: contactError } = await supabase.from("agency_contacts").select("id")
-      .eq("agency_id", agencyId).eq("id", contactId).is("archived_at", null).maybeSingle();
-    if (contactError) throw new Error(contactError.message);
-    if (!contact) contactId = null;
+    const { data: detail, error: contactError } = await supabase.rpc("get_agency_client", { p_agency_id: agencyId, p_client_id: contactId });
+    if (contactError && contactError.code !== "PT404") throw new Error(contactError.message);
+    const contact = (detail as ClientDetail | null)?.client;
+    // Merged directory IDs resolve to the canonical client; saved report details stay intact.
+    contactId = contact && !contact.archived_at ? contact.id : null;
   }
   return {
     mode: "named", contact_id: contactId ?? "", name: data.recipient_name ?? "",

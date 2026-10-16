@@ -20,7 +20,7 @@ export const updateClientSchema = clientSchema.safeExtend({
 });
 
 export const clientQuerySchema = z.object({
-  q: z.string().trim().max(160).default(""),
+  q: z.string().trim().max(254).default(""),
   page: z.coerce.number().int().min(1).max(100000).default(1),
   archived: z.enum(["active", "archived", "all"]).default("active"),
 });
