@@ -42,15 +42,21 @@ function EditorialMultiPageProposal({ data, brand, draft, attachments = NO_ATTAC
   const requested = useRef<{ id: string; history: boolean } | null>(null);
   const [opening, setOpening] = useState(active?.kind === "hero" && pages.length > 1);
   const initial = useRef(active?.id);
+  const pagePath = useCallback((id: string) => {
+    const [pathname, query] = (publicPath ?? "").split("?");
+    const params = new URLSearchParams(query);
+    params.set("page", id);
+    return `${pathname}?${params}`;
+  }, [publicPath]);
   const onPrepared = useCallback((id: string) => setMounted(previous => previous.has(id) ? previous : new Set([...previous, id])), []);
   const onError = useCallback((id: string) => { if (requested.current?.id === id) setFailed(true); }, []);
   const warm = useProposalPreload(data, pages, true, active?.id, onPrepared, onError);
   const commit = useCallback((id: string, history: boolean) => {
-    if (publicPath && history) window.history.pushState(null, "", `${publicPath}?page=${encodeURIComponent(id)}`);
+    if (publicPath && history) window.history.pushState(null, "", pagePath(id));
     requested.current = null;
     setPending(null); setFailed(false); setOpening(false); setSelected(id);
     shouldFocusPage.current = true;
-  }, [publicPath]);
+  }, [publicPath, pagePath]);
   const onReady = useCallback((id: string) => {
     ready.current.add(id);
     const first = pages.findIndex(page => page.id === initial.current);
@@ -73,7 +79,7 @@ function EditorialMultiPageProposal({ data, brand, draft, attachments = NO_ATTAC
     requested.current = { id, history }; setPending(id); warm(id);
   }, [active?.id, commit, warm]);
   const cancelNavigation = () => {
-    if (publicPath && requested.current?.history === false && active) window.history.replaceState(null, "", `${publicPath}?page=${encodeURIComponent(active.id)}`);
+    if (publicPath && requested.current?.history === false && active) window.history.replaceState(null, "", pagePath(active.id));
     requested.current = null; setPending(null); setFailed(false); setOpening(false);
   };
   useProposalPageTracking(active?.id, proposalRef);
@@ -95,8 +101,12 @@ function EditorialMultiPageProposal({ data, brand, draft, attachments = NO_ATTAC
   useEffect(() => {
     if (!publicPath) return;
     const restorePage = () => {
-      if (window.location.pathname !== publicPath) return;
-      const requested = new URLSearchParams(window.location.search).get("page");
+      const [pathname, query] = publicPath.split("?");
+      if (window.location.pathname !== pathname) return;
+      const locationParams = new URLSearchParams(window.location.search);
+      const mountedVersion = new URLSearchParams(query).get("version");
+      if (mountedVersion && locationParams.has("version") && locationParams.get("version") !== mountedVersion) return;
+      const requested = locationParams.get("page");
       const id = pages.find(page => page.id === requested)?.id ?? pages[0]?.id;
       if (id) navigate(id, false);
     };
@@ -108,7 +118,7 @@ function EditorialMultiPageProposal({ data, brand, draft, attachments = NO_ATTAC
   const immersiveCover = fullViewport && active.kind === "hero" && draft.heroLayout === "overlay" && !active.body && index < pages.length - 1;
   const viewportComparables = fullViewport && active.kind === "evidence" && !active.body && index < pages.length - 1;
   const control = (id: string, label: React.ReactNode, className: string, current = false) => publicPath
-    ? <a href={`${publicPath}?page=${encodeURIComponent(id)}`} onPointerEnter={() => warm(id)} onFocus={() => warm(id)} onClick={event => {
+    ? <a href={pagePath(id)} onPointerEnter={() => warm(id)} onFocus={() => warm(id)} onClick={event => {
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
       navigate(id);
@@ -124,7 +134,7 @@ function EditorialMultiPageProposal({ data, brand, draft, attachments = NO_ATTAC
     {(opening || pending) && <div role="status" aria-live="polite" className={cn(fullViewport ? "fixed" : "absolute", "inset-x-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-full border px-5 py-3 text-sm shadow-sm backdrop-blur-md", immersiveCover ? "border-white/20 bg-black/45 text-white" : "border-current/15 bg-(--proposal-bg) text-(--proposal-text)")}>
       {!failed && <LoaderCircle size={16} aria-hidden="true" className="shrink-0 motion-safe:animate-spin" />}
       <span>{failed ? "This page is taking longer than expected." : pending ? "Preparing page…" : "Preparing your proposal…"}</span>
-      {failed && (publicPath ? <a className="shrink-0 underline underline-offset-4" href={`${publicPath}?page=${encodeURIComponent(pending!)}`}>Reload</a> : <button type="button" className="shrink-0 underline underline-offset-4" onClick={() => window.location.reload()}>Reload</button>)}
+      {failed && (publicPath ? <a className="shrink-0 underline underline-offset-4" href={pagePath(pending!)}>Reload</a> : <button type="button" className="shrink-0 underline underline-offset-4" onClick={() => window.location.reload()}>Reload</button>)}
       {pending && <button type="button" aria-label="Cancel page change" className="-my-2 flex min-h-11 min-w-11 items-center justify-center" onClick={cancelNavigation}><X size={16} /></button>}
     </div>}
     <nav aria-label="Proposal pagination" aria-busy={Boolean(pending)} className={cn(viewportComparables && styles.navigation, "sticky bottom-0 z-20 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-current/15 bg-(--proposal-bg) px-4 py-3 text-sm", fullViewport && "min-h-[calc(5rem+env(safe-area-inset-bottom))] px-[clamp(1rem,4vw,4rem)] pb-[max(0.75rem,env(safe-area-inset-bottom))]", immersiveCover && "-mt-[calc(5rem+env(safe-area-inset-bottom))] border-transparent bg-transparent text-white")}>

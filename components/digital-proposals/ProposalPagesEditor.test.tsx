@@ -34,7 +34,7 @@ it("reorders by keyboard, announces the result and preserves hidden pages", () =
   handle.focus();
   fireEvent.keyDown(handle, { key: "ArrowUp" });
   expect(savedPages().map(page => page.id)).toEqual(["property", "appraisal", "evidence", "forecast", "service", "next-steps"]);
-  expect(screen.getByRole("status").textContent).toBe("Moved Comparable listings to position 3 of 6.");
+  expect(screen.getByRole("status").textContent).toBe("Moved Comparable listings to position 3 of 5.");
   expect(document.activeElement).toBe(handle);
   fireEvent.keyDown(handle, { key: "End" });
   expect(savedPages().at(-1)?.id).toBe("evidence");
@@ -50,7 +50,7 @@ it("previews pointer dragging and commits the complete page order only on drop",
   expect(savedPages()[0].id).toBe("property");
   fireEvent.pointerUp(list, { pointerId: 1, clientY: 310 });
   expect(savedPages().map(page => page.id)).toEqual(["appraisal", "forecast", "evidence", "property", "service", "next-steps"]);
-  expect(screen.getByRole("status").textContent).toBe("Moved Your property to position 4 of 6.");
+  expect(screen.getByRole("status").textContent).toBe("Moved Your property to position 4 of 5.");
 });
 
 it.each(["pointercancel", "Escape", "window blur"])("cancels a touch drag on %s without changing the draft", cancellation => {
@@ -68,18 +68,39 @@ it.each(["pointercancel", "Escape", "window blur"])("cancels a touch drag on %s 
   expect(screen.getByRole("status").textContent).toContain("Page order unchanged");
 });
 
-it("keeps the final included page enabled and unavailable pages muted and disabled", () => {
+it("keeps the final included page enabled and hides the unconfigured optional service choice", () => {
   render(<Editor pages={DEFAULT_PROPOSAL_DRAFT.pages.map(page => ({ ...page, enabled: page.id === "property" }))} />);
   const property = screen.getByLabelText("Include Your property") as HTMLInputElement;
   expect(property.disabled).toBe(true);
   fireEvent.click(property);
   expect(savedPages().filter(page => page.enabled).map(page => page.id)).toEqual(["property"]);
-  expect((screen.getByLabelText("Include Our management service") as HTMLInputElement).disabled).toBe(true);
+  expect(screen.queryByLabelText("Include Our management service")).toBeNull();
+  expect(savedPages().find(page => page.id === "service")).toEqual(DEFAULT_PROPOSAL_DRAFT.pages.find(page => page.id === "service"));
   fireEvent.click(screen.getByLabelText("Include Rental appraisal"));
   expect(property.disabled).toBe(false);
   fireEvent.click(property);
   expect(savedPages().filter(page => page.enabled).map(page => page.id)).toEqual(["appraisal"]);
   expect(screen.getByText("1 included")).toBeTruthy();
+});
+
+it("moves across an unconfigured service page without changing its saved slot or content", () => {
+  const pages = [...DEFAULT_PROPOSAL_DRAFT.pages];
+  const [service] = pages.splice(4, 1);
+  pages.splice(1, 0, service);
+  render(<Editor pages={pages} />);
+  fireEvent.click(screen.getByRole("button", { name: "Move Your property down" }));
+  expect(savedPages().map(page => page.id)).toEqual(["appraisal", "service", "property", "forecast", "evidence", "next-steps"]);
+  expect(savedPages()[1]).toEqual(service);
+  expect((screen.getByRole("button", { name: "Move Next steps down" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+it.each(["configured", "enabled", "studio"])("keeps a %s service page available without changing it on render", state => {
+  const pages = DEFAULT_PROPOSAL_DRAFT.pages.map(page => page.id === "service" ? {
+    ...page, body: state === "configured" ? "Our management service" : "", enabled: state === "enabled",
+  } : page);
+  render(<Editor pages={pages} contentEditable={state === "studio"} />);
+  expect(screen.getByLabelText("Include Our management service")).toBeTruthy();
+  expect(savedPages()).toEqual(pages);
 });
 
 it("blocks reordering while disabled, including a drag that began before disabling", () => {

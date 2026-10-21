@@ -1,0 +1,4 @@
+# Repository-local connection, restricted to the StayPacks Supabase project.
+# Authentication is stored by the MCP client, never in this file.
+[mcp_servers.staypacks-supabase]
+url = "https://mcp.supabase.com/mcp?project_ref=qmtfugaeujeikyegoxwi"

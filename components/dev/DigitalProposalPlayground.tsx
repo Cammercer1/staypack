@@ -15,6 +15,7 @@ import { createProposalFixture, PROPOSAL_FIXTURES, type ProposalFixtureId } from
 import { DEFAULT_PROPOSAL_DRAFT, proposalDraftSchema, refreshProposalDraftDefaults, validateProposalDraft, type ProposalDraft } from "@/lib/digital-proposals/template";
 import { DATA_TOKENS, formatToken, resolveTokenText, type DataToken } from "@/lib/digital-proposals/tokens";
 import type { ProposalData } from "@/lib/digital-proposals/data";
+import { withProposalPhotos } from "@/lib/digital-proposals/photos";
 
 type SavedAppraisalPreview = { reportId: string; data: ProposalData; workspace?: ProposalWorkspace };
 
@@ -58,7 +59,7 @@ function ProposalStudio({ savedAppraisal }: { savedAppraisal?: SavedAppraisalPre
   const textarea = useRef<HTMLTextAreaElement | null>(null);
   const upload = useRef<HTMLInputElement>(null);
   const usingSavedData = fixtureId === "saved" && Boolean(savedAppraisal);
-  const data = fixtureId === "saved" && savedAppraisal ? savedAppraisal.data : createProposalFixture(fixtureId === "saved" ? "complete" : fixtureId);
+  const data = withProposalPhotos(fixtureId === "saved" && savedAppraisal ? savedAppraisal.data : createProposalFixture(fixtureId === "saved" ? "complete" : fixtureId), draft.propertyImages);
   const resolved = resolveProposalBrand({ presetId: draft.presetId, template: draft.brandOverrides });
   const validation = validateProposalDraft(watched, data);
   const contrasts = [

@@ -34,6 +34,7 @@ export function ProposalComparison({ data, brand, draft }: ProposalTemplateProps
           {row.value === null && <dd className="col-span-2 mt-1 text-xs text-(--proposal-muted)">{row.id === "ltr" ? "Rental estimate needed" : "Scenario not supplied"}</dd>}
         </div>)}
       </dl>
+      <p className="mt-2 text-sm text-(--proposal-muted)">{mode === "yield" ? "Estimated gross yields" : `Estimated ${mode === "monthly" ? "monthly" : "annual"} gross revenue`} before management fees and operating costs.</p>
       <div className="mt-6"><RentalComparisonChart data={data} brand={brand} mode={mode} motion={draft.motion} /></div>
       {mode === "yield" && <p className="text-sm text-(--proposal-muted)">Based on an estimated property value of {formatCurrency(data.property.estimatedValue, data.market?.currency)}.</p>}
       {mode === "annual" && !draft.pages.some(page => page.kind === "forecast") && <div className="mt-8 border-t border-current/15 pt-6"><MonthlyRevenueChart data={data} brand={brand} motion={draft.motion} /></div>}

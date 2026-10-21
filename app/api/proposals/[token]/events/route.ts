@@ -7,9 +7,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     if (isAutomatedProposalRequest(request.headers.get("user-agent") ?? "")) return new Response(null, { status: 204 });
     const event = proposalEventSchema.parse(await proposalRequest(request));
     const { token } = await params;
-    const version = await publishedProposal(token);
+    const version = await publishedProposal(token, event.versionId);
+    // An older open page cannot identify its snapshot after a stable link moves.
+    if (!event.versionId && !version.legacy) return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
     if (allowedProposalEvent(event, version.snapshot)) {
-      const result = await createAdminClient().rpc("record_proposal_event", { p_token: token, p_id: event.id, p_session: event.session, p_kind: event.kind, p_target: event.target });
+      const args = { p_token: token, p_id: event.id, p_session: event.session, p_kind: event.kind, p_target: event.target };
+      const result = version.legacy
+        ? await createAdminClient().rpc("record_proposal_event", args)
+        : await createAdminClient().rpc("record_proposal_event_v2", { ...args, p_version_id: version.id });
       if (result.error) return new Response(null, { status: 503 });
     }
     return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });

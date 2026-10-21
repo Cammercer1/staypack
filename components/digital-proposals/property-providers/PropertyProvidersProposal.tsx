@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ArrowDown, ArrowRight, Bath, BedDouble, CarFront, ChevronLeft, ChevronRight, Download, List, Mail, Phone, Users, X } from "lucide-react";
 import type { ProposalTemplateProps } from "../DigitalProposal";
 import type { ProposalData } from "@/lib/digital-proposals/data";
+import { agencyContactActions, hasAgentContact } from "@/lib/digital-proposals/contacts";
 import { monthlyRevenueProjection, occupancyMonthLabel } from "@/lib/digital-proposals/forecastPresentation";
 import { proposalBrandStyle } from "@/lib/digital-proposals/brandStyle";
 import { resolveTokenText } from "@/lib/digital-proposals/tokens";
@@ -86,14 +87,29 @@ export function PropertyProvidersProposal({ data, brand, draft, initialPage, pub
   const [period, setPeriod] = useState<"annual" | "monthly">("annual");
   const root = useRef<HTMLDivElement>(null);
   const active = pages.find(page => page.id === selected) ?? pages[0];
+  function pagePath(id: string) {
+    const [pathname, query] = (publicPath ?? "").split("?");
+    const params = new URLSearchParams(query);
+    params.set("page", id);
+    return `${pathname}?${params}`;
+  }
   useEffect(() => {
-    const restore = () => setSelected(new URLSearchParams(window.location.search).get("page") ?? pages[0]?.id);
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (publicPath) {
+        const [pathname, query] = publicPath.split("?");
+        if (window.location.pathname !== pathname) return;
+        const mountedVersion = new URLSearchParams(query).get("version");
+        if (mountedVersion && params.has("version") && params.get("version") !== mountedVersion) return;
+      }
+      setSelected(params.get("page") ?? pages[0]?.id);
+    };
     window.addEventListener("popstate", restore); return () => window.removeEventListener("popstate", restore);
-  }, [pages]);
+  }, [pages, publicPath]);
   function navigate(id: string) {
     setContentsOpen(false);
     setSelected(id);
-    if (publicPath) window.history.pushState(null, "", `${publicPath}?page=${encodeURIComponent(id)}`);
+    if (publicPath) window.history.pushState(null, "", pagePath(id));
   }
   useEffect(() => {
     root.current?.scrollIntoView({ block: "start", behavior: "instant" });
@@ -104,7 +120,7 @@ export function PropertyProvidersProposal({ data, brand, draft, initialPage, pub
   const managed = data.str.managed.annualRevenue, ltr = data.ltr.annualRent;
   const rows = [{ label: "Long-term leasing", sub: "Estimated rental income", value: ltr, color: brand.chartLtr }, { label: "Short-term market", sub: "Estimated gross STR revenue", value: data.str.market.annualRevenue, color: brand.chartMarket }, { label: `With ${data.agency.name}`, sub: "Estimated gross STR revenue", value: managed, color: brand.chartManaged }];
   const max = Math.max(1, ...rows.map(row => row.value ?? 0));
-  const control = (id: string, label: React.ReactNode, className?: string) => <a key={id} href={publicPath ? `${publicPath}?page=${encodeURIComponent(id)}` : `?page=${id}`} className={className} aria-current={id === active.id ? "page" : undefined} onClick={event => { if(event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(id); }}>{label}</a>;
+  const control = (id: string, label: React.ReactNode, className?: string) => <a key={id} href={pagePath(id)} className={className} aria-current={id === active.id ? "page" : undefined} onClick={event => { if(event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(id); }}>{label}</a>;
   const navigationButton = "du-btn du-btn-sm du-btn-ghost min-h-11 min-w-11 rounded-(--proposal-radius) border-0 text-inherit shadow-none hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-offset-2";
   const paginationButton = cn(navigationButton, cover && "hover:bg-white/15");
   return <div data-theme={generic ? "agency-proposal" : "property-providers"} ref={root} className={`[--primary:var(--color-primary)] ${styles.proposal} ${cover ? styles.coverMode : ""} ${generic ? styles.agency : ""}`} style={proposalBrandStyle(brand)} data-testid="property-providers-proposal">
@@ -125,7 +141,7 @@ export function PropertyProvidersProposal({ data, brand, draft, initialPage, pub
       {active.kind === "service" && active.service && <PropertyProvidersService service={active.service} theme={generic ? "agency-proposal" : "property-providers"} />}
       {active.kind === "text" && <><h1 tabIndex={-1}>{active.title}</h1><p>{active.body}</p></>}
       {active.kind === "next_steps" && <><div className={styles.nextSteps}><div><h1 tabIndex={-1}>Let’s get started</h1><p>Contact our team to discuss the letting plan for {data.property.address}.</p><ol className={styles.steps}><li><b>01</b><span><strong>Make a plan</strong>Confirm your goals, availability and property presentation.</span></li><li><b>02</b><span><strong>Review the agreement</strong>Review the management agreement and service details.</span></li><li><b>03</b><span><strong>Welcome your first guests</strong>Prepare the property, launch the listing and manage each stay.</span></li></ol>{exampleAgreement ? <><AgreementPreview data={data} brand={brand} /><div className="mt-4"><button type="button" className="inline-flex min-h-11 items-center justify-center gap-3 rounded-sm border border-current/20 bg-transparent px-5 py-3 text-sm max-[760px]:w-full"><Download size={18} aria-hidden="true" />Download proposal PDF</button></div></> : draft.links.map(link=><a key={link.id} href={link.url} className={styles.primaryButton}>{link.label}<ArrowRight size={18} /></a>)}</div>
-        <aside className={styles.contactCard}>{data.agents.map(agent=><div key={agent.email}><div className={styles.agentPhoto}>{agent.photoUrl && <Image src={agent.photoUrl} alt={agent.name} fill unoptimized sizes="(max-width: 700px) 100vw, 340px" />}</div><div className={styles.agentDetails}><h2>{agent.name}</h2><p>{agent.role}</p>{agent.phone && <a href={`tel:${agent.phone.replace(/[^+\d]/g,"")}`}><Phone size={15} />{agent.phone}</a>}{agent.email && <a href={`mailto:${agent.email}`}><Mail size={15} />{agent.email}</a>}</div></div>)}</aside></div><details className={styles.disclaimer}><summary>Important information about these estimates <ArrowDown size={14} /></summary><p>{data.disclaimer}</p></details></>}
+        <aside className={styles.contactCard}>{data.agents.map(agent=><div key={agent.email}><div className={styles.agentPhoto}>{agent.photoUrl && <Image src={agent.photoUrl} alt={agent.name} fill unoptimized sizes="(max-width: 700px) 100vw, 340px" />}</div><div className={styles.agentDetails}><h2>{agent.name}</h2><p>{agent.role}</p>{agent.phone && <a href={`tel:${agent.phone.replace(/[^+\d]/g,"")}`}><Phone size={15} />{agent.phone}</a>}{agent.email && <a href={`mailto:${agent.email}`}><Mail size={15} />{agent.email}</a>}</div></div>)}{!hasAgentContact(data.agents) && agencyContactActions(data.agency).length > 0 && <div className={styles.agentDetails}><h2>Contact {data.agency.name}</h2>{agencyContactActions(data.agency).map(action => <a key={action.href} href={action.href} aria-label={action.label} className="min-h-11 [overflow-wrap:anywhere]">{action.value}</a>)}</div>}</aside></div><details className={styles.disclaimer}><summary>Important information about these estimates <ArrowDown size={14} /></summary><p>{data.disclaimer}</p></details></>}
     </div>}
     <nav aria-label="Proposal pagination" className={cn("fixed inset-x-0 bottom-0 z-20 grid min-h-[76px] grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-base-300 bg-base-100 px-[clamp(1rem,4vw,4rem)] py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-sm text-base-content", cover && "border-white/15 bg-neutral/90 text-neutral-content backdrop-blur-md")}>
       <div className="justify-self-start">{index > 0 && control(pages[index - 1].id, <><ChevronLeft size={18} aria-hidden="true" /><span className="sr-only min-[480px]:not-sr-only">Previous</span></>, paginationButton)}</div>

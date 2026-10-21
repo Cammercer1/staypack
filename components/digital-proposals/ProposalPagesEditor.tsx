@@ -9,13 +9,25 @@ import { cn } from "@/lib/utils";
 const pageIcons = { hero: House, comparison: BarChart3, forecast: TrendingUp, evidence: Layers, text: FileText, service: BriefcaseBusiness, next_steps: ArrowRight };
 type Drag = {
   id: string; pointerId: number; startY: number; sourceIndex: number; targetIndex: number;
-  ids: string[]; centers: number[]; listTop: number; moved: boolean; handle: HTMLButtonElement; capture: HTMLOListElement;
+  ids: string[]; choiceIds: string[]; centers: number[]; listTop: number; moved: boolean; handle: HTMLButtonElement; capture: HTMLOListElement;
 };
 
 function reordered<T>(items: T[], from: number, to: number): T[] {
   const result = [...items];
   result.splice(to, 0, result.splice(from, 1)[0]);
   return result;
+}
+
+function pageChoices(pages: ProposalPage[], contentEditable: boolean) {
+  return pages.filter(page => contentEditable || page.id !== "service" || page.kind !== "text" || page.enabled || Boolean(page.body.trim()));
+}
+
+/** Reorder visible choices while retaining unconfigured pages in their saved slots. */
+function reorderChoices(pages: ProposalPage[], choices: ProposalPage[], from: number, to: number) {
+  const ordered = reordered(choices, from, to);
+  const ids = new Set(choices.map(page => page.id));
+  let index = 0;
+  return pages.map(page => ids.has(page.id) ? ordered[index++] : page);
 }
 
 export function ProposalPagesEditor({ form, draft, contentEditable = true, disabled = false }: {
@@ -31,7 +43,8 @@ export function ProposalPagesEditor({ form, draft, contentEditable = true, disab
   const index = Math.max(0, draft.pages.findIndex(page => page.id === editingId));
   const page = draft.pages[index];
   const includedCount = draft.pages.filter(item => item.enabled).length;
-  const visiblePages = preview ? reordered(draft.pages, preview.from, preview.to) : draft.pages;
+  const choices = pageChoices(draft.pages, contentEditable);
+  const visiblePages = preview ? reordered(choices, preview.from, preview.to) : choices;
 
   const cancelDrag = useCallback(() => {
     const current = drag.current;
@@ -63,23 +76,26 @@ export function ProposalPagesEditor({ form, draft, contentEditable = true, disab
   function move(id: string, target: number) {
     if (disabled || drag.current) return;
     const pages = form.getValues("pages");
-    const source = pages.findIndex(item => item.id === id);
-    if (source < 0 || target < 0 || target >= pages.length || source === target) return;
-    form.setValue("pages", reordered(pages, source, target), { shouldDirty: true });
-    setAnnouncement(`Moved ${pages[source].title} to position ${target + 1} of ${pages.length}.`);
+    const available = pageChoices(pages, contentEditable);
+    const source = available.findIndex(item => item.id === id);
+    if (source < 0 || target < 0 || target >= available.length || source === target) return;
+    form.setValue("pages", reorderChoices(pages, available, source, target), { shouldDirty: true });
+    setAnnouncement(`Moved ${available[source].title} to position ${target + 1} of ${available.length}.`);
   }
 
   function startDrag(event: PointerEvent<HTMLButtonElement>, item: ProposalPage) {
     if (disabled || event.currentTarget.matches(":disabled") || event.button !== 0 || drag.current) return;
     const pages = form.getValues("pages");
-    const sourceIndex = pages.findIndex(page => page.id === item.id);
-    if (sourceIndex < 0) return;
+    const available = pageChoices(pages, contentEditable);
+    const sourceIndex = available.findIndex(page => page.id === item.id);
+    const elements = available.map(page => rows.current.get(page.id));
+    if (sourceIndex < 0 || elements.some(element => !element) || !listRef.current) return;
     event.preventDefault();
     event.currentTarget.focus({ preventScroll: true });
     drag.current = {
       id: item.id, pointerId: event.pointerId, startY: event.clientY, sourceIndex, targetIndex: sourceIndex,
-      ids: pages.map(page => page.id), centers: pages.map(page => {
-        const rect = rows.current.get(page.id)!.getBoundingClientRect();
+      ids: pages.map(page => page.id), choiceIds: available.map(page => page.id), centers: elements.map(element => {
+        const rect = element!.getBoundingClientRect();
         return rect.top + rect.height / 2;
       }), listTop: listRef.current!.getBoundingClientRect().top, moved: false, handle: event.currentTarget, capture: listRef.current!,
     };
@@ -103,18 +119,20 @@ export function ProposalPagesEditor({ form, draft, contentEditable = true, disab
     const current = drag.current;
     if (!current || current.pointerId !== event.pointerId) return;
     const pages = form.getValues("pages");
-    const sameOrder = pages.length === current.ids.length && pages.every((page, i) => page.id === current.ids[i]);
+    const available = pageChoices(pages, contentEditable);
+    const sameOrder = pages.length === current.ids.length && pages.every((page, i) => page.id === current.ids[i])
+      && available.length === current.choiceIds.length && available.every((page, i) => page.id === current.choiceIds[i]);
     drag.current = null;
     setPreview(null);
     if (!disabled && !current.handle.matches(":disabled") && sameOrder && current.moved && current.sourceIndex !== current.targetIndex) {
-      form.setValue("pages", reordered(pages, current.sourceIndex, current.targetIndex), { shouldDirty: true });
-      setAnnouncement(`Moved ${pages[current.sourceIndex].title} to position ${current.targetIndex + 1} of ${pages.length}.`);
+      form.setValue("pages", reorderChoices(pages, available, current.sourceIndex, current.targetIndex), { shouldDirty: true });
+      setAnnouncement(`Moved ${available[current.sourceIndex].title} to position ${current.targetIndex + 1} of ${available.length}.`);
     }
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
   function keyboardMove(event: KeyboardEvent<HTMLButtonElement>, id: string, position: number) {
-    const target = { ArrowUp: position - 1, ArrowDown: position + 1, Home: 0, End: draft.pages.length - 1 }[event.key];
+    const target = { ArrowUp: position - 1, ArrowDown: position + 1, Home: 0, End: choices.length - 1 }[event.key];
     if (target === undefined) return;
     event.preventDefault();
     move(id, target);
@@ -155,7 +173,7 @@ export function ProposalPagesEditor({ form, draft, contentEditable = true, disab
           {contentEditable && <button className="du-btn du-btn-sm du-btn-ghost" type="button" disabled={disabled || draft.pages.length >= 12} onClick={addPage}><Plus size={15} />Add</button>}
         </div>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-base-content/60">Drag to reorder. Choose which pages to include.</p>
+      <p className="mt-2 text-xs leading-relaxed text-base-content/60">Switch pages on or off; drag or use the arrows to reorder.</p>
       <p id={instructionsId} className="sr-only">Drag to reorder, or use the up and down arrow keys. Home and End move to the first and last positions. Press Escape to cancel a drag.</p>
     </div>
     <ol ref={listRef} aria-label="Proposal page order" className="space-y-2" onPointerMove={updateDrag} onPointerUp={finishDrag} onPointerCancel={cancelDrag} onLostPointerCapture={cancelDrag}>
@@ -175,12 +193,13 @@ export function ProposalPagesEditor({ form, draft, contentEditable = true, disab
             {contentEditable ? <button type="button" disabled={disabled} aria-pressed={page?.id === item.id} className="w-full break-words text-left text-sm font-medium leading-snug underline-offset-4 hover:underline disabled:cursor-not-allowed" onClick={() => setEditingId(item.id)}>{item.title}</button>
               : <span className={cn("block break-words text-sm font-medium leading-snug", unavailable ? "text-base-content/45" : item.enabled ? "text-base-content" : "text-base-content/60")}>{item.title}</span>}
             <span className={cn("mt-1 flex items-center gap-1.5 text-[11px] leading-snug", unavailable ? "text-base-content/45" : "text-base-content/55")}><Icon size={12} className="shrink-0" aria-hidden="true" />{unavailable ? "Not configured yet" : lastIncluded ? "Keep one page included" : item.enabled ? "Included" : "Hidden"}</span>
+            {unavailable && <p className="mt-1 text-xs leading-relaxed text-base-content/65">Ask your administrator to set up this page in the agency template.</p>}
           </div>
           <div className="flex shrink-0 flex-col items-center gap-1">
             <input type="checkbox" className="du-toggle du-toggle-xs du-toggle-primary" aria-label={`Include ${item.title}`} disabled={disabled || unavailable || lastIncluded} checked={item.enabled} title={unavailable ? "This page hasn't been configured yet" : lastIncluded ? "Keep at least one page included" : item.enabled ? "Hide page" : "Include page"} onChange={event => togglePage(item.id, event.target.checked)} />
             <div className="flex items-center">
               <button type="button" aria-label={`Move ${item.title} up`} disabled={disabled || i === 0} className="flex h-7 w-6 items-center justify-center rounded-md text-base-content/45 hover:bg-base-200 hover:text-base-content focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-20" onClick={() => move(item.id, i - 1)}><ArrowUp size={13} aria-hidden="true" /></button>
-              <button type="button" aria-label={`Move ${item.title} down`} disabled={disabled || i === draft.pages.length - 1} className="flex h-7 w-6 items-center justify-center rounded-md text-base-content/45 hover:bg-base-200 hover:text-base-content focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-20" onClick={() => move(item.id, i + 1)}><ArrowDown size={13} aria-hidden="true" /></button>
+              <button type="button" aria-label={`Move ${item.title} down`} disabled={disabled || i === choices.length - 1} className="flex h-7 w-6 items-center justify-center rounded-md text-base-content/45 hover:bg-base-200 hover:text-base-content focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-20" onClick={() => move(item.id, i + 1)}><ArrowDown size={13} aria-hidden="true" /></button>
             </div>
           </div>
         </li>;
@@ -189,7 +208,7 @@ export function ProposalPagesEditor({ form, draft, contentEditable = true, disab
     <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{announcement}</p>
     {contentEditable && page && <div className="space-y-4 border-t border-base-300 pt-5" key={page.id}>
       <label className="block text-sm">Page title<input disabled={disabled} className="du-input du-input-sm mt-2 w-full" {...form.register(`pages.${index}.title`)} /></label>
-      <label className="block text-sm">Page content<textarea disabled={disabled} className="du-textarea du-textarea-sm mt-2 min-h-48 w-full" placeholder="Tell the customer about your team, services or next steps. Data tokens work here too." {...form.register(`pages.${index}.body`)} /></label>
+      <label className="block text-sm">Page content<textarea disabled={disabled} className="du-textarea du-textarea-sm mt-2 min-h-48 w-full" placeholder="Tell the client about your team, services or next steps. Data tokens work here too." {...form.register(`pages.${index}.body`)} /></label>
       {page.id.startsWith("page-") && <button type="button" disabled={disabled || (page.enabled && includedCount === 1)} className="du-btn du-btn-sm du-btn-ghost" onClick={removePage}><Trash2 size={14} />Remove page</button>}
     </div>}
   </div>;

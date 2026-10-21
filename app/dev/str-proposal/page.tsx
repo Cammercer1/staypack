@@ -4,6 +4,7 @@ import { DigitalProposalPlayground } from "@/components/dev/DigitalProposalPlayg
 import { proposalContext, loadProposalWorkspace } from "@/lib/digital-proposals/server";
 import { applyAssignment, assignmentBrand } from "@/lib/digital-proposals/assignment";
 import { withProposalAgents } from "@/lib/digital-proposals/agents";
+import { withProposalPhotos } from "@/lib/digital-proposals/photos";
 import { MultiPageProposal } from "@/components/digital-proposals/MultiPageProposal";
 
 export const metadata = { title: "Digital template studio", robots: { index: false, follow: false } };
@@ -27,7 +28,7 @@ export default async function DigitalProposalPage({ searchParams }: {
   if (view === "proposal") {
     const draft = applyAssignment(workspace.draft, context.assignment);
     return <MultiPageProposal fullViewport initialPage={page} draft={draft} brand={assignmentBrand(context.assignment)}
-      data={withProposalAgents(context.data, draft.agentIds, context.availableAgents)} previewPdfDownload
+      data={withProposalPhotos(withProposalAgents(context.data, draft.agentIds, context.availableAgents), draft.propertyImages)} previewPdfDownload
       attachments={workspace.attachments.filter(item => draft.attachmentIds.includes(item.id)).map(item => ({ ...item, href: `/api/str/appraisals/${context.report.id}/proposal/attachments/${item.id}` }))} />;
   }
   return <DigitalProposalPlayground key={context.report.id} savedAppraisal={{ reportId: context.report.id, data: context.data, workspace }} />;

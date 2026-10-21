@@ -2,9 +2,9 @@ import { assetBucket } from "@/lib/storage/bucket";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cachedProposalSnapshot, publishedProposalAccess, ProposalError } from "@/lib/digital-proposals/published";
 import { proposalApiError } from "@/lib/digital-proposals/http";
-export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
   try {
-    const version = await publishedProposalAccess((await params).token);
+    const version = await publishedProposalAccess((await params).token, new URL(request.url).searchParams.get("version") ?? undefined);
     if (version.pdf_status !== "ready" || !version.pdf_path) throw new ProposalError("The proposal PDF is still being prepared. Please try again shortly.", 409);
     const result = await assetBucket(createAdminClient(), "proposal-pdfs").download(version.pdf_path);
     if (result.error || !result.data) throw new ProposalError("PDF unavailable. Please try again.", 503);

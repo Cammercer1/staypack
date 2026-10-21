@@ -20,7 +20,7 @@ export const proposalDataSchema = z.object({
   appraisal: appraisalProposalDataSchema.optional(),
   market: propertyMarketSchema.optional(),
   generatedAt: z.iso.datetime(),
-  agency: z.object({ name: z.string(), logoUrl: assetUrlSchema }),
+  agency: z.object({ name: z.string(), logoUrl: assetUrlSchema, phone: z.string().optional(), email: z.string().optional(), websiteUrl: z.string().optional() }),
   agent: z.object({ name: z.string(), role: z.string() }),
   agents: z.array(proposalAgentSchema).default([]),
   recipient: z.object({ displayName: z.string() }).nullable(),
@@ -49,7 +49,8 @@ export function proposalFromReport(report: FinalReportJson, recipientDisplayName
   return proposalDataSchema.parse({
     market: report.market,
     version: 1, generatedAt: report.generated_at,
-    agency: { name: report.agency.name, logoUrl: safeAsset(report.agency.logo_dark_url) || safeAsset(report.agency.logo_url) },
+    agency: { name: report.agency.name, logoUrl: safeAsset(report.agency.logo_dark_url) || safeAsset(report.agency.logo_url),
+      phone: report.agency.phone, email: report.agency.email, websiteUrl: report.agency.website_url },
     agent: { name: report.agent.name, role: report.agent.role_title },
     recipient: recipientDisplayName?.trim() ? { displayName: recipientDisplayName.trim() } : null,
     property: {

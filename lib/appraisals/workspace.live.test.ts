@@ -7,19 +7,28 @@ import { randomUUID } from "node:crypto";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
 import { mergeAppraisalResults, resolveAppraisalInput } from "./resolveAppraisalInput";
 import type { ProposalWorkspace } from "@/lib/digital-proposals/workspace";
+import { cleanupQaStorage } from "../testing/cleanupQaStorage";
 
 import type { ParsedListing } from "@/lib/types";
 import { runLeaseAppraisalJob } from "@/lib/lease-appraisal/runLeaseAppraisalJob";
 import { runSalesAppraisalJob } from "@/lib/sales-appraisal/runSalesAppraisalJob";
+
+// Keep live publication checks independent of removed playground gallery assets.
+const liveImageReplacements = new Map([
+  ["https://images.unsplash.com/photo-1600573472591-ee6b8c0c2a6a?w=1200&q=80", "https://staypack.app/marketing/property-interior.webp"],
+  ["https://images.unsplash.com/photo-1600047509807-ba8f84d030cd?w=1200&q=80", "https://staypack.app/marketing/property-exterior.webp"],
+  ["https://images.unsplash.com/photo-1600210492486-724fe41c20aa?w=1200&q=80", "https://staypack.app/marketing/proposal-property.webp"],
+]);
 // Only the provider boundary is synthetic. Actual workers, storage, CAS and HTTP run.
 vi.mock("@/lib/lease-appraisal/enrichParsedListingForLeaseAppraisal", () => ({ enrichParsedListingForLeaseAppraisal: vi.fn(async (parsed: ParsedListing) => ({ parsed: { ...parsed, warnings: ["Synthetic rental refresh"] }, warnings: [] })) }));
 vi.mock("@/lib/sales-appraisal/enrichParsedListingForSalesAppraisal", () => ({ enrichParsedListingForSalesAppraisal: vi.fn(async (parsed: ParsedListing) => ({ parsed: { ...parsed, warnings: ["Synthetic sales refresh"] }, warnings: [] })) }));
 
 // Opt-in only. Disposable agencies, synthetic provider evidence and no messages.
+// Each bounded case checks both products with serial hosted requests and two real PDFs.
 it.skipIf(process.env.APPRAISAL_INTEGRATION_TEST !== "1").each(["AU", "US"] as const)("%s rental and sales: authenticated APIs, isolation, immutable versions and brochure sources", async country => {
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false}});
   const origin = process.env.STAGING_BASE_URL ?? "http://localhost:3000";
-  const agencies = [randomUUID(),randomUUID()], listingId = randomUUID(), userIds: string[] = [], clients: SupabaseClient[] = [], cookies: string[] = [];
+  const agencies = [randomUUID(),randomUUID()], listingId = randomUUID(), userIds: string[] = [], accessTokens: string[] = [], clients: SupabaseClient[] = [], cookies: string[] = [];
   const check = <T extends { data: unknown; error: { message:string } | null }>(value:T): NonNullable<T["data"]> => { if(value.error) throw new Error(value.error.message); return value.data as NonNullable<T["data"]>; };
   const api = (path:string,method="GET",body?:unknown,actor=0) => fetch(`${origin}${path}`,{method,redirect:"manual",headers:{Origin:origin,Cookie:cookies[actor] ?? "","Content-Type":"application/json","User-Agent":"Mozilla/5.0 Safari/605.1"},...(body ? {body:JSON.stringify(body)} : {})});
   const json = async(path:string,method="GET",body?:unknown) => { const response=await api(path,method,body); const value=await response.json(); expect(response.status,`${path}: ${JSON.stringify(value)}`).toBeLessThan(300); return value; };
@@ -31,9 +40,11 @@ it.skipIf(process.env.APPRAISAL_INTEGRATION_TEST !== "1").each(["AU", "US"] as c
       check(await admin.from("agency_members").insert({agency_id:agencyId,user_id:user.id,role:"owner"}));
       const values:{name:string;value:string}[]=[];
       const auth=createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,{cookies:{getAll:()=>values,setAll:next=>{values.splice(0,values.length,...next); }}});
-      check(await auth.auth.signInWithPassword({email,password})); clients.push(auth); cookies.push(values.map(c=>`${c.name}=${c.value}`).join("; "));
+      accessTokens.push(check(await auth.auth.signInWithPassword({email,password})).session!.access_token);
+      clients.push(auth); cookies.push(values.map(c=>`${c.name}=${c.value}`).join("; "));
     }
     const f=createLintRegressionFixtures();
+    f.listing=JSON.parse(JSON.stringify(f.listing), (_key, value: unknown) => typeof value === "string" ? liveImageReplacements.get(value) ?? value : value);
     const source={...f.listing,id:listingId,agency_id:agencies[0],created_by:userIds[0],agent_profile_id:null,public_slug:`appraisal-${listingId}`};
     if (country === "US") Object.assign(source, {country:"United States",property_address:"545 Westbourne Dr",suburb:"West Hollywood",state:"CA",postcode:"90048",latitude:34.0811,longitude:-118.3801});
     if (country === "US") source.scraped_listing_json = { ...source.scraped_listing_json!, country: "US", address: source.property_address!, suburb: source.suburb!, state: source.state!, postcode: source.postcode!, domainAvm: undefined, domainAvmInputFingerprint: undefined, appraisalInputFingerprints: undefined };
@@ -45,6 +56,14 @@ it.skipIf(process.env.APPRAISAL_INTEGRATION_TEST !== "1").each(["AU", "US"] as c
     expect((await anonymous.from("appraisals").select("report_id")).error).not.toBeNull();
     const original=check(await admin.from("listings").select("*").eq("id",listingId).single());
     for(const kind of ["lease","sales"] as const) {
+      const startedAt = Date.now();
+      let previousPhaseAt = startedAt;
+      const phase = (name: string) => {
+        const now = Date.now();
+        console.info(`[appraisal live] ${country}/${kind}: ${name}; phase ${((now - previousPhaseAt) / 1000).toFixed(1)}s, total ${((now - startedAt) / 1000).toFixed(1)}s`);
+        previousPhaseAt = now;
+      };
+      phase("started");
       const ids=[randomUUID(),randomUUID()];
       const body={kind,listing_id:listingId,request_id:ids[0],recipient:{mode:"named",name:"Jordan Owner",email:"private-owner@example.com",phone:"0412345678"}};
       expect((await json("/api/appraisals","POST",body)).report.id).toBe(ids[0]);
@@ -93,7 +112,9 @@ it.skipIf(process.env.APPRAISAL_INTEGRATION_TEST !== "1").each(["AU", "US"] as c
       check(await admin.from("digital_proposal_assignments").insert({agency_id:agencies[0],kind,name:workspace.assignment!.name,version:1,defaults:workspace.assignment!.defaults}));
       workspace=await json(`${root}/proposal`);
       const saved=await json(`${root}/proposal`,"PUT",{draft,revision:0});
+      phase("publication starting");
       const published=await json(`${root}/proposal/publish`,"POST",{revision:saved.revision,sourceFingerprint:workspace.sourceFingerprint});
+      phase("published");
       const version=check(await admin.from("digital_proposal_versions").select("*").eq("id",published.version.id).single());
       expect(version.final_report_json.data.recipient.displayName).toBe("Jordan Owner");
       expect(JSON.stringify(version.final_report_json)).not.toContain("private-owner@example.com");
@@ -102,19 +123,26 @@ it.skipIf(process.env.APPRAISAL_INTEGRATION_TEST !== "1").each(["AU", "US"] as c
       const html=await publicPage.text(); expect(html).toContain(kind === "lease" ? "Rental appraisal" : "Sales appraisal");
       expect(html).not.toContain("private-owner@example.com");
       if (process.env.APPRAISAL_PDF_TEST === "1") {
+        phase("PDF starting");
         expect((await json(`${root}/proposal/pdf`,"POST",{versionId:version.id})).status).toBe("ready");
-        const pdf = await fetch(`${origin}/api/proposals/${published.version.path.split("/").pop()}/pdf`);
+        const pdfUrl = new URL(published.version.pdfPath, origin);
+        expect(pdfUrl.searchParams.get("version")).toBe(version.id);
+        const pdf = await fetch(pdfUrl);
         expect(pdf.status).toBe(200);
         const bytes=Buffer.from(await pdf.arrayBuffer()); expect(bytes.subarray(0,5).toString()).toBe("%PDF-");
         await writeFile(`/tmp/appraisal-${kind}.pdf`,bytes);
+        phase("PDF verified");
       }
       const collateral=check(await admin.from("collateral_items").select("report_id").eq("listing_id",listingId).eq("type",`${kind}_appraisal`).single());
       expect(collateral.report_id).toBe(ids[0]);
       const brochureSource=check(await admin.from("reports").select("final_report_json").eq("id",ids[0]).single());
       current=await json(root);
-      await json(root,"PATCH",{expected_updated_at:current.appraisal.updated_at,recipient:{...body.recipient,name:"Alex Updated"}});
+      // A different recipient needs a distinct identity; reusing Jordan's email
+      // correctly conflicts with the client directory's duplicate protection.
+      await json(root,"PATCH",{expected_updated_at:current.appraisal.updated_at,recipient:{...body.recipient,name:"Alex Updated",email:"private-updated-owner@example.com"}});
       expect((await api(`${root}/proposal/publish`,"POST",{revision:saved.revision,sourceFingerprint:workspace.sourceFingerprint})).status).toBe(409);
       current=await json(root);
+      expect(current.appraisal.recipient_name).toBe("Alex Updated");
       const updated=await json(`${root}/evidence/data`,"PATCH",{expected_updated_at:current.appraisal.updated_at,...(kind === "lease" ? {weekly_min:1700,weekly_max:1900,weekly_midpoint:1800} : {price_min:3300000,price_max:3500000,price_midpoint:3400000})});
       const awaitingReview=await json(`${root}/proposal`);
       expect(awaitingReview.needsEvidenceReview).toBe(true);
@@ -123,6 +151,7 @@ it.skipIf(process.env.APPRAISAL_INTEGRATION_TEST !== "1").each(["AU", "US"] as c
       workspace=await json(`${root}/proposal`);
       expect(check(await admin.from("reports").select("final_report_json").eq("id",ids[0]).single())).toEqual(brochureSource);
       expect(check(await admin.from("digital_proposal_versions").select("final_report_json").eq("id",version.id).single()).final_report_json).toEqual(version.final_report_json);
+      phase("snapshot checks passed");
       const other=await json(`/api/appraisals/${ids[1]}`);
       expect(other.appraisal.input_revision).toBe(0);
       expect(check(await admin.from("listings").select("*").eq("id",listingId).single())).toEqual(original);
@@ -131,13 +160,18 @@ it.skipIf(process.env.APPRAISAL_INTEGRATION_TEST !== "1").each(["AU", "US"] as c
       await json(`${root}/evidence/data`,"PATCH",{expected_updated_at:beforeRevoke.appraisal.updated_at,...edits});
       await json(`${root}/proposal/revoke`,"POST",{versionId:version.id,linkId:published.version.link_id});
       expect((await fetch(`${origin}${published.version.path}`)).status).toBe(404);
+      phase("revocation passed");
       await json(root,"DELETE"); await json(root,"POST");
       expect((await fetch(`${origin}${published.version.path}`)).status).toBe(404);
+      phase("archive/restore checks passed");
     }
     const str=await json("/api/str/appraisals"); expect(str.total).toBe(0);
     const all=await json("/api/appraisals"); expect(all.total).toBe(4);
   } finally {
+    const signOuts = await Promise.allSettled(accessTokens.map(token => admin.auth.admin.signOut(token, "global")));
+    if (signOuts.some(result => result.status === "rejected" || result.value.error)) throw new Error("Unable to sign out disposable QA sessions before cleanup.");
+    for(const id of agencies) await cleanupQaStorage(admin, id);
     for(const id of agencies) check(await admin.from("agencies").delete().eq("id",id));
     for(const id of userIds) check(await admin.auth.admin.deleteUser(id));
   }
-},240000);
+},480000);

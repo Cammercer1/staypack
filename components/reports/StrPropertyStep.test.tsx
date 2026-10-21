@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
@@ -7,6 +7,22 @@ import { calculatorPropertyReviewKey } from "@/lib/str-calculator/propertyReview
 import { StrPropertyStep, type StrPropertyHandle } from "./StrPropertyStep";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+it("continues from the bottom property actions and keeps pending controls disabled", async () => {
+  const { listing, report } = createLintRegressionFixtures();
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ listing })));
+  const onContinue = vi.fn();
+  const props = { listing, report, busy: false, onContinue };
+  const { rerender } = render(<StrPropertyStep {...props} />);
+  await waitFor(() => expect(screen.queryByText("Checking property…")).toBeNull());
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
+  const bottom = within(screen.getByRole("group", { name: "Property step actions" }));
+  fireEvent.click(bottom.getByRole("button", { name: "Continue to review estimate" }));
+  expect(onContinue).toHaveBeenCalledTimes(1);
+  rerender(<StrPropertyStep {...props} busy />);
+  expect(screen.getAllByRole("button", { name: "Continue to review estimate" }).every(button => (button as HTMLButtonElement).disabled)).toBe(true);
+  expect(screen.getByText(/Select On-site parking if guests can use them/)).toBeTruthy();
+});
+
 function setup(saved = false) {
   const { listing, report } = createLintRegressionFixtures();
   listing.advertised_sale_price = "$1,600,000";
@@ -28,6 +44,7 @@ it("prefills Domain fields, accepts toggles and flushes an unsubmitted custom am
   expect((screen.getByLabelText("Long-term rent ($ / week)") as HTMLInputElement).value).toBe("950");
   expect(screen.getByText("$49,400 / year")).toBeTruthy();
   expect(screen.getByText("Estimated gross LTR yield: 4.1%")).toBeTruthy();
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
   expect(screen.getByRole("button", { name: "Pool" }).getAttribute("aria-pressed")).toBe("true");
   fireEvent.click(screen.getByRole("button", { name: "Pool" }));
   fireEvent.change(screen.getByLabelText("Add another amenity"), { target: { value: "Private tennis court" } });
@@ -40,11 +57,14 @@ it("keeps edits made before a slow Domain response arrives", async () => {
   fireEvent.change(screen.getByLabelText("Car spaces"), { target: { value: "0" } });
   fireEvent.change(screen.getByLabelText("Estimated property value ($)"), { target: { value: "1450000" } });
   fireEvent.change(screen.getByLabelText("Long-term rent ($ / week)"), { target: { value: "875" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
   fireEvent.click(screen.getByRole("button", { name: "BBQ" }));
   await complete();
+  fireEvent.click(screen.getByRole("tab", { name: "Property details" }));
   expect((screen.getByLabelText("Car spaces") as HTMLInputElement).value).toBe("0");
   expect((screen.getByLabelText("Estimated property value ($)") as HTMLInputElement).value).toBe("1450000");
   expect((screen.getByLabelText("Long-term rent ($ / week)") as HTMLInputElement).value).toBe("875");
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
   expect(screen.getByRole("button", { name: "Pool" }).getAttribute("aria-pressed")).toBe("false");
   expect(screen.getByRole("button", { name: "BBQ" }).getAttribute("aria-pressed")).toBe("true");
 });
@@ -53,6 +73,7 @@ it("keeps saved clears when reopening and refreshing Domain", async () => {
   await complete();
   expect((screen.getByLabelText("Long-term rent ($ / week)") as HTMLInputElement).value).toBe("");
   expect((screen.getByLabelText("Estimated property value ($)") as HTMLInputElement).value).toBe("");
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
   expect(screen.getByRole("button", { name: "Pool" }).getAttribute("aria-pressed")).toBe("false");
   expect(screen.queryByText(/Estimated gross LTR yield:/)).toBeNull();
 });
@@ -85,11 +106,79 @@ it("distinguishes unknown parking from zero and rejects invalid counts", async (
   for (const value of ["-1", "1.5", "21"]) {
     fireEvent.change(screen.getByLabelText("Car spaces"), { target: { value } });
     await act(async () => { expect(await ref.current!.read()).toBeNull(); });
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Car spaces")));
   }
   fireEvent.change(screen.getByLabelText("Car spaces"), { target: { value: "0" } });
   await act(async () => { expect((await ref.current!.read())?.values.car_spaces).toBe(0); });
   fireEvent.change(screen.getByLabelText("Car spaces"), { target: { value: "" } });
   await act(async () => { expect((await ref.current!.read())?.values.car_spaces).toBeNull(); });
+});
+
+it("preserves property edits, amenity choices and unfinished amenity text across section switches", async () => {
+  const { ref, complete } = setup();
+  await complete();
+  expect(screen.getByRole("tab", { name: "Property details" }).getAttribute("aria-selected")).toBe("true");
+  expect(screen.queryByRole("button", { name: "Pool" })).toBeNull();
+  fireEvent.change(screen.getByLabelText("Long-term rent ($ / week)"), { target: { value: "875" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
+  fireEvent.click(screen.getByRole("button", { name: "BBQ" }));
+  fireEvent.change(screen.getByLabelText("Add another amenity"), { target: { value: "Private tennis court" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Property details" }));
+  expect((screen.getByLabelText("Long-term rent ($ / week)") as HTMLInputElement).value).toBe("875");
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
+  expect(screen.getByRole("button", { name: "BBQ" }).getAttribute("aria-pressed")).toBe("true");
+  expect((screen.getByLabelText("Add another amenity") as HTMLInputElement).value).toBe("Private tennis court");
+  fireEvent.click(screen.getByRole("tab", { name: "Property details" }));
+  await act(async () => {
+    const result = await ref.current!.read();
+    expect(result!.values.weeklyRent).toBe(875);
+    expect(result!.values.amenities).toContain("bbq_grill");
+    expect(result!.values.additionalAmenities).toEqual(["Private tennis court"]);
+  });
+});
+
+it("reveals Property details and focuses an invalid field when continuing from Amenities", async () => {
+  const { ref, complete } = setup();
+  await complete();
+  fireEvent.change(screen.getByLabelText("Car spaces"), { target: { value: "-1" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
+  await act(async () => { expect(await ref.current!.read()).toBeNull(); });
+  expect(screen.getByRole("tab", { name: "Property details" }).getAttribute("aria-selected")).toBe("true");
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Car spaces")));
+  expect(screen.getByRole("alert").textContent).toBe("Car spaces cannot be negative");
+});
+
+it("waits until a pending save releases the fields before focusing a validation error", async () => {
+  const { listing, report } = createLintRegressionFixtures();
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ listing })));
+  const ref = createRef<StrPropertyHandle>();
+  const props = { listing, report, busy: false, onContinue: vi.fn() };
+  const { rerender } = render(<StrPropertyStep ref={ref} {...props} />);
+  await waitFor(() => expect(screen.queryByText("Checking property…")).toBeNull());
+  fireEvent.change(screen.getByLabelText("Car spaces"), { target: { value: "-1" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
+  rerender(<StrPropertyStep ref={ref} {...props} busy />);
+  await act(async () => { expect(await ref.current!.read()).toBeNull(); });
+  expect(screen.getByRole("tab", { name: "Property details" }).getAttribute("aria-selected")).toBe("true");
+  expect(document.activeElement).not.toBe(screen.getByLabelText("Car spaces"));
+  rerender(<StrPropertyStep ref={ref} {...props} />);
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Car spaces")));
+});
+
+it("reveals Amenities when an unfinished custom amenity exceeds the saved limit", async () => {
+  const { listing, report } = createLintRegressionFixtures();
+  report.user_overrides_json = { strProperty: { propertyValue: null, weeklyRent: null, amenities: [], additionalAmenities: Array.from({ length: 20 }, (_, index) => `Amenity ${index}`) } };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ listing })));
+  const ref = createRef<StrPropertyHandle>();
+  render(<StrPropertyStep ref={ref} listing={listing} report={report} busy={false} onContinue={vi.fn()} />);
+  await waitFor(() => expect(screen.queryByText("Checking property…")).toBeNull());
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
+  fireEvent.change(screen.getByLabelText("Add another amenity"), { target: { value: "Private tennis court" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Property details" }));
+  await act(async () => { expect(await ref.current!.read()).toBeNull(); });
+  expect(screen.getByRole("tab", { name: "Amenities" }).getAttribute("aria-selected")).toBe("true");
+  expect(document.activeElement).toBe(screen.getByLabelText("Add another amenity"));
+  expect(screen.getByRole("alert").textContent).toBe("You can add up to 20 extra amenities.");
 });
 
 it("shows and edits US monthly rent while persisting an equivalent annual comparison", async () => {
@@ -116,11 +205,11 @@ it("checks calculator evidence before confirmation and keeps the visitor's room 
   const ref = createRef<StrPropertyHandle>();
   render(<StrPropertyStep ref={ref} listing={listing} report={report} busy={false} calculatorReview onContinue={vi.fn()} />);
   expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).toEqual({ refresh: false, calculatorReview: true, reportId: report.id });
-  expect((screen.getByRole("button", { name: "Confirm property & continue" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getAllByRole("button", { name: "Continue to review estimate" })[0] as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText("Checking Domain for photos and rental details…")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Guest capacity"), { target: { value: "7" } });
   await act(async () => resolve(Response.json({ listing: imported })));
-  expect((screen.getByRole("button", { name: "Confirm property & continue" }) as HTMLButtonElement).disabled).toBe(false);
+  expect((screen.getAllByRole("button", { name: "Continue to review estimate" })[0] as HTMLButtonElement).disabled).toBe(false);
   expect(screen.getByRole("img", { name: "Property photo 1" }).getAttribute("src")).toBe("https://example.test/imported.jpg");
   expect(screen.getByText(/Property record: 3 bedrooms · 1 bathroom/)).toBeTruthy();
   expect((screen.getByLabelText("Bedrooms") as HTMLInputElement).value).toBe("4");
@@ -154,11 +243,11 @@ it("recovers a failed automatic match by selecting the exact property and return
   render(<StrPropertyStep ref={ref} listing={listing} report={report} busy={false} calculatorReview onContinue={vi.fn()} />);
   await screen.findByRole("button", { name: "Find the right property" });
   fireEvent.click(screen.getByRole("button", { name: "Find the right property" }));
-  expect((screen.getByRole("button", { name: "Confirm property & continue" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getAllByRole("button", { name: "Continue to review estimate" })[0] as HTMLButtonElement).disabled).toBe(true);
   await act(async () => { expect(await ref.current!.read()).toBeNull(); });
   fireEvent.click(screen.getByRole("button", { name: "Find property" }));
   fireEvent.click(await screen.findByRole("button", { name: /2\/24 Cliffbrook Parade, Coogee NSW 2034/ }));
-  await waitFor(() => expect((screen.getByRole("button", { name: "Confirm property & continue" }) as HTMLButtonElement).disabled).toBe(false));
+  await waitFor(() => expect((screen.getAllByRole("button", { name: "Continue to review estimate" })[0] as HTMLButtonElement).disabled).toBe(false));
   expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ refresh: true, calculatorReview: true, reportId: report.id, candidate });
   expect(screen.getByRole("img", { name: "Property photo 1" }).getAttribute("src")).toBe("https://example.test/corrected.jpg");
   await act(async () => { expect((await ref.current!.read())!.profile).toMatchObject({ property_address: candidate.streetAddress, suburb: candidate.suburb, postcode: candidate.postcode, latitude: null, longitude: null, hero_image_url: "https://example.test/corrected.jpg" }); });
@@ -176,14 +265,16 @@ it("saves a manually corrected address without provider data and clears details 
   fireEvent.change(screen.getByLabelText("Long-term rent ($ / week)"), { target: { value: "800" } });
   fireEvent.change(screen.getByLabelText("Estimated property value ($)"), { target: { value: "1450000" } });
   fireEvent.change(screen.getByLabelText("Car spaces"), { target: { value: "1" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
   fireEvent.click(screen.getByRole("button", { name: "BBQ" }));
   fireEvent.change(screen.getByLabelText("Add another amenity"), { target: { value: "Tennis court" } });
   fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Property details" }));
   fireEvent.click(screen.getByRole("button", { name: "Find the right property" }));
   fireEvent.click(screen.getByRole("button", { name: "Enter address manually" }));
   for (const [label, value] of [["Street address", "2/24 Cliffbrook Parade"], ["Suburb", "Coogee"], ["State", "NSW"], ["Postcode", "2034"]]) fireEvent.change(screen.getByLabelText(label), { target: { value } });
   fireEvent.click(screen.getByRole("button", { name: "Use this address" }));
-  await waitFor(() => expect((screen.getByRole("button", { name: "Confirm property & continue" }) as HTMLButtonElement).disabled).toBe(false));
+  await waitFor(() => expect((screen.getAllByRole("button", { name: "Continue to review estimate" })[0] as HTMLButtonElement).disabled).toBe(false));
   expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ refresh: true, calculatorReview: true, reportId: report.id, address: { property_address: "2/24 Cliffbrook Parade", suburb: "Coogee", state: "NSW", postcode: "2034" } });
   expect(screen.getByText("No property photos found")).toBeTruthy();
   expect(screen.getByText(/No matching property profile was found/)).toBeTruthy();
@@ -204,6 +295,7 @@ it("clears old imported rental defaults after an explicit address correction", a
   fireEvent.click(await screen.findByRole("button", { name: /2\/24 Cliffbrook Parade, Coogee NSW 2034/ }));
   await waitFor(() => expect((screen.getByLabelText("Long-term rent ($ / week)") as HTMLInputElement).value).toBe(""));
   expect((screen.getByLabelText("Estimated property value ($)") as HTMLInputElement).value).toBe("");
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
   expect(screen.getByRole("button", { name: "Pool" }).getAttribute("aria-pressed")).toBe("false");
 });
 
@@ -241,6 +333,6 @@ it("restores corrected property details when confirmation saved them but the est
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ listing })));
   const ref = createRef<StrPropertyHandle>();
   render(<StrPropertyStep ref={ref} listing={listing} report={report} busy={false} calculatorReview onContinue={vi.fn()} />);
-  await waitFor(() => expect((screen.getByRole("button", { name: "Confirm property & continue" }) as HTMLButtonElement).disabled).toBe(false));
+  await waitFor(() => expect((screen.getAllByRole("button", { name: "Continue to review estimate" })[0] as HTMLButtonElement).disabled).toBe(false));
   await act(async () => { expect((await ref.current!.read())!.values).toMatchObject({ propertyValue: 1700000, weeklyRent: 800, amenities: ["wifi"], additionalAmenities: ["Tennis court"], bedrooms: 4, bathrooms: 2, accommodates: 8 }); });
 });

@@ -19,3 +19,14 @@ it.each(["str", "lease", "sales"] as const)("uses singular property feature labe
   if (kind === "str") { expect(text).toContain("1 guest"); expect(text).not.toContain("1 guests"); }
   else expect(text).not.toContain("guest");
 });
+
+it.each(["overlay", "split", "panorama"] as const)("keeps the selected cover without a gallery button on the %s cover", heroLayout => {
+  const data = createProposalFixture();
+  data.property.gallery = [data.property.heroImageUrl, "https://example.com/selected-kitchen.jpg"];
+  const draft = { ...DEFAULT_PROPOSAL_DRAFT, heroLayout };
+  expect(renderToStaticMarkup(<ProposalHero data={data} draft={draft} brand={BRAND_DEFAULTS} />)).not.toContain("View property photos");
+  const selected = { ...draft, propertyImages: { heroImageUrl: data.property.heroImageUrl, gallery: data.property.gallery } };
+  const html = renderToStaticMarkup(<ProposalHero data={data} draft={selected} brand={BRAND_DEFAULTS} />);
+  expect(html).not.toContain("View property photos");
+  expect(html).toContain(data.property.heroImageUrl.replace(/&/g, "&amp;"));
+});

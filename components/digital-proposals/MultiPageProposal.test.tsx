@@ -107,6 +107,22 @@ it("leaves modified link clicks to the browser", () => {
   expect(screen.getByRole("heading", { name: props.data.property.address })).toBeTruthy();
 });
 
+it("preserves the displayed version in public page links and browser history", async () => {
+  const version = "00000000-0000-4000-8000-000000000001";
+  const publicPath = `/proposal/public-token?version=${version}`;
+  render(<MultiPageProposal {...props} publicPath={publicPath} />);
+  expect(screen.getByRole("link", { name: "Next" }).getAttribute("href")).toBe(`${publicPath}&page=appraisal`);
+  fireEvent.click(screen.getByRole("link", { name: "Next" }));
+  await screen.findByRole("heading", { name: "Your rental income potential" });
+  expect(window.location.search).toBe(`?version=${version}&page=appraisal`);
+  openContents();
+  expect(within(screen.getByRole("dialog")).getAllByRole("link").every(link => link.getAttribute("href")?.startsWith(`${publicPath}&page=`))).toBe(true);
+  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  act(() => { window.history.replaceState(null, "", `${publicPath}&page=property`); window.dispatchEvent(new PopStateEvent("popstate")); });
+  expect(await screen.findByRole("heading", { name: props.data.property.address })).toBeTruthy();
+});
+
 it("places the forecast between appraisal and comparable listings, including direct links", async () => {
   const request = vi.fn(); vi.stubGlobal("fetch", request);
   render(<MultiPageProposal {...props} initialPage="appraisal" publicPath="/proposal/public-token" />);
@@ -158,10 +174,10 @@ it("preserves the comparison tab and mounted page when navigating away and back"
 it("keeps the current page on module failure and cancels a pending page change", async () => {
   let fail!: (reason: Error) => void;
   holds.set("comparison", new Promise((_resolve, reject) => { fail = reject; }));
-  render(<MultiPageProposal {...props} publicPath="/proposal/public-token" />);
+  render(<MultiPageProposal {...props} publicPath="/proposal/public-token?version=saved-version" />);
   fireEvent.click(screen.getByRole("link", { name: "Next" }));
   await act(async () => fail(new Error("Offline")));
-  expect(await screen.findByRole("link", { name: "Reload" })).toBeTruthy();
+  expect((await screen.findByRole("link", { name: "Reload" })).getAttribute("href")).toBe("/proposal/public-token?version=saved-version&page=appraisal");
   expect(screen.getByRole("heading", { name: props.data.property.address })).toBeTruthy();
   expect(window.location.search).toBe("");
   fireEvent.click(screen.getByRole("button", { name: "Cancel page change" }));

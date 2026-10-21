@@ -20,15 +20,16 @@ function context() {
     availableAgents: [], assignment: { name: "Test", version: 1, defaults: draft }, sourceFingerprint: "source",
   } as unknown as Parameters<typeof publishProposal>[0];
 }
-beforeEach(() => { vi.clearAllMocks(); mocks.rpc.mockResolvedValue({ data: { id, share_token: "a".repeat(64) }, error: null }); });
+beforeEach(() => { vi.clearAllMocks(); mocks.rpc.mockResolvedValue({ data: { id, share_token: "a".repeat(64), share_link: { id, token: "a".repeat(64), version_id: id, draft_revision: 1, source_fingerprint: "source", created_at: "2026-10-21T00:00:00Z", updated_at: "2026-10-21T00:00:00Z", revoked_at: null } }, error: null }); });
 
-it("publishes the preserved snapshot only after image verification, preserving the existing link API", async () => {
+it("publishes the preserved snapshot only after image verification and returns the stable link separately", async () => {
   mocks.preserve.mockImplementation(async (snapshot: ProposalSnapshot) => ({ ...snapshot, data: { ...snapshot.data, property: { ...snapshot.data.property, heroImageUrl: "https://assets.test/permanent.png" } } }));
   const result = await publishProposal(context(), 1, "source");
   expect(mocks.preserve).toHaveBeenCalledWith(expect.objectContaining({ version: 1 }), id);
-  expect(mocks.rpc).toHaveBeenCalledWith("publish_digital_proposal_v2", expect.objectContaining({ p_snapshot: expect.objectContaining({ data: expect.objectContaining({ property: expect.objectContaining({ heroImageUrl: "https://assets.test/permanent.png" }) }) }) }));
+  expect(mocks.rpc).toHaveBeenCalledWith("publish_digital_proposal_v3", expect.objectContaining({ p_snapshot: expect.objectContaining({ data: expect.objectContaining({ property: expect.objectContaining({ heroImageUrl: "https://assets.test/permanent.png" }) }) }) }));
   expect(mocks.preserve.mock.invocationCallOrder[0]).toBeLessThan(mocks.rpc.mock.invocationCallOrder[0]);
-  expect(result.path).toBe(`/proposal/${"a".repeat(64)}`);
+  expect(result.shareLink.path).toBe(`/proposal/${"a".repeat(64)}`);
+  expect(result.version.path).toBe(`/proposal/${"a".repeat(64)}?version=${id}`);
 });
 
 it("does not create or change a published version when image preservation fails", async () => {

@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
@@ -241,21 +242,20 @@ describe("short-term rental report journey", () => {
     await waitFor(() =>
       expect(
         (
-          screen.getByRole("button", {
-            name: "Get estimate & evidence",
-          }) as HTMLButtonElement
+          screen.getAllByRole("button", { name: "Continue to review estimate" })[0] as HTMLButtonElement
         ).disabled,
       ).toBe(false),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Get estimate & evidence" }),
+      screen.getAllByRole("button", { name: "Continue to review estimate" })[0],
     );
     await waitTab("Estimate & evidence");
+    fireEvent.click(screen.getByRole("tab", { name: "Comparables" }));
     expect(
       screen.getByRole("region", { name: "Comparable evidence" }),
     ).toBeTruthy();
     fireEvent.click(
-      screen.getByRole("button", { name: "Use estimate & choose design" }),
+      screen.getAllByRole("button", { name: "Use this estimate" })[0],
     );
     await waitTab("Design & content");
     expect(screen.queryByLabelText("Heading")).toBeNull();
@@ -277,14 +277,12 @@ describe("short-term rental report journey", () => {
     await waitFor(() =>
       expect(
         (
-          screen.getByRole("button", {
-            name: "Get estimate & evidence",
-          }) as HTMLButtonElement
+          screen.getAllByRole("button", { name: "Continue to review estimate" })[0] as HTMLButtonElement
         ).disabled,
       ).toBe(false),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Get estimate & evidence" }),
+      screen.getAllByRole("button", { name: "Continue to review estimate" })[0],
     );
     expect(await screen.findByText("Enter the guest capacity")).toBeTruthy();
     expect(
@@ -300,14 +298,12 @@ describe("short-term rental report journey", () => {
     await waitFor(() =>
       expect(
         (
-          screen.getByRole("button", {
-            name: "Get estimate & evidence",
-          }) as HTMLButtonElement
+          screen.getAllByRole("button", { name: "Continue to review estimate" })[0] as HTMLButtonElement
         ).disabled,
       ).toBe(false),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Get estimate & evidence" }),
+      screen.getAllByRole("button", { name: "Continue to review estimate" })[0],
     );
     expect(await screen.findByRole("alert")).toHaveProperty(
       "textContent",
@@ -319,7 +315,7 @@ describe("short-term rental report journey", () => {
     );
     failures.estimate = false;
     fireEvent.click(
-      screen.getByRole("button", { name: "Get estimate & evidence" }),
+      screen.getAllByRole("button", { name: "Continue to review estimate" })[0],
     );
     await waitTab("Estimate & evidence");
   });
@@ -384,7 +380,7 @@ describe("short-term rental report journey", () => {
     const { getReport, fetcher } = setup();
     clickTab("Estimate & evidence");
     await waitTab("Estimate & evidence");
-    fireEvent.click(screen.getByRole("button", { name: "Fine-tune assumptions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Adjust estimate" }));
     fireEvent.change(screen.getByLabelText("Average daily rate · ADR ($)"), {
       target: { value: "1" },
     });
@@ -452,14 +448,15 @@ describe("short-term rental report journey", () => {
   });
   it("retains the design and saved evidence after generation fails and can retry", async () => {
     const { failures, fetcher, templates, getReport } = setup(true);
-    fireEvent.click(screen.getByRole("button", { name: "Get estimate & evidence" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Continue to review estimate" })[0]);
     await waitTab("Estimate & evidence");
-    fireEvent.click(screen.getByRole("button", { name: "Use estimate & choose design" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Use this estimate" })[0]);
     await waitTab("Design & content");
     fireEvent.click(screen.getByRole("button", { name: new RegExp(templates[1].label) }));
     failures.generation = true;
     fireEvent.click(screen.getByRole("button", { name: "Use design & write report" }));
     expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Writing unavailable");
+    expect(document.activeElement).toBe(screen.getByRole("alert"));
     await waitTab("Design & content");
     expect(getReport().template_id).toBe(templates[1].id);
     failures.generation = false;
@@ -472,7 +469,7 @@ describe("short-term rental report journey", () => {
     const { failures } = setup();
     clickTab("Estimate & evidence");
     await waitTab("Estimate & evidence");
-    fireEvent.click(screen.getByRole("button", { name: "Fine-tune assumptions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Adjust estimate" }));
     fireEvent.change(screen.getByLabelText("Average daily rate · ADR ($)"), {
       target: { value: "400" },
     });
@@ -481,7 +478,7 @@ describe("short-term rental report journey", () => {
     clickTab("Review & share");
     await screen.findByRole("alert");
     await waitTab("Estimate & evidence");
-    fireEvent.click(screen.getByRole("button", { name: "Fine-tune assumptions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Adjust estimate" }));
     expect(
       screen.getByLabelText("Average daily rate · ADR ($)"),
     ).toHaveProperty("value", "400");
@@ -503,14 +500,12 @@ describe("short-term rental report journey", () => {
     await waitFor(() =>
       expect(
         (
-          screen.getByRole("button", {
-            name: "Review estimate & evidence",
-          }) as HTMLButtonElement
+          screen.getAllByRole("button", { name: "Continue to review estimate" })[0] as HTMLButtonElement
         ).disabled,
       ).toBe(false),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Review estimate & evidence" }),
+      screen.getAllByRole("button", { name: "Continue to review estimate" })[0],
     );
     await waitTab("Estimate & evidence");
     expect(getListing()).toEqual(originalListing);
@@ -537,14 +532,12 @@ describe("short-term rental report journey", () => {
     await waitFor(() =>
       expect(
         (
-          screen.getByRole("button", {
-            name: "Review estimate & evidence",
-          }) as HTMLButtonElement
+          screen.getAllByRole("button", { name: "Continue to review estimate" })[0] as HTMLButtonElement
         ).disabled,
       ).toBe(false),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Review estimate & evidence" }),
+      screen.getAllByRole("button", { name: "Continue to review estimate" })[0],
     );
     await waitTab("Estimate & evidence");
     expect(getListing().accommodates).toBe(6);
@@ -558,7 +551,7 @@ describe("short-term rental report journey", () => {
 describe("evidence before design safeguards", () => {
   it("has four ordered steps and locks design and delivery until their prerequisites exist", async () => {
     const { fetcher } = setup(true);
-    expect(screen.getAllByRole("tab").map(tab => tab.textContent?.replace(/^\d/, ""))).toEqual([
+    expect(within(screen.getByRole("tablist", { name: "Report creation steps" })).getAllByRole("tab").map(tab => tab.textContent?.replace(/^\d/, ""))).toEqual([
       "Property", "Estimate & evidence", "Design & content", "Review & share",
     ]);
     await waitTab("Property");
@@ -573,13 +566,13 @@ describe("evidence before design safeguards", () => {
 
   it("shows saved estimates in the template previews before any copy is generated", async () => {
     const { getReport } = setup(true);
-    fireEvent.click(screen.getByRole("button", { name: "Get estimate & evidence" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Continue to review estimate" })[0]);
     await waitTab("Estimate & evidence");
-    fireEvent.click(screen.getByRole("button", { name: "Fine-tune assumptions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Adjust estimate" }));
     fireEvent.change(screen.getByLabelText("Average daily rate · ADR ($)"), { target: { value: "400" } });
     fireEvent.change(screen.getByLabelText("Estimated occupancy (%)"), { target: { value: "75" } });
     fireEvent.click(screen.getByRole("button", { name: "Apply changes" }));
-    fireEvent.click(screen.getByRole("button", { name: "Use estimate & choose design" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Use this estimate" })[0]);
     await waitTab("Design & content");
     expect(getReport().final_estimate_json?.annualRevenue).toBe(109500);
     expect(screen.getAllByTestId("preview-revenue").some(el => el.textContent === "109500")).toBe(true);
@@ -628,7 +621,7 @@ describe("evidence before design safeguards", () => {
 
   it("saves a template selection when returning to evidence without generating content", async () => {
     const { fetcher, getReport, templates } = setup(true);
-    fireEvent.click(screen.getByRole("button", { name: "Get estimate & evidence" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Continue to review estimate" })[0]);
     await waitTab("Estimate & evidence");
     clickTab("Design & content");
     await waitTab("Design & content");
@@ -655,7 +648,7 @@ describe("evidence before design safeguards", () => {
 
   it("can estimate and return to evidence even when no templates are available", async () => {
     const { fetcher } = setup(true, { noTemplates: true });
-    fireEvent.click(screen.getByRole("button", { name: "Get estimate & evidence" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Continue to review estimate" })[0]);
     await waitTab("Estimate & evidence");
     clickTab("Design & content");
     await screen.findByText("No templates are available for your account.");
@@ -688,7 +681,7 @@ describe("evidence before design safeguards", () => {
 
     await waitTab("Property");
     expect(screen.getByRole("tab", { name: "Design & content" }).getAttribute("aria-disabled")).toBe("true");
-    const confirm = await screen.findByRole("button", { name: "Confirm property & continue" });
+    const confirm = (await screen.findAllByRole("button", { name: "Continue to review estimate" }))[0];
     await waitFor(() => expect(confirm.matches(":disabled")).toBe(false));
     fireEvent.click(confirm);
     await waitTab("Estimate & evidence");
@@ -753,16 +746,19 @@ it("saves rental and amenity changes per appraisal, preserves estimate overrides
   clickTab("Property");
   await waitTab("Property");
   fireEvent.change(screen.getByLabelText("Long-term rent ($ / week)"), { target: { value: "925" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
   fireEvent.click(screen.getByRole("button", { name: "Pool" }));
   fireEvent.change(screen.getByLabelText("Add another amenity"), { target: { value: "Private tennis court" } });
-  fireEvent.click(screen.getByRole("button", { name: "Review estimate & evidence" }));
+  fireEvent.click(screen.getAllByRole("button", { name: "Continue to review estimate" })[0]);
   await waitTab("Estimate & evidence");
   expect(getReport().user_overrides_json?.strProperty).toMatchObject({ weeklyRent: 925, amenities: ["pool"], additionalAmenities: ["Private tennis court"] });
   expect(getReport().user_overrides_json?.strAdjustment).toEqual(saved);
   expect(getReport().final_report_json?.ltr.annual_midpoint).toBe(48100);
   clickTab("Property");
   await waitTab("Property");
+  fireEvent.click(screen.getByRole("tab", { name: "Property details" }));
   expect((screen.getByLabelText("Long-term rent ($ / week)") as HTMLInputElement).value).toBe("925");
+  fireEvent.click(screen.getByRole("tab", { name: "Amenities" }));
   expect(screen.getByRole("button", { name: "Pool" }).getAttribute("aria-pressed")).toBe("true");
   expect(screen.getByRole("button", { name: "Remove Private tennis court" })).toBeTruthy();
   expect(fetcher.mock.calls.filter(([url]) => url === "/api/str/estimate")).toHaveLength(0);

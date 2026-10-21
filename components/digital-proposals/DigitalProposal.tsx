@@ -15,6 +15,7 @@ import { type ProposalDraft, type ProposalPage } from "@/lib/digital-proposals/t
 import type { ProposalAttachmentLink } from "@/lib/digital-proposals/workspace";
 import { isSafeProposalUrl } from "@/lib/digital-proposals/links";
 import { ProposalAgentContacts } from "./ProposalAgentContacts";
+import { agencyContactActions, hasAgentContact } from "@/lib/digital-proposals/contacts";
 import { useProposalTracking } from "./ProposalTracking";
 import { ProposalFonts } from "./ProposalFonts";
 
@@ -37,6 +38,7 @@ export function ProposalHero({ data, draft, fullViewport = false }: ProposalTemp
   const resolve = (value: string) => resolveTokenText(value, data).text;
   const recipient = resolve(draft.content.recipientLine);
   const subtitle = [resolve(draft.content.introduction), recipient].filter(Boolean).join(" ");
+  const locality = [data.property.suburb, data.property.state, data.property.postcode].filter(Boolean).join(" ");
   const panorama = draft.heroLayout === "panorama";
   const features = [
     { Icon: BedDouble, value: data.property.bedrooms, label: "bedroom" },
@@ -51,6 +53,7 @@ export function ProposalHero({ data, draft, fullViewport = false }: ProposalTemp
     <div className={cn("du-hero-content relative z-10 w-full min-w-0 max-w-none self-end text-center", fullViewport ? "px-[clamp(1.5rem,6vw,6rem)] pt-44 pb-[calc(clamp(8rem,16dvh,11rem)+env(safe-area-inset-bottom))]" : "px-6 pt-48 pb-10 @min-[600px]/proposal:px-12 @min-[680px]/proposal:pb-16", draft.motion && "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-700")}>
       <div className={cn("w-full [overflow-wrap:anywhere]", fullViewport ? "max-w-7xl" : "max-w-3xl")}>
         <h1 tabIndex={-1} className={cn("mx-auto text-balance font-[family-name:var(--proposal-heading)] leading-[1.08] tracking-tight", fullViewport ? "max-w-6xl text-[clamp(2.75rem,6.5cqi,7rem)]" : "max-w-2xl text-[clamp(2.25rem,5.5cqi,4.5rem)]")}>{resolve(draft.content.title)}</h1>
+        {locality && <p className="mt-3 text-base">{locality}</p>}
         {subtitle && <p className={cn("mx-auto mt-5 max-w-2xl whitespace-pre-line text-pretty leading-relaxed", fullViewport && "text-base @min-[680px]/proposal:text-xl")}>{subtitle}</p>}
         <div className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-3 text-sm" aria-label="Property features">{features}</div>
       </div>
@@ -61,6 +64,7 @@ export function ProposalHero({ data, draft, fullViewport = false }: ProposalTemp
     <div className={cn("grid gap-8", !panorama && "@min-[680px]/proposal:grid-cols-[0.95fr_1.05fr] @min-[680px]/proposal:items-center @min-[680px]/proposal:gap-12")}>
       <div className={draft.motion ? "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-700" : ""}>
         <h1 tabIndex={-1} className="max-w-3xl font-[family-name:var(--proposal-heading)] text-[clamp(2.25rem,5.5cqi,4.5rem)] leading-[1.08] tracking-tight [overflow-wrap:anywhere]">{resolve(draft.content.title)}</h1>
+        {locality && <p className="mt-3 text-sm text-(--proposal-muted)">{locality}</p>}
         {subtitle && <p className="mt-4 max-w-xl whitespace-pre-line leading-relaxed text-(--proposal-muted)">{subtitle}</p>}
         <div className="mt-8 flex flex-wrap gap-x-5 gap-y-3 text-sm" aria-label="Property features">
           {features}
@@ -82,6 +86,7 @@ export const DigitalProposal = memo(function DigitalProposal({ data, brand, draf
   const Comparison = sections?.comparison ?? ProposalComparison;
   const coverOnly = page?.kind === "hero" && draft.heroLayout === "overlay" && !page.body && !showDisclaimer;
   const immersiveCover = fullViewport && coverOnly;
+  const agencyActions = hasAgentContact(data.agents) ? [] : agencyContactActions(data.agency);
   return <article data-testid="digital-proposal" style={proposalBrandStyle(brand)} className={cn("@container/proposal min-w-0 bg-(--proposal-bg) font-[family-name:var(--proposal-body)] text-(--proposal-text)", fullViewport && "relative flex-1")}>
     <ProposalFonts brand={brand} />
     <div className={cn(immersiveCover ? "relative" : fullViewport ? "mx-auto w-full max-w-[100rem] px-[clamp(1.25rem,5vw,5rem)] pt-[clamp(1.5rem,4vh,3rem)] pb-12" : "px-5 pt-6 @min-[600px]/proposal:px-10 @min-[900px]/proposal:px-14", coverOnly ? "[&>section]:mb-0" : !fullViewport && "pb-8")}>
@@ -100,11 +105,13 @@ export const DigitalProposal = memo(function DigitalProposal({ data, brand, draf
         {page.kind === "next_steps" && <div className="mt-8 space-y-8">
           {attachments.length > 0 && <div><h2 className="mb-3 text-lg font-semibold">Documents</h2><ul className="divide-y divide-current/15">{attachments.map(item => <li key={item.id}><a download={item.name} href={item.href} onClick={() => track("document", item.id)} className="flex min-h-14 items-center justify-between gap-4 py-3 underline-offset-4 hover:underline" rel="noreferrer"><span className="min-w-0 break-words">{item.name}</span><span className="shrink-0 text-xs">Download PDF</span></a></li>)}</ul></div>}
           {draft.links.length > 0 && <div className="flex flex-wrap gap-3">{draft.links.filter(link => isSafeProposalUrl(link.url)).map(link => <a key={link.id} href={link.url} onClick={() => track(link.kind === "sign" ? "agreement" : "action", link.id)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center justify-center rounded-(--proposal-radius) bg-(--proposal-primary) px-5 py-3 text-center font-medium text-(--proposal-on-primary)">{link.label}<span className="sr-only"> (opens in a new tab)</span></a>)}</div>}
-          {!attachments.length && !draft.links.length && !page.body && !data.agents?.length && <p className="text-(--proposal-muted)">Contact {data.agency.name} to discuss the next steps for your property.</p>}
+          {agencyActions.length > 0 && <section aria-label="Agency contact details" className="space-y-3">
+            <h2 className="text-lg font-semibold">Contact {data.agency.name}</h2>
+            <div className="flex flex-wrap gap-3">{agencyActions.map(action => <a key={action.href} href={action.href} target={action.href.startsWith("https:") ? "_blank" : undefined} rel={action.href.startsWith("https:") ? "noopener noreferrer" : undefined} className="du-btn du-btn-sm min-h-12 h-auto max-w-full rounded-(--proposal-radius) border-current/25 bg-transparent px-5 py-3 text-inherit shadow-none"><span className="min-w-0 whitespace-normal [overflow-wrap:anywhere]">{action.label}<span className="mt-1 block text-xs font-normal">{action.value}</span></span>{action.href.startsWith("https:") && <span className="sr-only"> (opens in a new tab)</span>}</a>)}</div>
+          </section>}
+          {!attachments.length && !draft.links.length && !page.body && !data.agents?.length && !agencyActions.length && <p className="text-(--proposal-muted)">Contact {data.agency.name} to discuss the next steps for your property.</p>}
           {pdfHref && <a href={pdfHref} download onClick={() => track("pdf", "proposal")} className="du-btn du-btn-sm min-h-12 w-full rounded-(--proposal-radius) border-current/25 bg-transparent px-5 text-inherit shadow-none @min-[480px]/proposal:w-auto"><Download size={18} aria-hidden="true" />Download proposal PDF</a>}
-          {!pdfHref && previewPdfDownload && <button type="button" aria-disabled="true" title="Preview only — PDF download will be connected before launch." className="du-btn du-btn-sm min-h-12 w-full gap-3 rounded-(--proposal-radius) border-current/25 bg-transparent px-5 text-inherit shadow-none hover:bg-(--proposal-surface) focus-visible:outline-2 focus-visible:outline-offset-2 @min-[480px]/proposal:w-auto">
-            <Download size={18} aria-hidden="true" />Download proposal PDF
-          </button>}
+          {!pdfHref && previewPdfDownload && <p className="text-sm leading-relaxed text-(--proposal-muted)">PDF downloads are available in the final Get link or PDF step. Create a share link there to prepare your PDF; nothing is sent automatically.</p>}
           <ProposalAgentContacts agents={data.agents ?? []} />
         </div>}
       </section>}

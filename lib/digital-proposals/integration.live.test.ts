@@ -18,7 +18,7 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   const origin = process.env.STAGING_BASE_URL ?? "http://localhost:3000";
   const agencyId = randomUUID(), otherAgencyId = randomUUID(), listingId = randomUUID();
-  const userIds: string[] = [];
+  const userIds: string[] = [], accessTokens: string[] = [];
   const agentIds = [randomUUID(), randomUUID()], foreignAgentId = randomUUID(), archivedAgentId = randomUUID();
   const paths: { bucket: string; path: string }[] = [];
   let sourceImage: { path: string; url: string; bytes: Buffer } | undefined;
@@ -44,7 +44,8 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
       check(await admin.from("agency_members").insert({ agency_id: id, user_id: user.id, role: "owner" }));
       const cookies: { name: string; value: string }[] = [];
       const auth = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { getAll: () => cookies, setAll: values => { cookies.splice(0, cookies.length, ...values); } } });
-      check(await auth.auth.signInWithPassword({ email, password })); cookieHeaders.push(cookies.map(item => `${item.name}=${item.value}`).join("; "));
+      accessTokens.push(check(await auth.auth.signInWithPassword({ email, password })).session!.access_token);
+      cookieHeaders.push(cookies.map(item => `${item.name}=${item.value}`).join("; "));
     }
     check(await admin.from("agent_profiles").insert([
       { id: agentIds[0], agency_id: agencyId, name: "Alex Adviser", role_title: "Property manager", phone: "0400000001", email: "alex@example.com" },
@@ -107,7 +108,8 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
     expect(saved.draft.brandOverrides.primary).not.toBe("#ff0000");
     const noChange = await json(root, "PUT", { revision: saved.revision, draft: saved.draft }); expect(noChange.revision).toBe(saved.revision);
     expect((await api(root, "PUT", { revision: saved.revision - 1, draft })).status).toBe(409);
-    const first = (await json(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint })).version;
+    const firstPublication = await json(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint });
+    const first = firstPublication.version;
     const repeated = (await json(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint })).version;
     expect(repeated.id).toBe(first.id); expect(repeated.path).toBe(first.path);
     if (usesR2Storage()) {
@@ -116,7 +118,7 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
       for (const url of proposalImageUrls(frozen)) expect(url).toContain(`/report-assets/${agencyId}/published-images/`);
       expect(frozen.data.property.heroImageUrl).not.toBe(sourceImage!.url);
     }
-    const publicPath = first.path; const token = publicPath.split("/").pop();
+    const publicPath = first.path; const token = new URL(publicPath, origin).pathname.split("/").pop();
     if (process.env.STR_HAVEN_TEST === "1") {
       const frozen = check(await admin.from("digital_proposal_versions").select("final_report_json").eq("id", first.id).single()).final_report_json;
       expect(frozen.pdfReport.template_id).toBe("haven-properties-str");
@@ -142,14 +144,14 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
       await response.arrayBuffer();
     }));
     if (process.env.STR_HAVEN_TEST === "1") {
-      const service = await api(`${first.path}?page=service`, "GET", undefined, 2);
+      const service = await api(`${first.path}&page=service`, "GET", undefined, 2);
       expect(service.status).toBe(200); expect(await service.text()).toContain("Thoughtfully managed.");
     }
     expect(publicPage.headers.get("cache-control")).toMatch(/no-store|no-cache, must-revalidate/);
     expect(publicPage.headers.get("referrer-policy")).toBe("no-referrer");
     expect((await api(`/api/proposals/${token}/attachments/${attachment.id}`, "GET", undefined, 2)).status).toBe(200);
     expect((await api(`/api/proposals/${token}/attachments/${randomUUID()}`, "GET", undefined, 2)).status).toBe(404);
-    const contactsHtml = await (await api(`${first.path}?page=next-steps`, "GET", undefined, 2)).text();
+    const contactsHtml = await (await api(`${first.path}&page=next-steps`, "GET", undefined, 2)).text();
     expect(contactsHtml).toContain("Alex Adviser"); expect(contactsHtml).toContain("Taylor Agent");
     // Production Cloudflare email protection rewrites mailto URLs in the HTML;
     // compare the underlying address rather than requiring one wire encoding.
@@ -161,7 +163,7 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
     });
     expect(contactLinks).toContain("mailto:alex@example.com"); expect(contactsHtml).not.toContain("Other agency contact");
     const session = randomUUID();
-    const event = { id: randomUUID(), session, kind: "open", target: "proposal" };
+    const event = { id: randomUUID(), session, kind: "open", target: "proposal", versionId: first.id };
     expect((await api(`/api/proposals/${token}/events`, "POST", event, 2)).status).toBe(204);
     await api(`/api/proposals/${token}/events`, "POST", { ...event, id: randomUUID() }, 2);
     await api(`/api/proposals/${token}/events`, "POST", { ...event, id: randomUUID(), kind: "page", target: "appraisal" }, 2);
@@ -174,7 +176,10 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
     await json(`/api/str/appraisals/${reportId}`, "PATCH", { recipient: { mode: "named", name: "Alex QA", email: "private-new@example.com", phone: "0412345678" }, expected_updated_at: appraisal.updated_at });
     expect((await api(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint })).status).toBe(409);
     workspace = await json(root); expect(workspace.data!.recipient!.displayName).toBe("Alex QA");
-    const second = (await json(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint })).version; expect(second.id).not.toBe(first.id);
+    const secondPublication = await json(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint });
+    const second = secondPublication.version; expect(second.id).not.toBe(first.id);
+    expect(secondPublication.shareLink.path).toBe(firstPublication.shareLink.path);
+    expect(await (await api(secondPublication.shareLink.path, "GET", undefined, 2)).text()).toContain("Alex QA");
     if (sourceImage) {
       const source = { Bucket: r2Configuration().publicBucket, Key: `report-assets/${sourceImage.path}` };
       await r2Client().send(new DeleteObjectCommand(source));
@@ -192,7 +197,7 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
     if (process.env.STR_PDF_TEST === "1") {
       const pdfResult = await json(`${root}/pdf`, "POST", { versionId: second.id }); expect(pdfResult.status).toBe("ready");
       paths.push({ bucket: "proposal-pdfs", path: `${agencyId}/${reportId}/${second.id}.pdf` });
-      const pdf = await api(`/api/proposals/${second.path.split("/").pop()}/pdf`, "GET", undefined, 2); expect(pdf.status).toBe(200);
+      const pdf = await api(second.pdfPath, "GET", undefined, 2); expect(pdf.status).toBe(200);
       const buffer = Buffer.from(await pdf.arrayBuffer()); expect(buffer.subarray(0, 5).toString()).toBe("%PDF-");
       if (process.env.STR_HAVEN_TEST === "1") expect(buffer.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length, "Havenly's PDF must retain its two-page layout").toBe(2);
       mkdirSync("tmp/pdfs", { recursive: true }); writeFileSync("tmp/pdfs/proposal-integration-qa.pdf", buffer);
@@ -203,28 +208,31 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
     await json(`${root}/revoke`, "POST", { versionId: first.id, linkId: first.link_id });
     expect((await api(first.path, "GET", undefined, 2)).status).toBe(404);
     expect((await api(`/api/proposals/${token}/attachments/${attachment.id}`, "GET", undefined, 2)).status).toBe(404);
-    expect((await api(second.path, "GET", undefined, 2)).status).toBe(200);
+    expect((await api(second.path, "GET", undefined, 2)).status).toBe(404);
     const regenerated = (await json(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint })).version; expect(regenerated.id).toBe(second.id);
-    await json(`${root}/revoke`, "POST", { versionId: second.id, linkId: second.link_id });
+    await json(`${root}/revoke`, "POST", { versionId: regenerated.id, linkId: regenerated.link_id });
     const replacement = (await json(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint })).version;
     expect(replacement.id).toBe(second.id); expect(replacement.path).not.toBe(second.path);
     expect((await api(second.path, "GET", undefined, 2)).status).toBe(404);
     expect((await api(replacement.path, "GET", undefined, 2)).status).toBe(200);
     check(await admin.from("agent_profiles").update({ name: "Edited after publication" }).eq("id", agentIds[0]));
-    const frozenContacts = await (await api(`${replacement.path}?page=next-steps`, "GET", undefined, 2)).text();
+    const frozenContacts = await (await api(`${replacement.path}&page=next-steps`, "GET", undefined, 2)).text();
     expect(frozenContacts).toContain("Alex Adviser"); expect(frozenContacts).not.toContain("Edited after publication");
     // Access must remain fresh after multiple visits have warmed the immutable snapshot.
     check(await admin.from("digital_proposal_versions").update({ revoked_at: new Date().toISOString() }).eq("id", replacement.id));
     expect((await api(replacement.path, "GET", undefined, 2)).status).toBe(404);
     check(await admin.from("digital_proposal_versions").update({ revoked_at: null }).eq("id", replacement.id));
-    expect((await api(replacement.path, "GET", undefined, 2)).status).toBe(200);
+    // Even an administrator clearing version revocation cannot resurrect its issued token.
+    expect((await api(replacement.path, "GET", undefined, 2)).status).toBe(404);
     check(await admin.from("listings").update({ status: "archived" }).eq("id", listingId));
     expect((await api(replacement.path, "GET", undefined, 2)).status).toBe(404);
-    expect((await api(`/api/proposals/${replacement.path.split("/").pop()}/pdf`, "GET", undefined, 2)).status).toBe(404);
+    expect((await api(replacement.pdfPath, "GET", undefined, 2)).status).toBe(404);
     await json(`/api/str/appraisals/${reportId}`, "DELETE");
     expect((await api(second.path, "GET", undefined, 2)).status).toBe(404);
-    expect((await api(`/api/proposals/${second.path.split("/").pop()}/pdf`, "GET", undefined, 2)).status).toBe(404);
+    expect((await api(second.pdfPath, "GET", undefined, 2)).status).toBe(404);
   } finally {
+    const signOuts = await Promise.allSettled(accessTokens.map(token => admin.auth.admin.signOut(token, "global")));
+    if (signOuts.some(result => result.status === "rejected" || result.value.error)) throw new Error("Unable to sign out disposable QA sessions before cleanup.");
     if (usesR2Storage()) {
       // Only this test's generated agency prefix, including mirrored render assets.
       const config = r2Configuration(), client = r2Client();

@@ -713,3 +713,45 @@ runner adds twelve simultaneous Save contact/Create report requests. The opt-in
 `tests/staging/client-setup.spec.ts` exercises desktop/mobile saving, old URL
 redirects, automatic linking, all three report pickers, publication and public/
 print recipient snapshots in a disposable tenant, without paid provider calls.
+
+## Stable proposal links and draft autosave
+
+Apply `20261021065728_stable_proposal_share_links.sql`, then
+`20261021084230_proposal_link_history_api_compatibility.sql` before releasing the
+stable-link publisher. Both migrations have been verified in disposable
+PostgreSQL 17 and were applied to `qmtfugaeujeikyegoxwi` on 21 October 2026.
+Real API checks confirmed that the older unhinted link/version embeds and the
+new history joins succeed after the compatibility migration. For future database
+work, use the existing connection recorded in `AGENTS.md` and verify that target.
+
+Draft edits save privately through the existing revision-checked save endpoint.
+Publishing remains an explicit action: `publish_digital_proposal_v3` advances one
+primary link to an immutable snapshot. The first deliberate publication adopts
+the most recently issued active legacy link; other legacy links stay fixed.
+Revoked links never become active again. Publishing after revocation creates a
+new link. Reusing an earlier identical snapshot still records the latest published
+revision and source fingerprint.
+
+`digital_proposal_link_versions` records snapshots served by each link. Public
+navigation, PDF and attachment URLs, and activity events retain the rendered
+version so an already-open page remains coherent after another publication.
+Historical snapshots and stored PDFs are not rewritten. The migration updates
+event membership constraints, adds scoped RLS and service-only publishing/event
+functions, and keeps archived proposals unavailable.
+
+The follow-up gives the history table a surrogate primary key while retaining
+its scoped unique constraint and the event membership foreign key. This prevents
+PostgREST from inferring a second link-to-version relationship, preserving older
+deployed applications' unhinted embeds during rollout. It preserves all history,
+events, links, snapshots, PDF paths and access policies, then reloads the API
+schema cache. New application queries also explicitly select the existing direct
+foreign-key relationship.
+
+Before the migration is installed, existing links, previews and draft saves
+remain available; publishing returns an actionable migration-required error
+instead of issuing another changing URL. The disposable SQL runner
+`python3 supabase/tests/client_directory_run.py staypack-clients-qa` (against a
+fresh dedicated container of that name) includes legacy-link backfill,
+adoption, snapshot reuse, event attribution, revocation, isolation, archive and
+API-compatibility key/data-preservation checks. The opt-in live suite is `lib/digital-proposals/integration.live.test.ts`;
+run it only against an explicitly designated test environment.

@@ -80,6 +80,36 @@ async function lookup(includeAgents = true) {
   );
   await screen.findByLabelText("Street address");
 }
+it("starts with the address transferred from the property library without looking it up automatically", async () => {
+  const address = "7/2-4 Dolphin Street, Randwick, NSW 2031";
+  const onQueryChange = vi.fn();
+  render(<NewListingFlow storageKey="draft-test" initialQuery={address} onQueryChange={onQueryChange} />);
+  const input = await screen.findByLabelText("Property address");
+  expect(input).toHaveProperty("value", address);
+  expect(request).not.toHaveBeenCalled();
+  fireEvent.change(input, { target: { value: `${address} Australia` } });
+  expect(onQueryChange).toHaveBeenLastCalledWith(`${address} Australia`);
+});
+it("prefills a new library search while retaining the previous reviewed property draft", async () => {
+  await lookup();
+  fireEvent.change(screen.getByLabelText("Bedrooms"), { target: { value: "4" } });
+  cleanup();
+  const address = "7/2-4 Dolphin Street, Randwick, NSW 2031";
+  render(<NewListingFlow storageKey="draft-test" initialQuery={address} />);
+  expect(await screen.findByLabelText("Property address")).toHaveProperty("value", address);
+  expect(screen.getByText(/Choosing another property will replace it/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Continue this draft" }));
+  expect(screen.getByLabelText("Street address")).toHaveProperty("value", candidate.streetAddress);
+  expect(screen.getByLabelText("Bedrooms")).toHaveProperty("value", "4");
+});
+it("opens an incoming library address in address mode after an earlier URL import", async () => {
+  render(<NewListingFlow storageKey="draft-test" initialQuery={candidate.address} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Import listing URL" }));
+  cleanup();
+  render(<NewListingFlow storageKey="draft-test" initialQuery={candidate.address} />);
+  expect(await screen.findByLabelText("Property address")).toHaveProperty("value", candidate.address);
+  expect(screen.queryByLabelText("Listing URL")).toBeNull();
+});
 it("automatically looks up the completed unit/range address after choosing a suggestion", async () => {
   const address = "21/8-12 Ascot Street, Kensington NSW 2033";
   request.mockResolvedValueOnce(reply({ suggestions: [{ placeId: "building", address: "21/8-12 Ascot Street, Kensington NSW", mainText: "21/8-12 Ascot Street", secondaryText: "Kensington NSW" }] }))

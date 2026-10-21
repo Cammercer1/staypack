@@ -67,3 +67,63 @@ it("reports transient failures without serving cached content or claiming the li
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
   await expect(publishedProposal(token)).rejects.toMatchObject({ status: 503 });
 });
+
+it("pins an already-open proposal to a served version after the stable pointer moves", async () => {
+  const historical = structuredClone(access);
+  const newerId = "00000000-0000-4000-8000-000000000002";
+  Object.assign(access.version as object, { id: newerId, content_hash: "c".repeat(64) });
+  const originalFetch = globalThis.fetch;
+  vi.stubGlobal("fetch", vi.fn(async (input: string, init: RequestInit) => {
+    const url = new URL(input);
+    if (url.pathname.endsWith("digital_proposal_link_versions")) {
+      reads.push({ url, init });
+      return Response.json([{ link: { id }, version: historical.version }]);
+    }
+    return originalFetch(input, init);
+  }));
+  const result = await publishedProposal(token, id);
+  expect(result.id).toBe(id);
+  expect(result.legacy).toBe(false);
+  expect(reads[0].init.cache).toBe("no-store");
+  expect(reads[0].url.searchParams.get("version_id")).toBe(`eq.${id}`);
+  expect(reads[0].url.searchParams.get("link.token")).toBe(`eq.${token}`);
+  expect(reads[0].url.searchParams.get("link.revoked_at")).toBe("is.null");
+  expect(reads[1].url.searchParams.get("id")).toBe(`eq.${id}`);
+});
+
+it("rejects a snapshot that was never served by this token before reading cached content", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
+  await expect(publishedProposal(token, id)).rejects.toMatchObject({ status: 404 });
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it("keeps exact legacy snapshots readable before migration and fails closed for other versions", async () => {
+  const originalFetch = globalThis.fetch;
+  vi.stubGlobal("fetch", vi.fn(async (input: string, init: RequestInit) => {
+    if (new URL(input).pathname.endsWith("digital_proposal_link_versions")) return Response.json({ code: "PGRST205" }, { status: 404 });
+    return originalFetch(input, init);
+  }));
+  expect((await publishedProposalAccess(token, id)).legacy).toBe(true);
+  await expect(publishedProposalAccess(token, "00000000-0000-4000-8000-000000000002")).rejects.toMatchObject({ status: 404 });
+});
+
+it("does not downgrade membership authorization on operational database errors", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ code: "57014" }, { status: 503 })));
+  await expect(publishedProposalAccess(token, id)).rejects.toMatchObject({ status: 503 });
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it("resolves the current public target when both direct and history relationships exist", async () => {
+  const originalFetch = globalThis.fetch;
+  vi.stubGlobal("fetch", vi.fn(async (input: string, init: RequestInit) => {
+    const url = new URL(input);
+    if (url.pathname.endsWith("digital_proposal_links") && url.searchParams.get("select")?.includes("version:digital_proposal_versions!inner(")) {
+      return Response.json({ code: "PGRST201", message: "Multiple relationships found" }, { status: 300 });
+    }
+    return originalFetch(input, init);
+  }));
+  const result = await publishedProposal(token);
+  expect(result.id).toBe(id);
+  expect(result.snapshot.data.property.address).toBe(snapshot.data.property.address);
+  expect(reads[0].url.searchParams.get("select")).toContain("version:digital_proposal_versions!digital_proposal_links_agency_id_report_id_version_id_fkey!inner(");
+});

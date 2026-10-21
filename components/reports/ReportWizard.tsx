@@ -1,6 +1,6 @@
 "use client";
 
-import { CreateAnother, PropertyContext } from "@/components/properties/PropertyContext";
+import { CreateAnother } from "@/components/properties/PropertyContext";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ProposalWorkflow, type ProposalWorkflowHandle } from "@/components/digital-proposals/ProposalWorkflow";
 import { AppraisalWizardNavigation } from "@/components/appraisals/AppraisalWizardNavigation";
@@ -84,11 +84,18 @@ export function ReportWizard({
   const [childBusy, setChildBusy] = useState(false);
   const [activity, setActivity] = useState<"estimate" | "copy" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (error) {
+      errorRef.current?.scrollIntoView?.({ block: "center" });
+      errorRef.current?.focus({ preventScroll: true });
+    }
+  }, [error]);
   const [agencyAgents, setAgencyAgents] = useState<AgentProfile[]>([]);
   const [previewAgency, setPreviewAgency] = useState(agency);
   const [canManageStrDefaults, setCanManageStrDefaults] = useState(false);
   const proposalRef = useRef<ProposalWorkflowHandle>(null);
-  const wizardSteps = digitalProposal ? steps.map(item => ({ ...item, label: ({ estimate: "Rental appraisal", design: "Proposal", preview: "Review & share" } as Record<string, string>)[item.id] ?? item.label })) : steps;
+  const wizardSteps = digitalProposal ? steps.map(item => ({ ...item, label: ({ property: "Confirm property", estimate: "Review estimate", design: "Check proposal", preview: "Get link or PDF" } as Record<string, string>)[item.id] ?? item.label })) : steps;
   const designRef = useRef<StrDesignHandle>(null);
   const estimateRef = useRef<StrEstimateHandle>(null);
   const copyRef = useRef<StrCopyEditorHandle>(null);
@@ -356,6 +363,8 @@ export function ReportWizard({
       {error ? (
         <p
           role="alert"
+          ref={errorRef}
+          tabIndex={-1}
           data-theme="staypack-workspace"
           className="du-alert du-alert-error du-alert-soft"
         >
@@ -363,8 +372,7 @@ export function ReportWizard({
         </p>
       ) : null}
       {appraisalActions ? <div inert={disabled}>{appraisalActions}</div> : null}
-      {digitalProposal && <PropertyContext listing={listing} onEdit={() => void handleStepChange("property")} />}
-      {customerPanel ? <fieldset disabled={busy || childBusy} className="min-w-0">{customerPanel}</fieldset> : null}
+      {!digitalProposal && customerPanel ? <fieldset disabled={busy || childBusy} className="min-w-0">{customerPanel}</fieldset> : null}
       <Tabs
         value={step}
         onValueChange={(next) => void handleStepChange(String(next))}
@@ -399,7 +407,7 @@ export function ReportWizard({
           <div hidden={Boolean(activity)}>
             <StrEstimateStep
               ref={estimateRef}
-              continueLabel={digitalProposal ? "Continue to proposal" : undefined}
+              continueLabel={digitalProposal ? "Use this estimate" : undefined}
               agency={previewAgency}
               canManageDefaults={canManageStrDefaults}
               onCompanyPresetsChange={(presets) => setPreviewAgency((current) => ({ ...current, str_management_presets: presets }))}
@@ -452,7 +460,7 @@ export function ReportWizard({
           </div>
         </TabsContent>
         <TabsContent value="preview" className="space-y-5">
-          {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="share" refreshKey={customerRevision} disabled={customerEditing || busy} onBusyChange={setChildBusy} /> : preview ? (
+          {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="share" refreshKey={customerRevision} customerPanel={customerPanel ? <fieldset disabled={busy || childBusy} className="min-w-0">{customerPanel}</fieldset> : undefined} disabled={customerEditing || busy} onBusyChange={setChildBusy} /> : preview ? (
             <StrReportDeliveryStep
               disabled={customerEditing}
               report={report}

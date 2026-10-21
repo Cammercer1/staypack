@@ -79,3 +79,11 @@ netlify/functions/  — background jobs
 ## Environment
 
 Copy `.env.example` to `.env.local`. Dev mocks activate automatically when third-party API keys are missing.
+
+## Supabase connection
+
+- The user-designated app-managed MCP connection for this project is `6248e75a-72af-4f21-a201-67559ec15726`. Reuse it when its tools are exposed.
+- The repository-local `staypacks-supabase` MCP server in `.codex/config.toml` is also authenticated and restricted to this project's database. Use it for local CLI database work. Do not create another connection or start another sign-in flow without the user's request.
+- StayPacks' Supabase project reference is `qmtfugaeujeikyegoxwi`. Verify this target before database work. The account-wide Supabase plugin may expose a different project; never substitute that project.
+- This instruction records the intended connection, but does not bind the app's connection selection. If the designated connection's tools are not exposed in the current chat, report that limitation and ask the user to enable the existing connection rather than asking them to set it up again.
+- Keep credentials out of this repository and its MCP configuration.

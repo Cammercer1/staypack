@@ -5,6 +5,7 @@ import type { ProposalData } from "./data";
 import { resolveTokenText } from "./tokens";
 import { MAX_LISTING_AGENTS } from "@/lib/reports/constants";
 import { proposalServiceSchema, serviceTokenTexts } from "./service";
+import { proposalPhotoSelectionSchema } from "./photos";
 
 export const proposalPageSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{1,60}$/),
@@ -49,6 +50,7 @@ export const proposalDraftSchema = z.object({
   links: z.array(proposalLinkSchema).max(12).default([]),
   attachmentIds: z.array(z.uuid()).max(20).default([]),
   agentIds: z.array(z.uuid()).max(MAX_LISTING_AGENTS).default([]),
+  propertyImages: proposalPhotoSelectionSchema.optional(),
 }).strict().superRefine((draft, ctx) => {
   if (new Set(draft.agentIds).size !== draft.agentIds.length) ctx.addIssue({ code: "custom", path: ["agentIds"], message: "Include each agent once." });
   if (new Set(draft.attachmentIds).size !== draft.attachmentIds.length) ctx.addIssue({ code: "custom", path: ["attachmentIds"], message: "Include each document once." });

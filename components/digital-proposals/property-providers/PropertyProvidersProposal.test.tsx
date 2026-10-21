@@ -16,6 +16,12 @@ function snapshot(profile: unknown) {
 }
 
 describe("shared prospect proposal branding", () => {
+  it("keeps version-pinned public pagination on the displayed snapshot", () => {
+    const report = snapshot(ausVision);
+    const html = renderToStaticMarkup(<PropertyProvidersProposal {...report} publicPath="/proposal/stable-token?version=saved-version" />);
+    expect(html).toContain('href="/proposal/stable-token?version=saved-version&amp;page=appraisal"');
+    expect(html).not.toContain("saved-version?page=");
+  });
   it.each(["property", "appraisal", "forecast", "evidence", "service", "next-steps"])("renders the saved agency identity on %s without the previous prospect's content", page => {
     const report = snapshot(ausVision);
     const html = renderToStaticMarkup(<PropertyProvidersProposal {...report} initialPage={page} exampleAgreement />);
@@ -37,5 +43,23 @@ describe("shared prospect proposal branding", () => {
     expect(html).toContain("4.6");
     expect(html).toContain("RateMyAgent");
     expect(html).not.toContain("Aus Vision Realty");
+  });
+  it("shows public agency contact actions when no agent is selected", () => {
+    const report = snapshot(ausVision);
+    report.data.agents = [];
+    report.data.agency.email = "team@example.com";
+    const html = renderToStaticMarkup(<PropertyProvidersProposal {...report} initialPage="next-steps" />);
+    expect(html).toContain("Contact Aus Vision Realty");
+    expect(html).toContain('href="mailto:team%40example.com"');
+  });
+  it.each([ausVision, propertyProviders])("keeps the selected cover without showing a gallery button", profile => {
+    const report = snapshot(profile);
+    report.data.property.heroImageUrl = "https://example.com/selected-cover.jpg";
+    report.data.property.gallery = [report.data.property.heroImageUrl, "https://example.com/selected-kitchen.jpg"];
+    expect(renderToStaticMarkup(<PropertyProvidersProposal {...report} />)).not.toContain("View property photos");
+    report.draft.propertyImages = { heroImageUrl: report.data.property.heroImageUrl, gallery: report.data.property.gallery };
+    const html = renderToStaticMarkup(<PropertyProvidersProposal {...report} />);
+    expect(html).not.toContain("View property photos");
+    expect(html).toContain("https://example.com/selected-cover.jpg");
   });
 });

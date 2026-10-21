@@ -20,10 +20,12 @@ beforeEach(() => { vi.clearAllMocks(); mocks.fetch.mockResolvedValue({ buffer: b
 it("replaces every presentation image field, deduplicates downloads and leaves links, copy and input untouched", async () => {
   const source = "https://source.test/photo";
   const snapshot = { data: { property: { heroImageUrl: source, gallery: [source, ""] }, agency: { logoUrl: source }, agents: [{ photoUrl: source }], comparables: [{ imageUrl: source }], appraisal: { comparables: [{ imageUrl: source }] } },
-    draft: { pages: [{ service: { imageUrl: source, platforms: [{ imageUrl: source }], imageCaption: source } }], links: [{ url: source }] },
+    draft: { propertyImages: { heroImageUrl: source, gallery: [source] }, pages: [{ service: { imageUrl: source, platforms: [{ imageUrl: source }], imageCaption: source } }], links: [{ url: source }] },
     pdfReport: { property: { hero_image_url: source, selected_image_urls: [source], listing_url: source }, agency: { logo_url: source, logo_light_url: source, logo_dark_url: source, font_file_url: source }, agent: { photo_url: source }, str_enrichment: { comps: [{ thumbnail_url: source }] } } };
   const frozen = await preserveProposalImages(snapshot, scope);
   expect(proposalImageUrls(frozen)).toEqual([url]);
+  expect(frozen.draft.propertyImages).toEqual({ heroImageUrl: url, gallery: [url] });
+  expect(frozen.data.property.heroImageUrl).toBe(frozen.pdfReport.property.hero_image_url);
   expect(frozen.draft.links[0].url).toBe(source);
   expect(frozen.draft.pages[0].service.imageCaption).toBe(source);
   expect(frozen.pdfReport.property.listing_url).toBe(source);

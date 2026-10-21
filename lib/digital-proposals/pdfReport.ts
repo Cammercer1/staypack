@@ -6,6 +6,7 @@ import { z } from "zod";
 import { strManagementAssumptionsSchema } from "@/lib/reports/strEstimateAdjustments";
 import type { FinalReportJson } from "@/lib/types";
 import { assetUrlSchema, type ProposalAgent } from "./data";
+import type { ProposalPhotoSelection } from "./photos";
 
 const figure = z.number().finite().nullable();
 const range = z.object({ p25: figure, p50: figure, p75: figure, p90: figure });
@@ -103,4 +104,9 @@ export function buildProposalPdfReport(document: FinalReportJson, recipientDispl
 export function withPdfAgents(report: ProposalPdfReport, selected: ProposalAgent[]): ProposalPdfReport {
   const agents = selected.map(item => ({ name: item.name, role_title: item.role, phone: item.phone, email: item.email, photo_url: item.photoUrl }));
   return proposalPdfReportSchema.parse({ ...report, agent: agents[0] ?? blankAgent, agents });
+}
+
+export function withPdfPhotos(report: ProposalPdfReport, selection?: ProposalPhotoSelection): ProposalPdfReport {
+  if (!selection) return report;
+  return { ...report, property: { ...report.property, hero_image_url: selection.heroImageUrl, selected_image_urls: [...selection.gallery] } };
 }

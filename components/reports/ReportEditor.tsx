@@ -34,7 +34,7 @@ export function ReportEditor({ initialListing, initialReport, agency, availableT
       customerRevision={currentAppraisal?.updated_at}
       customerEditing={customerEditing}
       appraisalActions={appraisal ? <AppraisalArchiveControl reportId={appraisal.report_id} /> : undefined}
-      customerPanel={appraisal ? <AppraisalCustomerPanel key={currentAppraisal?.updated_at} initialAppraisal={currentAppraisal ?? appraisal} onSaved={setAppraisal} archived={false} onEditingChange={setCustomerEditing} /> : undefined}
+      customerPanel={appraisal ? <AppraisalCustomerPanel key={currentAppraisal?.updated_at} initialAppraisal={currentAppraisal ?? appraisal} onSaved={setAppraisal} archived={false} layout="inline" onEditingChange={setCustomerEditing} /> : undefined}
       onListingChange={setListing}
       onReportChange={setReport}
     />

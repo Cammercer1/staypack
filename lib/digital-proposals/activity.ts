@@ -3,6 +3,7 @@ import { comparablesByEstimate } from "./data";
 import type { ProposalSnapshot } from "./workspace";
 export const proposalEventSchema = z.object({
   id: z.uuid(), session: z.uuid(), kind: z.enum(["open", "page", "comparison", "comparable", "pdf", "document", "action", "agreement"]),
+  versionId: z.uuid().optional(),
   target: z.string().min(1).max(100),
 }).strict();
 export type ProposalEvent = z.infer<typeof proposalEventSchema>;

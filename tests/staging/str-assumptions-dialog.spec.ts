@@ -18,11 +18,14 @@ for (const viewport of [
     await page.goto("/dev/lint-regression", { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: "Start mock test session" }).click();
     await page.getByLabel("Test screen").selectOption("str-new");
-    await page.getByRole("button", { name: "Get estimate & evidence" }).click();
-    const trigger = page.getByRole("button", { name: "Fine-tune assumptions", exact: true });
-    const dialog = page.getByRole("dialog", { name: "Fine-tune assumptions" });
+    await page.getByRole("group", { name: "Property step actions" }).getByRole("button", { name: "Continue to review estimate" }).click();
+    const trigger = page.getByRole("button", { name: "Adjust estimate", exact: true });
+    const dialog = page.getByRole("dialog", { name: "Adjust estimate" });
+    await expect(page.getByLabel("Management uplift (%)", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("group", { name: "Estimate step actions" }).getByRole("button", { name: "Use this estimate", exact: true })).toBeVisible();
     await trigger.click();
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel("Management uplift (%)", { exact: true })).toBeVisible();
     const adr = dialog.getByLabel("Average daily rate · ADR ($)", { exact: true });
     const occupancy = dialog.getByLabel("Estimated occupancy (%)", { exact: true });
     const originalAdr = await adr.inputValue();

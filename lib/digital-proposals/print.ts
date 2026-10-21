@@ -1,4 +1,4 @@
-import { formatCurrency } from "@/lib/reports/formatters";
+import { formatCurrency, formatDistanceMeters } from "@/lib/reports/formatters";
 import { formatEvidenceDate as dateLabel } from "@/lib/appraisals/formatEvidenceDate";
 import { rentForPeriod } from "@/lib/property-market";
 import { comparablesByEstimate, comparisonRows } from "./data";
@@ -6,6 +6,7 @@ import { monthlyRevenueProjection } from "./seasonality";
 import { occupancyMonthLabel } from "./occupancy";
 import { resolveTokenText } from "./tokens";
 import { proposalPrintFontUrl } from "./fonts";
+import { agencyContactActions, contactActions, hasAgentContact, type ProposalContactAction } from "./contacts";
 import type { ProposalSnapshot } from "./workspace";
 const escape = (value: string) => value.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
 
@@ -15,6 +16,7 @@ const portrait = (url: string, name: string) => {
   return `<div class="portrait" aria-label="${escape(name)}"><span>${escape(initials)}</span>${/^https:\/\//i.test(url) ? `<img src="${escape(url)}" alt="" onerror="this.remove()">` : ""}</div>`;
 };
 const fact = (value: number | null, label: string) => value === null ? "" : `${value} ${label}${value === 1 ? "" : "s"}`;
+const contactLinks = (actions: ProposalContactAction[]) => actions.map(action => `<p><a href="${escape(action.href)}" aria-label="${escape(action.label)}">${escape(action.value)}</a></p>`).join("");
 /** Trusted, versioned print renderer. Uses the exact published data and token values. */
 export function proposalPrintHtml(snapshot: ProposalSnapshot) {
   const { data, draft, brand } = snapshot;
@@ -33,17 +35,24 @@ export function proposalPrintHtml(snapshot: ProposalSnapshot) {
   const monthly = months ? `<h3>Monthly revenue estimates</h3><table><thead><tr><th>Month</th>${rows.map(row => `<th>${escape(row.label)}</th>`).join("")}</tr></thead><tbody>${months.map(month => `<tr><td>${month.month}</td><td>${money(month.ltr)}</td><td>${money(month.market)}</td><td>${money(month.managed)}</td></tr>`).join("")}</tbody></table>` : "";
   const occupancy = data.occupancy ? `<h3>Historical market occupancy</h3><table><thead><tr><th>Month</th><th>Occupancy</th></tr></thead><tbody>${data.occupancy.months.map(row => `<tr><td>${occupancyMonthLabel(row.month)}</td><td>${row.average === null ? "Not available" : Math.round(row.average) + "%"}</td></tr>`).join("")}</tbody></table><p class="note">Historical market averages${data.occupancy.label ? ` for ${escape(data.occupancy.label)}` : ""}; not a forecast for this property.${data.occupancy.allPropertyTypes ? " Includes all property types with the same bedroom count." : ""}</p>` : `<p class="note">${escape(data.occupancyNotice ?? "Monthly occupancy history is not available for this market.")}</p>`;
   const yields = comparisonRows(data, "yield");
+  const locality = [data.property.suburb.trim(), [data.property.state.trim(), data.property.postcode.trim()].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  // Read the frozen presentation URLs, never the editable draft's source URLs.
+  const propertyPhotos = draft.propertyImages ? [...new Set(data.property.gallery)].filter(url => url && url !== data.property.heroImageUrl) : [];
   const pages = draft.pages.filter(page => page.enabled).flatMap(page => {
     let content = `<h1>${text(page.title)}</h1>`;
-    if (page.kind === "hero") content = `<div class="hero">${image(data.property.heroImageUrl, data.property.address)}<div class="overlay"><h1>${text(draft.content.title)}</h1><p>${text(draft.content.introduction)} ${text(draft.content.recipientLine)}</p><p>${[fact(data.property.bedrooms, "bedroom"), fact(data.property.bathrooms, "bathroom"), fact(data.property.carSpaces, "car space")].filter(Boolean).join(" · ")}</p></div></div>`;
-    if (page.kind === "comparison") content = `<h1>${text(draft.content.comparisonTitle)}</h1>${annual}${data.property.estimatedValue ? `<p class="note">Estimated gross yield: ${yields.map(row => `${escape(row.label)} ${row.value === null ? "—" : row.value.toFixed(1) + "%"}`).join(" · ")}</p>` : ""}${draft.pages.some(item => item.kind === "forecast") ? "" : monthly}<p class="note">Figures are gross estimates before fees and operating costs.</p>`;
+    if (page.kind === "hero") content = `<div class="hero">${image(data.property.heroImageUrl, data.property.address)}<div class="overlay"><h1>${text(draft.content.title)}</h1>${locality ? `<p>${escape(locality)}</p>` : ""}<p>${text(draft.content.introduction)} ${text(draft.content.recipientLine)}</p><p>${[fact(data.property.bedrooms, "bedroom"), fact(data.property.bathrooms, "bathroom"), fact(data.property.carSpaces, "car space")].filter(Boolean).join(" · ")}</p></div></div>`;
+    if (page.kind === "comparison") content = `<h1>${text(draft.content.comparisonTitle)}</h1>${annual}${data.property.estimatedValue ? `<p class="note">Estimated gross yield: ${yields.map(row => `${escape(row.label)} ${row.value === null ? "—" : row.value.toFixed(1) + "%"}`).join(" · ")}</p><p class="note">Based on an estimated property value of ${money(data.property.estimatedValue)}. Gross yield is estimated annual gross revenue divided by this value.</p>` : ""}${draft.pages.some(item => item.kind === "forecast") ? "" : monthly}<p class="note">Figures are gross estimates before fees and operating costs.</p>`;
     if (page.kind === "forecast") content += `<div class="forecast"><div>${monthly || `<p class="note">Monthly revenue estimates are not available for this appraisal.</p>`}</div><div>${occupancy}</div></div><p class="note">Estimated gross revenue is before fees and operating costs. Both STR scenarios follow the saved seasonal revenue pattern; long-term rent is spread evenly. Rounded monthly figures add up to the annual estimates.</p>`;
     if (page.kind === "comparison" && appraisal) {
       const range = appraisal.minimum !== null && appraisal.maximum !== null ? `${appraisalMoney(appraisal.minimum)} – ${appraisalMoney(appraisal.maximum)}` : appraisalMoney(appraisal.midpoint);
       content = `<h1>${text(draft.content.comparisonTitle)}</h1><div class="figures"><div><span>${lease ? `Estimated ${period === "month" ? "monthly" : "weekly"} rental range` : "Estimated selling range"}</span><strong>${range}${lease ? ` per ${period}` : ""}</strong></div></div><p class="note">${lease ? "An estimate of gross rent before management fees and property costs. Achievable rent depends on property condition and market demand." : "An appraisal estimate based on the reviewed comparable evidence. The eventual selling price will depend on buyer demand, presentation and the sales process."}</p>${appraisal.summary ? `<p class="body">${escape(appraisal.summary)}</p>` : ""}${appraisal.highlights.length ? `<ul>${appraisal.highlights.map(item => `<li>${escape(item)}</li>`).join("")}</ul>` : ""}${appraisal.methodology ? `<p class="note body">${escape(appraisal.methodology)}</p>` : ""}`;
     }
     if (page.kind === "evidence") {
-      const cards = appraisal ? appraisal.comparables.map(comp => `<div class="comparable">${image(comp.imageUrl, comp.name)}<h3>${escape(comp.name)}</h3><small>${comp.status === "sold" ? "Sold" : comp.status === "for_sale" ? "For sale · asking price" : "Rental listing"}</small><p>${[fact(comp.bedrooms, "bedroom"), fact(comp.bathrooms, "bathroom")].filter(Boolean).join(" · ")}</p><p>${comp.price !== null ? appraisalMoney(comp.price, comp.status === "rental") : escape(comp.priceDisplay || "Price not disclosed")}${comp.status === "rental" && comp.price !== null ? ` / ${period}` : ""}</p>${comp.status === "sold" && comp.soldDate ? `<small>Sold ${escape(dateLabel(comp.soldDate))}</small>` : ""}</div>`) : comparablesByEstimate(data).map(comp => `<div class="comparable">${image(comp.imageUrl, comp.name)}<h3>${escape(comp.name)}</h3><p>${money(comp.annualRevenue)} / year</p><small>Estimated gross STR revenue</small></div>`);
+      const cards = appraisal ? appraisal.comparables.map(comp => `<div class="comparable">${image(comp.imageUrl, comp.name)}<h3>${escape(comp.name)}</h3><small>${comp.status === "sold" ? "Sold" : comp.status === "for_sale" ? "For sale · asking price" : "Rental listing"}</small><p>${[fact(comp.bedrooms, "bedroom"), fact(comp.bathrooms, "bathroom")].filter(Boolean).join(" · ")}</p><p>${comp.price !== null ? appraisalMoney(comp.price, comp.status === "rental") : escape(comp.priceDisplay || "Price not disclosed")}${comp.status === "rental" && comp.price !== null ? ` / ${period}` : ""}</p>${comp.status === "sold" && comp.soldDate ? `<small>Sold ${escape(dateLabel(comp.soldDate))}</small>` : ""}</div>`) : comparablesByEstimate(data).map(comp => {
+        const distance = formatDistanceMeters(comp.distanceM);
+        const context = [fact(comp.bedrooms, "bedroom"), distance ? `${distance} away` : ""].filter(Boolean).join(" · ");
+        return `<div class="comparable">${image(comp.imageUrl, comp.name)}<h3>${escape(comp.name)}</h3>${context ? `<p class="note">${escape(context)}</p>` : ""}<p>${money(comp.annualRevenue)} / year</p><small>Estimated gross STR revenue</small></div>`;
+      });
       // Explicit batches keep each continuation branded instead of relying on an unheaded browser page break.
       const batches = Array.from({ length: Math.max(1, Math.ceil(cards.length / 4)) }, (_, index) => cards.slice(index * 4, index * 4 + 4));
       return batches.map((batch, index) => printPage(`<h1>${text(page.title)}${index ? ' <span class="continuation">(continued)</span>' : ""}</h1>${index === 0 && appraisal?.evidenceNote ? `<p class="note">${escape(appraisal.evidenceNote)}</p>` : ""}<div class="comparables">${batch.join("")}</div>${index === batches.length - 1 && page.body ? `<p class="body">${text(page.body)}</p>` : ""}`));
@@ -54,10 +63,17 @@ export function proposalPrintHtml(snapshot: ProposalSnapshot) {
     }
     if (page.body) content += `<p class="body">${text(page.body)}</p>`;
     if (page.kind === "next_steps") {
-      content += data.agents?.length ? `<h3>${data.agents.length === 1 ? "Your contact" : "Your contacts"}</h3><div class="contacts">${data.agents.map(agent => `<div class="contact">${portrait(agent.photoUrl, agent.name)}<div><strong>${escape(agent.name)}</strong>${agent.role ? `<p>${escape(agent.role)}</p>` : ""}${agent.phone ? `<p>${escape(agent.phone)}</p>` : ""}${agent.email ? `<p>${escape(agent.email)}</p>` : ""}</div></div>`).join("")}</div>` : "";
+      const agentContactAvailable = hasAgentContact(data.agents);
+      const agencyContacts = agentContactAvailable ? [] : agencyContactActions(data.agency);
+      content += data.agents?.length ? `<h3>${data.agents.length === 1 ? "Your contact" : "Your contacts"}</h3><div class="contacts">${data.agents.map(agent => `<div class="contact">${portrait(agent.photoUrl, agent.name)}<div><strong>${escape(agent.name)}</strong>${agent.role ? `<p>${escape(agent.role)}</p>` : ""}${contactLinks(contactActions(agent))}</div></div>`).join("")}</div>` : "";
+      if (agencyContacts.length) content += `<h3>Contact ${escape(data.agency.name)}</h3>${contactLinks(agencyContacts)}`;
       content += snapshot.attachments.length ? `<h3>Documents</h3><ul>${snapshot.attachments.map(item => `<li>${escape(item.name)}</li>`).join("")}</ul><p class="note">Open your digital proposal to download these documents.</p>` : "";
       content += draft.links.map(link => `<p><a href="${escape(link.url)}">${escape(link.label)}</a></p>`).join("");
-      if (!page.body && !draft.links.length && !snapshot.attachments.length && !data.agents?.length) content += `<p>Contact ${escape(data.agency.name)} to discuss the next steps for your property.</p>`;
+      if (!page.body && !draft.links.length && !snapshot.attachments.length && !agentContactAvailable && !agencyContacts.length) content += `<p>Contact ${escape(data.agency.name)} to discuss the next steps for your property.</p>`;
+    }
+    if (page.kind === "hero" && propertyPhotos.length) {
+      const batches = Array.from({ length: Math.ceil(propertyPhotos.length / 6) }, (_, index) => propertyPhotos.slice(index * 6, index * 6 + 6));
+      return [printPage(content), ...batches.map((batch, index) => printPage(`<h1>Property photos${index ? ' <span class="continuation">(continued)</span>' : ""}</h1><p class="note">${escape(data.property.address)}${locality ? `, ${escape(locality)}` : ""}</p><div class="comparables">${batch.map((url, offset) => `<div class="comparable">${image(url, `${data.property.address} - property photo ${index * 6 + offset + 1}`)}</div>`).join("")}</div>`))];
     }
     return printPage(content);
   });

@@ -49,6 +49,6 @@ export function NewStrAppraisalFlow({ initialListing, initialRecipient = general
     <Link href={back} className="inline-flex min-h-11 items-center gap-2 text-sm"><ArrowLeft className="size-4" aria-hidden="true" />{appraisalKindLabels[product]} appraisals</Link>
     <header><h1 className="font-display text-3xl">Create {appraisalKindLabels[product].toLowerCase()} appraisal</h1><p className="mt-3 text-base-content/65">Choose your property, then review the evidence and prepare your proposal.</p></header>
     <fieldset disabled={creating} className="min-w-0"><ClientPicker value={recipient} onChange={setRecipient} errors={clientErrors} initiallyOpen={initialRecipient.mode === "named" && !initialRecipient.name} /></fieldset>
-    <PropertyStartFlow busy={creating} initialListing={initialListing} storageKey={storageKey} continueLabel="Create appraisal" onContinue={create} />
+    <PropertyStartFlow busy={creating} initialListing={initialListing} storageKey={storageKey} enforcePhotoMinimum continueLabel="Create appraisal" onContinue={create} />
   </div>;
 }

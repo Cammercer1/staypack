@@ -1,6 +1,7 @@
 import { AgentAvatar } from "@/components/settings/AgentAvatar";
 import { Mail, Phone } from "lucide-react";
 import type { ProposalAgent } from "@/lib/digital-proposals/data";
+import { contactActions } from "@/lib/digital-proposals/contacts";
 
 export function ProposalAgentContacts({ agents }: { agents: ProposalAgent[] }) {
   if (!agents.length) return null;
@@ -10,9 +11,8 @@ export function ProposalAgentContacts({ agents }: { agents: ProposalAgent[] }) {
       {agents.map((agent, index) => <li key={index} className="flex min-w-0 max-w-full items-center gap-3">
         <AgentAvatar name={agent.name} src={agent.photoUrl} className="size-9 bg-(--proposal-surface) text-xs text-(--proposal-text) ring-0" />
         <span className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">{agent.name}</span>
-        {(agent.phone || agent.email) && <div className="flex shrink-0">
-          {agent.email && <a href={`mailto:${encodeURIComponent(agent.email)}`} aria-label={`Email ${agent.name}`} title={agent.email} className={contactLink}><Mail size={16} aria-hidden="true" /></a>}
-          {agent.phone && <a href={`tel:${agent.phone.replace(/[^+\d]/g, "")}`} aria-label={`Call ${agent.name}`} title={agent.phone} className={contactLink}><Phone size={16} aria-hidden="true" /></a>}
+        {contactActions(agent).length > 0 && <div className="flex shrink-0">
+          {contactActions(agent).map(action => <a key={action.href} href={action.href} aria-label={action.label} title={action.value} className={contactLink}>{action.href.startsWith("mailto:") ? <Mail size={16} aria-hidden="true" /> : <Phone size={16} aria-hidden="true" />}</a>)}
         </div>}
       </li>)}
     </ul>

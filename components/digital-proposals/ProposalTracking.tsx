@@ -6,7 +6,7 @@ const noTracking: Track = () => {};
 const Tracking = createContext<Track>(noTracking);
 export const useProposalTracking = () => useContext(Tracking);
 /** Present only on public links. No fingerprinting, contact data or cross-site identifiers. */
-export function ProposalTracking({ token, children }: { token: string; children: ReactNode }) {
+export function ProposalTracking({ token, versionId, children }: { token: string; versionId: string; children: ReactNode }) {
   const sent = useRef(new Set<string>());
   const session = useRef<string | null>(null);
   const lastSeen = useRef(0);
@@ -22,12 +22,12 @@ export function ProposalTracking({ token, children }: { token: string; children:
     } catch { if (!session.current || now - lastSeen.current >= 30 * 60_000) session.current = crypto.randomUUID(); }
     lastSeen.current = now;
     if (session.current !== previousSession) sent.current.clear();
-    const key = `${kind}:${target}`;
+    const key = `${token}:${versionId}:${kind}:${target}`;
     if (sent.current.has(key)) return;
-    const event: ProposalEvent = { id: crypto.randomUUID(), session: session.current!, kind, target };
+    const event: ProposalEvent = { id: crypto.randomUUID(), session: session.current!, versionId, kind, target };
     sent.current.add(key);
     void fetch(`/api/proposals/${token}/events`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(event), keepalive: true }).then(response => { if (!response.ok) sent.current.delete(key); }).catch(() => sent.current.delete(key));
-  }, [token]);
+  }, [token, versionId]);
   return <Tracking.Provider value={track}>{children}</Tracking.Provider>;
 }
 

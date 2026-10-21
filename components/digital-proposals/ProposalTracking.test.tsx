@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, expect, it, vi } from "vitest";
 import { useRef } from "react";
 import { ProposalTracking, useProposalPageTracking, useProposalTracking } from "./ProposalTracking";
+const versionId = "00000000-0000-4000-8000-000000000001";
 
 afterEach(() => { cleanup(); sessionStorage.clear(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 function Action() {
@@ -19,7 +20,7 @@ it("deduplicates a visit, then records a new visit after inactivity", async () =
   const request = vi.fn().mockResolvedValue({ ok: true });
   vi.stubGlobal("fetch", request);
   Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
-  render(<ProposalTracking token="test-link"><TrackedPage pageId="intro" /></ProposalTracking>);
+  render(<ProposalTracking token="test-link" versionId={versionId}><TrackedPage pageId="intro" /></ProposalTracking>);
   await act(() => vi.advanceTimersByTimeAsync(700));
   fireEvent.click(screen.getByText("Agreement"));
   fireEvent.click(screen.getByText("Agreement"));
@@ -38,13 +39,13 @@ it("tracks client-side page changes once and observes comparables only on the di
   vi.stubGlobal("IntersectionObserver", class { observe = observe; disconnect = disconnect; });
   vi.stubGlobal("fetch", request);
   Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
-  const view = render(<ProposalTracking token="test-link"><TrackedPage pageId="intro" /></ProposalTracking>);
+  const view = render(<ProposalTracking token="test-link" versionId={versionId}><TrackedPage pageId="intro" /></ProposalTracking>);
   await act(() => vi.advanceTimersByTimeAsync(700));
   expect(observe).not.toHaveBeenCalled();
-  view.rerender(<ProposalTracking token="test-link"><TrackedPage pageId="evidence" /></ProposalTracking>);
+  view.rerender(<ProposalTracking token="test-link" versionId={versionId}><TrackedPage pageId="evidence" /></ProposalTracking>);
   await act(() => vi.advanceTimersByTimeAsync(700));
   expect(observe).toHaveBeenCalledExactlyOnceWith(screen.getByText("Comparable"));
-  view.rerender(<ProposalTracking token="test-link"><TrackedPage pageId="intro" /></ProposalTracking>);
+  view.rerender(<ProposalTracking token="test-link" versionId={versionId}><TrackedPage pageId="intro" /></ProposalTracking>);
   await act(() => vi.advanceTimersByTimeAsync(700));
   const events = request.mock.calls.map(([, options]) => JSON.parse(options.body));
   expect(events.map(event => [event.kind, event.target])).toEqual([["open", "proposal"], ["page", "intro"], ["page", "evidence"]]);
@@ -62,9 +63,9 @@ it("observes comparable cards that mount after a lazy section loads without reco
   const request = vi.fn().mockResolvedValue({ ok: true }); vi.stubGlobal("fetch", request);
   const observe = vi.fn();
   vi.stubGlobal("IntersectionObserver", class { observe = observe; disconnect() {} });
-  const view = render(<ProposalTracking token="lazy-link"><TrackedPage pageId="evidence" ready={false} /></ProposalTracking>);
+  const view = render(<ProposalTracking token="lazy-link" versionId={versionId}><TrackedPage pageId="evidence" ready={false} /></ProposalTracking>);
   expect(observe).not.toHaveBeenCalled(); expect(request).not.toHaveBeenCalled();
-  await act(async () => view.rerender(<ProposalTracking token="lazy-link"><TrackedPage pageId="evidence" /></ProposalTracking>));
+  await act(async () => view.rerender(<ProposalTracking token="lazy-link" versionId={versionId}><TrackedPage pageId="evidence" /></ProposalTracking>));
   expect(observe).toHaveBeenCalledExactlyOnceWith(screen.getByText("Comparable"));
   expect(request).not.toHaveBeenCalled(); // Only visibility or actual viewing should produce events.
 });
@@ -84,14 +85,32 @@ it("never observes or records comparables in prepared hidden pages", async () =>
     return <div ref={root}><div data-proposal-page="property" aria-hidden={current !== "property" || undefined}>Cover</div>
       <div data-proposal-page="evidence" aria-hidden={current !== "evidence" || undefined}><div data-proposal-comparable="0">Prepared comparable</div></div></div>;
   }
-  const view = render(<ProposalTracking token="prepared-link"><Pages current="property" /></ProposalTracking>);
+  const view = render(<ProposalTracking token="prepared-link" versionId={versionId}><Pages current="property" /></ProposalTracking>);
   await act(() => vi.advanceTimersByTimeAsync(700));
   expect(observe).not.toHaveBeenCalled();
   const card = screen.getByText("Prepared comparable");
   act(() => intersect([{ isIntersecting: true, target: card }]));
   expect(request.mock.calls.map(([, options]) => JSON.parse(options.body).kind)).toEqual(["open", "page"]);
-  view.rerender(<ProposalTracking token="prepared-link"><Pages current="evidence" /></ProposalTracking>);
+  view.rerender(<ProposalTracking token="prepared-link" versionId={versionId}><Pages current="evidence" /></ProposalTracking>);
   expect(observe).toHaveBeenCalledExactlyOnceWith(card);
   act(() => intersect([{ isIntersecting: true, target: card }]));
   expect(JSON.parse(request.mock.calls.at(-1)![1].body)).toMatchObject({ kind: "comparable", target: "0" });
+});
+
+it("pins every event to the displayed version and deduplicates separately after the same link updates", async () => {
+  vi.useFakeTimers();
+  const request = vi.fn().mockResolvedValue({ ok: true });
+  vi.stubGlobal("fetch", request);
+  Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+  const view = render(<ProposalTracking token="stable-link" versionId={versionId}><TrackedPage pageId="intro" /></ProposalTracking>);
+  await act(() => vi.advanceTimersByTimeAsync(700));
+  fireEvent.click(screen.getByText("Agreement"));
+  const nextVersion = "00000000-0000-4000-8000-000000000002";
+  view.rerender(<ProposalTracking token="stable-link" versionId={nextVersion}><TrackedPage pageId="intro" /></ProposalTracking>);
+  await act(() => vi.advanceTimersByTimeAsync(700));
+  fireEvent.click(screen.getByText("Agreement"));
+  fireEvent.click(screen.getByText("Agreement"));
+  const events = request.mock.calls.map(([, options]) => JSON.parse(options.body));
+  expect(events.map(event => event.versionId)).toEqual([versionId, versionId, versionId, nextVersion, nextVersion, nextVersion]);
+  expect(new Set(events.map(event => event.session)).size).toBe(1);
 });

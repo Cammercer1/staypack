@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useImperativeHandle, type Ref, type ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
@@ -13,7 +13,7 @@ vi.mock("@/components/digital-proposals/ProposalWorkflow", () => ({
     return <>{customerPanel}<button onClick={() => onBusyChange(true)}>Begin publishing</button><button onClick={() => onBusyChange(false)}>Finish publishing</button></>;
   },
 }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 it("disables STR customer controls throughout sharing, then enables them again", async () => {
   const fixture = createLintRegressionFixtures();
@@ -24,4 +24,16 @@ it("disables STR customer controls throughout sharing, then enables them again",
   await waitFor(() => expect(customer.matches(":disabled")).toBe(true));
   fireEvent.click(screen.getByRole("button", { name: "Finish publishing" }));
   expect(customer.matches(":disabled")).toBe(false);
+});
+
+it("places client details in the final step and removes the duplicate property shortcut", async () => {
+  vi.stubGlobal("scrollTo", vi.fn());
+  const fixture = createLintRegressionFixtures();
+  render(<ReportWizard initialListing={fixture.listing} initialReport={fixture.report} agency={fixture.agency} digitalProposal customerPanel={<button>Edit customer</button>} />);
+  const customer = await screen.findByRole("button", { name: "Edit customer" });
+  expect(customer.closest('[role="tabpanel"]')?.getAttribute("aria-labelledby")).toBe(screen.getByRole("tab", { name: "Get link or PDF" }).id);
+  expect(screen.queryByRole("button", { name: "Edit property details" })).toBeNull();
+  await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "Check proposal" })); });
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Check proposal" }).getAttribute("aria-selected")).toBe("true"));
+  expect(screen.queryByRole("button", { name: "Edit customer" })).toBeNull();
 });

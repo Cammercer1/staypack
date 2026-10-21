@@ -57,6 +57,8 @@ async function responseJson(response: Response) {
 type NewListingFlowProps = {
   agencyAgents?: AgentProfile[];
   storageKey?: string;
+  initialQuery?: string;
+  onQueryChange?: (query: string) => void;
   onSaved?: (listingId: string) => void | Promise<void>;
   includeAgents?: boolean;
 };
@@ -67,15 +69,18 @@ export function NewListingFlow(props: NewListingFlowProps) {
 function CountryListingFlow({
   agencyAgents = [],
   storageKey: storageKeyPrefix = "staypacks:new-listing",
+  initialQuery = "",
+  onQueryChange,
   onSaved,
   includeAgents = true,
   country,
 }: NewListingFlowProps & { country: "AU" | "US" }) {
   const router = useRouter();
   const storageKey = `${storageKeyPrefix}:${country}`;
+  const [incomingQuery] = useState(() => initialQuery.trim());
   const [step, setStep] = useState<"find" | "review">("find");
   const [mode, setMode] = useState<"address" | "url">("address");
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(incomingQuery);
   const [url, setUrl] = useState("");
   const [draft, setDraft] = useState<Listing | null>(null);
   const [agents, setAgents] = useState<ListingAgentDraft[]>([]);
@@ -105,14 +110,17 @@ function CountryListingFlow({
     try {
       const saved = restoreNewListingDraft(sessionStorage.getItem(storageKey));
       if (saved) {
+        const newSearch = Boolean(incomingQuery && (incomingQuery !== saved.query || saved.mode !== "address"));
+        const restoredQuery = incomingQuery || saved.query;
         /* eslint-disable react-hooks/set-state-in-effect */
-        setStep(saved.draft ? saved.step : "find");
-        setMode(saved.mode);
-        setQuery(saved.query);
+        setStep(newSearch ? "find" : saved.draft ? saved.step : "find");
+        setMode(newSearch ? "address" : saved.mode);
+        setQuery(restoredQuery);
+        onQueryChange?.(restoredQuery);
         setUrl(saved.url);
         setDraft(saved.draft);
         setAgents(includeAgents ? saved.agents : []);
-        setRestored(true);
+        setRestored(!newSearch);
         reset(saved.values);
       }
     } catch {
@@ -121,7 +129,7 @@ function CountryListingFlow({
     setReady(true);
     /* eslint-enable react-hooks/set-state-in-effect */
     return () => pending.current?.abort();
-  }, [storageKey, reset, includeAgents]);
+  }, [storageKey, reset, includeAgents, incomingQuery, onQueryChange]);
 
   useEffect(() => {
     if (!ready || completed.current) return;
@@ -452,6 +460,7 @@ function CountryListingFlow({
                   }}
                   onChange={(address) => {
                     setQuery(address);
+                    onQueryChange?.(address);
                     setCandidates([]);
                     setDuplicate(null);
                     setMessage(null);

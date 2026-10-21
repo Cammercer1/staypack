@@ -11,10 +11,11 @@ import { getMasterPhotoCount } from "@/lib/listings/collateralPhotoRequirements"
 import type { Listing } from "@/lib/types";
 
 type PropertyOption = Pick<Listing, "id" | "property_address" | "suburb" | "hero_image_url">;
-export function PropertyStartFlow({ initialListing, storageKey, minimumPhotos = 5, continueLabel, busy = false, onContinue }: {
+export function PropertyStartFlow({ initialListing, storageKey, minimumPhotos = 5, enforcePhotoMinimum = false, continueLabel, busy = false, onContinue }: {
   initialListing: Listing | null;
   storageKey: string;
   minimumPhotos?: number;
+  enforcePhotoMinimum?: boolean;
   continueLabel: string | ((listing: Listing) => string);
   busy?: boolean;
   onContinue: (listing: Listing) => Promise<void>;
@@ -51,7 +52,7 @@ export function PropertyStartFlow({ initialListing, storageKey, minimumPhotos = 
     finally { pending.current = false; setLoading(false); }
   }
   async function proceed() {
-    if (!listing || disabled || dirty || pending.current) return;
+    if (!listing || disabled || dirty || pending.current || (enforcePhotoMinimum && getMasterPhotoCount(listing) < minimumPhotos)) return;
     pending.current = true; setLoading(true); setError("");
     try { await onContinue(listing); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to continue. Try again."); }
@@ -63,19 +64,20 @@ export function PropertyStartFlow({ initialListing, storageKey, minimumPhotos = 
     {!listing ? <>
       <h2 className="font-display text-2xl">Which property?</h2>
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={disabled} aria-pressed={mode === "existing"} onClick={() => changeMode("existing")} className={mode === "existing" ? "du-btn du-btn-sm min-h-11 du-btn-primary" : "du-btn du-btn-sm min-h-11"}>Existing property</button>
+        <button type="button" disabled={disabled} aria-pressed={mode === "existing"} onClick={() => changeMode("existing")} className={mode === "existing" ? "du-btn du-btn-sm min-h-11 du-btn-primary" : "du-btn du-btn-sm min-h-11"}>Saved properties</button>
         <button type="button" disabled={disabled} aria-pressed={mode === "import"} onClick={() => changeMode("import")} className={mode === "import" ? "du-btn du-btn-sm min-h-11 du-btn-primary" : "du-btn du-btn-sm min-h-11"}>Import or add property</button>
       </div>
-      {mode === "import" ? <NewListingFlow storageKey={storageKey} includeAgents={false} onSaved={select} /> : <section aria-label="Choose a property" className="space-y-4">
-        <label htmlFor={searchId} className="block text-sm font-medium">Search property address</label>
-        <div className="du-input du-input-sm min-h-12 w-full"><Search className="size-4" aria-hidden="true" /><input aria-label="Search property address" id={searchId} type="search" value={search} maxLength={160} onChange={event => setSearch(event.target.value)} placeholder="Search your properties" /></div>
+      {mode === "import" ? <NewListingFlow storageKey={storageKey} includeAgents={false} initialQuery={search} onQueryChange={setSearch} onSaved={select} /> : <section aria-label="Choose a property" className="space-y-4">
+        <label htmlFor={searchId} className="block text-sm font-medium">Search saved properties</label>
+        <label className="du-input du-input-sm min-h-12 w-full"><Search className="size-4" aria-hidden="true" /><input aria-label="Search saved properties" aria-describedby={`${searchId}-hint`} id={searchId} type="search" value={search} maxLength={160} onChange={event => setSearch(event.target.value)} placeholder="Search by address" /></label>
+        <p id={`${searchId}-hint`} className="text-sm text-base-content/65">Searches your agency’s property library. To find a new address, choose Import or add property.</p>
         {options.error ? <p role="alert" className="text-error">{options.error}</p> : options.loading ? <p role="status">Loading properties…</p> : options.data.length ? <ul className="divide-y divide-base-300 border-y border-base-300">
           {options.data.map(property => <li key={property.id}><button type="button" disabled={disabled} onClick={() => void select(property.id)} className="flex min-h-24 w-full items-center gap-4 rounded-lg py-4 text-left hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-primary">
             <ListingThumbnail src={property.hero_image_url} address={property.property_address || "Property"} className="size-16 shrink-0" />
             <span className="min-w-0 flex-1"><span className="block font-medium">{property.property_address || "Untitled property"}</span><span className="text-sm text-base-content/65">{property.suburb}</span></span>
             <ArrowRight className="mr-2 size-4 shrink-0" aria-hidden="true" />
           </button></li>)}
-        </ul> : <div className="space-y-3 rounded-xl border border-dashed border-base-300 p-6"><p>No properties found.</p><button type="button" className="du-btn du-btn-sm min-h-11" onClick={() => changeMode("import")}>Import or add property</button></div>}
+        </ul> : <div className="space-y-3 rounded-xl border border-dashed border-base-300 p-6"><p>{search.trim() ? `No saved properties match “${search.trim()}”.` : "No saved properties yet."}</p><button type="button" className="du-btn du-btn-sm min-h-11" onClick={() => changeMode("import")}>Import or add property</button></div>}
       </section>}
     </> : <>
       <fieldset disabled={disabled} className="min-w-0 space-y-4">
@@ -87,7 +89,7 @@ export function PropertyStartFlow({ initialListing, storageKey, minimumPhotos = 
         {photoCount < minimumPhotos && <p role="status" className="du-alert">Add and save at least {minimumPhotos} property photo{minimumPhotos === 1 ? "" : "s"} below before preparing a new document.</p>}
         {(editing || photoCount < minimumPhotos) && <PropertySetup key={listing.id} listing={listing} onUpdated={setListing} onDirtyChange={setDirty} />}
       </fieldset>
-      <button type="button" disabled={disabled || dirty} className="du-btn du-btn-sm du-btn-primary min-h-12" onClick={() => void proceed()}>{disabled ? "Opening…" : typeof continueLabel === "function" ? continueLabel(listing) : continueLabel}<ArrowRight className="size-4" aria-hidden="true" /></button>
+      <button type="button" disabled={disabled || dirty || (enforcePhotoMinimum && photoCount < minimumPhotos)} className="du-btn du-btn-sm du-btn-primary min-h-12" onClick={() => void proceed()}>{disabled ? "Opening…" : typeof continueLabel === "function" ? continueLabel(listing) : continueLabel}<ArrowRight className="size-4" aria-hidden="true" /></button>
     </>}
   </div>;
 }

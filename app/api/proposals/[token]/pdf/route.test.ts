@@ -32,3 +32,20 @@ it("checks fresh access and PDF readiness before reading the frozen filename", a
   expect(mocks.snapshot).not.toHaveBeenCalled();
   expect(mocks.download).not.toHaveBeenCalled();
 });
+
+it("authorizes a version-pinned PDF before downloading its stored snapshot", async () => {
+  mocks.snapshot.mockResolvedValue({ data: {} });
+  const versionId = "00000000-0000-4000-8000-000000000001";
+  const response = await GET(new Request(`https://staypack.app/api/proposals/token/pdf?version=${versionId}`), { params: Promise.resolve({ token: "token" }) });
+  expect(response.status).toBe(200);
+  expect(mocks.access).toHaveBeenCalledWith("token", versionId);
+  expect(mocks.download).toHaveBeenCalledWith("saved.pdf");
+});
+
+it("does not download a version unavailable through the link", async () => {
+  mocks.access.mockRejectedValue(Object.assign(new Error("Proposal not available."), { status: 404 }));
+  const response = await GET(new Request("https://staypack.app/api/proposals/token/pdf?version=unavailable"), { params: Promise.resolve({ token: "token" }) });
+  expect(response.status).toBe(404);
+  expect(mocks.download).not.toHaveBeenCalled();
+  expect(mocks.snapshot).not.toHaveBeenCalled();
+});

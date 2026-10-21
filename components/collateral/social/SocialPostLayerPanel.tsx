@@ -558,7 +558,7 @@ export function SocialPostLayerPanel({
                 }
               />
               {layers.title.text.trim() ? null : (
-                <p className="text-xs text-error-content">
+                <p className="text-xs text-error">
                   Add text — the headline won&apos;t appear on the post while
                   it&apos;s empty.
                 </p>
@@ -645,7 +645,7 @@ export function SocialPostLayerPanel({
                 }
               />
               {layers.subcopy.text.trim() ? null : (
-                <p className="text-xs text-error-content">
+                <p className="text-xs text-error">
                   Add text — the supporting line won&apos;t appear on the post
                   while it&apos;s empty.
                 </p>

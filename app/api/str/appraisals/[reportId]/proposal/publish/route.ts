@@ -9,12 +9,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ rep
   try {
     const context = await proposalContext((await params).reportId, request);
     const body = z.object({ revision: z.number().int().positive(), sourceFingerprint: z.string().length(64) }).strict().parse(await proposalRequest(request));
-    const version = await publishProposal(context, body.revision, body.sourceFingerprint);
+    const result = await publishProposal(context, body.revision, body.sourceFingerprint);
     // Fill the server cache before the first recipient visits. Never record viewer events here.
     after(async () => {
-      try { await publishedProposal(version.path.split("/").pop()!); }
+      try { await publishedProposal(result.shareLink.path.split("/").pop()!, result.version.id); }
       catch { console.warn("Proposal cache warm-up deferred to first visit"); }
     });
-    return privateJson({ version });
+    return privateJson(result);
   } catch (error) { return proposalApiError(error); }
 }

@@ -21,7 +21,7 @@ it("keeps brand pages selectable and reorderable without page text or add contro
   expect(screen.getAllByRole("checkbox")[2].getAttribute("aria-label")).toBe("Include Comparable listings");
   fireEvent.click(screen.getByLabelText("Include Comparable listings"));
   expect((screen.getByLabelText("Include Comparable listings") as HTMLInputElement).checked).toBe(false);
-  expect((screen.getByLabelText("Include Our management service") as HTMLInputElement).disabled).toBe(true);
+  expect(screen.queryByLabelText("Include Our management service")).toBeNull();
 });
 it("attaches multiple agents from the chooser and makes room when an agent is removed", async () => {
   render(<Editor />);
