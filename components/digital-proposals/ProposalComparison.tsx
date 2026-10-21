@@ -27,7 +27,7 @@ export function ProposalComparison({ data, brand, draft }: ProposalTemplateProps
       </div>
     </div>
     {mode === "yield" && !hasValue ? <p role="status" className="my-8 rounded-(--proposal-radius) bg-(--proposal-surface) p-5">Add an estimated property value to compare gross yields.</p> : <>
-      <dl className="mt-5 grid @min-[600px]/proposal:grid-cols-3 @min-[600px]/proposal:gap-6" aria-label="Rental comparison figures">
+      <dl className={cn("mt-5 grid @min-[600px]/proposal:gap-6", rows.length === 2 ? "@min-[600px]/proposal:grid-cols-2" : "@min-[600px]/proposal:grid-cols-3")} aria-label="Rental comparison figures">
         {rows.map(row => <div key={row.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 border-t border-current/15 py-3 @min-[600px]/proposal:block @min-[600px]/proposal:py-4" data-testid={`scenario-${row.id}`}>
           <dt className="text-sm font-medium leading-snug">{row.label}</dt>
           <dd className={cn("text-right font-[family-name:var(--proposal-heading)] tabular-nums tracking-tight @min-[600px]/proposal:mt-2 @min-[600px]/proposal:text-left", row.value === null ? "text-sm text-(--proposal-muted)" : "text-2xl @min-[600px]/proposal:text-4xl")}>{row.value === null ? "Not available" : mode === "yield" ? `${row.value.toFixed(1)}%` : formatCurrency(row.value, data.market?.currency)}</dd>

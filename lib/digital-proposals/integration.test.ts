@@ -63,3 +63,22 @@ it("prints the forecast once, after appraisal, with occupancy dates and frozen e
   expect(sections[3]).toContain("83%");
   expect(html.match(/Monthly revenue estimates/g)).toHaveLength(1);
 });
+
+it("omits missing LTR figures and keeps printed monthly columns aligned", () => {
+  const data = createProposalFixture();
+  data.ltr = { weeklyRent: null, annualRent: null };
+  const html = proposalPrintHtml({ ...snapshot, data });
+  const comparison = html.split('<section class="page">')[2];
+  expect(comparison).not.toContain("Long-term rental");
+  expect(comparison).toContain("$98,500");
+  expect(comparison).toContain("$113,275");
+  expect(comparison.match(/<strong>/g)).toHaveLength(2);
+  const monthlyTable = html.match(/<h3>Monthly revenue estimates<\/h3>(<table>.*?<\/table>)/)![1];
+  expect(monthlyTable.match(/<th>/g)).toHaveLength(3);
+  const monthRows = monthlyTable.match(/<tbody>(.*?)<\/tbody>/)![1].match(/<tr>.*?<\/tr>/g)!;
+  expect(monthRows).toHaveLength(12);
+  for (const row of monthRows) {
+    expect(row.match(/<td>/g)).toHaveLength(3);
+    expect(row).not.toContain("Not available");
+  }
+});

@@ -25,7 +25,7 @@ export function comparisonRows(data: ProposalData, mode: ComparisonMode) {
     { id: "ltr", label: "Long-term rental", annual: data.ltr.annualRent },
     { id: "market", label: "Market short-term rental", annual: data.str.market.annualRevenue },
     { id: "managed", label: managedScenarioLabel(data), annual: data.str.managed.annualRevenue },
-  ] as const).map(row => ({ ...row, value: row.annual === null ? null
+  ] as const).filter(row => row.id !== "ltr" || row.annual !== null).map(row => ({ ...row, value: row.annual === null ? null
     : mode === "yield" ? value !== null && value > 0 ? row.annual / value * 100 : null
     : mode === "monthly" ? row.annual / 12 : row.annual }));
 }

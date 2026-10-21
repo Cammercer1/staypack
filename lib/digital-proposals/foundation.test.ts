@@ -56,6 +56,13 @@ describe("digital proposal data", () => {
     expect(comparisonRows(data, "annual")[0].value).toBe(0);
     expect(comparisonRows(data, "yield")[0].value).toBeNull();
   });
+  it.each(["annual", "monthly", "yield"] as const)("omits a missing LTR estimate from the %s comparison without changing the saved data", mode => {
+    const data = createProposalFixture();
+    data.ltr = { weeklyRent: null, annualRent: null };
+    const before = structuredClone(data);
+    expect(comparisonRows(data, mode).map(row => row.id)).toEqual(["market", "managed"]);
+    expect(data).toEqual(before);
+  });
   it("strips private fields and rejects unsafe media URLs", () => {
     const data = proposalDataSchema.parse({ ...createProposalFixture(), recipient: { displayName: "Jordan", email: "private@example.test", phone: "123" }, privateNotes: "secret" });
     expect(JSON.stringify(data)).not.toMatch(/private|phone|email/);
