@@ -119,7 +119,8 @@ export async function publishProposal(context: Context, revision: number, source
   });
   let snapshot: typeof sourceSnapshot;
   try { snapshot = await preserveProposalImages(sourceSnapshot, context.agency.id); }
-  catch {
+  catch (error) {
+    console.warn("Proposal image preservation failed", error instanceof Error ? error.message : "Storage request failed");
     // Do not publish a new link with images that still depend on an external host.
     throw new ProposalError("We couldn't save a permanent copy of every proposal image. Check that the photos and logos still load, then try publishing again. Your existing links are unchanged.", 503);
   }
