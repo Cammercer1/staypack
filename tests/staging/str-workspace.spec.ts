@@ -9,6 +9,7 @@ import { createLintRegressionFixtures } from "../../components/dev/lintRegressio
 test("release: desktop/mobile STR navigation, appraisal, saved proposal and public sharing", async ({ page, context, browser, baseURL }, testInfo) => {
   test.skip(process.env.STR_LIVE_TEST !== "1", "Requires explicit live integration opt-in and backend credentials.");
   test.setTimeout(240_000);
+  page.setDefaultTimeout(15_000);
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   const agencyId = randomUUID(), listingId = randomUUID();
   const address = "12 Release QA Esplanade, Byron Bay NSW 2481";
@@ -69,20 +70,22 @@ test("release: desktop/mobile STR navigation, appraisal, saved proposal and publ
     await page.getByRole("button", { name: "Continue to proposal", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Your proposal", exact: true })).toBeVisible();
     expect(check(await admin.from("reports").select("final_estimate_json").eq("id", reportId).single()).final_estimate_json.annualRevenue).toBe(109500);
-    await page.getByLabel("Heading", { exact: true }).fill("Release verification proposal");
+    await page.getByRole("checkbox", { name: "Include Yearly forecast", exact: true }).uncheck();
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Continue to customer & share", exact: true }).click();
-    await page.getByRole("button", { name: "Add customer", exact: true }).click();
-    await page.getByLabel("Customer name", { exact: true }).fill("Jordan Release QA");
-    await page.getByRole("button", { name: "Save customer details", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Prepared for Jordan Release QA", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Add contact", exact: true }).click();
+    const contactDialog = page.getByRole("dialog", { name: "Add contact", exact: true });
+    await contactDialog.getByRole("button", { name: "Add new contact", exact: true }).click();
+    await contactDialog.getByLabel("Contact name", { exact: true }).fill("Jordan Release QA");
+    await contactDialog.getByRole("button", { name: "Save contact details", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Contact · Prepared for", exact: true }).getByText("Jordan Release QA", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Publish proposal", exact: true }).click();
     await expect(page.getByText("PDF generation skipped by release verification.", { exact: true })).toBeVisible({ timeout: 45_000 });
     const response = await context.request.get(`/api/str/appraisals/${reportId}/proposal`);
     expect(response.status()).toBe(200);
     const workspace = await response.json();
-    expect(workspace.draft.content.title).toBe("Release verification proposal");
+    expect(workspace.draft.pages.find((item: { id: string }) => item.id === "forecast").enabled).toBe(false);
     const publicPage = await visitor.newPage();
     publicPage.on("pageerror", error => errors.push(error.message));
     expect((await publicPage.goto(`${baseURL}${workspace.versions[0].path}`))?.status()).toBe(200);
