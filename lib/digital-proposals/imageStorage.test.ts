@@ -90,3 +90,11 @@ it("aborts a stalled image fetch at the publication deadline", async () => {
   await expect(preserveProposalImages({ heroImageUrl: "https://source.test/stalled" }, scope, { timeoutMs: 10 })).rejects.toThrow("timed out");
   expect(mocks.send).not.toHaveBeenCalled();
 });
+
+it("keeps raster bytes intact when embedded metadata contains SVG text", async () => {
+  const raster = Buffer.concat([bytes, Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><image href="https://metadata.test/preview"/></svg>')]);
+  mocks.fetch.mockResolvedValue({ buffer: raster, contentType: "image/png" });
+  const frozen = await preserveProposalImages({ heroImageUrl: "https://source.test/metadata.png" }, scope);
+  expect(frozen.heroImageUrl).toContain(createHash("sha256").update(raster).digest("hex"));
+  expect(mocks.send.mock.calls[0][0].input.Body).toEqual(raster);
+});

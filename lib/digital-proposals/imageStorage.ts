@@ -19,7 +19,10 @@ const sha256 = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex
 
 async function validatedImage(image: ProposalImage): Promise<ProposalImage & { extension: string }> {
   let xml = image.buffer.toString("utf8");
-  if (/<svg[\s>]/i.test(xml)) {
+  // PNG/JPEG metadata can itself contain SVG text. Only XML input is eligible
+  // for XML sanitizing; decoding binary image bytes as UTF-8 would corrupt them.
+  const isSvg = /^\s*</.test(xml) && /<svg[\s>]/i.test(xml);
+  if (isSvg) {
     // Older vector exports include a public SVG DTD. Remove that declaration
     // without loading it; internal subsets and entity declarations remain banned.
     xml = xml.replace(/<!DOCTYPE\s+svg\s+PUBLIC\s+["'][^"'\[\]<>]*["']\s+["'][^"'\[\]<>]*["']\s*>/gi, "");
@@ -27,13 +30,14 @@ async function validatedImage(image: ProposalImage): Promise<ProposalImage & { e
   }
   const references = [...xml.matchAll(/\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)].map(match => match[1] ?? match[2]);
   references.push(...[...xml.matchAll(/url\(([^)]*)\)/gi)].map(match => match[1].trim().replace(/^["']|["']$/g, "")));
-  if (/<svg[\s>]/i.test(xml) && (/<!DOCTYPE|<!ENTITY|<script|<foreignObject|@import/i.test(xml) || references.some(value => !value.trim().startsWith("#")))) {
+  if (isSvg && (/<!DOCTYPE|<!ENTITY|<script|<foreignObject|@import/i.test(xml) || references.some(value => !value.trim().startsWith("#")))) {
     throw new Error("SVG image contains external or active content");
   }
   const metadata = await sharp(image.buffer, { limitInputPixels: 40_000_000 }).metadata();
   // Rasterize SVGs so the permanent public copy cannot contain active SVG content
   // or references to external resources. Other image bytes remain unchanged.
   if (metadata.format === "svg") {
+    if (!isSvg) throw new Error("Unsupported SVG encoding");
     const buffer = await sharp(image.buffer, { density: 144, limitInputPixels: 40_000_000 }).png().toBuffer();
     return { buffer, contentType: "image/png", extension: "png" };
   }
