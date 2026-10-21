@@ -23,8 +23,9 @@ export type ProposalWorkflowHandle = { savePendingEdits: () => Promise<boolean> 
 export const ProposalWorkflow = forwardRef<ProposalWorkflowHandle, {
   reportId: string; stage: "proposal" | "share"; disabled?: boolean; refreshKey?: string;
   customerPanel?: ReactNode;
+  onReviewEvidence?: () => void;
   onContinue?: () => void; onBusyChange?: (busy: boolean) => void;
-}>(function ProposalWorkflow({ reportId, stage, disabled, refreshKey, customerPanel, onContinue, onBusyChange }, ref) {
+}>(function ProposalWorkflow({ reportId, stage, disabled, refreshKey, customerPanel, onContinue, onReviewEvidence, onBusyChange }, ref) {
   const paths = useAppraisalRoutes(reportId);
   const [workspace, setWorkspace] = useState<ProposalWorkspace | null>(null);
   const sourceKey = `${reportId}:${refreshKey ?? ""}`;
@@ -141,7 +142,7 @@ export const ProposalWorkflow = forwardRef<ProposalWorkflowHandle, {
       </div>}
     </div>
     {(stage === "proposal" || savingDraft) && <p role="status" className="text-sm text-base-content/65">{savingDraft || (form.formState.isDirty && !autosavePaused) ? "Saving…" : saveError ? "Changes not saved" : form.formState.isDirty ? "Unsaved changes." : workspace.draft ? "Saved" : "Changes save automatically."}</p>}
-    {workspace.needsEvidenceReview && <p role="status" className="du-alert du-alert-warning">Evidence has changed. Return to the estimate and review the evidence before publishing a new version. Existing links still show their saved version.</p>}
+    {workspace.needsEvidenceReview && <div role="status" className="du-alert du-alert-warning du-alert-soft flex flex-wrap items-center gap-3"><p className="min-w-0 flex-1">Review the updated estimate before publishing. Your shared proposal is unchanged.</p>{onReviewEvidence && <button type="button" className="du-btn du-btn-sm min-h-11" disabled={busy || savingDraft || sharing || disabled} onClick={onReviewEvidence}>Review estimate</button>}</div>}
     {stage === "proposal" && message && !form.formState.isDirty && <p role="status" className="text-sm">{message}</p>}
     {saveError && !photoPickerOpen && !customising && <div role="alert" className="du-alert du-alert-error du-alert-soft flex flex-wrap items-center gap-3"><span className="min-w-0 flex-1">{saveError}</span><button type="button" disabled={busy || disabled} className="du-btn du-btn-sm min-h-11" onClick={() => void save()}>Retry save</button></div>}
     {photoPickerOpen && <ProposalPhotoPicker open onOpenChange={setPhotoPickerOpen} availablePhotos={workspace.availablePhotos ?? photoSelection.gallery} value={photoSelection} onSave={savePhotos} error={saveError} coverPageIncluded={draft.pages.some(page => page.kind === "hero" && page.enabled)} disabled={busy || sharing || disabled} />}

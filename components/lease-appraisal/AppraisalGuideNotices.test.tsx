@@ -29,11 +29,13 @@ it("explains the automated lease guide and updates the outside-evidence warning 
   expect(screen.queryByText("These comparables drive the suggested rent range.")).toBeNull();
   const min = screen.getByLabelText("Weekly min ($)") as HTMLInputElement;
   const max = screen.getByLabelText("Weekly max ($)") as HTMLInputElement;
+  fireEvent.click(screen.getByRole("tab", { name: "Comparables" }));
   const firstComp = screen.getByRole("button", { name: /1\/20 Test Street/ });
   fireEvent.click(firstComp);
   expect(min.value).toBe("540");
   expect(max.value).toBe("590");
   expect(screen.getByText(/The guide is below all selected matching advertised rents/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("tab", { name: "Rent estimate" }));
   fireEvent.change(min, { target: { value: "630" } });
   fireEvent.change(max, { target: { value: "650" } });
   expect(screen.queryByText(/The guide is below all selected matching advertised rents/)).toBeNull();

@@ -11,7 +11,7 @@ import { editAppraisalEvidence } from "@/lib/appraisals/workspaceInputs";
 const { savePendingEdits } = vi.hoisted(() => ({ savePendingEdits: vi.fn() }));
 
 vi.mock("next/image", () => ({ default: () => null }));
-vi.mock("@/components/str-appraisals/AppraisalCustomerPanel", () => ({ AppraisalCustomerPanel: () => <button>Edit customer</button> }));
+vi.mock("@/components/str-appraisals/AppraisalCustomerPanel", () => ({ AppraisalCustomerPanel: ({ layout }: { layout?: string }) => <button data-layout={layout}>Edit customer</button> }));
 vi.mock("@/components/str-appraisals/AppraisalArchiveControl", () => ({ AppraisalArchiveControl: () => null }));
 vi.mock("@/components/digital-proposals/ProposalWorkflow", () => ({
   ProposalWorkflow: ({ ref, onBusyChange, customerPanel }: { ref: Ref<{ savePendingEdits: () => Promise<boolean> }>; onBusyChange: (busy: boolean) => void; customerPanel?: ReactNode }) => {
@@ -19,8 +19,58 @@ vi.mock("@/components/digital-proposals/ProposalWorkflow", () => ({
     return <>{customerPanel}<p>Proposal editor</p><button onClick={() => onBusyChange(true)}>Begin publishing</button><button onClick={() => onBusyChange(false)}>Finish publishing</button></>;
   },
 }));
-beforeEach(() => { savePendingEdits.mockReset().mockResolvedValue(true); });
+beforeEach(() => { savePendingEdits.mockReset().mockResolvedValue(true); vi.stubGlobal("scrollTo", vi.fn()); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+it.each(["lease", "sales"] as const)("%s: opens published proposals at sharing even when the estimate needs review", kind => {
+  const fixture = createLintRegressionFixtures();
+  const appraisal: WorkspaceAppraisal = { ...fixture.appraisal, kind, inputs_json: { version: 1, listing: fixture.listing }, input_revision: 2, document_revision: 1, document_json: fixture[kind].final_report_json };
+  render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} hasPublishedProposal archived={false} />);
+  expect(screen.getByRole("button", { name: "4. Get link or PDF" }).getAttribute("aria-current")).toBe("step");
+  expect(screen.getByRole("button", { name: "Edit customer" }).getAttribute("data-layout")).toBe("inline");
+  expect(screen.queryByText("Edit property details")).toBeNull();
+});
+
+it.each(["lease", "sales"] as const)("%s: keeps the optional client in sharing and starts an unpublished prepared proposal at step 3", async kind => {
+  const fixture = createLintRegressionFixtures();
+  const appraisal: WorkspaceAppraisal = { ...fixture.appraisal, kind, inputs_json: { version: 1, listing: fixture.listing }, input_revision: 1, document_revision: 1, document_json: fixture[kind].final_report_json };
+  render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} archived={false} />);
+  expect(screen.getByRole("button", { name: "3. Check proposal" }).getAttribute("aria-current")).toBe("step");
+  expect(screen.queryByRole("button", { name: "Edit customer" })).toBeNull();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "4. Get link or PDF" })); });
+  expect(screen.getByRole("button", { name: "Edit customer" }).getAttribute("data-layout")).toBe("inline");
+  expect(savePendingEdits).toHaveBeenCalledOnce();
+});
+
+it("keeps navigation in place after a save error and allows a successful retry", async () => {
+  const fixture = createLintRegressionFixtures();
+  const appraisal: WorkspaceAppraisal = { ...fixture.appraisal, kind: "lease", inputs_json: { version: 1, listing: fixture.listing }, input_revision: 1, document_revision: 1, document_json: fixture.lease.final_report_json };
+  savePendingEdits.mockRejectedValueOnce(new Error("Connection lost. Try again.")).mockResolvedValueOnce(true);
+  render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} archived={false} />);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "4. Get link or PDF" })); });
+  expect(screen.getByRole("button", { name: "3. Check proposal" }).getAttribute("aria-current")).toBe("step");
+  expect(screen.getByRole("alert").textContent).toBe("Connection lost. Try again.");
+  expect(document.activeElement).toBe(screen.getByRole("alert"));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "4. Get link or PDF" })); });
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getByRole("button", { name: "4. Get link or PDF" }).getAttribute("aria-current")).toBe("step");
+});
+
+it("saves once and locks navigation and client editing until a step change finishes", async () => {
+  const fixture = createLintRegressionFixtures();
+  const appraisal: WorkspaceAppraisal = { ...fixture.appraisal, kind: "sales", inputs_json: { version: 1, listing: fixture.listing }, input_revision: 1, document_revision: 1, document_json: fixture.sales.final_report_json };
+  let finishSave!: (saved: boolean) => void;
+  savePendingEdits.mockImplementationOnce(() => new Promise(resolve => { finishSave = resolve; }));
+  render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} hasPublishedProposal archived={false} />);
+  act(() => {
+    fireEvent.click(screen.getByRole("button", { name: "3. Check proposal" }));
+    fireEvent.click(screen.getByRole("button", { name: "1. Confirm property" }));
+  });
+  expect(savePendingEdits).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: "Edit customer" }).matches(":disabled")).toBe(true);
+  await act(async () => finishSave(true));
+  expect(screen.getByRole("button", { name: "3. Check proposal" }).getAttribute("aria-current")).toBe("step");
+});
 
 it.each(["lease", "sales"] as const)("%s: saves proposal edits before explicitly refreshing wording without publishing", async kind => {
   const fixture = createLintRegressionFixtures();
@@ -33,6 +83,7 @@ it.each(["lease", "sales"] as const)("%s: saves proposal edits before explicitly
   });
   vi.stubGlobal("fetch", fetcher);
   render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} archived={false} />);
+  fireEvent.click(screen.getByText("More options"));
   fireEvent.click(screen.getByRole("button", { name: "Refresh proposal wording" }));
   await waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
   expect(events).toEqual(["save", "refresh"]);
@@ -47,6 +98,7 @@ it("does not refresh wording when pending proposal edits fail to save", async ()
   const fetcher = vi.fn();
   vi.stubGlobal("fetch", fetcher);
   render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} archived={false} />);
+  fireEvent.click(screen.getByText("More options"));
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Refresh proposal wording" })); });
   expect(savePendingEdits).toHaveBeenCalledOnce();
   expect(fetcher).not.toHaveBeenCalled();
@@ -56,12 +108,12 @@ it.each(["lease", "sales"] as const)("%s: disables customer controls for the ful
   const fixture = createLintRegressionFixtures();
   const appraisal: WorkspaceAppraisal = { ...fixture.appraisal, kind, inputs_json: { version: 1, listing: fixture.listing }, input_revision: 1, document_revision: 1, document_json: fixture[kind].final_report_json };
   render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} archived={false} />);
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "4. Review & share" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "4. Get link or PDF" })); });
   const customer = screen.getByRole("button", { name: "Edit customer" });
   expect(customer.matches(":disabled")).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Begin publishing" }));
   expect(customer.matches(":disabled")).toBe(true);
-  expect((screen.getByRole("button", { name: "1. Property" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "1. Confirm property" }) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Finish publishing" }));
   expect(customer.matches(":disabled")).toBe(false);
 });
@@ -74,7 +126,7 @@ it.each(["lease", "sales"] as const)("%s: waits between job polls when a pending
   const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ listing: fixture.listing, job })).mockImplementation(() => new Promise<Response>(() => {}));
   vi.stubGlobal("fetch", fetcher);
   render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} initialJob={job} archived={false} />);
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "2. Review evidence" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "2. Review estimate" })); });
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect(fetcher.mock.calls[0][0]).toBe(`/api/appraisals/${appraisal.report_id}/evidence/jobs/pending-job`);
   await act(async () => { await vi.advanceTimersByTimeAsync(1999); });
@@ -97,15 +149,15 @@ it.each(["lease", "sales"] as const)("%s: keeps pending evidence in place until 
   });
   vi.stubGlobal("fetch", fetcher);
   render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} archived={false} />);
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "2. Review evidence" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "2. Review estimate" })); });
   const label = kind === "lease" ? "Weekly min ($)" : "Price min ($)";
   const value = kind === "lease" ? "1250" : "2450000";
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
-  fireEvent.click(screen.getByRole("button", { name: "1. Property" }));
-  expect(screen.getByRole("alert").textContent).toContain("save your evidence changes");
+  fireEvent.click(screen.getByRole("button", { name: "1. Confirm property" }));
+  expect(screen.getByText(/Choose ‘Use this estimate’ to save your evidence changes/).getAttribute("role")).toBe("alert");
   expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe(value);
   expect(fetcher).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Continue to proposal" }));
+  fireEvent.click(screen.getByRole("button", { name: "Use this estimate" }));
   await screen.findByText("Proposal editor");
   expect(fetcher).toHaveBeenCalledTimes(2);
   expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({ expected_updated_at: fixture.listing.updated_at, [kind === "lease" ? "weekly_min" : "price_min"]: Number(value) });
@@ -118,17 +170,18 @@ it.each(["lease", "sales"] as const)("%s: a failed evidence save keeps figures a
   const fetcher = vi.fn().mockImplementation(async () => Response.json({ error: "Unable to save evidence" }, { status: 500 }));
   vi.stubGlobal("fetch", fetcher);
   render(<AppraisalWorkspace initialAppraisal={appraisal} initialListing={fixture.listing} archived={false} />);
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "2. Review evidence" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "2. Review estimate" })); });
   const label = kind === "lease" ? "Weekly min ($)" : "Price min ($)";
   const value = kind === "lease" ? "1250" : "2450000";
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  fireEvent.click(screen.getByRole("tab", { name: "Comparables" }));
   fireEvent.click(screen.getByRole("button", { name: /20 Coast Street/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Continue to proposal" }));
-  await waitFor(() => expect((screen.getByRole("button", { name: "3. Proposal" }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: "Use this estimate" }));
+  await waitFor(() => expect((screen.getByRole("button", { name: "3. Check proposal" }) as HTMLButtonElement).disabled).toBe(false));
   expect(fetcher).toHaveBeenCalledOnce();
   expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe(value);
   expect(screen.getByRole("button", { name: /20 Coast Street/ }).getAttribute("aria-pressed")).toBe("false");
-  fireEvent.click(screen.getByRole("button", { name: "3. Proposal" }));
-  expect(screen.getByRole("alert").textContent).toContain("save your evidence changes");
+  fireEvent.click(screen.getByRole("button", { name: "3. Check proposal" }));
+  expect(screen.getByText(/Choose ‘Use this estimate’ to save your evidence changes/).getAttribute("role")).toBe("alert");
   expect(screen.queryByText("Proposal editor")).toBeNull();
 });

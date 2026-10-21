@@ -9,6 +9,7 @@ type Props = {
   saving: boolean;
   disabled: boolean;
   guidance: string;
+  guidanceAction?: { label: string; onClick: () => void };
   onContinue: () => void;
   continueLabel?: string;
 };
@@ -20,6 +21,7 @@ export function AppraisalDataToolbar({
   saving,
   disabled,
   guidance,
+  guidanceAction,
   onContinue,
   continueLabel = "Continue to edit content",
 }: Props) {
@@ -40,6 +42,7 @@ export function AppraisalDataToolbar({
         <p role="status" className="text-xs">
           {guidance}
         </p>
+        {guidanceAction && <button type="button" className="du-btn du-btn-link du-btn-sm min-h-11 justify-start px-0" onClick={guidanceAction.onClick}>{guidanceAction.label}</button>}
       </div>
       <button
         type="button"

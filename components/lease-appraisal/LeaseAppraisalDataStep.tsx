@@ -1,9 +1,10 @@
 "use client";
 import { UnsavedListingGuard } from "@/components/listings/UnsavedListingGuard";
 import { AppraisalDataToolbar } from "@/components/appraisals/AppraisalDataToolbar";
+import { AppraisalStepPanel, AppraisalStepTabs } from "@/components/appraisals/AppraisalStepTabs";
 import { ComparableFilters } from "@/components/appraisals/ComparableFilters";
 import { UsComparableDetails, UsComparableSearchSummary } from "@/components/appraisals/UsComparableDetails";
-import { avmPriceSuggestion } from "@/lib/listings/pricing";
+import { avmPriceSuggestion, validPriceBand } from "@/lib/listings/pricing";
 import { appraisalGuideCopy, rentalGuideComparison } from "@/lib/copy/appraisalGuideCopy";
 
 import { resolveAppraisalInput, appraisalInputError, hasStaleAppraisal } from "@/lib/appraisals/resolveAppraisalInput";
@@ -86,6 +87,15 @@ export function LeaseAppraisalDataStep({
   const selectionEdited = useRef(false);
   const estimate = avmPriceSuggestion(listing, "lease");
   const hasPriceOverride = Boolean(listing.appraisal_overrides_json?.lease);
+  const [section, setSection] = useState("estimate");
+  const [error, setError] = useState("");
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (error) {
+      errorRef.current?.scrollIntoView?.({ block: "center" });
+      errorRef.current?.focus({ preventScroll: true });
+    }
+  }, [error]);
   const [query, setQuery] = useState("");
   const [selectedOnly, setSelectedOnly] = useState(false);
   const [fetching, setFetching] = useState(false);
@@ -179,7 +189,11 @@ export function LeaseAppraisalDataStep({
   const noCompsFound = activeJob?.status === "completed" && !compsReady && !staleEvidence && !inputError;
   const initialCompsProcessing = jobProcessing && !compsReady;
   const refreshingComps = jobProcessing && compsReady;
-  const canContinue = compsReady && selectedIds.length > 0;
+  const enteredAmounts = [weeklyMin, weeklyMax, weeklyMid].map(value => value.trim() ? Number(value) : null);
+  const estimateError = enteredAmounts.some(value => value != null && (!Number.isFinite(value) || value <= 0))
+    ? "Enter amounts greater than zero."
+    : !validPriceBand(enteredAmounts[0], enteredAmounts[1], enteredAmounts[2]) ? "Minimum must not exceed maximum, and midpoint must be within the range." : null;
+  const canContinue = compsReady && selectedIds.length > 0 && !estimateError;
 
   useEffect(() => {
     if (!jobProcessing || !activeJob?.id) {
@@ -223,10 +237,9 @@ export function LeaseAppraisalDataStep({
                   toast.info("Search completed without suitable comparables");
                 }
               } else {
-                toast.error(
-                  nextJob.error_message ??
-                    "Rental comps failed to update. Refresh comps to try again.",
-                );
+                const message = nextJob.error_message ?? "Rental comparables failed to update. Open Comparables and try again.";
+                setError(message);
+                toast.error(message);
               }
             }
           }
@@ -234,11 +247,9 @@ export function LeaseAppraisalDataStep({
       } catch (error) {
         if (!cancelled && !pollErrorShownRef.current) {
           pollErrorShownRef.current = true;
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : "Unable to refresh appraisal data",
-          );
+          const message = error instanceof Error ? error.message : "Unable to refresh appraisal data";
+          setError(message);
+          toast.error(message);
         }
       }
     }
@@ -264,11 +275,12 @@ export function LeaseAppraisalDataStep({
   ]);
 
   function toggleComp(id: string) {
+    setError("");
     if (selectedIds.includes(id)) {
       selectionEdited.current = true;
       setSelectedIds(selectedIds.filter(item => item !== id));
     } else if (selectedIds.length >= MAX_LEASE_APPRAISAL_FEATURED_COMPS) {
-      toast.error(`Select up to ${MAX_LEASE_APPRAISAL_FEATURED_COMPS} comparables`);
+      setError(`Select up to ${MAX_LEASE_APPRAISAL_FEATURED_COMPS} comparables. Remove one before choosing another.`);
     } else {
       selectionEdited.current = true;
       setSelectedIds([...selectedIds, id]);
@@ -276,6 +288,8 @@ export function LeaseAppraisalDataStep({
   }
 
   async function fetchComps(options?: { silent?: boolean }) {
+    pollErrorShownRef.current = false;
+    setError("");
     setFetching(true);
     try {
       const response = await fetch(`${endpoint}/enrich`, {
@@ -300,9 +314,9 @@ export function LeaseAppraisalDataStep({
         );
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Unable to fetch rental comps",
-      );
+      const message = error instanceof Error ? error.message : "Unable to fetch rental comparables";
+      setError(message);
+      toast.error(message);
     } finally {
       setFetching(false);
     }
@@ -311,6 +325,7 @@ export function LeaseAppraisalDataStep({
   async function resetPrice() {
     if (savingRef.current) return;
     savingRef.current = true;
+    setError("");
     setSaving(true);
     try {
       const response = await fetch(`${endpoint}/data`, {
@@ -321,7 +336,9 @@ export function LeaseAppraisalDataStep({
       priceEdited.current = false;
       onListingChange(payload.listing);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to reset appraisal");
+      const message = error instanceof Error ? error.message : "Unable to reset appraisal";
+      setError(message);
+      toast.error(message);
     } finally { savingRef.current = false; setSaving(false); }
   }
 
@@ -335,12 +352,19 @@ export function LeaseAppraisalDataStep({
   async function saveData(onlyIfDirty = false, continueAfterSave = false): Promise<AppraisalStepSaveResult> {
     if (savingRef.current) return "failed";
     if (onlyIfDirty && !evidenceDirty) return "unchanged";
+    if (estimateError) {
+      setSection("estimate");
+      setError(estimateError);
+      return "failed";
+    }
     if (!canContinue) {
-      toast.error("Fetch comps and select at least one comparable");
+      setSection("comparables");
+      setError("Choose at least one comparable before continuing.");
       return "failed";
     }
 
     savingRef.current = true;
+    setError("");
     setSaving(true);
     try {
       const response = await fetch(
@@ -372,9 +396,9 @@ export function LeaseAppraisalDataStep({
       if (continueAfterSave) onContinue(payload.listing);
       return "saved";
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Unable to save appraisal data",
-      );
+      const message = error instanceof Error ? error.message : "Unable to save appraisal data";
+      setError(message);
+      toast.error(message);
       return "failed";
     } finally {
       savingRef.current = false;
@@ -391,98 +415,38 @@ export function LeaseAppraisalDataStep({
 
   return (
     <div data-theme="staypack-workspace" className="space-y-5 text-base-content">
-      {appraisalEndpoint && <UnsavedListingGuard dirty={evidenceDirty} description="Your evidence changes are unsaved. Continue to proposal to save them." />}
+      {appraisalEndpoint && <UnsavedListingGuard dirty={evidenceDirty} description="Your estimate and comparable changes are unsaved." />}
       <AppraisalDataToolbar
         summary={rentSummary}
         selectedCount={selectedIds.length}
         maxSelected={MAX_LEASE_APPRAISAL_FEATURED_COMPS}
         saving={saving}
         disabled={loading || !canContinue}
-        guidance={inputError ?? (fetchingComps && !compsReady
-          ? "Finding comparables. You can review the figures while we search."
-          : !compsReady ? "Fetch comparable evidence below to continue."
-          : selectedIds.length === 0 ? "Select at least one comparable below to continue."
-          : "Review the figures and selected comparables, then continue.")}
+        guidance={inputError ?? estimateError ?? (staleEvidence ? "Property details changed. Refresh comparables to continue."
+          : fetchingComps && !compsReady ? "Finding comparables…"
+          : !compsReady ? "Find comparables to support this estimate."
+          : selectedIds.length === 0 ? "Choose at least one comparable to continue."
+          : "Review the estimate and comparables, then continue.")}
+        guidanceAction={loading || inputError ? undefined
+          : estimateError ? { label: "Review estimate", onClick: () => setSection("estimate") }
+          : fetchingComps ? undefined
+          : staleEvidence || !compsReady ? { label: "Find comparables", onClick: () => setSection("comparables") }
+          : selectedIds.length === 0 ? { label: "Choose comparables", onClick: () => setSection("comparables") }
+          : undefined}
         continueLabel={continueLabel}
         onContinue={saveAndContinue}
       />
+      {error && <p ref={errorRef} role="alert" tabIndex={-1} className="du-alert du-alert-error du-alert-soft text-left text-sm outline-none">{error}</p>}
+      {!error && jobFailed && <p role="alert" className="du-alert du-alert-error du-alert-soft text-left text-sm">{activeJob?.error_message ?? "Unable to update comparables. Open Comparables and try again."}</p>}
       <fieldset disabled={saving || (Boolean(appraisalEndpoint) && jobProcessing)} className="min-w-0 space-y-5">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight">Review appraisal evidence</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-base-content/65">
-          {compsReady
-            ? refreshingComps
-              ? "Comparable rentals are refreshing in the background. Current comps remain available while the appraisal updates."
-              : `Review the suggested rent range and choose up to ${MAX_LEASE_APPRAISAL_FEATURED_COMPS} comparable rentals. Properties in ${listing.suburb ?? "your suburb"} appear first, followed by nearby areas.`
-            : jobProcessing
-              ? "Comparable rentals are being fetched in the background. This page will update when they are ready."
-              : `Fetch comparable rentals to support your appraisal. Adjust the ${market.rentPeriod === "month" ? "monthly" : "weekly"} rent band if needed, then choose featured comps.`}
-        </p>
-      </div>
+      {inputError ? <p role="alert" className="du-alert du-alert-error du-alert-soft text-left text-sm">{inputError}</p> : staleEvidence ? <p role="status" className="du-alert du-alert-warning text-left text-sm">Property details changed. Fetch comparables again to update the appraisal.</p> : null}
 
-      <div className="rounded-2xl border border-base-300 bg-base-100 p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="font-medium">Comparable rentals</p>
-          {refreshingComps ? (
-            <span className="du-badge du-badge-sm du-badge-ghost">Refreshing</span>
-          ) : compsReady ? (
-            <span className="du-badge du-badge-sm du-badge-success">Ready</span>
-          ) : jobProcessing ? (
-            <span className="du-badge du-badge-sm du-badge-ghost">Fetching</span>
-          ) : jobFailed ? (
-            <span className="du-badge du-badge-sm du-badge-error">Failed</span>
-          ) : (
-            <span className="du-badge du-badge-sm du-badge-outline">{noCompsFound ? "No matches" : "Required"}</span>
-          )}
-        </div>
-
-        <button
-          type="button"
-          className="du-btn du-btn-sm min-h-11 w-full sm:w-auto"
-          onClick={() => void fetchComps()}
-          disabled={loading || compsPrefetching || jobProcessing || Boolean(inputError)}
-        >
-          {compsPrefetching || fetching || jobProcessing ? (
-            <>
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              Fetching comps...
-            </>
-          ) : compsReady ? (
-            "Refresh comps"
-          ) : (
-            "Fetch rental comps"
-          )}
-        </button>
-        </div>
-        {refreshingComps ? (
-          <p role="status" className="mt-3 text-sm leading-relaxed text-base-content/65">
-            The current comps are shown below. The refresh will replace them when
-            it finishes.
-          </p>
-        ) : jobProcessing ? (
-          <p role="status" className="mt-3 text-sm leading-relaxed text-base-content/65">
-            Your appraisal is updating. This may take a few minutes.
-          </p>
-        ) : jobFailed ? (
-          <p role="alert" className="du-alert du-alert-error mt-3 text-left text-sm">
-            {activeJob?.error_message ??
-              "Rental comps failed to update. Refresh comps to try again."}
-          </p>
-        ) : noCompsFound ? (
-          <p role="status" className="mt-3 text-sm leading-relaxed text-base-content/65">
-            No suitable comparable rentals were found. Check the property details, then try fetching comparables again.
-          </p>
-        ) : null}
-      </div>
-
-      {inputError ? <p role="alert" className="du-alert du-alert-error text-left text-sm">{inputError}</p> : staleEvidence ? <p role="status" className="du-alert du-alert-warning text-left text-sm">Property details changed. Fetch comparables again to update the appraisal.</p> : null}
-
-      <>
+      <AppraisalStepTabs label="Evidence sections" value={section} onValueChange={setSection} disabled={loading} tabs={[{ value: "estimate", label: "Rent estimate" }, { value: "comparables", label: "Comparables" }]}>
+        <AppraisalStepPanel value="estimate">
           <div className="grid gap-5 rounded-2xl border border-base-300 bg-base-100 p-5 sm:grid-cols-3 sm:p-6">
             <div className="space-y-2 text-sm sm:col-span-3">
-              <h3 className="text-lg font-semibold">{hasPriceOverride ? "Your appraisal override" : "Suggested appraisal"}</h3>
-              <p className="leading-relaxed text-base-content/65">Edit any amount below. Your saved figures are kept when comparables refresh.</p>
+              <h3 className="text-lg font-semibold">{hasPriceOverride ? "Your rent estimate" : "Suggested rent estimate"}</h3>
+              <p className="leading-relaxed text-base-content/65">Adjust the figures if needed. Refreshing comparables keeps your saved figures.</p>
               <p className="leading-relaxed text-base-content/65">{priceEdited.current ? "The rental guide uses your entered figures." : guideCopy.description} Selecting comparables changes the evidence included, not your guide.</p>
               {estimate && <p className="rounded-xl bg-base-200/60 px-3 py-2.5 text-xs leading-relaxed text-base-content/65">Automated estimate: {estimate.display}{estimate.date ? ` · ${estimate.date}` : ""}{estimate.confidence ? ` · ${estimate.confidence} confidence` : ""}. This may be outdated; use your local knowledge.</p>}
               {hasPriceOverride && <button type="button" className="du-btn du-btn-sm min-h-11 h-auto w-full py-2 text-wrap sm:w-auto" disabled={loading || refreshingComps} onClick={resetPrice}>Use latest suggested appraisal</button>}
@@ -532,13 +496,65 @@ export function LeaseAppraisalDataStep({
             {guideComparison && <p role="status" className="du-alert du-alert-warning text-left text-sm sm:col-span-3">The guide is {guideComparison} all selected matching advertised rents. Review the figures and differences between the properties before publishing.</p>}
           </div>
 
+        </AppraisalStepPanel>
+        <AppraisalStepPanel value="comparables">
+          <div className="rounded-2xl border border-base-300 bg-base-100 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-medium">Comparable rentals</p>
+              {refreshingComps ? (
+                <span className="du-badge du-badge-sm du-badge-ghost">Refreshing</span>
+              ) : compsReady ? (
+                <span className="du-badge du-badge-sm du-badge-success">Ready</span>
+              ) : jobProcessing ? (
+                <span className="du-badge du-badge-sm du-badge-ghost">Fetching</span>
+              ) : jobFailed ? (
+                <span className="du-badge du-badge-sm du-badge-error">Failed</span>
+              ) : (
+                <span className="du-badge du-badge-sm du-badge-outline">{noCompsFound ? "No matches" : "Required"}</span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="du-btn du-btn-sm min-h-11 w-full sm:w-auto"
+              onClick={() => void fetchComps()}
+              disabled={loading || compsPrefetching || jobProcessing || Boolean(inputError)}
+            >
+              {compsPrefetching || fetching || jobProcessing ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  Finding comparables…
+                </>
+              ) : compsReady ? (
+                "Refresh comparables"
+              ) : (
+                "Find comparable rentals"
+              )}
+            </button>
+            </div>
+            {refreshingComps ? (
+              <p role="status" className="mt-3 text-sm leading-relaxed text-base-content/65">
+                Updating comparables. Your saved figures will stay the same.
+              </p>
+            ) : jobProcessing ? (
+              <p role="status" className="mt-3 text-sm leading-relaxed text-base-content/65">
+                Finding comparables. This may take a few minutes.
+              </p>
+            ) : noCompsFound ? (
+              <p role="status" className="mt-3 text-sm leading-relaxed text-base-content/65">
+                No suitable rentals found. Check the property details, then try again.
+              </p>
+            ) : null}
+          </div>
+
           <div className="space-y-5 rounded-2xl border border-base-300 bg-base-100 p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div><h3 className="text-lg font-semibold">Featured comparables</h3><p className="mt-1 text-sm text-base-content/65">Choose the evidence that best supports your appraisal.</p></div>
+              <div><h3 className="text-lg font-semibold">Featured comparables</h3><p className="mt-1 text-sm text-base-content/65">Choose up to {MAX_LEASE_APPRAISAL_FEATURED_COMPS} to include in the proposal.</p></div>
               <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/65 sm:justify-end">
                 <p>{compRows.length} candidates found</p>
                 <p className="du-badge du-badge-sm h-auto min-h-7 py-1">
-                  {selectedIds.length} / {MAX_LEASE_APPRAISAL_FEATURED_COMPS} selected for the report
+                  {selectedIds.length} / {MAX_LEASE_APPRAISAL_FEATURED_COMPS} selected
                 </p>
               </div>
             </div>
@@ -584,7 +600,7 @@ export function LeaseAppraisalDataStep({
 
             {compRows.length === 0 ? (
               <p role="status" className="rounded-xl border border-dashed border-base-300 bg-base-200/30 p-6 text-center text-sm leading-relaxed text-base-content/65">
-                {fetchingComps ? "Searching for comparables… Results will appear here automatically." : "No comparables available. Fetch comparable evidence to get started."}
+                {fetchingComps ? "Searching for comparables… Results will appear here automatically." : "No comparables yet. Fetch comparables to get started."}
               </p>
             ) : visibleCompRows.length === 0 ? (
               <p role="status" className="rounded-xl border border-dashed border-base-300 bg-base-200/30 p-6 text-center text-sm leading-relaxed text-base-content/65">
@@ -703,9 +719,8 @@ export function LeaseAppraisalDataStep({
               </div>
             )}
           </div>
-      </>
-
-
+        </AppraisalStepPanel>
+      </AppraisalStepTabs>
       </fieldset>
     </div>
   );

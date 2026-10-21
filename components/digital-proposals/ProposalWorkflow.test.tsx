@@ -32,10 +32,10 @@ vi.mock("./ProposalWorkspaceControls", async () => ({
   proposalFetch: mocks.fetch,
   ProposalDocumentsEditor: (await vi.importActual<typeof import("./ProposalDocumentsEditor")>("./ProposalDocumentsEditor")).ProposalDocumentsEditor,
   ProposalPagesEditor: ({ form, draft }: { form: UseFormReturn<ProposalDraft>; draft: ProposalDraft }) => <label>Include forecast<input type="checkbox" checked={draft.pages[2].enabled} onChange={event => form.setValue("pages.2.enabled", event.target.checked, { shouldDirty: true })} /></label>,
-  ProposalSharePanel: ({ workspace, onBusyChange, onSave, disabled, customerPanel, onPreviewDraft, previewingDraft, draftPreview }: {
-    disabled?: boolean; workspace: ProposalWorkspace; onBusyChange: (busy: boolean) => void; onSave: () => Promise<number | null>;
+  ProposalSharePanel: ({ workspace, onBusyChange, onSave, disabled, valid, customerPanel, onPreviewDraft, previewingDraft, draftPreview }: {
+    disabled?: boolean; valid?: boolean; workspace: ProposalWorkspace; onBusyChange: (busy: boolean) => void; onSave: () => Promise<number | null>;
     customerPanel?: ReactNode; onPreviewDraft?: () => void; previewingDraft?: boolean; draftPreview?: ReactNode;
-  }) => <section aria-label="Publish and share proposal">{customerPanel}<button disabled={disabled} onClick={async () => {
+  }) => <section aria-label="Publish and share proposal" data-valid={valid}>{customerPanel}<button disabled={disabled} onClick={async () => {
     onBusyChange(true);
     try { await onSave(); await mocks.share(); } finally { onBusyChange(false); }
   }}>Publish {workspace.sourceFingerprint}</button><button onClick={onPreviewDraft}>{previewingDraft ? "Close preview" : "Preview draft"}</button>{draftPreview}</section>,
@@ -47,6 +47,17 @@ const workspace = (sourceFingerprint: string): ProposalWorkspace => ({
 });
 beforeEach(() => vi.resetAllMocks());
 afterEach(() => { cleanup(); vi.useRealTimers(); });
+
+it("offers a clear route back to an updated estimate while keeping publishing invalid", async () => {
+  mocks.fetch.mockResolvedValueOnce({ ...workspace("stale-estimate"), needsEvidenceReview: true });
+  const onReviewEvidence = vi.fn();
+  render(<ProposalWorkflow reportId="report" stage="share" onReviewEvidence={onReviewEvidence} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Review estimate" }));
+  expect(onReviewEvidence).toHaveBeenCalledOnce();
+  expect(screen.getByText("Review the updated estimate before publishing. Your shared proposal is unchanged.")).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Publish and share proposal" }).getAttribute("data-valid")).toBe("false");
+  expect(mocks.share).not.toHaveBeenCalled();
+});
 
 it("withholds sharing and saves until customer edits have refreshed the source, preserving draft edits", async () => {
   let finishRefresh!: (value: ProposalWorkspace) => void;
