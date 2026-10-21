@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, unstable_rethrow } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireStrAppraisalAccess } from "@/lib/str-appraisals/service";
+import { hasPublishedProposal } from "@/lib/digital-proposals/publication";
 import { AppraisalCustomerPanel } from "@/components/str-appraisals/AppraisalCustomerPanel";
 import { ReportEditor } from "@/components/reports/ReportEditor";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,14 @@ export default async function ListingReportEditorPage({
   let agency;
   let listing: Listing;
   let report: Report;
+  let publishedProposal = false;
 
   try {
-    ({ agency, listing, report, appraisal } = await requireStrAppraisalAccess(reportId));
+    const context = await requireStrAppraisalAccess(reportId);
+    ({ agency, listing, report, appraisal } = context);
+    if (report.status !== "archived") {
+      publishedProposal = await hasPublishedProposal(context.supabase, agency.id, report.id);
+    }
   } catch (error) {
     unstable_rethrow(error);
     if (error instanceof Error && ["STR appraisal not found", "Report not found", "Listing not found"].includes(error.message)) notFound();
@@ -58,6 +64,7 @@ export default async function ListingReportEditorPage({
         appraisal={appraisal}
         initialListing={listing}
         initialReport={report}
+        hasPublishedProposal={publishedProposal}
         agency={agency}
       />}
     </div>

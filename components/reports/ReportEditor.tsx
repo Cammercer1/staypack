@@ -12,12 +12,13 @@ type Props = {
   calculatorReview?: boolean;
   initialListing: Listing;
   initialReport: Report;
+  hasPublishedProposal?: boolean;
   agency: Agency;
   appraisal?: StrAppraisal;
   availableTemplates?: TemplatesResponse;
 };
 
-export function ReportEditor({ initialListing, initialReport, agency, availableTemplates, appraisal, calculatorReview }: Props) {
+export function ReportEditor({ initialListing, initialReport, hasPublishedProposal, agency, availableTemplates, appraisal, calculatorReview }: Props) {
   const [currentAppraisal, setAppraisal] = useState(appraisal);
   const [customerEditing, setCustomerEditing] = useState(false);
   const [listing, setListing] = useState(initialListing);
@@ -28,6 +29,7 @@ export function ReportEditor({ initialListing, initialReport, agency, availableT
       calculatorReview={calculatorReview}
       initialListing={listing}
       initialReport={report}
+      hasPublishedProposal={hasPublishedProposal}
       agency={agency}
       availableTemplates={availableTemplates}
       digitalProposal={Boolean(appraisal)}

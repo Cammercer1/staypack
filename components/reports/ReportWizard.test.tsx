@@ -4,6 +4,7 @@ import { useImperativeHandle, type Ref, type ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { createLintRegressionFixtures } from "@/components/dev/lintRegressionFixtures";
 import { ReportWizard } from "./ReportWizard";
+import type { Report } from "@/lib/types";
 
 vi.mock("next/image", () => ({ default: () => null }));
 vi.mock("@/lib/reports/reportRequests", () => ({ reportRequest: vi.fn().mockResolvedValue({ agents: [] }), jsonRequest: vi.fn() }));
@@ -14,6 +15,37 @@ vi.mock("@/components/digital-proposals/ProposalWorkflow", () => ({
   },
 }));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+it("opens a published digital proposal on Get link or PDF without legacy report JSON", async () => {
+  vi.stubGlobal("scrollTo", vi.fn());
+  const fixture = createLintRegressionFixtures();
+  // Digital publication does not change the legacy report status or snapshot.
+  const report: Report = { ...fixture.report, status: "estimated", final_report_json: null };
+  render(<ReportWizard initialListing={fixture.listing} initialReport={report} agency={fixture.agency} digitalProposal hasPublishedProposal customerPanel={<button>Edit customer</button>} />);
+  await screen.findByRole("button", { name: "Edit customer" });
+  expect(screen.getByRole("tab", { name: "Get link or PDF" }).getAttribute("aria-selected")).toBe("true");
+
+  await act(async () => { fireEvent.click(screen.getByRole("tab", { name: "Review estimate" })); });
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Review estimate" }).getAttribute("aria-selected")).toBe("true"));
+});
+
+it("keeps an unpublished estimated proposal on Review estimate", async () => {
+  const fixture = createLintRegressionFixtures();
+  render(<ReportWizard initialListing={fixture.listing} initialReport={{ ...fixture.report, final_report_json: null }} agency={fixture.agency} digitalProposal />);
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Review estimate" }).getAttribute("aria-selected")).toBe("true"));
+});
+
+it("opens a new proposal on Confirm property", async () => {
+  const fixture = createLintRegressionFixtures();
+  render(<ReportWizard initialListing={fixture.listing} initialReport={{ ...fixture.report, final_report_json: null, final_estimate_json: null }} agency={fixture.agency} digitalProposal />);
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Confirm property" }).getAttribute("aria-selected")).toBe("true"));
+});
+
+it("honours an explicit property review when a proposal is published", async () => {
+  const fixture = createLintRegressionFixtures();
+  render(<ReportWizard initialListing={fixture.listing} initialReport={{ ...fixture.report, final_report_json: null }} agency={fixture.agency} digitalProposal hasPublishedProposal calculatorReview />);
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Confirm property" }).getAttribute("aria-selected")).toBe("true"));
+});
 
 it("disables STR customer controls throughout sharing, then enables them again", async () => {
   const fixture = createLintRegressionFixtures();

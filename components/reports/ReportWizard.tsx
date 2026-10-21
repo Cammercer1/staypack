@@ -43,6 +43,7 @@ export function ReportWizard({
   initialListing,
   calculatorReview = false,
   initialReport,
+  hasPublishedProposal = false,
   agency,
   availableTemplates,
   customerPanel,
@@ -56,6 +57,7 @@ export function ReportWizard({
   calculatorReview?: boolean;
   initialListing: Listing;
   initialReport: Report;
+  hasPublishedProposal?: boolean;
   agency: Agency;
   availableTemplates?: TemplatesResponse;
   customerPanel?: ReactNode;
@@ -71,7 +73,8 @@ export function ReportWizard({
   const reportRef = useRef(initialReport);
   const [reviewRequested, setReviewRequested] = useState(calculatorReview || calculatorPropertyReviewRequired(initialReport, initialListing));
   const [step, setStep] = useState(
-    reviewRequested ? "property" : initialReport.final_report_json
+    // Digital proposals publish separate snapshots, without legacy final_report_json.
+    reviewRequested ? "property" : (digitalProposal && hasPublishedProposal) || initialReport.final_report_json
       ? "preview"
       : initialReport.final_estimate_json
         ? "estimate"
