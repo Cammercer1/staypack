@@ -6,7 +6,7 @@ Branded short-term rental potential reports for real estate agencies.
 
 - Next.js App Router
 - TypeScript, Tailwind CSS, shadcn/ui
-- Supabase Auth, Postgres, Storage
+- Supabase Auth and Postgres; Cloudflare R2 file storage
 - Server routes for scraping, AirROI, OpenAI, Browserless
 
 ## Container development
@@ -144,6 +144,75 @@ Open [http://localhost:3000](http://localhost:3000).
 - Dev mocks for OpenAI copy and QR/PDF when third-party keys are missing
 - Public report and print routes rendered from `final_report_json`
 - Optional QR destinations chosen independently for each report, brochure, or business card; new documents default to no QR
+
+## File storage
+
+Production uses `STORAGE_PROVIDER=r2`. Supabase remains the database and authentication
+provider. Configure the six server-only `R2_*` variables in `.env.example` in both
+Netlify Builds and Functions scopes. Never expose the R2 credential through a
+`NEXT_PUBLIC_*` variable. The credential has object read/write access only to
+`staypack-public` and `staypack-private`.
+
+`lib/storage/bucket.ts` routes existing logical bucket names to R2 keys of the form
+`<logical-bucket>/<original-path>`. Images, fonts, QR codes and public report PDFs use
+`staypack-public`, served at `https://assets.staypack.app`. Proposal PDFs and attachments
+use `staypack-private`, which has no public domain. Downloads still go through the
+existing StayPack access and revocation checks. The server falls back to Supabase for
+an old private object only when R2 returns a missing-object response.
+
+Image uploads use a ten-minute signed PUT bound to the authorized agency/listing,
+content type, size and a fresh object key. Finalization verifies the uploaded object.
+The public bucket allows GET/HEAD CORS from all origins (including fonts and canvas
+exports), and PUT from the configured StayPack origins with `Content-Type`,
+`If-None-Match` and `Cache-Control`. Add a specific preview origin to CORS when testing
+browser uploads there. Older open browser sessions can finish their original Supabase
+upload protocol; newly loaded clients use R2.
+
+### Migration and rollback
+
+The October 2026 migration preserves published report JSON and existing URLs. Original
+public report PDFs and ordinary assets remain in Supabase because externally shared
+Supabase URLs cannot be redirected. Their copies are also in R2. Only verified private
+originals and unreferenced, old PDF-rendering mirrors are eligible for cleanup.
+
+Use Node 24 with `.env.local` and the private `.env.r2-migration.local` file:
+
+```bash
+node --env-file=.env.local --env-file=.env.r2-migration.local scripts/migrate-storage-to-r2.mjs inventory
+node --env-file=.env.local --env-file=.env.r2-migration.local scripts/migrate-storage-to-r2.mjs copy
+node --env-file=.env.local --env-file=.env.r2-migration.local scripts/migrate-storage-to-r2.mjs verify
+node --env-file=.env.local scripts/verify-storage-links.mjs https://staypack.app production
+node --env-file=.env.local --env-file=.env.r2-migration.local scripts/cleanup-migrated-storage.mjs
+```
+
+Copying writes an owner-only local backup, reads every R2 object back in full, and
+records SHA-256 checksums in `tmp/r2-migration/manifest.jsonl`. It refuses to overwrite
+different target bytes. Keep this ignored directory, including `backup/`, `deleted.jsonl`
+and deployment evidence. Cleanup defaults to a plan; `--apply` additionally requires
+recent production link checks, a fresh inventory, a new reference scan, and verified
+backups and targets. It uses the Supabase Storage API, never SQL metadata deletion.
+
+After cleanup, **restore deleted originals before reverting to a pre-R2 deployment or
+setting `STORAGE_PROVIDER=supabase`**:
+
+```bash
+node --env-file=.env.local scripts/migrate-storage-to-r2.mjs restore
+```
+
+Restoration verifies backups and restored bytes and refuses to overwrite changed files.
+The deployment IDs and original environment snapshot are retained privately under
+`tmp/r2-migration/`. Supabase's billing usage may lag the current stored-byte total.
+
+The first verified R2 release was `6ad809549395619e473bfd20`. It was pinned during
+the migration to protect private downloads while the source changes were being
+merged. When using a temporary manual release, keep it pinned until a deployment
+from the merged Git commit passes the storage checks, then publish that deployment
+and unlock Netlify auto publishing.
+
+Storage unit tests run normally. Opt-in live checks use only disposable object keys
+or temporary agencies/users: `RUN_R2_STORAGE_SMOKE=1` for
+`lib/storage/integration.live.test.ts`, and `STR_LIVE_TEST=1 STR_PDF_TEST=1 STR_HAVEN_TEST=1`
+with `STAGING_BASE_URL` for `lib/digital-proposals/integration.live.test.ts`.
 
 ## STR estimates and comparable selection
 

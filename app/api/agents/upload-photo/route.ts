@@ -1,3 +1,4 @@
+import { assetBucket } from "@/lib/storage/bucket";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAgencyAdmin } from "@/lib/auth/requireUser";
@@ -29,8 +30,7 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    const { error } = await admin.storage
-      .from("agent-assets")
+    const { error } = await assetBucket(admin, "agent-assets")
       .upload(path, buffer, {
         contentType: file.type || "image/jpeg",
         upsert: false,
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
     const {
       data: { publicUrl },
-    } = admin.storage.from("agent-assets").getPublicUrl(path);
+    } = assetBucket(admin, "agent-assets").getPublicUrl(path);
 
     return NextResponse.json({ url: publicUrl, path });
   } catch (error) {

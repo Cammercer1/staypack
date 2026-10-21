@@ -1,3 +1,4 @@
+import { assetBucket } from "@/lib/storage/bucket";
 import { LEGACY_PROPERTY_PAGE_TOOLS } from "@/lib/listings/legacyPropertyPages";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -54,8 +55,7 @@ export async function POST(
   const qrVersion = Date.now();
   const qrPath = `${agency.id}/${listing.id}/landing-qr-${qrVersion}.png`;
 
-  const { error: uploadError } = await admin.storage
-    .from("report-assets")
+  const { error: uploadError } = await assetBucket(admin, "report-assets")
     .upload(qrPath, qrBuffer, { contentType: "image/png", upsert: true });
 
   if (uploadError) {
@@ -64,7 +64,7 @@ export async function POST(
 
   const {
     data: { publicUrl: landingQrCodeUrl },
-  } = admin.storage.from("report-assets").getPublicUrl(qrPath);
+  } = assetBucket(admin, "report-assets").getPublicUrl(qrPath);
 
   const { error: updateError } = await supabase
     .from("listings")

@@ -47,6 +47,7 @@ if (process.env.PRINT_BASE_URL?.trim()) {
 }
 
 const { createAdminClient } = await import("../lib/supabase/admin.ts");
+const { assetBucket } = await import("../lib/storage/bucketCore.ts");
 const { normaliseAirbticsResponse } = await import("../lib/airbtics/client.ts");
 const { positionStrEstimate } = await import("../lib/airbtics/positionEstimate.ts");
 const { buildStrEnrichment } = await import("../lib/airbtics/enrich.ts");
@@ -240,25 +241,22 @@ console.log("   Print URL:", printUrl);
 const pdfBuffer = await renderPdfFromUrl(printUrl, {
   mirrorImage: async (sourceUrl, buffer, contentType) => {
     const path = buildPdfImagePath(report.agency_id, report.id, sourceUrl, contentType);
-    const { error } = await admin.storage
-      .from("report-assets")
+    const { error } = await assetBucket(admin, "report-assets")
       .upload(path, buffer, { contentType, upsert: true });
     if (error) return null;
-    return admin.storage.from("report-assets").getPublicUrl(path).data.publicUrl;
+    return assetBucket(admin, "report-assets").getPublicUrl(path).data.publicUrl;
   },
   mirrorStylesheet: async (sourceUrl, buffer, contentType) => {
     const path = buildPdfStylesheetPath(report.agency_id, report.id, sourceUrl);
-    const { error } = await admin.storage
-      .from("report-assets")
+    const { error } = await assetBucket(admin, "report-assets")
       .upload(path, buffer, { contentType, upsert: true });
     if (error) return null;
-    return admin.storage.from("report-assets").getPublicUrl(path).data.publicUrl;
+    return assetBucket(admin, "report-assets").getPublicUrl(path).data.publicUrl;
   },
 });
 
 const pdfPath = `${report.agency_id}/${report.id}/delivery-report.pdf`;
-const { error: uploadError } = await admin.storage
-  .from("report-pdfs")
+const { error: uploadError } = await assetBucket(admin, "report-pdfs")
   .upload(pdfPath, pdfBuffer, { contentType: "application/pdf", upsert: true });
 
 if (uploadError) {
@@ -266,7 +264,7 @@ if (uploadError) {
   process.exit(1);
 }
 
-const { data: pdfPublic } = admin.storage.from("report-pdfs").getPublicUrl(pdfPath);
+const { data: pdfPublic } = assetBucket(admin, "report-pdfs").getPublicUrl(pdfPath);
 const pdfUrl = cacheBustedPdfUrl(pdfPublic.publicUrl, Date.now());
 
 await admin

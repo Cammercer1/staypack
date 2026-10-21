@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireListingAccess, requireReportWithListing } from "@/lib/auth/requireUser";
 import { MAX_UPLOADED_IMAGES } from "@/lib/reports/constants";
+import { z } from "zod";
+import { usesR2Storage } from "@/lib/storage/r2";
+import { signR2ImageUpload } from "@/lib/storage/signedUpload";
 
 const ALLOWED_TYPES = [
   "image/png",
@@ -9,14 +12,18 @@ const ALLOWED_TYPES = [
   "image/avif",
 ];
 
-type SignFileInput = { name?: string; type?: string };
+const signSchema = z.object({
+  report_id: z.string().optional(), listing_id: z.string().optional(),
+  storage_protocol: z.literal(2).optional(),
+  files: z.array(z.object({ name: z.string().optional(), type: z.string(), size: z.number().int().positive().optional() })).min(1).max(MAX_UPLOADED_IMAGES),
+});
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json().catch(() => null);
+    const body = signSchema.parse(await request.json());
     const reportId = String(body?.report_id ?? "");
     const listingId = String(body?.listing_id ?? "");
-    const files: SignFileInput[] = Array.isArray(body?.files) ? body.files : [];
+    const files = body.files;
 
     if (!reportId && !listingId) {
       return NextResponse.json(
@@ -69,6 +76,10 @@ export async function POST(request: Request) {
           (file.name?.split(".").pop()?.toLowerCase() ?? "").replace(/[^a-z0-9]/g, "") ||
           "jpg";
         const path = `${agency.id}/${listing.id}/${crypto.randomUUID()}.${extension}`;
+        // Older open browser sessions can finish their Supabase upload protocol.
+        if (body.storage_protocol === 2 && usesR2Storage()) {
+          return signR2ImageUpload(path, file.type, file.size ?? 0);
+        }
         const { data, error } = await bucket.createSignedUploadUrl(path);
 
         if (error || !data) {
@@ -79,7 +90,7 @@ export async function POST(request: Request) {
           data: { publicUrl },
         } = bucket.getPublicUrl(path);
 
-        return { path, token: data.token, signedUrl: data.signedUrl, publicUrl };
+        return { provider: "supabase", path, token: data.token, signedUrl: data.signedUrl, publicUrl };
       }),
     );
 

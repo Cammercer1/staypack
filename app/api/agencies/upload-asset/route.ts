@@ -1,3 +1,4 @@
+import { assetBucket } from "@/lib/storage/bucket";
 import { randomUUID } from "node:crypto";
 import {
   validateBrandAsset,
@@ -50,8 +51,7 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    const { error } = await admin.storage
-      .from("agency-assets")
+    const { error } = await assetBucket(admin, "agency-assets")
       .upload(path, buffer, {
         contentType: file.type || "application/octet-stream",
         upsert: false,
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
     const {
       data: { publicUrl },
-    } = admin.storage.from("agency-assets").getPublicUrl(path);
+    } = assetBucket(admin, "agency-assets").getPublicUrl(path);
 
     return NextResponse.json({ url: publicUrl, path });
   } catch (error) {

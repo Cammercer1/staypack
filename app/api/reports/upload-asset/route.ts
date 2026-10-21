@@ -1,6 +1,8 @@
+import { assetBucket } from "@/lib/storage/bucket";
 import { NextResponse } from "next/server";
 import { requireListingAccess, requireReportWithListing } from "@/lib/auth/requireUser";
 import { MAX_UPLOADED_IMAGES } from "@/lib/reports/constants";
+import { MAX_IMAGE_UPLOAD_BYTES } from "@/lib/storage/uploadPolicy";
 
 const ALLOWED_TYPES = [
   "image/png",
@@ -18,6 +20,9 @@ export async function POST(request: Request) {
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+    }
+    if (!file.size || file.size > MAX_IMAGE_UPLOAD_BYTES) {
+      return NextResponse.json({ error: "Choose an image under 20 MB" }, { status: 413 });
     }
 
     if (!reportId && !listingId) {
@@ -51,7 +56,7 @@ export async function POST(request: Request) {
     const path = `${agency.id}/${listing.id}/${crypto.randomUUID()}.${extension}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    const { error } = await supabase.storage.from("report-assets").upload(path, buffer, {
+    const { error } = await assetBucket(supabase, "report-assets").upload(path, buffer, {
       contentType: file.type || "image/jpeg",
       upsert: false,
     });
@@ -62,7 +67,7 @@ export async function POST(request: Request) {
 
     const {
       data: { publicUrl },
-    } = supabase.storage.from("report-assets").getPublicUrl(path);
+    } = assetBucket(supabase, "report-assets").getPublicUrl(path);
 
     const uploadedImageUrls = [...existingUploads, publicUrl];
     const { error: updateError } = await supabase

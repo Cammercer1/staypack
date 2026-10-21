@@ -1,3 +1,4 @@
+import { assetBucket } from "@/lib/storage/bucket";
 import { currentReportSnapshot, preservePublishedReport, publishedReportSnapshot } from "@/lib/reports/publicationSnapshot";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -53,8 +54,7 @@ export async function POST(
           contentType,
         );
 
-        const { error } = await admin.storage
-          .from("report-assets")
+        const { error } = await assetBucket(admin, "report-assets")
           .upload(path, buffer, {
             contentType,
             upsert: true,
@@ -64,14 +64,13 @@ export async function POST(
           return null;
         }
 
-        return admin.storage.from("report-assets").getPublicUrl(path).data
+        return assetBucket(admin, "report-assets").getPublicUrl(path).data
           .publicUrl;
       },
       mirrorStylesheet: async (sourceUrl, buffer, contentType) => {
         const path = buildPdfStylesheetPath(agency.id, report.id, sourceUrl);
 
-        const { error } = await admin.storage
-          .from("report-assets")
+        const { error } = await assetBucket(admin, "report-assets")
           .upload(path, buffer, {
             contentType,
             upsert: true,
@@ -81,15 +80,14 @@ export async function POST(
           return null;
         }
 
-        return admin.storage.from("report-assets").getPublicUrl(path).data
+        return assetBucket(admin, "report-assets").getPublicUrl(path).data
           .publicUrl;
       },
     });
     const cacheVersion = Date.now();
     const pdfPath = `${agency.id}/${report.id}/report-${crypto.randomUUID()}.pdf`;
 
-    const { error: uploadError } = await admin.storage
-      .from("report-pdfs")
+    const { error: uploadError } = await assetBucket(admin, "report-pdfs")
       .upload(pdfPath, pdfBuffer, {
         contentType: "application/pdf",
         upsert: true,
@@ -101,7 +99,7 @@ export async function POST(
 
     const {
       data: { publicUrl },
-    } = admin.storage.from("report-pdfs").getPublicUrl(pdfPath);
+    } = assetBucket(admin, "report-pdfs").getPublicUrl(pdfPath);
 
     const pdfUrl = cacheBustedPdfUrl(publicUrl, cacheVersion);
 
@@ -141,7 +139,7 @@ export async function POST(
     }
 
     if (!data) {
-      await admin.storage.from("report-pdfs").remove([pdfPath]);
+      await assetBucket(admin, "report-pdfs").remove([pdfPath]);
       return NextResponse.json({ error: "The report changed while the PDF was preparing. Prepare it again to include your latest changes." }, { status: 409 });
     }
     return NextResponse.json({ pdf_url: pdfUrl, report: data });

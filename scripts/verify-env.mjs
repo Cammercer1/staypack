@@ -5,6 +5,10 @@ const requiredPublic = [
 
 const missing = requiredPublic.filter((key) => !process.env[key]?.trim());
 
+if (process.env.STORAGE_PROVIDER === "r2") {
+  missing.push(...["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_PUBLIC_BUCKET", "R2_PRIVATE_BUCKET", "R2_PUBLIC_BASE_URL"].filter(key => !process.env[key]?.trim()));
+}
+
 if (missing.length > 0) {
   console.error(
     "\nBuild failed: missing required environment variables:\n",
