@@ -1,3 +1,4 @@
+import { assetBucket } from "@/lib/storage/bucket";
 import { resolveAppraisalInput, assertAppraisalInput } from "@/lib/appraisals/resolveAppraisalInput";
 import { applyDocumentLinkDraft, type DocumentLink } from "@/lib/documents/documentLink";
 import { createDocumentLinkDraft } from "@/lib/documents/createDocumentLinkDraft";
@@ -206,32 +207,29 @@ export async function generateHeadlessLeaseAppraisal({
   const pdfBuffer = await renderPdfFromUrl(printUrl, {
     mirrorImage: async (sourceUrl, buffer, contentType) => {
       const path = buildPdfImagePath(agency.id, report.id, sourceUrl, contentType);
-      const { error } = await admin.storage
-        .from("report-assets")
+      const { error } = await assetBucket(admin, "report-assets")
         .upload(path, buffer, { contentType, upsert: true });
       if (error) return null;
-      return admin.storage.from("report-assets").getPublicUrl(path).data.publicUrl;
+      return assetBucket(admin, "report-assets").getPublicUrl(path).data.publicUrl;
     },
     mirrorStylesheet: async (sourceUrl, buffer, contentType) => {
       const path = buildPdfStylesheetPath(agency.id, report.id, sourceUrl);
-      const { error } = await admin.storage
-        .from("report-assets")
+      const { error } = await assetBucket(admin, "report-assets")
         .upload(path, buffer, { contentType, upsert: true });
       if (error) return null;
-      return admin.storage.from("report-assets").getPublicUrl(path).data.publicUrl;
+      return assetBucket(admin, "report-assets").getPublicUrl(path).data.publicUrl;
     },
   });
 
   const pdfPath = `${agency.id}/${report.id}/lease-appraisal.pdf`;
-  const { error: pdfUploadError } = await admin.storage
-    .from("report-pdfs")
+  const { error: pdfUploadError } = await assetBucket(admin, "report-pdfs")
     .upload(pdfPath, pdfBuffer, { contentType: "application/pdf", upsert: true });
 
   if (pdfUploadError) {
     throw new Error(pdfUploadError.message);
   }
 
-  const { data: pdfPublic } = admin.storage.from("report-pdfs").getPublicUrl(pdfPath);
+  const { data: pdfPublic } = assetBucket(admin, "report-pdfs").getPublicUrl(pdfPath);
   const pdfUrl = cacheBustedPdfUrl(pdfPublic.publicUrl, Date.now());
 
   await admin

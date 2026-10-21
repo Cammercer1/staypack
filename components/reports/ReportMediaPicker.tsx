@@ -18,6 +18,7 @@ import {
 } from "@/components/listings/ListingImageMetaControls";
 import type { ListingImageMetaMap } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
+import type { SignedAssetUpload } from "@/lib/storage/uploadPolicy";
 import {
   PRINT_SAFE_LONG_EDGE,
   createOptimizerWorker,
@@ -36,11 +37,7 @@ type UploadStatus = {
   optimizedCount: number;
 };
 
-type SignedUpload = {
-  path: string;
-  token: string;
-  publicUrl: string;
-};
+type SignedUpload = SignedAssetUpload;
 
 type Props = {
   scrapedImages?: string[];
@@ -148,28 +145,6 @@ export function ReportMediaPicker({
     setUploadStatus({ total: filesToUpload.length, completed: 0, optimizedCount: 0 });
 
     try {
-      const signRes = await fetch("/api/reports/upload-asset/sign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          report_id: reportId,
-          listing_id: listingId,
-          files: filesToUpload.map((file) => ({ name: file.name, type: file.type })),
-        }),
-      });
-      const signPayload = await signRes.json().catch(() => ({}));
-
-      if (!signRes.ok) {
-        toast.error(signPayload.error ?? "Upload failed");
-        return;
-      }
-
-      const signedUploads: SignedUpload[] = signPayload.uploads ?? [];
-      if (signedUploads.length !== filesToUpload.length) {
-        toast.error("Upload failed");
-        return;
-      }
-
       const supabase = createClient();
       const concurrency = Math.min(UPLOAD_CONCURRENCY, filesToUpload.length);
       const workers = Array.from({ length: concurrency }, () => createOptimizerWorker());
@@ -190,7 +165,6 @@ export function ReportMediaPicker({
           if (index >= filesToUpload.length) return;
 
           const originalFile = filesToUpload[index];
-          const target = signedUploads[index];
 
           try {
             const { file, optimized, width, height } = worker
@@ -206,14 +180,29 @@ export function ReportMediaPicker({
               lowResCount += 1;
             }
 
-            const { error } = await supabase.storage
-              .from("report-assets")
-              .uploadToSignedUrl(target.path, target.token, file, {
+            const signRes = await fetch("/api/reports/upload-asset/sign", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                report_id: reportId, listing_id: listingId, storage_protocol: 2,
+                files: [{ name: file.name, type: file.type, size: file.size }],
+              }),
+            });
+            const signPayload = await signRes.json().catch(() => ({}));
+            if (!signRes.ok || signPayload.uploads?.length !== 1) {
+              throw new Error(signPayload.error ?? "Unable to prepare image upload");
+            }
+            const target: SignedUpload = signPayload.uploads[0];
+            if (target.provider === "r2") {
+              if (!target.signedUrl) throw new Error("Missing image upload URL");
+              const response = await fetch(target.signedUrl, { method: "PUT", headers: target.headers, body: file });
+              if (!response.ok) throw new Error("Image upload failed");
+            } else {
+              if (!target.token) throw new Error("Missing image upload token");
+              const { error } = await supabase.storage.from("report-assets").uploadToSignedUrl(target.path, target.token, file, {
                 contentType: file.type || "image/jpeg",
               });
-
-            if (error) {
-              throw error;
+              if (error) throw error;
             }
 
             results[index] = target;
@@ -253,7 +242,7 @@ export function ReportMediaPicker({
         body: JSON.stringify({
           report_id: reportId,
           listing_id: listingId,
-          paths: succeeded.map((upload) => upload.path),
+          uploads: succeeded.map((upload) => ({ path: upload.path, provider: upload.provider ?? "supabase" })),
         }),
       });
       const finalizePayload = await finalizeRes.json().catch(() => ({}));

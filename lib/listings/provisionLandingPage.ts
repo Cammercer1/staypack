@@ -1,3 +1,4 @@
+import { assetBucket } from "@/lib/storage/bucket";
 import { LEGACY_PROPERTY_PAGE_TOOLS } from "@/lib/listings/legacyPropertyPages";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleKey, isLegacyPublicUrlHost } from "@/lib/env";
@@ -34,8 +35,7 @@ async function uploadListingLandingQr(
   const qrVersion = Date.now();
   const qrPath = `${agency.id}/${listingId}/landing-qr-${qrVersion}.png`;
 
-  const { error: uploadError } = await admin.storage
-    .from("report-assets")
+  const { error: uploadError } = await assetBucket(admin, "report-assets")
     .upload(qrPath, qrBuffer, {
       contentType: "image/png",
       upsert: true,
@@ -47,7 +47,7 @@ async function uploadListingLandingQr(
 
   const {
     data: { publicUrl: landingQrCodeUrl },
-  } = admin.storage.from("report-assets").getPublicUrl(qrPath);
+  } = assetBucket(admin, "report-assets").getPublicUrl(qrPath);
 
   return landingQrCodeUrl;
 }

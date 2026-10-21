@@ -1,3 +1,4 @@
+import { assetBucket } from "@/lib/storage/bucket";
 import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { privateJson } from "@/lib/str-appraisals/api";
@@ -20,12 +21,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ rep
     if ((count.count ?? 0) >= 50) throw new ProposalError("This proposal has reached its document limit.");
     const id = randomUUID();
     const path = `${context.agency.id}/${context.report.id}/${id}.pdf`;
-    const uploaded = await admin.storage.from("proposal-documents").upload(path, bytes, { contentType: "application/pdf", upsert: false });
+    const uploaded = await assetBucket(admin, "proposal-documents").upload(path, bytes, { contentType: "application/pdf", upsert: false });
     if (uploaded.error) throw new ProposalError("Document upload failed. Please try again.", 500);
     const attachment = { id, name: safeDocumentName(file.name), byte_size: file.size };
     const saved = await admin.from("digital_proposal_attachments").insert({ ...attachment, storage_path: path, report_id: context.report.id, agency_id: context.agency.id });
     if (saved.error) {
-      await admin.storage.from("proposal-documents").remove([path]);
+      await assetBucket(admin, "proposal-documents").remove([path]);
       throw new ProposalError("Unable to save the document.", 500);
     }
     return privateJson({ attachment }, 201);

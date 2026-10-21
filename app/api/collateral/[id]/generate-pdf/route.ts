@@ -1,3 +1,4 @@
+import { assetBucket } from "@/lib/storage/bucket";
 import { NextResponse } from "next/server";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -49,8 +50,7 @@ export async function POST(
           contentType,
         );
 
-        const { error } = await admin.storage
-          .from("report-assets")
+        const { error } = await assetBucket(admin, "report-assets")
           .upload(path, buffer, {
             contentType,
             upsert: true,
@@ -60,7 +60,7 @@ export async function POST(
           return null;
         }
 
-        return admin.storage.from("report-assets").getPublicUrl(path).data
+        return assetBucket(admin, "report-assets").getPublicUrl(path).data
           .publicUrl;
       },
       mirrorStylesheet: async (sourceUrl, buffer, contentType) => {
@@ -70,8 +70,7 @@ export async function POST(
           sourceUrl,
         );
 
-        const { error } = await admin.storage
-          .from("report-assets")
+        const { error } = await assetBucket(admin, "report-assets")
           .upload(path, buffer, {
             contentType,
             upsert: true,
@@ -81,15 +80,14 @@ export async function POST(
           return null;
         }
 
-        return admin.storage.from("report-assets").getPublicUrl(path).data
+        return assetBucket(admin, "report-assets").getPublicUrl(path).data
           .publicUrl;
       },
     });
 
     const pdfPath = `${agency.id}/collateral/${collateral.id}.pdf`;
 
-    const { error: uploadError } = await admin.storage
-      .from("report-pdfs")
+    const { error: uploadError } = await assetBucket(admin, "report-pdfs")
       .upload(pdfPath, pdfBuffer, {
         contentType: "application/pdf",
         upsert: true,
@@ -101,7 +99,7 @@ export async function POST(
 
     const {
       data: { publicUrl: storedPdfUrl },
-    } = admin.storage.from("report-pdfs").getPublicUrl(pdfPath);
+    } = assetBucket(admin, "report-pdfs").getPublicUrl(pdfPath);
 
     const pdfUrl = cacheBustedPdfUrl(storedPdfUrl, Date.now());
     const generatedAt = new Date().toISOString();

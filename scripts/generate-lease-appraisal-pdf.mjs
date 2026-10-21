@@ -113,6 +113,7 @@ async function main() {
     "../lib/reports/templates/ids.ts"
   );
   const { createAdminClient } = await import("../lib/supabase/admin.ts");
+const { assetBucket } = await import("../lib/storage/bucketCore.ts");
   const { getReportsUrl } = await import("../lib/env.ts");
   const { buildPublicReportUrl } = await import("../lib/reports/slugs.ts");
   const {
@@ -224,11 +225,10 @@ async function main() {
         sourceUrl,
         contentType,
       );
-      const { error } = await admin.storage
-        .from("report-assets")
+      const { error } = await assetBucket(admin, "report-assets")
         .upload(path, buffer, { contentType, upsert: true });
       if (error) return null;
-      return admin.storage.from("report-assets").getPublicUrl(path).data.publicUrl;
+      return assetBucket(admin, "report-assets").getPublicUrl(path).data.publicUrl;
     },
     mirrorStylesheet: async (sourceUrl, buffer, contentType) => {
       const path = buildPdfStylesheetPath(
@@ -236,11 +236,10 @@ async function main() {
         PREVIEW_REPORT_ID,
         sourceUrl,
       );
-      const { error } = await admin.storage
-        .from("report-assets")
+      const { error } = await assetBucket(admin, "report-assets")
         .upload(path, buffer, { contentType, upsert: true });
       if (error) return null;
-      return admin.storage.from("report-assets").getPublicUrl(path).data.publicUrl;
+      return assetBucket(admin, "report-assets").getPublicUrl(path).data.publicUrl;
     },
   });
 

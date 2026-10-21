@@ -9,6 +9,8 @@ import { applyStrEstimateAdjustments, saveStrRateOverride } from "@/lib/reports/
 import type { ProposalWorkspace } from "./workspace";
 import { proposalPrintUrl } from "./printAccess";
 import havenlyAssignment from "./assignments/havenly.json";
+import { usesR2Storage, r2Client, r2Configuration } from "@/lib/storage/r2";
+import { DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
 // Only disposable agencies/users. No estimate/import/copy APIs or messages.
 it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, assignment, snapshots, documents, analytics and PDF", async () => {
@@ -51,6 +53,21 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
     const photos = ["marketing/staypack-rental-appraisal-front.webp", "marketing/staypack-rental-appraisal-comparables.webp", "marketing/businessman-presenting-brochure.webp", "collateral/refined-floor-plan-preview.png", "staypack-logo.png"].map(path => `https://staypack.app/${path}`);
     photos[0] = createLintRegressionFixtures().document.property.hero_image_url;
     check(await admin.from("listings").insert({ id: listingId, public_slug: `proposal-integration-${listingId}`, agency_id: agencyId, created_by: userIds[0], property_address: "12 Proposal Test Esplanade, Byron Bay NSW 2481", suburb: "Byron Bay", state: "NSW", postcode: "2481", bedrooms: 3, bathrooms: 2, property_type: "house", hero_image_url: photos[0], selected_image_urls: photos, uploaded_image_urls: photos }));
+    if (usesR2Storage()) {
+      const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1XQAAAAASUVORK5CYII=", "base64");
+      const signed = await json("/api/reports/upload-asset/sign", "POST", { listing_id: listingId, storage_protocol: 2, files: [{ name: "qa.png", type: "image/png", size: image.length }] });
+      const upload = signed.uploads[0];
+      expect(upload.provider).toBe("r2");
+      expect((await fetch(upload.signedUrl, { method: "PUT", headers: upload.headers, body: image })).status).toBe(200);
+      const finalized = await json("/api/reports/upload-asset/finalize", "POST", { listing_id: listingId, uploads: [{ path: upload.path, provider: upload.provider }] });
+      expect(finalized.uploaded_image_urls).toContain(upload.publicUrl);
+      expect(upload.publicUrl).toMatch(/^https:\/\/assets\.staypack\.app\//);
+      expect(Buffer.from(await (await fetch(upload.publicUrl)).arrayBuffer())).toEqual(image);
+      const imageForm = new FormData(); imageForm.set("listing_id", listingId); imageForm.set("file", new File([image], "qa-server.png", { type: "image/png" }));
+      const serverUpload = await fetch(`${origin}/api/reports/upload-asset`, { method: "POST", headers: { Cookie: cookieHeaders[0], Origin: origin }, body: imageForm });
+      expect(serverUpload.status).toBe(200);
+      expect((await serverUpload.json()).url).toMatch(/^https:\/\/assets\.staypack\.app\//);
+    }
     const created = await json("/api/str/appraisals", "POST", { listing_id: listingId, request_id: randomUUID(), recipient: { mode: "named", name: "Jordan QA", email: "private-qa@example.com", phone: "0412345678" } });
     const reportId = created.report.id;
     const root = `/api/str/appraisals/${reportId}/proposal`;
@@ -183,6 +200,20 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
     expect((await api(second.path, "GET", undefined, 2)).status).toBe(404);
     expect((await api(`/api/proposals/${second.path.split("/").pop()}/pdf`, "GET", undefined, 2)).status).toBe(404);
   } finally {
+    if (usesR2Storage()) {
+      // Only this test's generated agency prefix, including mirrored render assets.
+      const config = r2Configuration(), client = r2Client();
+      for (const [Bucket, buckets] of [[config.publicBucket, ["report-assets", "report-pdfs"]], [config.privateBucket, ["proposal-pdfs", "proposal-documents"]]] as const) {
+        for (const bucket of buckets) {
+          let ContinuationToken: string | undefined;
+          do {
+            const page = await client.send(new ListObjectsV2Command({ Bucket, Prefix: `${bucket}/${agencyId}/`, ContinuationToken }));
+            for (const object of page.Contents ?? []) await client.send(new DeleteObjectCommand({ Bucket, Key: object.Key! }));
+            ContinuationToken = page.NextContinuationToken;
+          } while (ContinuationToken);
+        }
+      }
+    }
     for (const { bucket, path } of paths) await admin.storage.from(bucket).remove([path]);
     // Branded PDFs mirror print assets under disposable version folders.
     const folders = await admin.storage.from("report-assets").list(agencyId);

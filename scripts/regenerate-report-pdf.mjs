@@ -47,6 +47,7 @@ const reportIdArg = args.find(
 );
 
 const { createAdminClient } = await import("../lib/supabase/admin.ts");
+const { assetBucket } = await import("../lib/storage/bucketCore.ts");
 const { applyTemplateBrandToFinalReport } = await import(
   "../lib/reports/applyTemplateBrand.ts"
 );
@@ -180,11 +181,10 @@ const pdfBuffer = await renderPdfFromUrl(printUrl, {
       sourceUrl,
       contentType,
     );
-    const { error } = await admin.storage
-      .from("report-assets")
+    const { error } = await assetBucket(admin, "report-assets")
       .upload(path, buffer, { contentType, upsert: true });
     if (error) return null;
-    return admin.storage.from("report-assets").getPublicUrl(path).data.publicUrl;
+    return assetBucket(admin, "report-assets").getPublicUrl(path).data.publicUrl;
   },
   mirrorStylesheet: async (sourceUrl, buffer, contentType) => {
     const path = buildPdfStylesheetPath(
@@ -192,17 +192,15 @@ const pdfBuffer = await renderPdfFromUrl(printUrl, {
       report.id,
       sourceUrl,
     );
-    const { error } = await admin.storage
-      .from("report-assets")
+    const { error } = await assetBucket(admin, "report-assets")
       .upload(path, buffer, { contentType, upsert: true });
     if (error) return null;
-    return admin.storage.from("report-assets").getPublicUrl(path).data.publicUrl;
+    return assetBucket(admin, "report-assets").getPublicUrl(path).data.publicUrl;
   },
 });
 
 const pdfPath = `${report.agency_id}/${report.id}/delivery-report.pdf`;
-const { error: uploadError } = await admin.storage
-  .from("report-pdfs")
+const { error: uploadError } = await assetBucket(admin, "report-pdfs")
   .upload(pdfPath, pdfBuffer, { contentType: "application/pdf", upsert: true });
 
 if (uploadError) {
@@ -210,7 +208,7 @@ if (uploadError) {
   process.exit(1);
 }
 
-const { data: pdfPublic } = admin.storage.from("report-pdfs").getPublicUrl(pdfPath);
+const { data: pdfPublic } = assetBucket(admin, "report-pdfs").getPublicUrl(pdfPath);
 const pdfUrl = cacheBustedPdfUrl(pdfPublic.publicUrl, Date.now());
 
 await admin

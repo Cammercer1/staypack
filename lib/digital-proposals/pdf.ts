@@ -1,3 +1,4 @@
+import { assetBucket } from "@/lib/storage/bucket";
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { browserlessRequest, hasBrowserlessConfig } from "@/lib/browserless/client";
@@ -29,13 +30,13 @@ export async function prepareProposalPdf(agencyId: string, reportId: string, ver
     const buffer = snapshot.pdfReport ? await renderPdfFromUrl(proposalPrintUrl(versionId, base), {
       mirrorImage: async (url, bytes, contentType) => {
         const path = buildPdfImagePath(agencyId, versionId, url, contentType);
-        const result = await admin.storage.from("report-assets").upload(path, bytes, { contentType, upsert: true });
-        return result.error ? null : admin.storage.from("report-assets").getPublicUrl(path).data.publicUrl;
+        const result = await assetBucket(admin, "report-assets").upload(path, bytes, { contentType, upsert: true });
+        return result.error ? null : assetBucket(admin, "report-assets").getPublicUrl(path).data.publicUrl;
       },
       mirrorStylesheet: async (url, bytes, contentType) => {
         const path = buildPdfStylesheetPath(agencyId, versionId, url);
-        const result = await admin.storage.from("report-assets").upload(path, bytes, { contentType, upsert: true });
-        return result.error ? null : admin.storage.from("report-assets").getPublicUrl(path).data.publicUrl;
+        const result = await assetBucket(admin, "report-assets").upload(path, bytes, { contentType, upsert: true });
+        return result.error ? null : assetBucket(admin, "report-assets").getPublicUrl(path).data.publicUrl;
       },
     }) : await browserlessRequest("/pdf", {
       html: proposalPrintHtml(snapshot), emulateMediaType: "print",
@@ -47,7 +48,7 @@ export async function prepareProposalPdf(agencyId: string, reportId: string, ver
     if (!buffer || !Buffer.isBuffer(buffer) || !isPdf(buffer)) throw new Error("Invalid PDF response");
     const path = `${agencyId}/${reportId}/${versionId}.pdf`;
     stage = "upload";
-    const upload = await admin.storage.from("proposal-pdfs").upload(path, buffer, { contentType: "application/pdf", upsert: true });
+    const upload = await assetBucket(admin, "proposal-pdfs").upload(path, buffer, { contentType: "application/pdf", upsert: true });
     if (upload.error) throw new Error("PDF storage failed");
     stage = "status";
     const saved = await admin.from("digital_proposal_versions").update({ pdf_status: "ready", pdf_path: path }).eq("id", versionId);

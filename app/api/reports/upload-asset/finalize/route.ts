@@ -2,15 +2,21 @@ import { NextResponse } from "next/server";
 import { requireListingAccess, requireReportWithListing } from "@/lib/auth/requireUser";
 import { MAX_UPLOADED_IMAGES } from "@/lib/reports/constants";
 import { dedupeImageUrls } from "@/lib/listings/dedupeImageUrls";
+import { z } from "zod";
+import { verifyR2ImageUpload } from "@/lib/storage/signedUpload";
+
+const finalizeSchema = z.object({
+  report_id: z.string().optional(), listing_id: z.string().optional(),
+  paths: z.array(z.string()).max(MAX_UPLOADED_IMAGES).optional(),
+  uploads: z.array(z.object({ path: z.string(), provider: z.enum(["supabase", "r2"]) })).max(MAX_UPLOADED_IMAGES).optional(),
+});
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json().catch(() => null);
+    const body = finalizeSchema.parse(await request.json());
     const reportId = String(body?.report_id ?? "");
     const listingId = String(body?.listing_id ?? "");
-    const paths: string[] = Array.isArray(body?.paths)
-      ? body.paths.filter((path: unknown): path is string => typeof path === "string")
-      : [];
+    const uploads = body.uploads ?? (body.paths ?? []).map(path => ({ path, provider: "supabase" as const }));
 
     if (!reportId && !listingId) {
       return NextResponse.json(
@@ -19,7 +25,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (paths.length === 0) {
+    if (uploads.length === 0) {
       return NextResponse.json({ error: "No uploaded files to save" }, { status: 400 });
     }
 
@@ -31,9 +37,14 @@ export async function POST(request: Request) {
     const bucket = supabase.storage.from("report-assets");
     const newUrls: string[] = [];
 
-    for (const path of paths) {
-      if (!path.startsWith(prefix)) {
+    for (const { path, provider } of uploads) {
+      if (!path.startsWith(prefix) || path.slice(prefix.length).includes("/") || /[\\\x00-\x1f]/.test(path)) {
         return NextResponse.json({ error: "Invalid upload path" }, { status: 400 });
+      }
+
+      if (provider === "r2") {
+        newUrls.push(await verifyR2ImageUpload(path));
+        continue;
       }
 
       const {

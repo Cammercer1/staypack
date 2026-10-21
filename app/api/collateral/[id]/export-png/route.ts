@@ -1,3 +1,4 @@
+import { assetBucket } from "@/lib/storage/bucket";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCollateralAccess } from "@/lib/auth/requireUser";
@@ -89,8 +90,7 @@ export async function POST(
     const version = Date.now();
     const storagePath = `${agency.id}/collateral/${collateral.id}/${variant}-${version}.png`;
 
-    const { error: uploadError } = await admin.storage
-      .from("report-assets")
+    const { error: uploadError } = await assetBucket(admin, "report-assets")
       .upload(storagePath, pngBuffer, {
         contentType: "image/png",
         upsert: false,
@@ -103,7 +103,7 @@ export async function POST(
 
     const {
       data: { publicUrl },
-    } = admin.storage.from("report-assets").getPublicUrl(storagePath);
+    } = assetBucket(admin, "report-assets").getPublicUrl(storagePath);
 
     const pngUrl = withStorageCacheBust(publicUrl, version);
 
