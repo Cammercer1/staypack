@@ -13,6 +13,7 @@ import { resolveProposalBrand } from "./brand";
 import { applyAssignment, assignmentSchema, defaultAssignment } from "./assignment";
 import { validateProposalDraft, proposalDraftSchema } from "./template";
 import { attachmentSchema, proposalSnapshotSchema, type ProposalWorkspace } from "./workspace";
+import { preserveProposalImages } from "./imageStorage";
 
 import { ProposalError } from "./errors";
 export { ProposalError } from "./errors";
@@ -110,12 +111,18 @@ export async function publishProposal(context: Context, revision: number, source
   if (draft.pages.some(page => page.enabled && page.kind === "text" && !page.body.trim())) throw new ProposalError("Add content to each enabled text page before publishing.");
   if ((draft.links.length || draft.attachmentIds.length || draft.agentIds.length) && !draft.pages.some(page => page.enabled && page.kind === "next_steps")) throw new ProposalError("Include the Next steps page to share agents, documents and action links.");
   const data = withProposalAgents(context.data, draft.agentIds, context.availableAgents);
-  const snapshot = proposalSnapshotSchema.parse({ version: 1, data, draft: { ...draft, pages: draft.pages.filter(page => page.enabled) },
+  const sourceSnapshot = proposalSnapshotSchema.parse({ version: 1, data, draft: { ...draft, pages: draft.pages.filter(page => page.enabled) },
     brand: resolveProposalBrand({ presetId: draft.presetId, template: draft.brandOverrides }).values,
     attachments: await selectedAttachments(context, draft.attachmentIds),
     assignment: { name: context.assignment.name, version: context.assignment.version },
     pdfReport: context.pdfReport ? withPdfAgents(context.pdfReport, data.agents) : undefined,
   });
+  let snapshot: typeof sourceSnapshot;
+  try { snapshot = await preserveProposalImages(sourceSnapshot, context.agency.id); }
+  catch {
+    // Do not publish a new link with images that still depend on an external host.
+    throw new ProposalError("We couldn't save a permanent copy of every proposal image. Check that the photos and logos still load, then try publishing again. Your existing links are unchanged.", 503);
+  }
   const result = await createAdminClient().rpc("publish_digital_proposal_v2", {
     p_agency_id: context.agency.id, p_report_id: context.report.id, p_revision: revision,
     p_snapshot: snapshot, p_token: randomBytes(32).toString("hex"),

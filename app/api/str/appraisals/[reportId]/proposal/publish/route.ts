@@ -4,6 +4,7 @@ import { z } from "zod";
 import { privateJson } from "@/lib/str-appraisals/api";
 import { proposalContext, publishProposal } from "@/lib/digital-proposals/server";
 import { proposalApiError, proposalRequest } from "@/lib/digital-proposals/http";
+export const maxDuration = 60;
 export async function POST(request: Request, { params }: { params: Promise<{ reportId: string }> }) {
   try {
     const context = await proposalContext((await params).reportId, request);

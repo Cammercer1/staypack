@@ -11,6 +11,7 @@ import { prospectProfileSchema } from "../lib/prospects/profile";
 import { saveProspectBrand } from "../lib/prospects/repository";
 import { prospectPublicPath, prospectSlugCandidates } from "../lib/prospects/publicLinks";
 import { buildProspectProposal } from "../lib/prospects/buildProposal";
+import { preserveProposalImages } from "../lib/digital-proposals/imageStorage";
 import { importDomainProperty } from "../lib/domain-avm/propertyLookup";
 import { fetchStrEstimate } from "../lib/str/estimate";
 import { geocodeReportAddress } from "../lib/geocoding";
@@ -51,12 +52,13 @@ async function main() {
   const brandId = await saveProspectBrand(ownerId, profile);
   const propertyOverrides = values.overrides ? JSON.parse(readFileSync(values.overrides, "utf8")) : {};
   const { snapshot, overrides, finalEstimate } = buildProspectProposal({ profile, brandId, proposalId, listing, ...inputs, propertyOverrides });
+  const publishedSnapshot = values.publish ? await preserveProposalImages(snapshot, `prospects/${brandId}`) : snapshot;
   const token = values.publish ? randomBytes(32).toString("hex") : null;
   const record = {
     id: proposalId, brand_id: brandId, owner_user_id: ownerId,
     property_address: `${listing.property_address}, ${listing.suburb}, ${listing.state} ${listing.postcode}`,
     source_listing_json: listing, original_estimate_json: inputs.estimate, enrichment_json: inputs.enrichment,
-    overrides_json: overrides, brand_snapshot_json: profile, final_report_json: snapshot,
+    overrides_json: overrides, brand_snapshot_json: profile, final_report_json: publishedSnapshot,
     public_token: token, published_at: token ? new Date().toISOString() : null,
   };
   const candidates = token ? prospectSlugCandidates(profile.slug, snapshot.data.property.address, snapshot.data.property.suburb, proposalId) : [null];
