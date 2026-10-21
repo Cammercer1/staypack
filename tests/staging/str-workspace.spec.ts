@@ -9,7 +9,6 @@ import { createLintRegressionFixtures } from "../../components/dev/lintRegressio
 test("release: desktop/mobile STR navigation, appraisal, saved proposal and public sharing", async ({ page, context, browser, baseURL }, testInfo) => {
   test.skip(process.env.STR_LIVE_TEST !== "1", "Requires explicit live integration opt-in and backend credentials.");
   test.setTimeout(240_000);
-  page.setDefaultTimeout(15_000);
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   const agencyId = randomUUID(), listingId = randomUUID();
   const address = "12 Release QA Esplanade, Byron Bay NSW 2481";
