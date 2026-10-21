@@ -76,12 +76,19 @@ async function recovery(row: Row, source: string) {
     throw new Error(`Cannot recover image ${source}: ${error instanceof Error ? error.message : "download failed"}`);
   }
 }
+const verifiedImages = new Set<string>();
 async function verifyImages(snapshot: unknown) {
-  for (const url of proposalImageUrls(snapshot)) {
-    assert.ok(url.startsWith(`${r2Configuration().publicBaseUrl}/report-assets/`) && /\/published-images\/[a-f0-9]{64}\.(jpg|png|webp|gif|avif)$/.test(url), "Image is not preserved");
-    const bytes = await fetchExportImage(url);
-    assert.equal(digest(bytes.buffer), url.split("/").at(-1)!.split(".")[0], "Public image checksum differs");
-  }
+  const urls = proposalImageUrls(snapshot).filter(url => !verifiedImages.has(url));
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(6, urls.length) }, async () => {
+    while (next < urls.length) {
+      const url = urls[next++];
+      assert.ok(url.startsWith(`${r2Configuration().publicBaseUrl}/report-assets/`) && /\/published-images\/[a-f0-9]{64}\.(jpg|png|webp|gif|avif)$/.test(url), "Image is not preserved");
+      const bytes = await fetchExportImage(url);
+      assert.equal(digest(bytes.buffer), url.split("/").at(-1)!.split(".")[0], "Public image checksum differs");
+      verifiedImages.add(url);
+    }
+  }));
 }
 async function main() {
   const mode = process.argv[2] ?? "prepare";

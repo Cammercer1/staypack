@@ -67,7 +67,13 @@ export async function preserveProposalImages<T>(snapshot: T, scope: string, opti
           publicUrl = absolute;
         } else {
           const recovered = await options.recover?.(source);
-          const image = await validatedImage(recovered ?? await fetchExportImage(absolute, controller.signal));
+          const original = recovered ?? await fetchExportImage(absolute, controller.signal);
+          let image: Awaited<ReturnType<typeof validatedImage>>;
+          try { image = await validatedImage(original); }
+          catch (error) {
+            // Identify malformed source responses without logging signed URLs.
+            throw new Error(`${error instanceof Error ? error.message : "Invalid image"}; host=${new URL(absolute).hostname}; source=${sha256(Buffer.from(source)).slice(0, 16)}; bytes=${original.buffer.length}; signature=${original.buffer.subarray(0, 8).toString("hex")}`);
+          }
           controller.signal.throwIfAborted();
           const hash = sha256(image.buffer);
           const path = `${scope}/published-images/${hash}.${image.extension}`;
