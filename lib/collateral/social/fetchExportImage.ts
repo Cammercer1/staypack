@@ -74,7 +74,7 @@ async function requestImage(url: URL, signal: AbortSignal): Promise<IncomingMess
         else callback(null, address.address, address.family);
       },
       signal,
-      headers: { Accept: "image/*", "Accept-Encoding": "identity" },
+      headers: { Accept: "image/*", "Accept-Encoding": "identity", "User-Agent": "StayPack/1.0 (+https://staypack.app)" },
     }, resolve);
     request.on("error", reject);
     request.end();
@@ -82,9 +82,12 @@ async function requestImage(url: URL, signal: AbortSignal): Promise<IncomingMess
 }
 
 /** Authenticated image proxy: only public destinations, bounded redirects and body. */
-export async function fetchExportImage(value: string) {
+export async function fetchExportImage(value: string, signal?: AbortSignal) {
   let target = imageUrl(value);
   const controller = new AbortController();
+  const abort = () => controller.abort(signal?.reason);
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) abort();
   const timeout = setTimeout(() => controller.abort(new Error("Image request timed out")), FETCH_TIMEOUT_MS);
   try {
     for (let followed = 0; ; followed++) {
@@ -125,5 +128,5 @@ export async function fetchExportImage(value: string) {
   } catch (error) {
     if (controller.signal.aborted) throw controller.signal.reason;
     throw error;
-  } finally { clearTimeout(timeout); }
+  } finally { clearTimeout(timeout); signal?.removeEventListener("abort", abort); }
 }

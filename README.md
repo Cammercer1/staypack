@@ -168,6 +168,33 @@ exports), and PUT from the configured StayPack origins with `Content-Type`,
 browser uploads there. Older open browser sessions can finish their original Supabase
 upload protocol; newly loaded clients use R2.
 
+Publishing a digital proposal copies its photos, logos, agent portraits, comparable
+images and service images into `report-assets/<agency>/published-images/` in R2.
+Public URLs are based on a SHA-256 checksum and are never overwritten. Every copy
+is downloaded and verified before the proposal snapshot and share link are saved.
+If an image cannot be preserved, publication fails and existing links stay intact.
+The online proposal and newly generated PDFs use the saved copies. Drafts still use
+their source images. Published prospect examples use the same process under
+`report-assets/prospects/<brand>/published-images/`.
+
+Keep `published-images/` objects permanently while any published version references
+them; do not include them in temporary PDF-image cleanup or expiry rules.
+
+Existing proposal snapshots can be backfilled with the commands below (Node 24,
+R2 server environment). Preparation saves private original snapshots, copies and
+verifies images, and produces an all-or-nothing readiness plan. Apply checks for
+concurrent changes before updating only image URLs and the snapshot cache hash;
+version IDs, share tokens, public slugs, attachments and PDF paths stay unchanged.
+`verify` checks every image checksum and all original share-link records. `rollback`
+restores the backed-up snapshots without overwriting later edits. Keep the ignored
+`tmp/proposal-image-preservation/` directory, which contains private share tokens.
+
+```bash
+npx --yes --package=tsx@4.23.15 tsx --env-file=.env.local scripts/preserve-published-proposal-images.ts prepare
+npx --yes --package=tsx@4.23.15 tsx --env-file=.env.local scripts/preserve-published-proposal-images.ts apply
+npx --yes --package=tsx@4.23.15 tsx --env-file=.env.local scripts/preserve-published-proposal-images.ts verify
+```
+
 ### Migration and rollback
 
 The October 2026 migration preserves published report JSON and existing URLs. Original

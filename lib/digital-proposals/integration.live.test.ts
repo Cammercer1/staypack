@@ -10,7 +10,8 @@ import type { ProposalWorkspace } from "./workspace";
 import { proposalPrintUrl } from "./printAccess";
 import havenlyAssignment from "./assignments/havenly.json";
 import { usesR2Storage, r2Client, r2Configuration } from "@/lib/storage/r2";
-import { DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand } from "@aws-sdk/client-s3";
+import { proposalImageUrls } from "./imageSnapshot";
 
 // Only disposable agencies/users. No estimate/import/copy APIs or messages.
 it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, assignment, snapshots, documents, analytics and PDF", async () => {
@@ -20,6 +21,7 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
   const userIds: string[] = [];
   const agentIds = [randomUUID(), randomUUID()], foreignAgentId = randomUUID(), archivedAgentId = randomUUID();
   const paths: { bucket: string; path: string }[] = [];
+  let sourceImage: { path: string; url: string; bytes: Buffer } | undefined;
   const check = <T extends { data: unknown; error: { message: string } | null }>(result: T): NonNullable<T["data"]> => {
     if (result.error) throw new Error(result.error.message); return result.data as NonNullable<T["data"]>;
   };
@@ -63,6 +65,8 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
       expect(finalized.uploaded_image_urls).toContain(upload.publicUrl);
       expect(upload.publicUrl).toMatch(/^https:\/\/assets\.staypack\.app\//);
       expect(Buffer.from(await (await fetch(upload.publicUrl)).arrayBuffer())).toEqual(image);
+      sourceImage = { path: upload.path, url: upload.publicUrl, bytes: image };
+      check(await admin.from("listings").update({ hero_image_url: upload.publicUrl, selected_image_urls: [upload.publicUrl, ...photos.slice(1)] }).eq("id", listingId));
       const imageForm = new FormData(); imageForm.set("listing_id", listingId); imageForm.set("file", new File([image], "qa-server.png", { type: "image/png" }));
       const serverUpload = await fetch(`${origin}/api/reports/upload-asset`, { method: "POST", headers: { Cookie: cookieHeaders[0], Origin: origin }, body: imageForm });
       expect(serverUpload.status).toBe(200);
@@ -106,6 +110,12 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
     const first = (await json(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint })).version;
     const repeated = (await json(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint })).version;
     expect(repeated.id).toBe(first.id); expect(repeated.path).toBe(first.path);
+    if (usesR2Storage()) {
+      const frozen = check(await admin.from("digital_proposal_versions").select("final_report_json").eq("id", first.id).single()).final_report_json;
+      expect(proposalImageUrls(frozen).length).toBeGreaterThan(0);
+      for (const url of proposalImageUrls(frozen)) expect(url).toContain(`/report-assets/${agencyId}/published-images/`);
+      expect(frozen.data.property.heroImageUrl).not.toBe(sourceImage!.url);
+    }
     const publicPath = first.path; const token = publicPath.split("/").pop();
     if (process.env.STR_HAVEN_TEST === "1") {
       const frozen = check(await admin.from("digital_proposal_versions").select("final_report_json").eq("id", first.id).single()).final_report_json;
@@ -165,6 +175,18 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
     expect((await api(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint })).status).toBe(409);
     workspace = await json(root); expect(workspace.data!.recipient!.displayName).toBe("Alex QA");
     const second = (await json(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint })).version; expect(second.id).not.toBe(first.id);
+    if (sourceImage) {
+      const source = { Bucket: r2Configuration().publicBucket, Key: `report-assets/${sourceImage.path}` };
+      await r2Client().send(new DeleteObjectCommand(source));
+      await expect(r2Client().send(new HeadObjectCommand(source))).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+      const frozen = check(await admin.from("digital_proposal_versions").select("final_report_json").eq("id", second.id).single()).final_report_json;
+      const response = await fetch(frozen.data.property.heroImageUrl);
+      expect(response.status).toBe(200);
+      expect(Buffer.from(await response.arrayBuffer())).toEqual(sourceImage.bytes);
+      const page = await (await api(second.path, "GET", undefined, 2)).text();
+      expect(page).toContain(frozen.data.property.heroImageUrl);
+      expect(page).not.toContain(sourceImage.url);
+    }
     expect(await (await api(first.path, "GET", undefined, 2)).text()).toContain("Jordan QA");
     expect(await (await api(second.path, "GET", undefined, 2)).text()).toContain("Alex QA");
     if (process.env.STR_PDF_TEST === "1") {
@@ -175,6 +197,9 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
       if (process.env.STR_HAVEN_TEST === "1") expect(buffer.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length, "Havenly's PDF must retain its two-page layout").toBe(2);
       mkdirSync("tmp/pdfs", { recursive: true }); writeFileSync("tmp/pdfs/proposal-integration-qa.pdf", buffer);
     }
+    // Later publishes intentionally read the draft's source again. Restore only
+    // this test's disposable original after proving the saved page/PDF survives it.
+    if (sourceImage) await r2Client().send(new PutObjectCommand({ Bucket: r2Configuration().publicBucket, Key: `report-assets/${sourceImage.path}`, Body: sourceImage.bytes, ContentType: "image/png", IfNoneMatch: "*" }));
     await json(`${root}/revoke`, "POST", { versionId: first.id, linkId: first.link_id });
     expect((await api(first.path, "GET", undefined, 2)).status).toBe(404);
     expect((await api(`/api/proposals/${token}/attachments/${attachment.id}`, "GET", undefined, 2)).status).toBe(404);
