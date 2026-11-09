@@ -8,6 +8,27 @@ The `public_slug` is saved once at publication. Repeated property examples get a
 
 Both URL namespaces send `X-Robots-Tag: noindex, nofollow, noarchive` plus HTML noindex metadata and no-store headers. They are absent from sitemaps and public navigation, with no examples index or company directory. Do not block these paths in robots.txt: crawlers need to read the noindex directive. Noindex is not access control.
 
+Public rendering checks publication and revocation with an explicit `no-store`
+request on every visit, then reads the frozen snapshot from the server's internal
+Next Data Cache (24 hours, keyed by proposal ID and `published_at`). HTML and RSC
+responses remain private/no-store. Never cache the access decision or serve a
+cached report on an access-check error. Administrative changes to an already
+published snapshot must also advance `published_at` to change its cache key.
+
+Only agency name, logo and primary colours are separately cached for one hour
+and may appear in the streaming loading screen before authorization completes.
+A revoked link can briefly show that branding, but no property, recipient,
+estimate or report metadata is released. Existing downloaded content cannot be
+recalled; the guarantee applies to subsequent requests. Keep `revalidate = 0`
+on the example routes: `force-dynamic` would disable the explicit content cache.
+
+After building, verify actual Next caching/streaming and warm-cache revocation
+with synthetic data (no production writes):
+
+```sh
+docker compose exec app node scripts/verify-public-proposal-cache.mjs
+```
+
 ## Create another example
 
 Use the Docker environment (Node 24 and server credentials). Prepare/validate a profile using `prospectProfileSchema`, then run:

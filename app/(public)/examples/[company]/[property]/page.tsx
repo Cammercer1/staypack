@@ -1,10 +1,12 @@
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { MultiPageProposal } from "@/components/digital-proposals/MultiPageProposal";
-import { publishedProspectProposalBySlug } from "@/lib/prospects/server";
+import { PublicProposal } from "@/components/digital-proposals/PublicProposal";
+import { ProposalLoading } from "@/components/digital-proposals/ProposalLoading";
+import { publishedProspectProposalBySlug, prospectLoadingBrand } from "@/lib/prospects/published";
 
-export const dynamic = "force-dynamic";
+// Dynamic HTML + fresh authorization, but allow explicit internal content/branding caches.
+export const revalidate = 0;
 const getProposal = cache(publishedProspectProposalBySlug);
 
 type ExampleParams = { company: string; property: string };
@@ -26,9 +28,17 @@ export async function generateMetadata({ params }: { params: Promise<ExamplePara
   };
 }
 
-export default async function ExampleProposalPage({ params, searchParams }: {
+type PageProps = {
   params: Promise<ExampleParams>; searchParams: Promise<{ page?: string }>;
-}) {
+};
+
+export default async function ExampleProposalPage(props: PageProps) {
+  const { company, property } = await props.params;
+  const brand = await prospectLoadingBrand("public_slug", `${company}/${property}`);
+  return <Suspense fallback={<ProposalLoading brand={brand} />}><AuthorizedExample {...props} /></Suspense>;
+}
+
+async function AuthorizedExample({ params, searchParams }: PageProps) {
   const { company, property } = await params;
   const slug = `${company}/${property}`;
   const proposal = await getProposal(slug);
@@ -36,6 +46,6 @@ export default async function ExampleProposalPage({ params, searchParams }: {
   const page = (await searchParams).page;
   const { data, draft, brand } = proposal.snapshot;
   if (page && !draft.pages.some(item => item.enabled && item.id === page)) notFound();
-  return <main><MultiPageProposal fullViewport exampleAgreement data={data} draft={draft} brand={brand}
+  return <main><PublicProposal fullViewport exampleAgreement data={data} draft={draft} brand={brand}
     initialPage={page} publicPath={`/examples/${slug}`} /></main>;
 }

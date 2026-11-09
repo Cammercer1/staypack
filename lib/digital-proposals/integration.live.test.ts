@@ -29,6 +29,16 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
   async function api(path: string, method = "GET", body?: unknown, actor = 0) {
     return fetch(`${origin}${path}`, { method, redirect: "manual", headers: { "Content-Type": "application/json", Origin: origin, Cookie: cookieHeaders[actor] ?? "", "User-Agent": "Mozilla/5.0 Safari/605.1" }, ...(body ? { body: JSON.stringify(body) } : {}) });
   }
+  async function expectUnavailablePublicPage(path: string) {
+    const response = await api(path, "GET", undefined, 2);
+    const html = await response.text();
+    // Streaming the branding shell commits HTTP 200 before Next can render notFound().
+    expect([200, 404]).toContain(response.status);
+    expect(html).toMatch(/404|NEXT_HTTP_ERROR_FALLBACK/);
+    for (const privateContent of ["Jordan QA", "Alex QA", "12 Proposal Test Esplanade"]) {
+      expect(html).not.toContain(privateContent);
+    }
+  }
   async function json(path: string, method = "GET", body?: unknown) {
     const response = await api(path, method, body);
     const payload = await response.json();
@@ -206,29 +216,29 @@ it.skipIf(process.env.STR_LIVE_TEST !== "1")("live digital workflow: isolation, 
     // this test's disposable original after proving the saved page/PDF survives it.
     if (sourceImage) await r2Client().send(new PutObjectCommand({ Bucket: r2Configuration().publicBucket, Key: `report-assets/${sourceImage.path}`, Body: sourceImage.bytes, ContentType: "image/png", IfNoneMatch: "*" }));
     await json(`${root}/revoke`, "POST", { versionId: first.id, linkId: first.link_id });
-    expect((await api(first.path, "GET", undefined, 2)).status).toBe(404);
+    await expectUnavailablePublicPage(first.path);
     expect((await api(`/api/proposals/${token}/attachments/${attachment.id}`, "GET", undefined, 2)).status).toBe(404);
-    expect((await api(second.path, "GET", undefined, 2)).status).toBe(404);
+    await expectUnavailablePublicPage(second.path);
     const regenerated = (await json(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint })).version; expect(regenerated.id).toBe(second.id);
     await json(`${root}/revoke`, "POST", { versionId: regenerated.id, linkId: regenerated.link_id });
     const replacement = (await json(`${root}/publish`, "POST", { revision: saved.revision, sourceFingerprint: workspace.sourceFingerprint })).version;
     expect(replacement.id).toBe(second.id); expect(replacement.path).not.toBe(second.path);
-    expect((await api(second.path, "GET", undefined, 2)).status).toBe(404);
+    await expectUnavailablePublicPage(second.path);
     expect((await api(replacement.path, "GET", undefined, 2)).status).toBe(200);
     check(await admin.from("agent_profiles").update({ name: "Edited after publication" }).eq("id", agentIds[0]));
     const frozenContacts = await (await api(`${replacement.path}&page=next-steps`, "GET", undefined, 2)).text();
     expect(frozenContacts).toContain("Alex Adviser"); expect(frozenContacts).not.toContain("Edited after publication");
     // Access must remain fresh after multiple visits have warmed the immutable snapshot.
     check(await admin.from("digital_proposal_versions").update({ revoked_at: new Date().toISOString() }).eq("id", replacement.id));
-    expect((await api(replacement.path, "GET", undefined, 2)).status).toBe(404);
+    await expectUnavailablePublicPage(replacement.path);
     check(await admin.from("digital_proposal_versions").update({ revoked_at: null }).eq("id", replacement.id));
     // Even an administrator clearing version revocation cannot resurrect its issued token.
-    expect((await api(replacement.path, "GET", undefined, 2)).status).toBe(404);
+    await expectUnavailablePublicPage(replacement.path);
     check(await admin.from("listings").update({ status: "archived" }).eq("id", listingId));
-    expect((await api(replacement.path, "GET", undefined, 2)).status).toBe(404);
+    await expectUnavailablePublicPage(replacement.path);
     expect((await api(replacement.pdfPath, "GET", undefined, 2)).status).toBe(404);
     await json(`/api/str/appraisals/${reportId}`, "DELETE");
-    expect((await api(second.path, "GET", undefined, 2)).status).toBe(404);
+    await expectUnavailablePublicPage(second.path);
     expect((await api(second.pdfPath, "GET", undefined, 2)).status).toBe(404);
   } finally {
     const signOuts = await Promise.allSettled(accessTokens.map(token => admin.auth.admin.signOut(token, "global")));

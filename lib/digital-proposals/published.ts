@@ -2,6 +2,8 @@ import "server-only";
 import { z } from "zod";
 import { ProposalError } from "./errors";
 import { viewerSnapshotSchema } from "./viewerSnapshot";
+import { databaseRequest } from "@/lib/supabase/rest";
+import { LOADING_BRAND_SELECT, loadingBrandSchema } from "./loadingBrand";
 
 export { ProposalError } from "./errors";
 
@@ -14,14 +16,23 @@ const accessSchema = z.object({
   }),
 });
 
-function databaseRequest(table: string, query: Record<string, string>) {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!base || !key) throw new Error("Missing Supabase service role configuration");
-  return {
-    url: `${base}/rest/v1/${table}?${new URLSearchParams(query)}`,
-    headers: { apikey: key, Authorization: `Bearer ${key}` },
-  };
+/** Only public agency branding may be rendered before the separate, fresh access check. */
+export async function proposalLoadingBrand(token: string, versionId?: string) {
+  if (!/^[a-f0-9]{64}$/.test(token) || (versionId !== undefined && !z.uuid().safeParse(versionId).success)) return null;
+  const fields = `${LOADING_BRAND_SELECT},report:reports!inner(listing:listings!inner(id))`;
+  const scope = { "version.revoked_at": "is.null", "version.report.status": "neq.archived", "version.report.listing.status": "neq.archived", limit: "1" };
+  const request = versionId ? databaseRequest("digital_proposal_link_versions", {
+    select: `link:digital_proposal_links!inner(id),version:digital_proposal_versions!inner(${fields})`,
+    "link.token": `eq.${token}`, "link.revoked_at": "is.null", version_id: `eq.${versionId}`, ...scope,
+  }) : databaseRequest("digital_proposal_links", {
+    select: `version:digital_proposal_versions!digital_proposal_links_agency_id_report_id_version_id_fkey!inner(${fields})`, token: `eq.${token}`, revoked_at: "is.null", ...scope,
+  });
+  try {
+    const response = await fetch(request.url, { headers: request.headers, cache: "force-cache", next: { revalidate: 3600 } });
+    if (!response.ok) return null;
+    const rows = await response.json();
+    return loadingBrandSchema.safeParse(rows[0]?.version).data ?? null;
+  } catch { return null; }
 }
 
 /** Fresh scoped joins preserve revocation and archive boundaries on every request. */
