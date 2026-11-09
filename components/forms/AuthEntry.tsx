@@ -16,8 +16,13 @@ export function AuthEntry({ mode }: { mode: "login" | "signup" }) {
     let active = true;
     // This is only a navigation hint. Protected pages and APIs verify the user
     // and current agency membership on the server before returning private data.
-    void createClient().auth.getSession().then(({ data }) => {
-      if (active && data.session) router.replace(next);
+    const supabase = createClient();
+    void supabase.auth.getSession().then(async ({ data }) => {
+      if (!active || !data.session) return;
+      // A stale local session must not bounce a rejected/deleted user between
+      // login and the protected page. Anonymous visitors need no auth request.
+      const verified = await supabase.auth.getUser();
+      if (active && verified.data.user) router.replace(next);
     }).catch(() => {});
     return () => { active = false; };
   }, [next, router]);
