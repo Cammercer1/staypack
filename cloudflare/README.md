@@ -6,6 +6,12 @@ application remains the origin for dashboard, APIs, jobs and private print
 rendering. `/proposal/print/*` passes through to that origin. This is a standalone
 Worker built from the shared report reader and renderer, without a Next runtime.
 
+The Worker uses a placement hint near `aws:ap-northeast-1`, matching the primary
+database in Tokyo. This avoids repeated intercontinental database round trips;
+static assets still run nearest to visitors. If the primary database moves,
+update this hint and repeat regional timing and revocation checks. Do not point
+it at a replica to avoid the primary access check.
+
 The Worker uses the primary Supabase project `qmtfugaeujeikyegoxwi`. Every report
 request checks live publication, revocation and archive state before reading a
 snapshot. Only immutable snapshots use the bounded in-memory cache. Report HTML,
@@ -82,23 +88,23 @@ References: [Workers execution model](https://developers.cloudflare.com/workers/
 
 ## Live verification — 9 November 2026
 
-Worker version `2b80bdb2-672e-48ce-b7b1-f3c05da87282` deployed successfully on
-Workers Free. Deployment reported 32 ms startup. The first regional requests,
+Worker version `e620229f-383e-4104-a6ea-9cbf5da8ca95` deployed successfully on
+Workers Free with Tokyo placement. Deployment reported 35 ms startup. The first regional requests,
 before warming the new deployment, returned HTTP 200 through Cloudflare:
 
 | Probe | First response | Total request | Repeat response |
 | --- | ---: | ---: | ---: |
-| Sydney | 1,018 ms | 1,047 ms | 351 ms |
-| Melbourne | 892 ms | 1,130 ms | 752 ms |
-| Los Angeles | 879 ms | 932 ms | 1,072 ms |
-| New York | 1,320 ms | 1,373 ms | 1,251 ms |
+| Sydney | 814 ms | 839 ms | 318 ms |
+| Melbourne | 814 ms | 838 ms | 174 ms |
+| Los Angeles | 858 ms | 906 ms | 391 ms |
+| New York | 845 ms | 878 ms | 212 ms |
 
-Globalping measurement IDs: `2sZsDniNBWsfkn3yG00021TEp` (first requests) and
-`2QcbkltF0lyeirkZJ00021TEq` (repeats), using the same four probes as the Netlify
+Globalping measurement IDs: `2J4hzqJLksp7h41vY00021TEu` (first requests) and
+`2Ur7cQPa2nsAEy92L00021TEu` (repeats), using the same four probes as the Netlify
 baseline. First response excludes DNS/TCP/TLS setup; total request includes it.
 These are point-in-time observations, not latency guarantees.
 
-Fresh browser contexts showed the report in 2.94 seconds on desktop and 1.72
+Fresh browser contexts showed the report in 1.48 seconds on desktop and 1.38
 seconds on mobile. Delaying CSS confirmed the Property Providers logo on its
 primary blue background, followed by the styled report. There were no browser
 errors or horizontal overflow. Anonymous dashboard access redirected to login;
@@ -108,7 +114,12 @@ Disposable live database fixtures passed 20 active reads and 12 revocation check
 covering example tokens/canonical URLs, revoked shared links, revoked pinned
 versions and archived reports, including RSC requests. The same four regional
 probes warmed a fictional example and then all received 404 after revocation
-(161–401 ms), with no report data. Fixtures were removed after verification.
+(231–300 ms), with no report data. Fixtures were removed after verification.
+
+Before adding the database placement hint, the Cloudflare deployment returned
+first responses in 879–1,320 ms and repeats in 351–1,251 ms. The placement change
+reduced the remaining database network delay without changing access checks or
+enabling a paid service. See [placement documentation](https://developers.cloudflare.com/workers/configuration/placement/).
 
 Initial aggregate telemetry reported 54 requests, zero runtime errors, 4.14 ms
 median CPU and 36.80 ms p99 CPU. The Free plan tolerates occasional overruns but
