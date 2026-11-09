@@ -56,7 +56,7 @@ next-env.d.ts
 /public/_report-viewer/
 /netlify/edge-functions/public-reports.js
 /.report-worker/
-/.wrangler/
+**/.wrangler/
 **/.dev.vars*
 
 # Local Supabase CLI cache

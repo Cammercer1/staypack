@@ -1,5 +1,6 @@
 {
   "name": "staypack-public-reports",
+  "account_id": "fc594f30144c9ba2a1cb9a5c3ce1313a",
   "main": "../.report-worker/worker.js",
   "compatibility_date": "2026-11-09",
   "workers_dev": false,

@@ -68,8 +68,10 @@ reverted.
 
 Cloudflare Workers is the selected report delivery target. Its isolate runtime
 avoids a Node server startup, and the existing domain already uses Cloudflare.
-Use Workers Paid for production headroom (US$5/month plus usage beyond included
-allowances); the Free plan allows only 10 ms CPU per invocation. Do not move or
+The initial rollout tests the existing Free plan at the owner's request. Monitor
+CPU limits and runtime failures during live verification; it allows only 10 ms
+CPU per invocation. Workers Paid offers more headroom (US$5/month plus usage
+beyond included allowances), but requires a separate approved upgrade. Do not move or
 replicate the database merely to improve report delivery: fresh primary checks
 are necessary for immediate revocation.
 
