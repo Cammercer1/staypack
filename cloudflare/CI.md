@@ -39,6 +39,12 @@ These are the actual UI components with synthetic records. Saves remain in that
 tab's memory and reset on reload. The dashboard's normal application links are
 not live navigation: use the preview's screen selector.
 
+The same Chromium suite can verify a deployed private preview. Set
+`CI_PREVIEW_URL` to its workers.dev origin and `CI_PREVIEW_PASSWORD` securely in
+the process environment, then run `npx playwright test --config playwright.ci.config.ts`.
+The configuration rejects production/custom-domain targets and starts no local
+server in this mode. Never put the password in a command argument, URL or log.
+
 No preview receives customer records, a hosted Supabase connection, service-role
 keys, provider credentials, queue bindings, cron triggers or production routes.
 The server blocks live API and application routes, and browser connections are

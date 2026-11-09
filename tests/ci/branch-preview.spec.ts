@@ -10,6 +10,7 @@ test("branch preview protects assets, blocks live endpoints and renders syntheti
   await expect(page.getByRole("heading", { name: "Private branch preview", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Start mock test session" }).click();
   await expect(page.getByRole("heading", { name: "Your appraisals.", exact: true })).toBeVisible();
+  await expect(page.getByText("Prepared for Preview Client", { exact: true })).toBeVisible();
   await page.getByLabel("Test screen", { exact: true }).selectOption("str-workspace");
   await page.getByRole("tab", { name: "Check proposal", exact: true }).click();
   await page.getByRole("button", { name: /Edit pages/ }).click();
