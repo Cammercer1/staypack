@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useForm } from "react-hook-form";
 import { createLintRegressionFixtures, installRegressionMocks, type RegressionFixtures } from "./lintRegressionFixtures";
 import { DashboardAnalytics } from "@/components/dashboard/DashboardAnalytics";
+import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
 import { LeadsInbox } from "@/components/leads/LeadsInbox";
 import { ListingImageGallery } from "@/components/listings/ListingImageGallery";
 import { ListingAgentsStrip } from "@/components/listings/ListingAgentsStrip";
@@ -36,11 +37,11 @@ import type { AgencyInput } from "@/lib/validation/schemas";
 const cases = ["brochure", "sales-brochure-new", "lease-brochure-new", "brochure-generation", "editor", "wizard", "report", "gallery", "landing", "agents", "unknown-agents", "branding", "analytics", "leads", "progress", "social", "report-wizard", "str-new", "str-first", "lease-wizard", "sales-wizard", "lease-new", "sales-new", "appraisal-generation", "workspace", "business-card"] as const;
 const subscribeToHydration = () => () => {};
 
-export function LintRegressionPlayground() {
+export function LintRegressionPlayground({ branchPreview = false }: { branchPreview?: boolean }) {
   const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const [fixtures] = useState(createLintRegressionFixtures);
   const [started, setStarted] = useState(false);
-  const [selected, setSelected] = useState<string>("brochure");
+  const [selected, setSelected] = useState<string>(branchPreview ? "dashboard" : "brochure");
   const [requests, setRequests] = useState<string[]>([]);
   const restore = useRef<(() => void) | null>(null);
   useEffect(() => () => restore.current?.(), []);
@@ -52,15 +53,16 @@ export function LintRegressionPlayground() {
 
   return <main className="mx-auto max-w-7xl space-y-5 p-6">
     <header className="space-y-3 rounded-xl border bg-amber-50 p-4 text-slate-900">
-      <h1 className="text-2xl font-semibold">StayPack mock regression preview</h1>
+      <h1 className="text-2xl font-semibold">{branchPreview ? "Private branch preview" : "StayPack mock regression preview"}</h1>
       <p>Synthetic listing and agency. Saves stay in this browser tab and reset on reload.</p>
+      {branchPreview && <p>Use the screen selector to review this branch. Live login, publishing, PDFs, messages and background jobs are disabled.</p>}
       {!started ? <Button disabled={!hydrated} onClick={start}>Start mock test session</Button> : <label>Test screen <select aria-label="Test screen" value={selected} onChange={(e) => {
         const name = e.target.value;
         restore.current?.();
         setRequests([]);
         restore.current = installRegressionMocks(name === "str-first" ? { ...fixtures, agency: { ...fixtures.agency, str_management_presets: [] } } : fixtures, (label) => setRequests((items) => [...items, label]), name === "str-new" || name === "str-first" ? "str" : name === "lease-new" ? "lease" : name === "sales-new" ? "sales" : name === "sales-brochure-new" ? "sales_brochure" : name === "lease-brochure-new" ? "rental_brochure" : undefined);
         setSelected(name);
-      }} className="ml-3 rounded border p-2">{cases.map((name) => <option key={name}>{name}</option>)}</select></label>}
+      }} className="ml-3 rounded border p-2">{[...(branchPreview ? ["dashboard", "str-workspace"] : []), ...cases].map((name) => <option key={name}>{name}</option>)}</select></label>}
     </header>
     {started && <RegressionCase key={selected} name={selected} fixtures={fixtures} />}
     <details><summary>Mock API activity ({requests.length})</summary><pre data-testid="mock-requests">{requests.join("\n")}</pre></details>
@@ -86,6 +88,8 @@ function RegressionCase({ name, fixtures }: { name: string; fixtures: Regression
   const document = { ...fixtures.document, template_id: templateId };
   const report = { ...salesBrochureToReportShape(fixtures.document), template_id: reportTemplate };
 
+  if (name === "dashboard") return <DashboardOverview agencyName="Preview Agency" appraisals={[]} counts={{ draft: 3, ready: 2, published: 1 }} loadError={false} />;
+  if (name === "str-workspace") return <ReportEditor appraisal={fixtures.appraisal} agency={agency} initialListing={listing} initialReport={fixtures.report} />;
   if (name === "sales-brochure-new" || name === "lease-brochure-new") return <SalesBrochureWizard agency={agency} initialListing={listing} initialCollateral={brochureDraft} collateralType={brochureDraft.type} initialAgencyAgents={[fixtures.agent]} />;
   if (name === "brochure-generation") return <BrochureGenerationStatus />;
   if (name === "str-new" || name === "str-first") return <ReportEditor appraisal={fixtures.appraisal} agency={name === "str-first" ? { ...agency, str_management_presets: [] } : agency} initialListing={listing} initialReport={{ ...fixtures.report, template_id: null, original_estimate_json: null, user_overrides_json: null, final_estimate_json: null, final_report_json: null, ai_copy_json: null, str_enrichment_json: null, status: "draft" }} />;

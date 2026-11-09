@@ -1,0 +1,15 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { spawn } from 'node:child_process';
+import { previewConfig } from './config.mjs';
+const root = resolve('ci-release');
+const config = previewConfig('ci-browser', '0'.repeat(40), root, true);
+config.vars.BRANCH_PREVIEW_ACCESS_KEY = 'ci-local-only';
+const work = await mkdtemp(join(tmpdir(), 'staypack-browser-ci-'));
+const path = join(work, 'serve.json');
+await writeFile(path, JSON.stringify(config));
+const env = Object.fromEntries(['PATH', 'HOME', 'LANG', 'CI'].filter(k => process.env[k]).map(k => [k, process.env[k]]));
+const child = spawn('npx', ['--yes', 'wrangler@4.158.0', 'dev', '--config', path, '--local', '--ip', '127.0.0.1', '--port', '4173', '--log-level', 'warn'], { cwd: work, env, stdio: 'inherit' });
+for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => child.kill(signal));
+child.on('exit', async code => { await rm(work, { recursive: true, force: true }); process.exit(code ?? 1); });

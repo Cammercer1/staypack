@@ -420,10 +420,12 @@ The full dependency inventory and rollout notes are in [the property-pages audit
 Cloudflare Workers hosts production. Production features must be committed with
 their pages, API routes, supporting modules, migrations and lockfile. Build from
 the current `origin/main` plus the reviewed change so newer public proposals are
-preserved. Git pushes do not deploy automatically: run `npm run build:cloudflare`
-in the Node 24 container, then `npm run deploy:cloudflare` with the authorized
-local Wrangler identity. Shared public-report changes also require
-`npm run deploy:report-worker`. See `cloudflare/README.md` for the live verification
+preserved. Push a branch for automatic checks and a private synthetic-data UI
+preview. Merge to `main` to deploy the checked application and public-report
+Workers together. See `cloudflare/CI.md` for the workflow, preview limitations,
+credentials and recovery. Manual deployment remains available through
+`npm run build:cloudflare`, `npm run deploy:cloudflare` and
+`npm run deploy:report-worker`; see `cloudflare/README.md` for the live verification
 record and rollback procedure. Keep the retired Netlify project disabled and locked.
 
 `npm run build` now runs desktop/mobile navigation regression tests and checks

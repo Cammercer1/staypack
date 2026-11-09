@@ -6,6 +6,8 @@ import { patchCssModules } from "vite-css-modules";
 import path from "node:path";
 
 export default defineConfig({
+  // CI receives only explicit build-time public values. Never read a developer's dotenv files.
+  envDir: process.env.STAYPACK_CI_BUILD === "1" ? false : undefined,
   resolve: {
     alias: { "@/lib/hosting/jobQueue": path.resolve(import.meta.dirname, "cloudflare/jobQueue.ts") },
   },

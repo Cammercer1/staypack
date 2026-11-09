@@ -21,6 +21,7 @@ Branded short-term rental potential reports for real estate agencies. Next.js Ap
 - `npm run build:cloudflare` — production application build for Workers; run in the Node 24 container
 - `npm run deploy:cloudflare` — deploy the checked application build using the authorized local Wrangler identity
 - `npm run deploy:report-worker` — deploy the separate public report Worker and matching assets; shared report changes require both deployments. See `cloudflare/README.md` for credentials and verification.
+- Normal releases use `.github/workflows/ci.yml` and `deploy.yml`: push a branch for checks and a private synthetic-data UI preview, then merge to `main` to deploy both production Workers. See `cloudflare/CI.md`. Never give previews live Supabase, provider, queue or cron credentials/bindings. Database CI uses an empty disposable PostgreSQL database only.
 - `npm run lint` — ESLint
 - `npm test` — Vitest unit tests
 - Supabase migrations live in `supabase/migrations/` — see `supabase/README.md`

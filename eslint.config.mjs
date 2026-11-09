@@ -13,6 +13,7 @@ const eslintConfig = defineConfig([
     ".netlify/**",
     ".report-worker/**",
     "dist/**",
+    "ci-release/**",
     ".wrangler/**",
     "cloudflare/.wrangler/**",
     "public/_report-viewer/**",
