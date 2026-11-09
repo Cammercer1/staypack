@@ -88,7 +88,11 @@ function RegressionCase({ name, fixtures }: { name: string; fixtures: Regression
   const document = { ...fixtures.document, template_id: templateId };
   const report = { ...salesBrochureToReportShape(fixtures.document), template_id: reportTemplate };
 
-  if (name === "dashboard") return <DashboardOverview agencyName="Preview Agency" appraisals={[]} counts={{ draft: 3, ready: 2, published: 1 }} loadError={false} />;
+  if (name === "dashboard") return <DashboardOverview agencyName="Preview Agency" appraisals={[{
+    ...fixtures.appraisal, kind: "str", recipient_name: "Preview Client", proposal_status: "Draft",
+    report: { id: fixtures.report.id, listing_id: listing.id, status: "draft", updated_at: fixtures.report.updated_at, pdf_url: null,
+      listing: { id: listing.id, property_address: listing.property_address, hero_image_url: listing.hero_image_url, suburb: listing.suburb, status: "active" } },
+  }]} counts={{ draft: 1, ready: 0, published: 0 }} loadError={false} />;
   if (name === "str-workspace") return <ReportEditor appraisal={fixtures.appraisal} agency={agency} initialListing={listing} initialReport={fixtures.report} />;
   if (name === "sales-brochure-new" || name === "lease-brochure-new") return <SalesBrochureWizard agency={agency} initialListing={listing} initialCollateral={brochureDraft} collateralType={brochureDraft.type} initialAgencyAgents={[fixtures.agent]} />;
   if (name === "brochure-generation") return <BrochureGenerationStatus />;
