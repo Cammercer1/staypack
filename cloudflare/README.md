@@ -127,3 +127,124 @@ can terminate sustained CPU use above 10 ms. This functional trial passed; it is
 not proof of capacity for every report or traffic level. Monitor `exceededCpu`
 and daily requests, and obtain approval before upgrading to Paid. Runtime logs
 remain disabled so private report tokens are not retained in request logs.
+
+## Full application Free-plan evaluation — 9 November 2026
+
+**Decision: keep Netlify for the application. This experiment is not ready for a
+production cutover.** Public reports continue using the existing production
+report Worker. No production routes, database schema, subscriptions or Netlify
+deployments changed during this evaluation.
+
+The isolated `codex/cloudflare-app-preview` branch tests vinext 1.4.4 with the
+Cloudflare adapter 1.3.3. Cloudflare currently recommends vinext for Next.js apps,
+but it is beta. This required React 19.3.1, Vite 8 and Vitest 5, regenerated the
+lockfile, and changed the package to ESM. These are experimental toolchain
+changes, not a small adapter change to merge wholesale into production.
+
+The private `staypack-app-preview` Worker used the Free plan, no custom routes,
+Tokyo placement beside the existing primary database, and a secret access gate.
+Billing and delivery endpoints were disabled. Published report routes delegated
+to the existing production report Worker, preserving its fresh primary access
+checks. The final tested deployment was
+`eb42fdab-5543-4351-ab10-293410308348`; its build reported 17 ms startup on the
+initial deployment. Startup telemetry is not a browser load-time guarantee.
+
+### Regional timings
+
+Authenticated read-only probes ran from Sydney and US East, verified using
+`cf-placement: remote-SYD` and `remote-IAD`. Three rounds alternated target order.
+The table shows median complete HTML response time, excluding browser JavaScript
+and hydration. See `preview-results.json` for individual samples and first-byte
+times. The small sample is directional evidence, not a cold-start guarantee.
+
+| Probe | Page | Netlify | Cloudflare preview |
+| --- | --- | ---: | ---: |
+| Sydney | Dashboard | 2,301 ms | 460 ms |
+| Sydney | Editor | 3,221 ms | 387 ms |
+| Sydney | Login | 546 ms | 280 ms |
+| US East | Dashboard | 1,754 ms | 1,725 ms |
+| US East | Editor | 3,329 ms | 1,007 ms |
+| US East | Login | 124 ms | 391 ms |
+
+US first-byte times were worse for the preview dashboard (1,570 vs 197 ms) and
+editor (811 vs 309 ms), even where the complete response improved. Database
+distance and request work remain relevant. Both report targets already use
+Cloudflare, so there was no meaningful report hosting change in this trial.
+
+Local browser tests additionally loaded the editor, selected Check proposal,
+opened Edit pages and closed the dialog. Final preview attempts took 2.914 and
+2.897 seconds, versus 11.532 and 6.721 seconds on Netlify. Dashboard results
+varied: 2.221–3.135 seconds on Cloudflare versus 2.655–3.542 seconds on Netlify.
+An earlier preview editor load took 9.924 seconds; this is retained in the raw
+results rather than treating the best results as a guarantee. Homepage-to-usable
+login navigation took 105–111 ms in the preview and 124–140 ms on Netlify, after
+the homepage was ready. These local browser measurements are not regional tests.
+
+Fast streamed HTML exposed clicks arriving before editor step handlers were
+ready. `AppraisalWizardNavigation` now disables those controls until hydration.
+The final interaction checks and functional checks passed after this fix.
+
+### Functional results and blockers
+
+Passed: anonymous redirects, login return URL, editing and saving across tabs
+and reloads, stale-save conflicts, cross-agency read/write denial, mobile layout,
+and immediate access denial after membership removal. A warmed report returned
+404 immediately after revocation on both preview and production; subsequent
+Sydney and US East requests returned 404 without report data on both targets.
+
+Three issues prevent replacing Netlify:
+
+1. **Free CPU headroom:** sampled telemetry across 92 requests showed 31.387 ms
+   median CPU, 271.324 ms p95 and 437.687 ms p99, against Free's 10 ms allowance.
+   There were no Worker runtime exceptions in that sample, but handled 502/503
+   application errors occurred below. Successful requests above the allowance
+   do not establish reliable Free-plan capacity. Network waiting is not CPU.
+2. **Publishing:** the real publish endpoint returned 503 because the native
+   Sharp image module cannot load in the Workers runtime. Existing published
+   links stayed unchanged. Image preservation needs a compatible implementation;
+   end-to-end PDF creation was not verified after this publishing failure.
+3. **Background jobs:** lease and sales job-start endpoints returned 502 because
+   their Netlify background dispatch has not been replaced by a durable
+   Cloudflare queue consumer. Diagnostic direct runner tests passed completed-job
+   idempotency and persisted failures for missing inputs. They do not validate
+   durable execution, retries, scheduling or successful provider enrichment.
+
+No paid provider enrichment, billing or customer delivery was exercised. Paying
+for more CPU alone would not fix image processing or background job dispatch.
+A future migration needs those implementations plus repeated end-to-end,
+regional and revocation checks before any production routing change.
+
+### Validation and cleanup
+
+The production preview build, TypeScript check and changed-file lint passed.
+The full unit suite passed 2,357 tests with six skipped before the hydration
+guard. The guard and related editor/preview boundary checks then passed all 12
+focused tests, followed by a fresh build, deployment and live verification.
+
+All disposable users were signed out and deleted. Their agencies, memberships,
+listings, reports, versions, links and jobs were confirmed removed. Both regional
+probe Workers were deleted. The app preview's workers.dev and version preview
+URLs are disabled, and its access secret and database service-role secret were
+removed. Production's six report routes were verified unchanged. No paid plan
+was enabled. The preview is deliberately offline after evaluation.
+
+To reproduce in an isolated worktree using Node 24:
+
+```sh
+STAYPACK_DEV_PORT=3102 npm run container:up
+STAYPACK_DEV_PORT=3102 npm run container:status
+STAYPACK_DEV_PORT=3102 node scripts/container.mjs exec app npm run build:cloudflare-preview
+```
+
+Use `build:cloudflare-preview` rather than the raw Vite build. It checks the exact
+preview account/name, rejects production routes, verifies the Supabase project,
+removes the adapter's generated `dist/server/.dev.vars`, and scans deployable
+files for private environment values. Supply runtime secrets through protected
+Wrangler input; never commit them. Deployment uses `dist/server/wrangler.json`.
+Re-enable only this private preview for a new trial, with fresh disposable
+accounts and a fresh access key. Never connect this branch to production Git
+deploys or attach `staypack.app` routes while the blockers remain.
+
+References: [Next.js on Workers](https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/),
+[Free limits and CPU accounting](https://developers.cloudflare.com/workers/platform/limits/),
+[placement verification](https://developers.cloudflare.com/workers/configuration/placement/).

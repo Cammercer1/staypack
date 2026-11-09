@@ -1,0 +1,46 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "staypack-app-preview",
+  "compatibility_date": "2026-11-09",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "main": "cloudflare/app-preview-entry.ts",
+  "assets": {
+    "directory": "dist/client",
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/*",
+      "!/_next/static/*",
+      "!/*/_next/static/*"
+    ]
+  },
+  "account_id": "fc594f30144c9ba2a1cb9a5c3ce1313a",
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [],
+  "send_metrics": false,
+  "observability": {
+    "enabled": false
+  },
+  "cache": {
+    "enabled": false
+  },
+  "placement": {
+    "region": "aws:ap-northeast-1"
+  },
+  "vars": {
+    "APP_ENV": "production",
+    "SITE_URL": "https://staypack-app-preview.cameronmercer1991.workers.dev",
+    "NEXT_PUBLIC_SITE_URL": "https://staypack-app-preview.cameronmercer1991.workers.dev",
+    "NEXT_PUBLIC_REPORTS_URL": "https://staypack-app-preview.cameronmercer1991.workers.dev"
+  },
+  "services": [
+    {
+      "binding": "PUBLIC_REPORTS",
+      "service": "staypack-public-reports"
+    }
+  ]
+}

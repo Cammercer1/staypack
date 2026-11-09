@@ -2,7 +2,11 @@
 
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
 import { ArrowLeft, FileText } from "lucide-react";
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
+
+const subscribeToHydration = () => () => {};
+const clientReady = () => true;
+const serverWaiting = () => false;
 
 type WorkflowStep = {
   id: string;
@@ -16,6 +20,9 @@ export function AppraisalWizardNavigation({ steps, currentStep, label, onStepCha
   label: string;
   onStepChange?: (step: string) => void;
 }) {
+  // Fast streamed HTML can arrive before the step handlers. Keep the controls
+  // inert until hydration so an early click cannot silently disappear.
+  const ready = useSyncExternalStore(subscribeToHydration, clientReady, serverWaiting);
   const List = onStepChange ? "nav" : TabsPrimitive.List;
   const StepControl = onStepChange ? NativeStep : TabsPrimitive.Tab;
   return (
@@ -34,7 +41,7 @@ export function AppraisalWizardNavigation({ steps, currentStep, label, onStepCha
             key={item.id}
             value={item.id}
             {...(onStepChange ? { onClick: () => onStepChange(item.id), "aria-current": active ? "step" as const : undefined, "aria-label": `${index + 1}. ${item.label}` } : {})}
-            disabled={item.disabled}
+            disabled={!ready || item.disabled}
             className={active
               ? "du-tab du-tab-active h-auto min-h-16 min-w-0 flex-col gap-1.5 rounded-xl bg-primary px-2 py-2 text-xs leading-tight font-medium text-primary-content transition-colors hover:text-primary-content focus-visible:outline-primary sm:min-h-12 sm:flex-row sm:gap-2 sm:px-3 sm:text-sm"
               : "du-tab h-auto min-h-16 min-w-0 flex-col gap-1.5 rounded-xl px-2 py-2 text-xs leading-tight font-medium text-base-content/65 transition-colors hover:bg-base-100/70 hover:text-base-content focus-visible:outline-primary sm:min-h-12 sm:flex-row sm:gap-2 sm:px-3 sm:text-sm"}
