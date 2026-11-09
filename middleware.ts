@@ -97,6 +97,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|_report-viewer/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Public viewers and their APIs authorize inside their own handlers. Exclude them
+    // before the framework middleware boots, rather than only returning early above.
+    "/((?!_next/static|_next/image|_report-viewer/|proposal(?:/|$)|example(?:/|$)|examples(?:/|$)|api/proposals/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

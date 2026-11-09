@@ -29,6 +29,10 @@ export function publicReportHandler(assets: ViewerAssets, fetcher: typeof fetch 
     const unavailable = (status: number) => respond(`<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Proposal unavailable</title><body style="font-family:Arial,sans-serif;padding:40px"><main><h1>${status === 404 ? "404 — Proposal not available" : "Proposal temporarily unavailable"}</h1><p>${status === 404 ? "This link is no longer available." : "Please try again shortly."}</p></main></body></html>`, status);
     if (request.method !== "GET" && request.method !== "HEAD") { headers.set("Allow", "GET, HEAD"); return respond("Method not allowed", 405); }
     const url = new URL(request.url);
+    if (url.hostname === "staypack.netlify.app") {
+      url.protocol = "https:"; url.host = "staypack.app";
+      headers.set("Location", url.toString()); return respond("", 308);
+    }
     const match = url.pathname.match(/^\/(?:examples\/([^/]+\/[^/]+)|example\/([a-f0-9]{64})|proposal\/([a-f0-9]{64}))\/?$/);
     if (!match || url.searchParams.getAll("page").length > 1 || url.searchParams.getAll("version").length > 1) return unavailable(404);
     const page = url.searchParams.get("page") ?? undefined;
@@ -60,7 +64,8 @@ export function publicReportHandler(assets: ViewerAssets, fetcher: typeof fetch 
       if (page && !payload.snapshot.draft.pages.some(item => item.enabled && item.id === page)) return unavailable(404);
       const { data, brand } = payload.snapshot;
       const loader = renderToStaticMarkup(createElement(ProposalLoading, { brand: { name: data.agency.name, logoUrl: data.agency.logoUrl, primary: brand.primary, primaryText: brand.primaryText } }));
-      const styles = assets.styles.map(path => `<link rel="stylesheet" href="${escape(path)}">`).join("");
+      // The inline branded shell can paint while the larger viewer styles download.
+      const styles = assets.styles.map(path => `<link rel="preload" as="style" href="${escape(path)}"><link rel="stylesheet" media="print" data-report-styles href="${escape(path)}">`).join("");
       const images = [data.agency.logoUrl, data.property.heroImageUrl].filter(Boolean).map(src => `<link rel="preload" as="image" href="${escape(src)}">`).join("");
       return respond(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer"><title>${escape(payload.title)}</title><meta property="og:title" content="${escape(payload.title)}"><meta property="og:image" content="${escape(data.property.heroImageUrl)}"><style>${criticalStyles}</style>${images}${styles}<script type="module" src="${escape(assets.script)}"></script></head><body><div id="public-report-root">${loader}</div><script type="application/json" id="public-report-data">${json(payload)}</script><noscript><style>[data-testid="proposal-loading"]{display:none}</style><p>Please enable JavaScript to view this proposal.</p></noscript></body></html>`);
     } catch (error) {

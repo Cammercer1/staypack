@@ -32,6 +32,13 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 const get = (path: string, rsc = false) => handler(new Request(`https://staypack.app${path}`, { headers: rsc ? { RSC: "1" } : {} }));
 
+it("keeps the legacy host canonical without starting framework middleware", async () => {
+  const response = await handler(new Request(`https://staypack.netlify.app/examples/${slug}?page=forecast`));
+  expect(response.status).toBe(308);
+  expect(response.headers.get("Location")).toBe(`https://staypack.app/examples/${slug}?page=forecast`);
+  expect(reads).toHaveLength(0);
+});
+
 it.each([`/examples/${slug}`, `/proposal/${token}`, `/proposal/${token}?version=${id}`])("freshly denies %s after warming the snapshot cache", async path => {
   for (let i = 0; i < 2; i++) {
     const response = await get(path);
