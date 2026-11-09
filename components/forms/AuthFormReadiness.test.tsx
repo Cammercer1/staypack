@@ -30,7 +30,7 @@ it("enables the hydrated form and signs in through the client handler", async ()
   expect(email.closest("fieldset")?.disabled).toBe(false);
   fireEvent.change(email, { target: { value: "qa@example.com" } });
   fireEvent.change(screen.getByLabelText("Password"), { target: { value: "synthetic-password" } });
-  fireEvent.click(screen.getByRole("button", { name: "Sign in", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
   await waitFor(() => expect(mocks.signIn).toHaveBeenCalledWith({ email: "qa@example.com", password: "synthetic-password" }));
   expect(mocks.push).toHaveBeenCalledWith("/short-term-rentals");
 });
