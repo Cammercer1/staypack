@@ -4,6 +4,7 @@ import { z } from "zod";
 import { r2Client, r2Configuration, usesR2Storage } from "../storage/r2";
 
 const qaNames = new Map([
+  ["cf-preview", "Cloudflare Preview QA"],
   ["integration", "Proposal Integration QA"],
   ["str-release", "STR Release QA"],
   ["appraisal", "Appraisal Integration"],

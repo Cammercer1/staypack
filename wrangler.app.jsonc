@@ -19,7 +19,7 @@
     ]
   },
   "account_id": "fc594f30144c9ba2a1cb9a5c3ce1313a",
-  "workers_dev": true,
+  "workers_dev": false,
   "preview_urls": false,
   "routes": [
     {
@@ -47,7 +47,7 @@
     "SITE_URL": "https://staypack.app",
     "NEXT_PUBLIC_SITE_URL": "https://staypack.app",
     "NEXT_PUBLIC_REPORTS_URL": "https://staypack.app",
-    "SCHEDULES_ENABLED": "0"
+    "SCHEDULES_ENABLED": "1"
   },
   "services": [
     {

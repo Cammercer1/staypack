@@ -5,7 +5,7 @@ with placement near the existing Tokyo Supabase database. Public reports retain
 their smaller, separate Worker. Supabase remains the source of truth; Browserless
 renders PDFs and SVG logos; R2 stores public images and private documents.
 
-The paid candidate fixes the Free trial blockers below:
+The production deployment fixes the Free trial blockers below:
 
 - Raster metadata uses pure JavaScript. Isolated Browserless screenshots convert
   SVG logos; permanent image copies remain content-addressed and checked on readback.
@@ -20,7 +20,7 @@ The paid candidate fixes the Free trial blockers below:
 - The production app owns `/proposal/print/*` explicitly, ahead of the report
   Worker's wider `/proposal/*` route. PDF rendering must never fall back to Netlify.
 - Billing sync retains its one-minute cadence and cache cleanup its five-minute
-  cadence. `SCHEDULES_ENABLED` stays `0` until Netlify's schedules are stopped.
+  cadence. `SCHEDULES_ENABLED=1` was deployed after Netlify was disabled.
   The old delivery-cron declaration had no deployed function; no new customer
   email schedule is enabled by this migration.
 
@@ -43,7 +43,7 @@ npm run deploy:cloudflare
 remove generated dotenv files and scan artifacts for embedded private values.
 Deploy uses encrypted Worker secrets from the existing local environment, passed
 through a temporary mode-0600 file which is removed afterwards. No secrets belong
-in Git. The production workers.dev hostname requires a temporary candidate key;
+in Git. The production workers.dev hostname and preview URLs are disabled;
 normal access is only through `staypack.app`. There is no automatic Git deployment
 configured for the app: use the checked build and deployment commands above.
 
@@ -81,6 +81,60 @@ prefetched. Local dashboard readiness was 0.91–1.23 seconds and interactive ed
 readiness 2.57–2.66 seconds. These are small samples, not latency guarantees.
 Public reports already ran on Cloudflare and therefore show no hosting improvement
 in this comparison. Production cutover verification is recorded separately below.
+
+## Production cutover and retirement
+
+`staypack.app` is served by `staypack-app` version
+`7361e535-c1f5-444f-bbbb-c5fc5e9bb093` (the tested code from
+`cc2531ce-a4d2-4350-995c-5dfde3331e8b`, with the temporary candidate access secret
+removed). The two production app routes and six
+public-report routes are intact. The final editor fix prevents step navigation
+until saved proposal data has loaded; 57 focused tests passed after that fix.
+The existing four storage-cleanup tests also passed.
+
+Netlify was kept live through candidate validation and production verification,
+then disabled reversibly, with auto publishing locked to `6087f47`. Its US$9
+Personal plan is confirmed scheduled to downgrade to Free on 27 November 2026.
+Cloudflare Workers Paid has a US$5/month base fee plus usage above its allowance;
+existing database, storage and external-service costs are separate. Netlify's
+project and known-good deployment remain available for an explicit rollback.
+
+A fresh Browserless PDF generated successfully after Netlify was disabled:
+HTTP 200, 294,284 bytes, valid PDF signature. Authenticated dashboard and editor,
+login, and the Property Providers example still returned 200. Warmed current and
+version-specific report URLs plus PDF downloads returned immediate no-store 404s
+after revocation, without private report text. Regional revocation checks also
+passed in Sydney and US East. The inline loader displayed the client's logo and
+primary blue background, with no StayPack branding.
+
+Cloudflare cron events at 09:30–09:34 UTC completed with no exceptions, including
+the five-minute cache-cleanup boundary. Billing mode remains disabled, matching
+the previous deployment. Disposable users, agency rows, report files, private
+preview Worker, two probes and preview queues were removed. Production routes
+and queues were verified unchanged after cleanup.
+
+Final production complete-HTML medians (three requests per region/page):
+
+| Probe | Page | Netlify | Cloudflare production |
+| --- | --- | ---: | ---: |
+| Sydney | Dashboard | 2,619 ms | 487 ms |
+| Sydney | Editor | 4,119 ms | 724 ms |
+| Sydney | Login | 15 ms | 179 ms |
+| US East | Dashboard | 1,782 ms | 472 ms |
+| US East | Editor | 3,087 ms | 809 ms |
+| US East | Login | 259 ms | 311 ms |
+
+These measure complete HTML, not browser readiness. Local production browser
+checks reached a usable dashboard in 0.98–1.92 seconds and opened the editor's
+Edit pages dialog in 3.96–4.05 seconds. Homepage-to-usable-login navigation took
+89–96 ms with prefetching. Direct login HTML remains slower than Netlify's static
+CDN response. No latency guarantee is implied by these small samples.
+
+See `production-results.json` for sanitized evidence. There is no remaining
+application dependency on an enabled Netlify site. The underlying proxied DNS
+origin is retained for rollback, and the separate report Worker's historical
+print fallback is overridden by the explicit production print route. Do not
+remove that route during routine deployments.
 
 ---
 

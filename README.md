@@ -105,12 +105,12 @@ Compose service and starts the dev server automatically.
 PDF generation still uses Browserless. A hosted Browserless instance cannot
 reach your laptop's `localhost`; the existing mock PDF path is available without
 its API key. Real PDF testing requires a Browserless setup that can reach the
-local app. Netlify background functions and scheduled delivery jobs are not
-started by `next dev`.
+local app. Cloudflare Queue consumers and Cron Triggers are not started by
+`next dev`; test them through an isolated Workers preview.
 
 ## Local setup without Docker
 
-Use Node 24 (`nvm use` reads `.nvmrc`), matching the container and Netlify runtime.
+Use Node 24 (`nvm use` reads `.nvmrc`), matching the container and production build tooling.
 
 1. Install dependencies:
 
@@ -148,8 +148,8 @@ Open [http://localhost:3000](http://localhost:3000).
 ## File storage
 
 Production uses `STORAGE_PROVIDER=r2`. Supabase remains the database and authentication
-provider. Configure the six server-only `R2_*` variables in `.env.example` in both
-Netlify Builds and Functions scopes. Never expose the R2 credential through a
+provider. Configure the six server-only `R2_*` variables in `.env.example` as
+encrypted Cloudflare Worker secrets through the deployment script. Never expose the R2 credential through a
 `NEXT_PUBLIC_*` variable. The credential has object read/write access only to
 `staypack-public` and `staypack-private`.
 
@@ -232,9 +232,9 @@ The deployment IDs and original environment snapshot are retained privately unde
 
 The first verified R2 release was `6ad809549395619e473bfd20`. It was pinned during
 the migration to protect private downloads while the source changes were being
-merged. When using a temporary manual release, keep it pinned until a deployment
-from the merged Git commit passes the storage checks, then publish that deployment
-and unlock Netlify auto publishing.
+merged. This is historical Netlify migration evidence. Netlify is now disabled
+with auto publishing locked; current deployment and rollback instructions are in
+`cloudflare/README.md`.
 
 Storage unit tests run normally. Opt-in live checks use only disposable object keys
 or temporary agencies/users: `RUN_R2_STORAGE_SMOKE=1` for
@@ -417,23 +417,26 @@ The full dependency inventory and rollout notes are in [the property-pages audit
 
 ### Production release integrity
 
-Netlify builds production from `main`. Production features must be committed
-with their pages, API routes, supporting modules, migrations and lockfile before
-deployment. A manual deploy from uncommitted files is temporary: the next Git
-build replaces the whole application. Build from the current `origin/main` plus
-the reviewed change so newer public proposals are preserved.
+Cloudflare Workers hosts production. Production features must be committed with
+their pages, API routes, supporting modules, migrations and lockfile. Build from
+the current `origin/main` plus the reviewed change so newer public proposals are
+preserved. Git pushes do not deploy automatically: run `npm run build:cloudflare`
+in the Node 24 container, then `npm run deploy:cloudflare` with the authorized
+local Wrangler identity. Shared public-report changes also require
+`npm run deploy:report-worker`. See `cloudflare/README.md` for the live verification
+record and rollback procedure. Keep the retired Netlify project disabled and locked.
 
 `npm run build` now runs desktop/mobile navigation regression tests and checks
 the compiled route manifest for the STR workspace, appraisal APIs, proposal
 sharing/print/download routes and existing prospect examples. A missing entry
 fails the build instead of publishing an incomplete application.
 
-Before pushing, run `npm test` and `npm run build` in the Node 24 container.
+Before pushing, run `npm test` and `npm run build:cloudflare` in the Node 24 container.
 For authenticated release verification, run the opt-in browser test against the
 candidate deployment, then repeat it against production:
 
 ```bash
-STR_LIVE_TEST=1 STAGING_BASE_URL=https://YOUR-DEPLOY.netlify.app \
+STR_LIVE_TEST=1 STAGING_BASE_URL=https://YOUR-AUTHORIZED-PREVIEW \
   npm run test:staging -- tests/staging/str-workspace.spec.ts
 ```
 

@@ -17,8 +17,10 @@ Branded short-term rental potential reports for real estate agencies. Next.js Ap
 - The raw Docker command above is for the primary checkout only. In a worktree, use `STAYPACK_DEV_PORT=3101 node scripts/container.mjs exec app <command>` (with that preview's chosen port). Start previews with `STAYPACK_DEV_PORT=3101 npm run container:up`; the helper isolates the Docker project and verifies its source folder. Port 3000 is reserved for the primary checkout.
 - Run `npm run container:status` before diagnosing an old UI to confirm the checkout, branch, commit and Docker source. Use the same `STAYPACK_DEV_PORT` setting for worktree checks.
 - `npm run dev` — local dev server at http://localhost:3000
-- `npm run build` — production build (runs env verification first)
-- `npm run deploy:report-worker` — deploy the public report Worker and matching assets to Cloudflare; report changes require this in addition to Netlify. See `cloudflare/README.md` for credentials and verification.
+- `npm run build` — Next.js compatibility/rollback build (runs env verification first)
+- `npm run build:cloudflare` — production application build for Workers; run in the Node 24 container
+- `npm run deploy:cloudflare` — deploy the checked application build using the authorized local Wrangler identity
+- `npm run deploy:report-worker` — deploy the separate public report Worker and matching assets; shared report changes require both deployments. See `cloudflare/README.md` for credentials and verification.
 - `npm run lint` — ESLint
 - `npm test` — Vitest unit tests
 - Supabase migrations live in `supabase/migrations/` — see `supabase/README.md`
@@ -28,7 +30,7 @@ Branded short-term rental potential reports for real estate agencies. Next.js Ap
 - Next.js 16 App Router, TypeScript, Tailwind CSS 4, shadcn/ui
 - Supabase Auth, Postgres, Storage, RLS
 - Server routes for scraping, Airbtics, OpenAI, Browserless, Bright Data
-- Dashboard, APIs and jobs are hosted on Netlify; public reports run on Cloudflare Workers. Canonical public URL is `https://staypack.app`.
+- Dashboard and APIs run on Cloudflare Workers Paid using pinned vinext; appraisal jobs use Queues and maintenance uses Cron Triggers. Public reports have a separate Worker. Netlify is disabled and retained for rollback. Canonical public URL is `https://staypack.app`.
 
 ## Architecture
 
@@ -39,7 +41,8 @@ app/api/            — server route handlers (secrets stay here)
 lib/                — business logic, scraping, templates, delivery
 components/         — React UI
 supabase/migrations — SQL schema
-netlify/functions/  — background jobs
+cloudflare/         — Workers entrypoints, durable appraisal jobs and scheduled maintenance
+netlify/functions/  — legacy wrappers for rollback
 ```
 
 - Do **not** use n8n. The app handles the full flow itself.
