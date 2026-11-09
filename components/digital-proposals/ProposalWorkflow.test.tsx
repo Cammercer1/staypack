@@ -48,6 +48,20 @@ const workspace = (sourceFingerprint: string): ProposalWorkspace => ({
 beforeEach(() => vi.resetAllMocks());
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
+it("uses server-loaded data once, then refreshes after customer changes", async () => {
+  const consumed = vi.fn();
+  const initialWorkspace = workspace("server-customer");
+  const view = render(<ProposalWorkflow reportId="report" stage="share" refreshKey="customer-1" initialWorkspace={initialWorkspace} onInitialWorkspaceUsed={consumed} />);
+  await screen.findByRole("button", { name: "Publish server-customer" });
+  expect(mocks.fetch).not.toHaveBeenCalled();
+  expect(consumed).toHaveBeenCalledOnce();
+  mocks.fetch.mockResolvedValueOnce(workspace("updated-customer"));
+  view.rerender(<ProposalWorkflow reportId="report" stage="share" refreshKey="customer-2" initialWorkspace={initialWorkspace} onInitialWorkspaceUsed={consumed} />);
+  await screen.findByRole("button", { name: "Publish updated-customer" });
+  expect(mocks.fetch).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("button", { name: "Publish server-customer" })).toBeNull();
+});
+
 it("offers a clear route back to an updated estimate while keeping publishing invalid", async () => {
   mocks.fetch.mockResolvedValueOnce({ ...workspace("stale-estimate"), needsEvidenceReview: true });
   const onReviewEvidence = vi.fn();

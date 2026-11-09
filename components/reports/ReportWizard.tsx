@@ -1,26 +1,20 @@
 "use client";
 
 import { CreateAnother } from "@/components/properties/PropertyContext";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ProposalWorkflow, type ProposalWorkflowHandle } from "@/components/digital-proposals/ProposalWorkflow";
 import { AppraisalWizardNavigation } from "@/components/appraisals/AppraisalWizardNavigation";
 import { LayoutTemplate } from "lucide-react";
 import { StrPropertyStep, type StrPropertyHandle } from "./StrPropertyStep";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { DocumentGenerationStatus } from "@/components/documents/DocumentGenerationStatus";
-import {
-  StrDesignStep,
-  type StrDesignHandle,
-} from "@/components/reports/StrDesignStep";
+import type { StrDesignHandle } from "@/components/reports/StrDesignStep";
 import {
   StrEstimateStep,
   type StrEstimateHandle,
 } from "@/components/reports/StrEstimateStep";
-import {
-  GeneratedCopyEditor,
-  type StrCopyEditorHandle,
-} from "@/components/reports/GeneratedCopyEditor";
-import { StrReportDeliveryStep } from "@/components/reports/StrReportDeliveryStep";
+import type { StrCopyEditorHandle } from "@/components/reports/GeneratedCopyEditor";
+import type { ProposalWorkspace } from "@/lib/digital-proposals/workspace";
 import type { TemplatesResponse } from "@/components/templates/useAvailableTemplates";
 import { applyDocumentLinkDraft } from "@/lib/documents/documentLink";
 import { mergeAgencyBrandIntoFinalReport } from "@/lib/reports/mergeAgencyBrand";
@@ -31,6 +25,12 @@ import { calculatorPropertyReviewRequired } from "@/lib/str-calculator/propertyR
 import { strPropertyContextSchema } from "@/lib/str/propertyInputs";
 import { jsonRequest, reportRequest } from "@/lib/reports/reportRequests";
 import type { Agency, AgentProfile, Listing, Report } from "@/lib/types";
+
+const loadingStep = <div role="status" className="p-6">Loading editor…</div>;
+// React.lazy preserves the imperative save handles used when changing steps.
+const StrDesignStep = lazy(() => import("./StrDesignStep").then(module => ({ default: module.StrDesignStep })));
+const GeneratedCopyEditor = lazy(() => import("./GeneratedCopyEditor").then(module => ({ default: module.GeneratedCopyEditor })));
+const StrReportDeliveryStep = lazy(() => import("./StrReportDeliveryStep").then(module => ({ default: module.StrReportDeliveryStep })));
 
 const steps = [
   { id: "property", label: "Property" },
@@ -46,6 +46,7 @@ export function ReportWizard({
   hasPublishedProposal = false,
   agency,
   availableTemplates,
+  initialProposal,
   customerPanel,
   appraisalActions,
   customerEditing = false,
@@ -60,6 +61,7 @@ export function ReportWizard({
   hasPublishedProposal?: boolean;
   agency: Agency;
   availableTemplates?: TemplatesResponse;
+  initialProposal?: ProposalWorkspace;
   customerPanel?: ReactNode;
   appraisalActions?: ReactNode;
   customerEditing?: boolean;
@@ -70,6 +72,10 @@ export function ReportWizard({
 }) {
   const [listing, setListing] = useState(initialListing);
   const [report, setReport] = useState(initialReport);
+  const [preparedSource, setPreparedSource] = useState({ reportUpdatedAt: initialReport.updated_at, customerRevision, consumed: false });
+  const consumePreparedWorkspace = useCallback(() => { setPreparedSource(source => ({ ...source, consumed: true })); }, []);
+  const preparedWorkspace = !preparedSource.consumed && report.updated_at === preparedSource.reportUpdatedAt
+    && customerRevision === preparedSource.customerRevision ? initialProposal : undefined;
   const reportRef = useRef(initialReport);
   const [reviewRequested, setReviewRequested] = useState(calculatorReview || calculatorPropertyReviewRequired(initialReport, initialListing));
   const [step, setStep] = useState(
@@ -427,8 +433,9 @@ export function ReportWizard({
         </TabsContent>
         <TabsContent value="design">
           {progress}
+          <Suspense fallback={loadingStep}>
           <div hidden={Boolean(activity)}>
-            {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="proposal" refreshKey={customerRevision} disabled={customerEditing || busy} onBusyChange={setChildBusy} onContinue={() => void handleStepChange("preview")} /> : choosingDesign ? (
+            {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="proposal" refreshKey={customerRevision} initialWorkspace={preparedWorkspace} onInitialWorkspaceUsed={consumePreparedWorkspace} disabled={customerEditing || busy} onBusyChange={setChildBusy} onContinue={() => void handleStepChange("preview")} /> : choosingDesign ? (
               <StrDesignStep
                 ref={designRef}
                 agency={previewAgency}
@@ -461,9 +468,11 @@ export function ReportWizard({
               </div>
             )}
           </div>
+          </Suspense>
         </TabsContent>
         <TabsContent value="preview" className="space-y-5">
-          {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="share" refreshKey={customerRevision} customerPanel={customerPanel ? <fieldset disabled={busy || childBusy} className="min-w-0">{customerPanel}</fieldset> : undefined} disabled={customerEditing || busy} onBusyChange={setChildBusy} /> : preview ? (
+          <Suspense fallback={loadingStep}>
+          {digitalProposal ? <ProposalWorkflow ref={proposalRef} reportId={report.id} stage="share" refreshKey={customerRevision} initialWorkspace={preparedWorkspace} onInitialWorkspaceUsed={consumePreparedWorkspace} customerPanel={customerPanel ? <fieldset disabled={busy || childBusy} className="min-w-0">{customerPanel}</fieldset> : undefined} disabled={customerEditing || busy} onBusyChange={setChildBusy} /> : preview ? (
             <StrReportDeliveryStep
               disabled={customerEditing}
               report={report}
@@ -473,6 +482,7 @@ export function ReportWizard({
               onBusyChange={setChildBusy}
             />
           ) : null}
+          </Suspense>
         </TabsContent>
       </Tabs>
       {digitalProposal && step === "preview" && !busy && !childBusy && !customerEditing && <CreateAnother listingId={listing.id} sourceReportId={report.id} />}

@@ -8,6 +8,9 @@ import { ReportEditor } from "@/components/reports/ReportEditor";
 import { Button } from "@/components/ui/button";
 import { STR_REPORT_LABEL } from "@/lib/listings/collateralTypes";
 import type { Listing, Report } from "@/lib/types";
+import type { ProposalWorkspace } from "@/lib/digital-proposals/workspace";
+import { requireAgency } from "@/lib/auth/requireUser";
+import { calculatorPropertyReviewRequired } from "@/lib/str-calculator/propertyReviewRequired";
 
 export default async function ListingReportEditorPage({
   params, searchParams,
@@ -23,12 +26,23 @@ export default async function ListingReportEditorPage({
   let listing: Listing;
   let report: Report;
   let publishedProposal = false;
+  let initialProposal: ProposalWorkspace | undefined;
 
   try {
-    const context = await requireStrAppraisalAccess(reportId);
+    const agencyContext = await requireAgency();
+    const [context, published] = await Promise.all([
+      requireStrAppraisalAccess(reportId),
+      hasPublishedProposal(agencyContext.supabase, agencyContext.agency.id, reportId),
+    ]);
     ({ agency, listing, report, appraisal } = context);
     if (report.status !== "archived") {
-      publishedProposal = await hasPublishedProposal(context.supabase, agency.id, report.id);
+      publishedProposal = published;
+      if (published && !reviewProperty && !calculatorPropertyReviewRequired(report, listing)) {
+        const { proposalContext, loadProposalWorkspace } = await import("@/lib/digital-proposals/server");
+        // Access is shared within this render. Deliver the initial workspace with
+        // the page instead of starting another auth/query waterfall after hydration.
+        initialProposal = await proposalContext(reportId).then(loadProposalWorkspace).catch(() => undefined);
+      }
     }
   } catch (error) {
     unstable_rethrow(error);
@@ -66,6 +80,7 @@ export default async function ListingReportEditorPage({
         initialReport={report}
         hasPublishedProposal={publishedProposal}
         agency={agency}
+        initialProposal={initialProposal}
       />}
     </div>
   );

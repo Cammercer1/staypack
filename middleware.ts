@@ -16,22 +16,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // Public proposals perform their own fresh access check; account cookies are irrelevant.
   const pathname = request.nextUrl.pathname;
-  // These endpoints authenticate with a Stripe signature or scheduler secret.
-  if (pathname === "/api/billing/webhook" || pathname === "/api/billing/usage-sync") {
-    return NextResponse.next({ request });
-  }
-  // Embedded calculators do not depend on third-party account cookies.
-  if (pathname.startsWith("/embed/str-calculator/") || pathname.startsWith("/api/str-calculator/")) {
-    return NextResponse.next({ request });
-  }
-  if (pathname === "/proposal" || pathname.startsWith("/proposal/") || pathname.startsWith("/api/proposals/")
-    || pathname === "/example" || pathname.startsWith("/example/")
-    || pathname === "/examples" || pathname.startsWith("/examples/")) {
-    return NextResponse.next({ request });
-  }
-
+  const isProtected = protectedPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  // Public/auth pages are static. APIs authorize at their data boundary and can
+  // refresh cookies themselves. Only protected page renders need this refresh.
+  if (!isProtected) return NextResponse.next({ request });
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -55,41 +44,16 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const isProtected = protectedPrefixes.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
-  const isAuthRoute =
-    pathname.startsWith("/login") || pathname.startsWith("/signup");
-
-  if (!user && isProtected) {
+  // Verify/refresh the cookie here; getUser and current membership are checked
+  // again at the server data boundary. Avoid a second membership database trip.
+  const { data } = await supabase.auth.getClaims();
+  if (!data?.claims) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirectTo", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  if (user && isAuthRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
-  }
-
-  if (user && isProtected && pathname !== "/onboarding") {
-    const { data: membership } = await supabase
-      .from("agency_members")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (!membership) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
-      return NextResponse.redirect(url);
-    }
+    const response = NextResponse.redirect(url);
+    for (const cookie of supabaseResponse.cookies.getAll()) response.cookies.set(cookie);
+    return response;
   }
 
   return supabaseResponse;
@@ -97,8 +61,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Public viewers and their APIs authorize inside their own handlers. Exclude them
-    // before the framework middleware boots, rather than only returning early above.
-    "/((?!_next/static|_next/image|_report-viewer/|proposal(?:/|$)|example(?:/|$)|examples(?:/|$)|api/proposals/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/dashboard/:path*", "/onboarding/:path*", "/reports/:path*", "/listings/:path*",
+    "/leads/:path*", "/settings/:path*", "/short-term-rentals/:path*", "/appraisals/:path*",
+    "/brochures/:path*", "/social/:path*", "/create/:path*", "/marketing/str-calculator/:path*",
+    "/contacts/:path*", "/clients/:path*",
   ],
 };

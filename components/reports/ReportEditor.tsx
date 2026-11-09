@@ -7,6 +7,7 @@ import { AppraisalArchiveControl } from "@/components/str-appraisals/AppraisalAr
 import { AppraisalCustomerPanel } from "@/components/str-appraisals/AppraisalCustomerPanel";
 import type { StrAppraisal } from "@/lib/str-appraisals/types";
 import type { Agency, Listing, Report } from "@/lib/types";
+import type { ProposalWorkspace } from "@/lib/digital-proposals/workspace";
 
 type Props = {
   calculatorReview?: boolean;
@@ -16,9 +17,10 @@ type Props = {
   agency: Agency;
   appraisal?: StrAppraisal;
   availableTemplates?: TemplatesResponse;
+  initialProposal?: ProposalWorkspace;
 };
 
-export function ReportEditor({ initialListing, initialReport, hasPublishedProposal, agency, availableTemplates, appraisal, calculatorReview }: Props) {
+export function ReportEditor({ initialListing, initialReport, hasPublishedProposal, agency, availableTemplates, appraisal, calculatorReview, initialProposal }: Props) {
   const [currentAppraisal, setAppraisal] = useState(appraisal);
   const [customerEditing, setCustomerEditing] = useState(false);
   const [listing, setListing] = useState(initialListing);
@@ -31,6 +33,7 @@ export function ReportEditor({ initialListing, initialReport, hasPublishedPropos
       initialReport={report}
       hasPublishedProposal={hasPublishedProposal}
       agency={agency}
+      initialProposal={initialProposal}
       availableTemplates={availableTemplates}
       digitalProposal={Boolean(appraisal)}
       customerRevision={currentAppraisal?.updated_at}

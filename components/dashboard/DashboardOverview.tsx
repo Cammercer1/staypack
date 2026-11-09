@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink as Link } from "@/components/app-shell/IntentLink";
 import { ArrowRight, BookOpen, CircleAlert, FileText, Images, Plus } from "lucide-react";
 import { WorkspaceHeader } from "@/components/app-shell/WorkspaceHeader";
 import { ListingThumbnail } from "@/components/listings/ListingThumbnail";

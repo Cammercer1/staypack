@@ -1,10 +1,12 @@
 import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { requireAgency, requireReportWithListing } from "@/lib/auth/requireUser";
+import { requireAgency } from "@/lib/auth/requireUser";
+import { requireAppraisalAccess } from "@/lib/appraisals/access";
+import { ProposalError } from "@/lib/digital-proposals/errors";
 import { collateralPhotoRequirementError } from "@/lib/listings/collateralPhotoRequirements";
 import type { Agency, Listing, Report } from "@/lib/types";
 import { resolveAvailableTemplates } from "@/lib/templates/resolveAvailableTemplates";
-import { appraisalStatuses, type AgencyContact, type StrAppraisal, type StrAppraisalRow } from "./types";
+import { appraisalStatuses, type AgencyContact, type StrAppraisalRow } from "./types";
 import { generalRecipient, recipientPayload, type AppraisalQuery, type RecipientValues } from "./validation";
 import { listClients } from "@/lib/clients/service";
 
@@ -14,12 +16,12 @@ export async function requireStrWorkspaceAccess() {
 }
 
 export async function requireStrAppraisalAccess(reportId: string) {
-  const context = await requireReportWithListing(reportId);
-  const { data, error } = await context.supabase.from("str_appraisals").select("*")
-    .eq("report_id", reportId).eq("agency_id", context.agency.id).eq("kind", "str").maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("STR appraisal not found");
-  return { ...context, appraisal: data as StrAppraisal };
+  const context = await requireAppraisalAccess(reportId).catch(error => {
+    if (error instanceof ProposalError && error.status === 404) throw new Error("STR appraisal not found");
+    throw error;
+  });
+  if (context.appraisal.kind !== "str") throw new Error("STR appraisal not found");
+  return context;
 }
 
 export async function loadAgencyContacts(supabase: SupabaseClient, agencyId: string, search = "") {

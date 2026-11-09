@@ -4,6 +4,13 @@
 [build.environment]
   NODE_VERSION = "24"
 
+# Canonicalize the legacy host without running application middleware on public pages.
+[[redirects]]
+  from = "https://staypack.netlify.app/*"
+  to = "https://staypack.app/:splat"
+  status = 301
+  force = true
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 

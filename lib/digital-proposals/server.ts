@@ -13,7 +13,6 @@ import { resolveProposalBrand } from "./brand";
 import { applyAssignment, assignmentSchema, defaultAssignment } from "./assignment";
 import { validateProposalDraft, proposalDraftSchema } from "./template";
 import { attachmentSchema, proposalSnapshotSchema, type ProposalWorkspace, type ProposalShareLink } from "./workspace";
-import { preserveProposalImages } from "./imageStorage";
 import { availableProposalPhotos, withProposalPhotos, type ProposalPhotoSelection } from "./photos";
 
 import { ProposalError } from "./errors";
@@ -38,8 +37,10 @@ export async function proposalContext(reportId: string, request?: Request) {
   if (!z.uuid().safeParse(reportId).success) throw new ProposalError("Appraisal not found.", 404);
   const context = await requireProposalAppraisalAccess(reportId, request);
   if (context.report.status === "archived" || context.listing.status === "archived") throw new ProposalError("Restore this appraisal before editing its proposal.", 409);
-  const agencyAgents = await loadAgencyAgentProfiles(context.supabase, context.agency.id);
-  const assigned = await context.supabase.from("digital_proposal_assignments").select("name,version,defaults").eq("agency_id", context.agency.id).eq("kind", context.appraisal.kind).maybeSingle();
+  const [agencyAgents, assigned] = await Promise.all([
+    loadAgencyAgentProfiles(context.supabase, context.agency.id),
+    context.supabase.from("digital_proposal_assignments").select("name,version,defaults").eq("agency_id", context.agency.id).eq("kind", context.appraisal.kind).maybeSingle(),
+  ]);
   check(assigned.error);
   const assignment = assigned.data ? assignmentSchema.parse(assigned.data) : defaultAssignment(context.agency, context.appraisal.kind);
   const kind = context.appraisal.kind;
@@ -73,19 +74,18 @@ export async function loadProposalWorkspace(context: Context): Promise<ProposalW
   const { supabase, report, agency } = context;
   const fields = "id,draft_revision,created_at,revoked_at,share_token,pdf_status,source_fingerprint";
   // Select the current-version FK, not the served-version history relationship.
-  const [draft, attachments, versions, links] = await Promise.all([
+  const [draft, attachments, versions, links, history] = await Promise.all([
     supabase.from("digital_proposal_drafts").select("draft_json,revision").eq("report_id", report.id).eq("agency_id", agency.id).maybeSingle(),
     supabase.from("digital_proposal_attachments").select("id,name,byte_size").eq("report_id", report.id).eq("agency_id", agency.id).order("created_at"),
     supabase.from("digital_proposal_versions").select(`${fields},digital_proposal_links!digital_proposal_links_agency_id_report_id_version_id_fkey(id,token,created_at,revoked_at)`).eq("report_id", report.id).eq("agency_id", agency.id).order("created_at", { ascending: false }).limit(20),
     supabase.from("digital_proposal_links").select(`id,token,version_id,created_at,updated_at,revoked_at,is_primary,published_revision,published_source_fingerprint,version:digital_proposal_versions!digital_proposal_links_agency_id_report_id_version_id_fkey(${fields})`)
       .eq("report_id", report.id).eq("agency_id", agency.id).order("created_at", { ascending: false }),
+    supabase.from("digital_proposal_link_versions").select("link_id,version_id").eq("report_id", report.id).eq("agency_id", agency.id),
   ]);
   for (const result of [draft, attachments, versions]) check(result.error);
   const migrated = !missingStableLinkSchema(links.error);
   if (migrated) check(links.error);
   // History includes prior targets of a stable link, which no longer appear in the direct version join.
-  const history = migrated ? await supabase.from("digital_proposal_link_versions").select("link_id,version_id")
-    .eq("report_id", report.id).eq("agency_id", agency.id) : { data: [], error: null };
   if (migrated) check(history.error);
   const orderedLinks = (migrated ? z.array(storedLinkSchema).parse(links.data ?? []) : []).sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
   const primary = orderedLinks.find(link => link.is_primary && !link.revoked_at) ?? orderedLinks.find(link => link.is_primary);
@@ -177,7 +177,11 @@ export async function publishProposal(context: Context, revision: number, source
     pdfReport: context.pdfReport ? withPdfPhotos(withPdfAgents(context.pdfReport, data.agents), draft.propertyImages) : undefined,
   });
   let snapshot: typeof sourceSnapshot;
-  try { snapshot = await preserveProposalImages(sourceSnapshot, context.agency.id); }
+  try {
+    // Storage/S3 dependencies are only needed when publishing, not to open or save an editor.
+    const { preserveProposalImages } = await import("./imageStorage");
+    snapshot = await preserveProposalImages(sourceSnapshot, context.agency.id);
+  }
   catch (error) {
     console.warn("Proposal image preservation failed", error instanceof Error ? error.message : "Storage request failed");
     // Do not publish a new link with images that still depend on an external host.

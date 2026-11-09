@@ -22,13 +22,16 @@ import { createProposalDraftSaver, mergeSavedProposalDraft, PROPOSAL_AUTOSAVE_DE
 export type ProposalWorkflowHandle = { savePendingEdits: () => Promise<boolean> };
 export const ProposalWorkflow = forwardRef<ProposalWorkflowHandle, {
   reportId: string; stage: "proposal" | "share"; disabled?: boolean; refreshKey?: string;
+  initialWorkspace?: ProposalWorkspace; onInitialWorkspaceUsed?: () => void;
   customerPanel?: ReactNode;
   onReviewEvidence?: () => void;
   onContinue?: () => void; onBusyChange?: (busy: boolean) => void;
-}>(function ProposalWorkflow({ reportId, stage, disabled, refreshKey, customerPanel, onContinue, onReviewEvidence, onBusyChange }, ref) {
+}>(function ProposalWorkflow({ reportId, stage, disabled, refreshKey, initialWorkspace, onInitialWorkspaceUsed, customerPanel, onContinue, onReviewEvidence, onBusyChange }, ref) {
   const paths = useAppraisalRoutes(reportId);
   const [workspace, setWorkspace] = useState<ProposalWorkspace | null>(null);
   const sourceKey = `${reportId}:${refreshKey ?? ""}`;
+  const prepared = useRef(initialWorkspace ? { key: sourceKey, value: initialWorkspace } : null);
+  const preparedConsumed = useRef(onInitialWorkspaceUsed);
   const [loadedSourceKey, setLoadedSourceKey] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<{ key: string; message: string } | null>(null);
   const [section, setSection] = useState<"content" | "preview">("content");
@@ -81,7 +84,12 @@ export const ProposalWorkflow = forwardRef<ProposalWorkflowHandle, {
       // A refreshed customer must read the revision returned by an earlier save.
       if (saver.pending) await saver.pending;
       if (cancelled) return;
-      const value = await proposalFetch<ProposalWorkspace>(`${paths.api}/proposal`);
+      // Consume a server-provided workspace once. Customer changes and later
+      // mounts must fetch current data, including saved drafts and revoked links.
+      const initial = prepared.current;
+      prepared.current = null;
+      if (initial) preparedConsumed.current?.();
+      const value = initial?.key === sourceKey ? initial.value : await proposalFetch<ProposalWorkspace>(`${paths.api}/proposal`);
       if (cancelled) return;
       setWorkspace(value);
       setLoadedSourceKey(sourceKey);

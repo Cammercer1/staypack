@@ -11,22 +11,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { loginSchema } from "@/lib/validation/schemas";
+import { safeAuthRedirect } from "@/lib/auth/redirectPath";
 
 type LoginForm = {
   email: string;
   password: string;
 };
 
-function safeNextPath(nextPath: string | undefined) {
-  return nextPath?.startsWith("/") && !nextPath.startsWith("//")
-    ? nextPath
-    : "/dashboard";
-}
-
 export function LoginForm({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const redirectTo = safeNextPath(nextPath);
+  const redirectTo = safeAuthRedirect(nextPath);
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },

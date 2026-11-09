@@ -229,12 +229,14 @@ function setup(draft = false, options: { report?: Partial<Report>; noTemplates?:
 }
 const clickTab = (name: string) =>
   fireEvent.click(screen.getByRole("tab", { name }));
-const waitTab = (name: string) =>
-  waitFor(() =>
+const waitTab = async (name: string) => {
+  await waitFor(() =>
     expect(
       screen.getByRole("tab", { name }).getAttribute("aria-selected"),
     ).toBe("true"),
   );
+  await waitFor(() => expect(screen.queryByText("Loading editor…")).toBeNull());
+};
 
 describe("short-term rental report journey", () => {
   it("goes from property to evidence to design, then writes content only after choosing a design", async () => {

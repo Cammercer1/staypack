@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { getSiteUrl } from "@/lib/env";
 import { signupSchema } from "@/lib/validation/schemas";
+import { safeAuthRedirect } from "@/lib/auth/redirectPath";
 
 type SignupForm = {
   email: string;
@@ -19,16 +20,10 @@ type SignupForm = {
   confirmPassword: string;
 };
 
-function safeNextPath(nextPath: string | undefined) {
-  return nextPath?.startsWith("/") && !nextPath.startsWith("//")
-    ? nextPath
-    : "/dashboard";
-}
-
 export function SignupForm({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const redirectTo = safeNextPath(nextPath);
+  const redirectTo = safeAuthRedirect(nextPath);
   const form = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
     defaultValues: { email: "", password: "", confirmPassword: "" },
