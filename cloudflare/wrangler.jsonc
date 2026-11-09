@@ -1,0 +1,27 @@
+{
+  "name": "staypack-public-reports",
+  "main": "../.report-worker/worker.js",
+  "compatibility_date": "2026-11-09",
+  "workers_dev": false,
+  "preview_urls": false,
+  "keep_vars": true,
+  "send_metrics": false,
+  "minify": true,
+  "cache": { "enabled": false },
+  "assets": {
+    "directory": "../.report-worker/assets",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "run_worker_first": ["/examples/*", "/example/*", "/proposal/*"]
+  },
+  "routes": [
+    { "pattern": "staypack.app/examples/*", "zone_name": "staypack.app" },
+    { "pattern": "staypack.app/example/*", "zone_name": "staypack.app" },
+    { "pattern": "staypack.app/proposal/*", "zone_name": "staypack.app" },
+    { "pattern": "staypack.app/_report-viewer/*", "zone_name": "staypack.app" },
+    { "pattern": "staypack.app/fonts/*", "zone_name": "staypack.app" },
+    { "pattern": "staypack.app/brands/*", "zone_name": "staypack.app" }
+  ],
+  "observability": { "enabled": false }
+}

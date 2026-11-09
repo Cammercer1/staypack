@@ -16,6 +16,8 @@
     "container:status": "node scripts/container.mjs status",
     "build": "node scripts/verify-env.mjs && npm run test:release && npm run build:public-viewer && next build && node scripts/verify-release.mjs",
     "build:public-viewer": "node scripts/build-public-viewer.mjs",
+    "build:report-worker": "node scripts/build-public-viewer.mjs --cloudflare",
+    "deploy:report-worker": "npm run build:report-worker && npx --yes wrangler@4.158.0 deploy --config cloudflare/wrangler.jsonc",
     "start": "next start",
     "lint": "eslint",
     "test": "node --test scripts/container.test.mjs && vitest run",
