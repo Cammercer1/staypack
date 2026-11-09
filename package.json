@@ -19,7 +19,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --test scripts/container.test.mjs && vitest run",
-    "test:release": "node --test scripts/verify-release.test.mjs netlify/plugins/defer-framework-middleware/index.test.mjs && vitest run components/app-shell/AppShell.test.tsx components/dashboard/DashboardOverview.test.tsx components/digital-proposals/ProposalWorkflow.test.tsx lib/prospects/routes.test.ts",
+    "test:release": "node --test scripts/verify-release.test.mjs && vitest run components/app-shell/AppShell.test.tsx components/dashboard/DashboardOverview.test.tsx components/digital-proposals/ProposalWorkflow.test.tsx lib/prospects/routes.test.ts",
     "test:staging": "playwright test",
     "test:watch": "vitest"
   },

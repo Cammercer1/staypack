@@ -113,14 +113,6 @@ Check `X-StayPack-Delivery: edge` and `Server-Timing` on deployed viewer respons
 test a revoked link after warming the snapshot cache. Never enable response
 caching on the edge function, which would bypass its access checks.
 
-Netlify bundles all edge entries together and statically imports them at startup.
-The local `defer-framework-middleware` build plugin must follow the Next adapter:
-it defers the generated middleware import until a matching request needs it.
-The original handler, authorization, cookies and matchers remain intact. The
-plugin fails the build if an adapter update changes the recognized entry, so
-review it when upgrading the adapter or migrating `middleware.ts` to `proxy.ts`.
-Release tests cover deferred initialization and failure without bypassing auth.
-
 Publish these routes through the normal Git deployment to `staypack.app`. A manual
 Netlify deployment does not add files to Git and will be replaced by the next build.
 Keep the public routes, shared proposal renderer, brand/font assets and prospect
