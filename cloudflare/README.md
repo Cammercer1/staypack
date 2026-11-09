@@ -1,3 +1,91 @@
+# Full application migration — 9 November 2026
+
+Workers Paid is activated. The application runs using vinext 1.4.4 on Workers,
+with placement near the existing Tokyo Supabase database. Public reports retain
+their smaller, separate Worker. Supabase remains the source of truth; Browserless
+renders PDFs and SVG logos; R2 stores public images and private documents.
+
+The paid candidate fixes the Free trial blockers below:
+
+- Raster metadata uses pure JavaScript. Isolated Browserless screenshots convert
+  SVG logos; permanent image copies remain content-addressed and checked on readback.
+- Workers image downloads use public fetch with bounded redirects, time and bytes.
+  Node deployments retain DNS-pinned sockets. Workers enables
+  `global_fetch_strictly_public` and has no private-network bindings.
+- Next cache hints are translated into the existing bounded immutable-snapshot
+  cache. Authorization/revocation reads remain `no-store` on every request.
+- Lease and sales enrichment uses Cloudflare Queues with retries, a dead-letter
+  queue, agency checks and compare-and-swap job claims. Replaying completed jobs
+  does not run provider enrichment again.
+- The production app owns `/proposal/print/*` explicitly, ahead of the report
+  Worker's wider `/proposal/*` route. PDF rendering must never fall back to Netlify.
+- Billing sync retains its one-minute cadence and cache cleanup its five-minute
+  cadence. `SCHEDULES_ENABLED` stays `0` until Netlify's schedules are stopped.
+  The old delivery-cron declaration had no deployed function; no new customer
+  email schedule is enabled by this migration.
+
+The existing billing mode remains disabled. Migration does not activate Stripe
+billing or send customer delivery messages. Runtime dependencies have no high or
+critical audit findings; lower-severity transitive findings remain in vinext's
+image-generation/development tooling. vinext is still beta, so keep the pinned
+versions and run the live release checks for framework upgrades.
+
+## Build, deploy and rollback
+
+From the migration worktree with Node 24:
+
+```sh
+STAYPACK_DEV_PORT=3102 node scripts/container.mjs exec app npm run build:cloudflare
+npm run deploy:cloudflare
+```
+
+`wrangler.app.jsonc` is production; root `wrangler.jsonc` is private QA. Both builds
+remove generated dotenv files and scan artifacts for embedded private values.
+Deploy uses encrypted Worker secrets from the existing local environment, passed
+through a temporary mode-0600 file which is removed afterwards. No secrets belong
+in Git. The production workers.dev hostname requires a temporary candidate key;
+normal access is only through `staypack.app`. There is no automatic Git deployment
+configured for the app: use the checked build and deployment commands above.
+
+Before retirement, rollback is removal of the two `staypack-app` routes, leaving
+all six `staypack-public-reports` routes intact. Netlify's known-good deployment is
+`6087f47` / `6af17f05327228e2745187d1`. After retirement, restore that deployment and
+its two maintenance schedules before routing traffic back; disable Cloudflare
+maintenance first. Database and storage formats are unchanged by this migration.
+
+## Paid preview validation
+
+2,373 unit tests passed (six opt-in live tests skipped); TypeScript passed and
+ESLint reported no errors. Separate live tests verified login, saved editor
+changes, conflicts, cross-agency denial, membership removal and immediate warmed
+report revocation. Both real provider jobs completed (28 lease and 30 sales
+comparables), including an automatic retry. Production queue dispatch also
+completed; four repeated completed-job messages left attempt counts unchanged.
+Legacy and current-template PDFs generated, downloaded and rendered successfully.
+
+Three rounds of probes placed in Sydney and US East measured complete HTML,
+not browser hydration. Individual results are in `paid-preview-results.json`.
+
+| Probe | Page | Netlify median | Cloudflare median |
+| --- | --- | ---: | ---: |
+| Sydney | Dashboard | 2,619 ms | 1,286 ms |
+| Sydney | Editor | 4,119 ms | 884 ms |
+| Sydney | Login | 15 ms | 619 ms |
+| US East | Dashboard | 1,782 ms | 539 ms |
+| US East | Editor | 3,087 ms | 538 ms |
+| US East | Login | 259 ms | 413 ms |
+
+Direct login HTML is slower than Netlify's static CDN response. Homepage-to-usable
+login navigation was 56–83 ms in local browser checks because the form is
+prefetched. Local dashboard readiness was 0.91–1.23 seconds and interactive editor
+readiness 2.57–2.66 seconds. These are small samples, not latency guarantees.
+Public reports already ran on Cloudflare and therefore show no hosting improvement
+in this comparison. Production cutover verification is recorded separately below.
+
+---
+
+## Archived Free-plan evaluation
+
 # Public report hosting
 
 The report Worker serves `/examples/*`, `/example/*`, `/proposal/*`, the hashed

@@ -262,6 +262,7 @@ describe("short-term rental report journey", () => {
     await waitTab("Design & content");
     expect(screen.queryByLabelText("Heading")).toBeNull();
     expect(fetcher.mock.calls.some(([url]) => url.endsWith("generate-copy"))).toBe(false);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Use design & write report" })).toHaveProperty("disabled", false));
     fireEvent.click(screen.getByRole("button", { name: "Use design & write report" }));
     expect(await screen.findByLabelText("Heading")).toBeTruthy();
     expect(

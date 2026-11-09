@@ -3,7 +3,7 @@
   "name": "staypack-app-preview",
   "compatibility_date": "2026-11-09",
   "compatibility_flags": [
-    "nodejs_compat"
+    "nodejs_compat", "global_fetch_strictly_public"
   ],
   "main": "cloudflare/app-preview-entry.ts",
   "assets": {
@@ -32,6 +32,7 @@
     "region": "aws:ap-northeast-1"
   },
   "vars": {
+    "CLOUDFLARE_APP": "1",
     "APP_ENV": "production",
     "SITE_URL": "https://staypack-app-preview.cameronmercer1991.workers.dev",
     "NEXT_PUBLIC_SITE_URL": "https://staypack-app-preview.cameronmercer1991.workers.dev",
@@ -42,5 +43,26 @@
       "binding": "PUBLIC_REPORTS",
       "service": "staypack-public-reports"
     }
-  ]
+  ],
+  "limits": {
+    "cpu_ms": 30000
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "APPRAISAL_JOBS",
+        "queue": "staypack-preview-appraisals"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "staypack-preview-appraisals",
+        "max_batch_size": 1,
+        "max_batch_timeout": 1,
+        "max_retries": 3,
+        "max_concurrency": 2,
+        "dead_letter_queue": "staypack-preview-appraisals-dead"
+      }
+    ]
+  }
 }

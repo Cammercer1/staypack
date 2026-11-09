@@ -6,10 +6,14 @@ import { patchCssModules } from "vite-css-modules";
 import path from "node:path";
 
 export default defineConfig({
+  resolve: {
+    alias: { "@/lib/hosting/jobQueue": path.resolve(import.meta.dirname, "cloudflare/jobQueue.ts") },
+  },
   plugins: [
     patchCssModules({ exportMode: "default" }),
     vinext(),
     cloudflare({
+      configPath: process.env.STAYPACK_CLOUDFLARE_CONFIG || "wrangler.jsonc",
       viteEnvironment: {
         name: "rsc",
         childEnvironments: ["ssr"],

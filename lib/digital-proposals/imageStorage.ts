@@ -1,7 +1,8 @@
 // Server/CLI module; never import this into a client component.
 import { createHash } from "node:crypto";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import sharp from "sharp";
+import { imageSize } from "image-size";
+import { rasterizeSvg } from "../browserless/screenshot";
 import { fetchExportImage } from "../collateral/social/fetchExportImage";
 import { r2Client, r2PublicUrl, usesR2Storage } from "../storage/r2";
 import { storageObject } from "../storage/r2";
@@ -33,15 +34,17 @@ async function validatedImage(image: ProposalImage): Promise<ProposalImage & { e
   if (isSvg && (/<!DOCTYPE|<!ENTITY|<script|<foreignObject|@import/i.test(xml) || references.some(value => !value.trim().startsWith("#")))) {
     throw new Error("SVG image contains external or active content");
   }
-  const metadata = await sharp(image.buffer, { limitInputPixels: 40_000_000 }).metadata();
+  const metadata = imageSize(image.buffer);
+  if (!metadata.width || !metadata.height || !Number.isFinite(metadata.width * metadata.height)
+    || metadata.width * metadata.height > 40_000_000) throw new Error("Unsupported proposal image dimensions");
   // Rasterize SVGs so the permanent public copy cannot contain active SVG content
   // or references to external resources. Other image bytes remain unchanged.
-  if (metadata.format === "svg") {
+  if (metadata.type === "svg") {
     if (!isSvg) throw new Error("Unsupported SVG encoding");
-    const buffer = await sharp(image.buffer, { density: 144, limitInputPixels: 40_000_000 }).png().toBuffer();
+    const buffer = await rasterizeSvg(image.buffer, metadata.width, metadata.height);
     return { buffer, contentType: "image/png", extension: "png" };
   }
-  const format = metadata.format === "heif" && metadata.compression === "av1" ? "avif" : metadata.format;
+  const format = metadata.type === "jpg" ? "jpeg" : metadata.type;
   const extension = format && extensions[format];
   if (!extension || !metadata.width || !metadata.height) throw new Error("Unsupported proposal image");
   return { ...image, extension, contentType: `image/${format}` };

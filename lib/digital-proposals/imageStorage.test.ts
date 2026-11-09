@@ -4,7 +4,8 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { preserveProposalImages } from "./imageStorage";
 import { proposalImageUrls, replaceProposalImages } from "./imageSnapshot";
 
-const mocks = vi.hoisted(() => ({ fetch: vi.fn(), send: vi.fn() }));
+const mocks = vi.hoisted(() => ({ fetch: vi.fn(), send: vi.fn(), rasterize: vi.fn() }));
+vi.mock("../browserless/screenshot", () => ({ rasterizeSvg: mocks.rasterize }));
 vi.mock("../collateral/social/fetchExportImage", () => ({ fetchExportImage: mocks.fetch }));
 vi.mock("../storage/r2", () => ({
   usesR2Storage: () => true, r2Client: () => ({ send: mocks.send }),
@@ -15,7 +16,7 @@ const scope = "a".repeat(36);
 const bytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1XQAAAAASUVORK5CYII=", "base64");
 const hash = createHash("sha256").update(bytes).digest("hex");
 const url = `https://assets.test/report-assets/${scope}/published-images/${hash}.png`;
-beforeEach(() => { vi.clearAllMocks(); mocks.fetch.mockResolvedValue({ buffer: bytes, contentType: "image/png" }); mocks.send.mockResolvedValue({}); });
+beforeEach(() => { vi.clearAllMocks(); mocks.fetch.mockResolvedValue({ buffer: bytes, contentType: "image/png" }); mocks.send.mockResolvedValue({}); mocks.rasterize.mockResolvedValue(bytes); });
 
 it("replaces every presentation image field, deduplicates downloads and leaves links, copy and input untouched", async () => {
   const source = "https://source.test/photo";

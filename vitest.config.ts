@@ -9,11 +9,11 @@ export default defineConfig({
     // Ordinary tests use mocked Supabase storage, even with R2 enabled locally.
     // Explicit live checks opt in; R2 unit tests replace their own SDK client.
     env: { STORAGE_PROVIDER: process.env.RUN_R2_STORAGE_SMOKE === "1" || process.env.STR_LIVE_TEST === "1" || process.env.APPRAISAL_INTEGRATION_TEST === "1" ? (process.env.STORAGE_PROVIDER || "supabase") : "supabase" },
-    include: ["lib/**/*.test.ts", "components/**/*.test.{ts,tsx}", "app/**/*.test.ts"],
+    include: ["lib/**/*.test.ts", "components/**/*.test.{ts,tsx}", "app/**/*.test.ts", "cloudflare/**/*.test.ts"],
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "."),
+      "@": path.resolve(import.meta.dirname, "."),
     },
   },
 });

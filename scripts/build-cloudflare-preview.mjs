@@ -3,25 +3,28 @@ import { readFile, readdir, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = process.cwd();
-const config = JSON.parse(await readFile(resolve(root, "wrangler.jsonc"), "utf8"));
-if (config.name !== "staypack-app-preview" || config.account_id !== "fc594f30144c9ba2a1cb9a5c3ce1313a" || config.routes?.length) {
-  throw new Error("The evaluation build must use the isolated StayPack preview without production routes");
+const production = process.argv.includes("--production");
+const configPath = production ? "wrangler.app.jsonc" : "wrangler.jsonc";
+const config = JSON.parse(await readFile(resolve(root, configPath), "utf8"));
+if (config.name !== (production ? "staypack-app" : "staypack-app-preview") || config.account_id !== "fc594f30144c9ba2a1cb9a5c3ce1313a" || (!production && config.routes?.length)
+  || config.routes?.some(route => !["staypack.app/*", "staypack.app/proposal/print/*"].includes(route.pattern))) {
+  throw new Error("Unexpected Cloudflare app name, account or routes");
 }
 try { process.loadEnvFile(resolve(root, ".env.local")); } catch (error) { if (error.code !== "ENOENT") throw error; }
 if (new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname !== "qmtfugaeujeikyegoxwi.supabase.co") {
   throw new Error("Unexpected Supabase project");
 }
-const origin = "https://staypack-app-preview.cameronmercer1991.workers.dev";
+const origin = production ? "https://staypack.app" : "https://staypack-app-preview.cameronmercer1991.workers.dev";
 try {
   const code = await new Promise((accept, reject) => {
     const child = spawn("npm", ["run", "build:vinext"], {
       stdio: "inherit",
-      env: { ...process.env, NEXT_PUBLIC_SITE_URL: origin, NEXT_PUBLIC_REPORTS_URL: origin },
+      env: { ...process.env, STAYPACK_CLOUDFLARE_CONFIG: configPath, NEXT_PUBLIC_SITE_URL: origin, NEXT_PUBLIC_REPORTS_URL: origin },
     });
     child.on("error", reject);
     child.on("close", accept);
   });
-  if (code !== 0) throw new Error(`Preview build failed (${code})`);
+  if (code !== 0) throw new Error(`Cloudflare build failed (${code})`);
 } finally {
   // The adapter copies local dotenv values for local emulation. They are not a
   // deployment artifact; remove that generated copy even after a failed build.
@@ -39,4 +42,4 @@ for (const directory of ["dist/client", "dist/server"]) {
     }
   }
 }
-console.log("Preview build checked: no production routes or embedded private environment values.");
+console.log(`${production ? "Production" : "Preview"} build checked: expected routing and no embedded private environment values.`);

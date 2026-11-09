@@ -1,3 +1,4 @@
+import { claimAppraisalJob } from "@/lib/appraisals/claimJob";
 import { requireListingAgencyCountry } from "@/lib/property-market/requireAgencyCountry";
 import { enrichWorkspaceAppraisal } from "@/lib/appraisals/enrichWorkspaceAppraisal";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -54,10 +55,12 @@ async function markJobFailed({
   supabase,
   jobId,
   message,
+  attempt,
 }: {
   supabase: SupabaseClient;
   jobId: string;
   message: string;
+  attempt: number;
 }) {
   await supabase
     .from("lease_appraisal_jobs")
@@ -67,13 +70,14 @@ async function markJobFailed({
       failed_at: new Date().toISOString(),
       heartbeat_at: new Date().toISOString(),
     })
-    .eq("id", jobId);
+    .eq("id", jobId).eq("status", "processing").eq("attempts", attempt);
 }
 
 export async function runLeaseAppraisalJob({
   supabase,
   jobId,
 }: RunLeaseAppraisalJobInput) {
+  let ownedAttempt: number | undefined;
   try {
     const job = await loadJob(supabase, jobId);
 
@@ -81,23 +85,8 @@ export async function runLeaseAppraisalJob({
       return job;
     }
 
-    const now = new Date().toISOString();
-    const { data: processingJob, error: processingError } = await supabase
-      .from("lease_appraisal_jobs")
-      .update({
-        status: "processing",
-        attempts: (job.attempts ?? 0) + 1,
-        started_at: job.started_at ?? now,
-        heartbeat_at: now,
-        error_message: null,
-      })
-      .eq("id", job.id)
-      .select("*")
-      .single();
-
-    if (processingError || !processingJob) {
-      throw new Error(processingError?.message ?? "Unable to start lease job");
-    }
+    const processingJob = await claimAppraisalJob(supabase, "lease_appraisal_jobs", job);
+    ownedAttempt = processingJob.attempts;
 
     const listing = await loadListing(
       supabase,
@@ -129,7 +118,7 @@ export async function runLeaseAppraisalJob({
         heartbeat_at: completedAt,
         error_message: null,
       })
-      .eq("id", job.id)
+      .eq("id", job.id).eq("status", "processing").eq("attempts", ownedAttempt)
       .select("*")
       .single();
 
@@ -139,10 +128,11 @@ export async function runLeaseAppraisalJob({
 
     return completedJob as LeaseAppraisalJob;
   } catch (error) {
-    await markJobFailed({
+    if (ownedAttempt !== undefined) await markJobFailed({
       supabase,
       jobId,
       message: messageFromError(error),
+      attempt: ownedAttempt,
     }).catch((saveError) => {
       console.error("Failed to mark lease appraisal job failed:", saveError);
     });

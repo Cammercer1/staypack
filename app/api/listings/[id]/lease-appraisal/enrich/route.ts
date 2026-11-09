@@ -1,3 +1,4 @@
+import { enqueueAppraisalJob } from "@/lib/hosting/jobQueue";
 import { assertPropertyCountry } from "@/lib/property-market/agencyCountry";
 import { appraisalInputError } from "@/lib/appraisals/resolveAppraisalInput";
 import { NextResponse } from "next/server";
@@ -134,6 +135,15 @@ export async function POST(
         return runSynchronously({ supabase, listing });
       }
       throw new Error(jobError?.message ?? "Unable to create lease job");
+    }
+
+    try {
+      if (await enqueueAppraisalJob({ kind: "lease", jobId: job.id, agencyId: agency.id })) {
+        return NextResponse.json({ listing, job, status: "pending" }, { status: 202 });
+      }
+    } catch {
+      await markJobFailed(job as LeaseAppraisalJob, "Unable to enqueue comparable search");
+      return NextResponse.json({ error: "Unable to start comparable search", job }, { status: 502 });
     }
 
     const body = JSON.stringify({ jobId: job.id });

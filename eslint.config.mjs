@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     ".next-local/**",
     ".netlify/**",
     ".report-worker/**",
+    "dist/**",
+    ".wrangler/**",
     "cloudflare/.wrangler/**",
     "public/_report-viewer/**",
     "netlify/edge-functions/public-reports.js",

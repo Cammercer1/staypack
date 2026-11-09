@@ -81,6 +81,42 @@ async function requestImage(url: URL, signal: AbortSignal): Promise<IncomingMess
   });
 }
 
+/** Workers' public fetch has no private network binding or Node socket lookup.
+ * The deployment also enables global_fetch_strictly_public so same-zone URLs
+ * cannot bypass the public Worker/access checks and reach a private origin.
+ */
+async function workerImage(target: URL, signal: AbortSignal) {
+  for (let followed = 0; ; followed++) {
+    signal.throwIfAborted();
+    const response = await fetch(target, { redirect: "manual", signal,
+      headers: { Accept: "image/*", "Accept-Encoding": "identity", "User-Agent": "StayPack/1.0 (+https://staypack.app)" } });
+    const reader = response.body?.getReader();
+    try {
+      if (redirects.has(response.status)) {
+        const location = response.headers.get("location");
+        if (followed >= MAX_REDIRECTS || !location) throw new Error("Image redirected too many times");
+        target = imageUrl(location, target);
+        continue;
+      }
+      if (!response.ok) throw new Error(`Image fetch failed (${response.status})`);
+      const contentType = response.headers.get("content-type") ?? "application/octet-stream";
+      if (!contentType.toLowerCase().startsWith("image/")) throw new Error("URL did not return an image");
+      if (Number(response.headers.get("content-length")) > MAX_BYTES) throw new Error("Image is too large");
+      let size = 0;
+      const chunks: Buffer[] = [];
+      while (reader) {
+        const { done, value } = await beforeAbort(reader.read(), signal);
+        if (done) break;
+        size += value.length;
+        if (size > MAX_BYTES) throw new Error("Image is too large");
+        chunks.push(Buffer.from(value));
+      }
+      if (!size) throw new Error("Image is empty");
+      return { buffer: Buffer.concat(chunks, size), contentType };
+    } finally { await reader?.cancel().catch(() => {}); }
+  }
+}
+
 /** Authenticated image proxy: only public destinations, bounded redirects and body. */
 export async function fetchExportImage(value: string, signal?: AbortSignal) {
   let target = imageUrl(value);
@@ -90,6 +126,7 @@ export async function fetchExportImage(value: string, signal?: AbortSignal) {
   if (signal?.aborted) abort();
   const timeout = setTimeout(() => controller.abort(new Error("Image request timed out")), FETCH_TIMEOUT_MS);
   try {
+    if (process.env.CLOUDFLARE_APP === "1") return await workerImage(target, controller.signal);
     for (let followed = 0; ; followed++) {
       const response = await requestImage(target, controller.signal);
       const abortResponse = () => response.destroy(controller.signal.reason);

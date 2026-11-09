@@ -1,6 +1,7 @@
 import { CalculatorError } from "./service";
 
 export function calculatorClientAddress(request: Request) {
+  if (process.env.CLOUDFLARE_APP === "1") return request.headers.get("cf-connecting-ip") || "unknown";
   // Netlify overwrites this header at its edge. Do not trust forwarded IP headers.
   return process.env.NETLIFY === "true" ? request.headers.get("x-nf-client-connection-ip") || "unknown" : "local";
 }

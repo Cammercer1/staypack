@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ProposalError } from "./errors";
 import { viewerSnapshotSchema } from "./viewerSnapshot";
 import { databaseRequest } from "@/lib/supabase/rest";
+import { hostingDatabaseFetch } from "@/lib/hosting/databaseFetch";
 import { LOADING_BRAND_SELECT, loadingBrandSchema } from "./loadingBrand";
 
 export { ProposalError } from "./errors";
@@ -28,7 +29,7 @@ export async function proposalLoadingBrand(token: string, versionId?: string) {
     select: `version:digital_proposal_versions!digital_proposal_links_agency_id_report_id_version_id_fkey!inner(${fields})`, token: `eq.${token}`, revoked_at: "is.null", ...scope,
   });
   try {
-    const response = await fetch(request.url, { headers: request.headers, cache: "force-cache", next: { revalidate: 3600 } });
+    const response = await hostingDatabaseFetch(request.url, { headers: request.headers, cache: "force-cache", next: { revalidate: 3600 } });
     if (!response.ok) return null;
     const rows = await response.json();
     return loadingBrandSchema.safeParse(rows[0]?.version).data ?? null;
@@ -36,7 +37,7 @@ export async function proposalLoadingBrand(token: string, versionId?: string) {
 }
 
 /** Fresh scoped joins preserve revocation and archive boundaries on every request. */
-export async function publishedProposalAccess(token: string, versionId?: string, fetcher: typeof fetch = fetch): Promise<{
+export async function publishedProposalAccess(token: string, versionId?: string, fetcher: typeof fetch = hostingDatabaseFetch): Promise<{
   id: string; agency_id: string; report_id: string; content_hash: string | null;
   pdf_status: "pending" | "generating" | "ready" | "failed"; pdf_path: string | null; linkId: string; legacy: boolean;
 }> {
@@ -74,7 +75,7 @@ export async function publishedProposalAccess(token: string, versionId?: string,
 }
 
 /** Internal cache only; this function never grants public access on its own. */
-export async function cachedProposalSnapshot(versionId: string, contentHash: string | null, fetcher: typeof fetch = fetch) {
+export async function cachedProposalSnapshot(versionId: string, contentHash: string | null, fetcher: typeof fetch = hostingDatabaseFetch) {
   const { url, headers } = databaseRequest("digital_proposal_versions", {
     id: `eq.${versionId}`, ...(contentHash ? { content_hash: `eq.${contentHash}` } : {}),
     select: "version:final_report_json->version,data:final_report_json->data,draft:final_report_json->draft,brand:final_report_json->brand,attachments:final_report_json->attachments,assignment:final_report_json->assignment",
@@ -90,7 +91,7 @@ export async function cachedProposalSnapshot(versionId: string, contentHash: str
   return viewerSnapshotSchema.parse({ ...row, assignment: row.assignment ?? undefined });
 }
 
-export async function publishedProposal(token: string, versionId?: string, fetcher: typeof fetch = fetch) {
+export async function publishedProposal(token: string, versionId?: string, fetcher: typeof fetch = hostingDatabaseFetch) {
   const access = await publishedProposalAccess(token, versionId, fetcher);
   const snapshot = await cachedProposalSnapshot(access.id, access.content_hash, fetcher);
   return { ...access, snapshot };

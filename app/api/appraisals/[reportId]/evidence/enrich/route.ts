@@ -1,3 +1,4 @@
+import { enqueueAppraisalJob } from "@/lib/hosting/jobQueue";
 import { z } from "zod";
 import { requireAppraisalAccess, requireEditableAppraisal, checkAppraisalError } from "@/lib/appraisals/workspace";
 import { appraisalInputError } from "@/lib/appraisals/resolveAppraisalInput";
@@ -35,6 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ rep
     checkAppraisalError(inserted.error);
     const job = inserted.data as LeaseAppraisalJob;
     try {
+      if (await enqueueAppraisalJob({ kind, jobId: job.id, agencyId: context.agency.id })) return privateJson({ job, listing: context.workingListing }, 202);
       const payload = JSON.stringify({ jobId: job.id });
       const { timestamp, signature } = (kind === "lease" ? signLeaseAppraisalJobBody : signSalesAppraisalJobBody)(payload);
       const endpoint = (kind === "lease" ? process.env.LEASE_APPRAISAL_JOB_BACKGROUND_URL : process.env.SALES_APPRAISAL_JOB_BACKGROUND_URL)?.trim() || new URL(`/background/${kind}-appraisal-enrich`, request.url).toString();

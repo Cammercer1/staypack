@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { databaseRequest } from "@/lib/supabase/rest";
+import { hostingDatabaseFetch } from "@/lib/hosting/databaseFetch";
 import { viewerSnapshotSchema } from "@/lib/digital-proposals/viewerSnapshot";
 import { LOADING_BRAND_SELECT, loadingBrandSchema } from "@/lib/digital-proposals/loadingBrand";
 import { isProspectPublicSlug } from "./publicLinks";
@@ -16,17 +17,17 @@ export async function prospectLoadingBrand(column: Lookup, value: string) {
     select: LOADING_BRAND_SELECT, [column]: `eq.${value}`, published_at: "not.is.null", revoked_at: "is.null", limit: "1",
   });
   try {
-    const response = await fetch(url, { headers, cache: "force-cache", next: { revalidate: 3600 } });
+    const response = await hostingDatabaseFetch(url, { headers, cache: "force-cache", next: { revalidate: 3600 } });
     if (!response.ok) return null;
     const rows = await response.json();
     return loadingBrandSchema.safeParse(rows[0]).data ?? null;
   } catch { return null; } // A decorative failure must not bypass the authoritative reader.
 }
 
-export async function publishedProspectProposal(token: string, fetcher: typeof fetch = fetch) {
+export async function publishedProspectProposal(token: string, fetcher: typeof fetch = hostingDatabaseFetch) {
   return isValid("public_token", token) ? findPublishedProposal("public_token", token, fetcher) : null;
 }
-export async function publishedProspectProposalBySlug(slug: string, fetcher: typeof fetch = fetch) {
+export async function publishedProspectProposalBySlug(slug: string, fetcher: typeof fetch = hostingDatabaseFetch) {
   return isValid("public_slug", slug) ? findPublishedProposal("public_slug", slug, fetcher) : null;
 }
 
