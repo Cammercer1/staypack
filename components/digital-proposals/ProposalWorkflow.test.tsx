@@ -48,6 +48,16 @@ const workspace = (sourceFingerprint: string): ProposalWorkspace => ({
 beforeEach(() => vi.resetAllMocks());
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
+it("holds step navigation until the initial draft can be saved", async () => {
+  let finish!: (value: ProposalWorkspace) => void;
+  mocks.fetch.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  const onBusyChange = vi.fn();
+  render(<ProposalWorkflow reportId="report" stage="share" onBusyChange={onBusyChange} />);
+  expect(onBusyChange).toHaveBeenLastCalledWith(true);
+  await act(async () => finish(workspace("ready")));
+  expect(onBusyChange).toHaveBeenLastCalledWith(false);
+});
+
 it("uses server-loaded data once, then refreshes after customer changes", async () => {
   const consumed = vi.fn();
   const initialWorkspace = workspace("server-customer");

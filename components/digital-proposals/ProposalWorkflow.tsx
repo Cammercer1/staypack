@@ -46,7 +46,10 @@ export const ProposalWorkflow = forwardRef<ProposalWorkflowHandle, {
   const [committing, setCommitting] = useState(false);
   const busy = uploading || committing;
   const [sharing, setSharing] = useState(false);
-  useEffect(() => { onBusyChange?.(busy || savingDraft || sharing); }, [busy, savingDraft, sharing, onBusyChange]);
+  const loading = loadedSourceKey !== sourceKey && loadError?.key !== sourceKey;
+  // An early step change calls savePendingEdits. Keep navigation waiting until
+  // the saved draft has loaded, otherwise that first click is silently rejected.
+  useEffect(() => { onBusyChange?.(loading || busy || savingDraft || sharing); }, [loading, busy, savingDraft, sharing, onBusyChange]);
   useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
   const commits = useRef(0);
   const loaded = useRef(false);
