@@ -18,7 +18,10 @@ Code entrypoints:
 
 ## Required env vars
 
-Add these to `.env.local` (and mirror in `.env.example` if needed):
+For production, configure these as encrypted runtime settings on Cloudflare
+Worker `staypack-app`. For local work, use ignored `.env.local`; document names
+and sample defaults only in `.env.example`, never real keys. These locations do
+not synchronize. See [environment ownership](../cloudflare/ENVIRONMENT.md).
 
 ```bash
 BRIGHTDATA_API_KEY=...

@@ -8,6 +8,17 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 Branded short-term rental potential reports for real estate agencies. Next.js App Router SaaS with Supabase backend.
 
+## Current hosting and releases
+
+- The whole production web app runs on **Cloudflare Workers Paid** at `https://staypack.app`. Netlify is disabled and retained only for an explicit rollback; do not deploy there or restore its schedules during routine work.
+- `staypack-app` serves the homepage, login, dashboard, editors, APIs and private print routes. `staypack-public-reports` serves published reports and viewer assets. Preserve the app's explicit `/proposal/print/*` route ahead of the report Worker's broader `/proposal/*` route.
+- Appraisal enrichment runs through Cloudflare Queues (`staypack-appraisals`, with `staypack-appraisals-dead` for failed deliveries). The app's Cron Trigger handles billing sync each minute and cache cleanup every five minutes. Billing remains disabled; no customer-delivery email schedule was enabled by the migration.
+- Supabase still provides the database, Auth and RLS for project `qmtfugaeujeikyegoxwi`; production file storage is Cloudflare R2. Browserless still renders PDFs. Moving hosting did not move the database into Cloudflare.
+- Start new work from current `origin/main` on a `codex/…` branch. Preserve existing work and verify the checkout before editing; old branches can still contain Netlify-era instructions.
+- After an authorized commit/push, GitHub runs quality, database, build and browser checks and creates a password-protected synthetic UI preview. Merge a passing PR to `main` for automatic deployment of **both** Workers. Required checks and PR protection apply to administrators too. Deleting the branch removes its preview.
+- Previews have no live database, provider credentials, queues or cron jobs; saves reset on reload. Both existing free Supabase projects are in use. Do not connect previews to either project or pause one to make room. Database CI uses disposable local PostgreSQL.
+- Read [hosting and recovery](cloudflare/README.md), [environment ownership](cloudflare/ENVIRONMENT.md) and [CI/preview workflow](cloudflare/CI.md). These describe current operations; [migration history](cloudflare/HISTORY.md) and older Netlify deployment records are historical evidence.
+
 ## Commands
 
 - `npm ci` — install locked dependencies (Node 24 LTS)
@@ -21,7 +32,7 @@ Branded short-term rental potential reports for real estate agencies. Next.js Ap
 - `npm run build:cloudflare` — production application build for Workers; run in the Node 24 container
 - `npm run deploy:cloudflare` — deploy the checked application build using the authorized local Wrangler identity
 - `npm run deploy:report-worker` — deploy the separate public report Worker and matching assets; shared report changes require both deployments. See `cloudflare/README.md` for credentials and verification.
-- Normal releases use `.github/workflows/ci.yml` and `deploy.yml`: push a branch for checks and a private synthetic-data UI preview, then merge to `main` to deploy both production Workers. See `cloudflare/CI.md`. Never give previews live Supabase, provider, queue or cron credentials/bindings. Database CI uses an empty disposable PostgreSQL database only.
+- The manual deploy commands above are for an authorized recovery or one-off operation. Normal releases use `.github/workflows/ci.yml` and `deploy.yml`; branch cleanup uses `preview-cleanup.yml`.
 - `npm run lint` — ESLint
 - `npm test` — Vitest unit tests
 - Supabase migrations live in `supabase/migrations/` — see `supabase/README.md`
@@ -29,7 +40,7 @@ Branded short-term rental potential reports for real estate agencies. Next.js Ap
 ## Stack
 
 - Next.js 16 App Router, TypeScript, Tailwind CSS 4, shadcn/ui
-- Supabase Auth, Postgres, Storage, RLS
+- Supabase Auth, Postgres and RLS; Cloudflare R2 file storage
 - Server routes for scraping, Airbtics, OpenAI, Browserless, Bright Data
 - Dashboard and APIs run on Cloudflare Workers Paid using pinned vinext; appraisal jobs use Queues and maintenance uses Cron Triggers. Public reports have a separate Worker. Netlify is disabled and retained for rollback. Canonical public URL is `https://staypack.app`.
 
@@ -84,7 +95,13 @@ netlify/functions/  — legacy wrappers for rollback
 
 ## Environment
 
-Copy `.env.example` to `.env.local`. Dev mocks activate automatically when third-party API keys are missing.
+- **Production server values:** encrypted secrets on Cloudflare Worker `staypack-app` (Supabase service role, R2, Browserless, providers, email and billing). The report Worker separately needs `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Changes to a shared credential must reach every consuming Worker.
+- **Versioned runtime configuration:** `wrangler.app.jsonc` and `cloudflare/wrangler.jsonc` own routes, bindings, schedules and non-sensitive settings. Root `wrangler.jsonc` is legacy private QA, not production or automatic branch previews.
+- **GitHub deployment credentials:** the main-only `cloudflare-deploy` environment contains `CLOUDFLARE_API_TOKEN` and `BRANCH_PREVIEW_ACCESS_KEY`. Do not put application service credentials in branch builds.
+- **Public build values:** repository variable `PRODUCTION_SUPABASE_ANON_KEY` becomes `NEXT_PUBLIC_SUPABASE_ANON_KEY` through `scripts/ci/build.mjs`; that script also supplies the public Supabase URL and site/report origins. Public-value changes require a rebuild and matching runtime settings where consumed. Never use a service-role key here.
+- **Local development:** copy `.env.example` only if `.env.local` is absent; keep values private. Development mocks are used where supported when provider keys are missing. Local files, Netlify and Cloudflare are **not automatically synchronized**.
+- Normal CI deploys preserve existing Cloudflare runtime secrets and never upload `.env.local`. Manual `scripts/deploy-cloudflare-app.mjs` does upload its allowlisted local values and can overwrite hosted values; check they are current before using it. Document/configure new settings in the correct place rather than assuming a Git commit creates a secret.
+- Follow [ENVIRONMENT.md](cloudflare/ENVIRONMENT.md) for changes and rotation. Do not print values, commit dotenv files or place private keys under `NEXT_PUBLIC_`.
 
 ## Supabase connection
 
