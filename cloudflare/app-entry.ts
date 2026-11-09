@@ -5,6 +5,7 @@ import { scheduledMaintenance } from "./scheduled";
 type Environment = {
   CANDIDATE_ACCESS_KEY?: string;
   SCHEDULES_ENABLED?: string;
+  RELEASE_SHA?: string;
   PUBLIC_REPORTS: { fetch(request: Request): Promise<Response> };
 };
 type Context = { waitUntil(promise: Promise<unknown>): void };
@@ -24,6 +25,7 @@ const worker = {
     const response = await application.fetch(request, env, context);
     const headers = new Headers(response.headers);
     headers.set("X-StayPack-Hosting", "cloudflare-app");
+    if (env.RELEASE_SHA) headers.set("X-StayPack-Revision", env.RELEASE_SHA);
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   },
 };

@@ -32,7 +32,11 @@ versions and run the live release checks for framework upgrades.
 
 ## Build, deploy and rollback
 
-From the migration worktree with Node 24:
+The normal release path is now branch → passing GitHub checks → merge to `main`
+→ automatic deployment of both Workers. Private branch previews use synthetic
+data and have no hosted database or jobs. See [CI.md](CI.md) for details.
+
+For an authorized manual recovery, from a worktree with Node 24:
 
 ```sh
 STAYPACK_DEV_PORT=3102 node scripts/container.mjs exec app npm run build:cloudflare
@@ -44,8 +48,8 @@ remove generated dotenv files and scan artifacts for embedded private values.
 Deploy uses encrypted Worker secrets from the existing local environment, passed
 through a temporary mode-0600 file which is removed afterwards. No secrets belong
 in Git. The production workers.dev hostname and preview URLs are disabled;
-normal access is only through `staypack.app`. There is no automatic Git deployment
-configured for the app: use the checked build and deployment commands above.
+normal access is only through `staypack.app`. CI retains existing runtime secrets
+in Cloudflare; production server credentials are never supplied to branch builds.
 
 Before retirement, rollback is removal of the two `staypack-app` routes, leaving
 all six `staypack-public-reports` routes intact. Netlify's known-good deployment is
