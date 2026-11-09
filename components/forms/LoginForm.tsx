@@ -12,13 +12,15 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { loginSchema } from "@/lib/validation/schemas";
 import { safeAuthRedirect } from "@/lib/auth/redirectPath";
+import { useAuthFormReady } from "./useAuthFormReady";
 
 type LoginForm = {
   email: string;
   password: string;
 };
 
-export function LoginForm({ nextPath }: { nextPath?: string }) {
+export function LoginForm({ nextPath, pending = false }: { nextPath?: string; pending?: boolean }) {
+  const ready = useAuthFormReady() && !pending;
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const redirectTo = safeAuthRedirect(nextPath);
@@ -51,7 +53,8 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
           Welcome back. Continue building STR potential reports for your agency.
         </p>
       </div>
-      <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
+      <form method="post" onSubmit={form.handleSubmit(onSubmit)}>
+        <fieldset disabled={!ready || loading} className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <Input id="email" type="email" {...form.register("email")} />
@@ -63,6 +66,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
         <Button type="submit" className="w-full" size="lg" disabled={loading}>
           {loading ? "Signing in..." : "Sign in"}
         </Button>
+        </fieldset>
       </form>
       <p className="mt-6 text-sm text-muted-foreground">
         No account yet?{" "}

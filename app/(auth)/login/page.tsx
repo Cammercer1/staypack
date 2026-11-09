@@ -10,7 +10,7 @@ export default function LoginPage() {
       title="reports for every listing."
       description="Create polished short-term rental potential reports your agency can share in sales packs, open homes and buyer follow-up."
     >
-      <Suspense fallback={<LoginForm />}><AuthEntry mode="login" /></Suspense>
+      <Suspense fallback={<LoginForm pending />}><AuthEntry mode="login" /></Suspense>
     </AuthLayout>
   );
 }

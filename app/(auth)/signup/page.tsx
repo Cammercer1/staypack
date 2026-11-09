@@ -10,7 +10,7 @@ export default function SignupPage() {
       title="Short-term rental reports built for agencies."
       description="Sign up to configure your agency branding, generate buyer-facing reports, and publish shareable links in minutes."
     >
-      <Suspense fallback={<SignupForm />}><AuthEntry mode="signup" /></Suspense>
+      <Suspense fallback={<SignupForm pending />}><AuthEntry mode="signup" /></Suspense>
     </AuthLayout>
   );
 }
