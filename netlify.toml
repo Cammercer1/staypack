@@ -7,6 +7,10 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
+# Runs after the Next adapter and before edge bundling.
+[[plugins]]
+  package = "./netlify/plugins/defer-framework-middleware"
+
 # Public reports run on the global edge, without starting the Next.js Node function.
 # Never opt these responses into CDN caching: every request must check live access.
 [[edge_functions]]
