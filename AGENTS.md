@@ -18,6 +18,7 @@ Branded short-term rental potential reports for real estate agencies. Next.js Ap
 - Run `npm run container:status` before diagnosing an old UI to confirm the checkout, branch, commit and Docker source. Use the same `STAYPACK_DEV_PORT` setting for worktree checks.
 - `npm run dev` — local dev server at http://localhost:3000
 - `npm run build` — production build (runs env verification first)
+- `npm run deploy:report-worker` — deploy the public report Worker and matching assets to Cloudflare; report changes require this in addition to Netlify. See `cloudflare/README.md` for credentials and verification.
 - `npm run lint` — ESLint
 - `npm test` — Vitest unit tests
 - Supabase migrations live in `supabase/migrations/` — see `supabase/README.md`
@@ -27,7 +28,7 @@ Branded short-term rental potential reports for real estate agencies. Next.js Ap
 - Next.js 16 App Router, TypeScript, Tailwind CSS 4, shadcn/ui
 - Supabase Auth, Postgres, Storage, RLS
 - Server routes for scraping, Airbtics, OpenAI, Browserless, Bright Data
-- Hosted on Netlify; canonical public URL is `https://staypack.app`
+- Dashboard, APIs and jobs are hosted on Netlify; public reports run on Cloudflare Workers. Canonical public URL is `https://staypack.app`.
 
 ## Architecture
 
@@ -45,6 +46,7 @@ netlify/functions/  — background jobs
 - Supabase is the source of truth.
 - Never call third-party APIs from the browser. All Airbtics, OpenAI, Browserless, Google, and Supabase service-role keys stay server-side.
 - Published reports render from `final_report_json` so old reports stay stable.
+- Public report HTML and access decisions must never be cached. Every request checks publication/revocation/archive state against the primary database before using an immutable snapshot cache.
 - Store original scraped data, user overrides, and final report JSON separately.
 - Browserless is required for PDF generation; also used as fallback for JS-heavy scraping.
 - Scraping should be resilient — if data is missing, users can enter it manually.

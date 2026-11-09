@@ -79,3 +79,40 @@ References: [Workers execution model](https://developers.cloudflare.com/workers/
 [pricing](https://developers.cloudflare.com/workers/platform/pricing/),
 [route subrequests](https://developers.cloudflare.com/workers/configuration/routing/routes/),
 [supported fetch cache modes](https://developers.cloudflare.com/workers/runtime-apis/request/).
+
+## Live verification — 9 November 2026
+
+Worker version `2b80bdb2-672e-48ce-b7b1-f3c05da87282` deployed successfully on
+Workers Free. Deployment reported 32 ms startup. The first regional requests,
+before warming the new deployment, returned HTTP 200 through Cloudflare:
+
+| Probe | First response | Total request | Repeat response |
+| --- | ---: | ---: | ---: |
+| Sydney | 1,018 ms | 1,047 ms | 351 ms |
+| Melbourne | 892 ms | 1,130 ms | 752 ms |
+| Los Angeles | 879 ms | 932 ms | 1,072 ms |
+| New York | 1,320 ms | 1,373 ms | 1,251 ms |
+
+Globalping measurement IDs: `2sZsDniNBWsfkn3yG00021TEp` (first requests) and
+`2QcbkltF0lyeirkZJ00021TEq` (repeats), using the same four probes as the Netlify
+baseline. First response excludes DNS/TCP/TLS setup; total request includes it.
+These are point-in-time observations, not latency guarantees.
+
+Fresh browser contexts showed the report in 2.94 seconds on desktop and 1.72
+seconds on mobile. Delaying CSS confirmed the Property Providers logo on its
+primary blue background, followed by the styled report. There were no browser
+errors or horizontal overflow. Anonymous dashboard access redirected to login;
+unauthorized private print access and an invalid public token returned 404.
+
+Disposable live database fixtures passed 20 active reads and 12 revocation checks
+covering example tokens/canonical URLs, revoked shared links, revoked pinned
+versions and archived reports, including RSC requests. The same four regional
+probes warmed a fictional example and then all received 404 after revocation
+(161–401 ms), with no report data. Fixtures were removed after verification.
+
+Initial aggregate telemetry reported 54 requests, zero runtime errors, 4.14 ms
+median CPU and 36.80 ms p99 CPU. The Free plan tolerates occasional overruns but
+can terminate sustained CPU use above 10 ms. This functional trial passed; it is
+not proof of capacity for every report or traffic level. Monitor `exceededCpu`
+and daily requests, and obtain approval before upgrading to Paid. Runtime logs
+remain disabled so private report tokens are not retained in request logs.
