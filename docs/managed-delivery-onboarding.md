@@ -5,7 +5,7 @@ Multi-tenant pipeline: **partner scrape → property ledger → STR PDF → emai
 ## Prerequisites
 
 1. Apply migrations `027_delivery_platform.sql` and `028_delivery_tenant_brand.sql`.
-2. Set environment variables (see `.env.example`):
+2. Set runtime variables on Cloudflare Worker `staypack-app`, or in ignored `.env.local` for local work (see [environment ownership](../cloudflare/ENVIRONMENT.md) and [`.env.example`](../.env.example)):
    - `DELIVERY_CRON_SECRET` — protects cron and admin delivery APIs
    - `RESEND_API_KEY` + `DELIVERY_FROM_EMAIL` — production email (dev logs only without Resend)
    - Optional: `DELIVERY_ALERT_WEBHOOK_URL` — Slack/generic webhook on run failures
@@ -130,7 +130,7 @@ Email attachments use the same naming pattern via `lib/delivery/reports/pdfFilen
 Outbound delivery uses the **Resend HTTP API** ([`lib/delivery/email/client.ts`](../lib/delivery/email/client.ts)), not SMTP.
 
 1. Create an API key at [resend.com](https://resend.com).
-2. Add to `.env.local` / production env:
+2. Add to ignored `.env.local` for local work or `staypack-app` encrypted runtime secrets for production:
    - `RESEND_API_KEY=re_...`
    - `DELIVERY_FROM_EMAIL=havenly property <reports@yourdomain.com>` (verify domain in Resend first; use `onboarding@resend.dev` for testing)
 3. **Digest email:** each cron/run sends **one email per run** with links to view/download STR and lease PDFs (no attachments). Implemented in [`lib/delivery/email/sendDeliveryDigestEmail.ts`](../lib/delivery/email/sendDeliveryDigestEmail.ts).
@@ -172,18 +172,21 @@ Response includes `processedListings` with `publicUrl` / `pdfUrl` per report.
 
 ## Scheduler
 
-Call every 15 minutes (only due tenants run):
+No automatic customer-delivery email schedule is enabled. The current Cloudflare
+Cron Trigger handles billing sync and cache cleanup only. The old Netlify delivery
+schedule declaration had no deployed function and Netlify is now disabled.
+
+For an explicitly authorized manual run, the endpoint processes due tenants:
 
 ```bash
 curl "$SITE_URL/api/delivery/cron" \
   -H "Authorization: Bearer $DELIVERY_CRON_SECRET"
 ```
 
-**Netlify:** scheduled function is enabled in [`netlify.toml`](../netlify.toml) (`*/15 * * * *` → `/api/delivery/cron`).
-
-Set on Netlify: `DELIVERY_CRON_SECRET`, `RESEND_API_KEY`, `DELIVERY_FROM_EMAIL`, plus Bright Data / Supabase / Browserless / Airbtics / OpenAI keys.
-
-**External cron** (cron-job.org, GitHub Actions) works the same if not on Netlify.
+Runtime delivery and provider credentials belong to `staypack-app`. Adding a
+15-minute delivery schedule is a separate feature/activation decision: confirm
+recipients and delivery modes, implement and verify it, and avoid duplicate
+schedulers. Do not enable it as part of an ordinary hosting deployment or preview.
 
 ## Partner discovery adapters
 

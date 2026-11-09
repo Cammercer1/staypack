@@ -2,6 +2,27 @@
 
 Branded short-term rental potential reports for real estate agencies.
 
+## Production hosting and deployments
+
+The entire production web app is hosted on **Cloudflare Workers Paid** at
+[staypack.app](https://staypack.app): homepage, login, dashboard, editors, APIs,
+published reports and print routes. `staypack-app` handles the application;
+`staypack-public-reports` handles public report delivery. Cloudflare Queues run
+appraisal jobs and Cron Triggers run maintenance. Netlify is disabled and kept
+only for explicit rollback.
+
+Supabase remains the database/Auth/RLS service; Cloudflare R2 stores files and
+Browserless generates PDFs. These services were not replaced by the hosting move.
+
+Push a `codex/…` branch for automatic tests and a password-protected synthetic
+UI preview. Merge a passing PR to `main` to deploy both production Workers.
+Deleting the branch removes its preview. Previews have no customer database or
+live jobs; edits reset on reload. Both existing Supabase projects remain intact.
+
+- [Environment variables and secrets](cloudflare/ENVIRONMENT.md): Cloudflare runtime secrets, GitHub build/deploy settings and local `.env.local` have distinct roles and do not sync automatically.
+- [Deployment and preview workflow](cloudflare/CI.md): required checks, preview access, automatic release verification and rollback.
+- [Hosting and recovery](cloudflare/README.md): Worker routing, queues, schedules and migration evidence.
+
 ## Stack
 
 - Next.js App Router
@@ -17,7 +38,7 @@ dependencies, Next.js output, and the npm download cache live in Docker volumes,
 separate from any host installation. The app runs as the non-root `node` user.
 Container development uses Next.js's supported Webpack mode with one-second
 file polling, so hot reload works across macOS Docker mounts. The regular
-`npm run dev` and production build keep their existing Turbopack defaults.
+`npm run dev` and Next.js compatibility build keep their existing Turbopack defaults.
 Development output uses `.next-local`, separate from production output in
 `.next`, so staging builds cannot remove the running dev server's build files.
 
@@ -68,7 +89,7 @@ docker compose logs --follow app       # View server logs
 docker compose exec app bash           # Open a container shell
 docker compose exec app npm test       # Run unit tests
 docker compose exec app npm run lint   # Run ESLint
-docker compose exec app npm run build  # Check the production build
+docker compose exec app npm run build:cloudflare # Check the Workers production build
 docker compose down                   # Stop; preserve dependency/cache volumes
 ```
 
@@ -106,7 +127,8 @@ PDF generation still uses Browserless. A hosted Browserless instance cannot
 reach your laptop's `localhost`; the existing mock PDF path is available without
 its API key. Real PDF testing requires a Browserless setup that can reach the
 local app. Cloudflare Queue consumers and Cron Triggers are not started by
-`next dev`; test them through an isolated Workers preview.
+`next dev`. Automatic branch previews intentionally have no jobs; use unit tests
+or an explicitly authorized isolated job test environment.
 
 ## Local setup without Docker
 
@@ -148,8 +170,9 @@ Open [http://localhost:3000](http://localhost:3000).
 ## File storage
 
 Production uses `STORAGE_PROVIDER=r2`. Supabase remains the database and authentication
-provider. Configure the six server-only `R2_*` variables in `.env.example` as
-encrypted Cloudflare Worker secrets through the deployment script. Never expose the R2 credential through a
+provider. The six server-only `R2_*` settings listed in `.env.example` live as
+encrypted secrets on `staypack-app`; see [environment ownership](cloudflare/ENVIRONMENT.md).
+Normal CI retains them. Never expose the R2 credential through a
 `NEXT_PUBLIC_*` variable. The credential has object read/write access only to
 `staypack-public` and `staypack-private`.
 
@@ -164,8 +187,9 @@ Image uploads use a ten-minute signed PUT bound to the authorized agency/listing
 content type, size and a fresh object key. Finalization verifies the uploaded object.
 The public bucket allows GET/HEAD CORS from all origins (including fonts and canvas
 exports), and PUT from the configured StayPack origins with `Content-Type`,
-`If-None-Match` and `Cache-Control`. Add a specific preview origin to CORS when testing
-browser uploads there. Older open browser sessions can finish their original Supabase
+`If-None-Match` and `Cache-Control`. Automatic synthetic branch previews do not
+upload to production storage and need no CORS entry. Any separately authorized
+upload integration target needs its own allowed origin. Older open browser sessions can finish their original Supabase
 upload protocol; newly loaded clients use R2.
 
 Publishing a digital proposal copies its photos, logos, agent portraits, comparable
@@ -399,20 +423,24 @@ The full dependency inventory and rollout notes are in [the property-pages audit
 ### Milestone 3
 
 - Browserless PDF route (mock without key)
-- PDF stored in Supabase Storage when configured
+- PDFs stored through the storage adapter (R2 in production; legacy Supabase support)
 - Print route with A4 CSS
 
 ## Your next steps
 
-1. Create a Supabase project
-2. Run the SQL migrations
-3. Add Supabase keys to `.env.local`
-4. Add third-party API keys as you obtain them
+1. Start from current `origin/main` on a `codex/…` branch, preserving local work.
+2. Reuse the existing Supabase project and connections in [AGENTS.md](AGENTS.md);
+   do not create a project or replay migration history for routine setup.
+3. Check [environment ownership](cloudflare/ENVIRONMENT.md) before changing local,
+   public build or production runtime settings.
+4. Run relevant checks, then use the [branch → PR → main workflow](cloudflare/CI.md)
+   when a release is authorized.
 
 ## Scripts
 
 - `npm run dev` — start local development
-- `npm run build` — production build
+- `npm run build:cloudflare` — Cloudflare production application build
+- `npm run build` — Next.js compatibility/rollback build
 - `npm run lint` — ESLint
 
 ### Production release integrity
@@ -428,17 +456,18 @@ credentials and recovery. Manual deployment remains available through
 `npm run deploy:report-worker`; see `cloudflare/README.md` for the live verification
 record and rollback procedure. Keep the retired Netlify project disabled and locked.
 
-`npm run build` now runs desktop/mobile navigation regression tests and checks
+The compatibility command `npm run build` runs desktop/mobile navigation regression tests and checks
 the compiled route manifest for the STR workspace, appraisal APIs, proposal
 sharing/print/download routes and existing prospect examples. A missing entry
 fails the build instead of publishing an incomplete application.
 
 Before pushing, run `npm test` and `npm run build:cloudflare` in the Node 24 container.
-For authenticated release verification, run the opt-in browser test against the
-candidate deployment, then repeat it against production:
+For separately authorized authenticated release verification, run the opt-in
+browser test against the agreed target. Automatic synthetic branch previews
+cannot run this test because they have no hosted database or live APIs:
 
 ```bash
-STR_LIVE_TEST=1 STAGING_BASE_URL=https://YOUR-AUTHORIZED-PREVIEW \
+STR_LIVE_TEST=1 STAGING_BASE_URL=https://YOUR-AUTHORIZED-TEST-TARGET \
   npm run test:staging -- tests/staging/str-workspace.spec.ts
 ```
 
@@ -456,11 +485,11 @@ attachments, immutable versions, activity and revocation on the same deployment.
 
 The route is available in development. `/dev/document-print` also renders synthetic documents through the actual report/card/brochure print components, with optional `kind`, `template`, and `qr=on` parameters. A preview build must explicitly set `STAYPACK_REGRESSION_PREVIEW=1`; normal production builds return 404 for both routes. Do not enable this flag on production. This does not create a separate Supabase environment or replace authenticated integration tests.
 
-Run the browser checks sequentially against a mock-enabled preview:
+Run the browser checks against the local mock harness:
 
 ```bash
 npx playwright install chromium
-STAGING_BASE_URL=https://YOUR-PREVIEW.netlify.app npm run test:staging
+STAGING_BASE_URL=http://localhost:3000 npm run test:staging
 ```
 
 The suite covers all brochure template renders, pagination resets, brochure/report editing, wizard navigation, the mobile gallery, landing template save/cancel, listing and scraped agents, branding and font search, analytics, lead status, scrape progress, and the social agent picker. It also fails if an app API request escapes the mock layer. Playwright writes its report to `playwright-report/` and failure artifacts to `test-results/` (both ignored by Git and ESLint).

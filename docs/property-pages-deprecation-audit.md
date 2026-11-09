@@ -1,5 +1,10 @@
 # Property pages deprecation audit and execution plan
 
+Hosting note: this October audit describes the old deployment. The whole app now
+runs on [Cloudflare](../cloudflare/README.md); current appraisal enrichment uses
+Queues and branch previews have no live database. Netlify wrappers referenced
+below are retained only for rollback, not current job execution.
+
 Retire property landing pages, buyer lead management, and landing-page analytics from the main StayPacks workflow. Keep property records as the reusable input for reports. Make any link or QR printed on a document an explicit choice on that individual report, brochure, or business card.
 
 The inventory and plan below describe the repository at commit `89a4912`, dated 8 October 2026. The approved implementation is now complete in the workspace and deployed to a mock-enabled preview. See the implementation notes at the end of this document and [validation results](report-tool-validation.md). The production deployment and existing customer records were not changed. Subsequently authorised QA records were created and archived in the shared database; see the validation results.

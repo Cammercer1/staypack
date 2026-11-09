@@ -4,6 +4,12 @@ Work on a `codex/…` branch, push it, inspect its checks and private preview, t
 merge a pull request into `main`. Production deploys automatically after the
 checks pass. A branch push never deploys production. Netlify stays disabled.
 
+The workflows are [`ci.yml`](../.github/workflows/ci.yml) (checks/build),
+[`deploy.yml`](../.github/workflows/deploy.yml) (deploy after successful push CI)
+and [`preview-cleanup.yml`](../.github/workflows/preview-cleanup.yml) (branch deletion).
+See [ENVIRONMENT.md](ENVIRONMENT.md) for runtime secrets, public build variables
+and local configuration; they are not synchronized automatically.
+
 ## Checks
 
 `StayPack CI` runs on repository branch pushes:
@@ -23,7 +29,13 @@ reviewed release step. CI never applies migrations to production.
 
 Provider calls, customer email, real billing and production PDFs are not run by
 this pipeline. Unit tests cover their behavior; framework/provider changes still
-need the authorized live integration/PDF checks described in README.md.
+need the authorized live integration/PDF checks described in the
+[project README](../README.md).
+
+Only successful **push-triggered** CI runs deploy. `workflow_dispatch` runs checks
+and builds without deploying. To retry deployment or refresh a preview secret,
+rerun the original push CI run while its commit is still the branch head; source
+artifacts expire after one day. A new authorized push also runs the full workflow.
 
 ## Private previews
 
@@ -86,7 +98,8 @@ skipped. Inspect the failed Actions run before retrying.
 
 A successful deployment does not roll back SQL or external provider effects.
 For a code regression after deployment, revert the merge with a new PR and let
-checks redeploy it, or use the authorized manual Worker rollback in README.md.
+checks redeploy it, or use the authorized manual Worker rollback in the
+[operations guide](README.md).
 Main requires the three CI checks and a pull request; force pushes and deletion
 are disabled. No additional review is required for this single-owner workflow.
 

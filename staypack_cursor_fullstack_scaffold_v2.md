@@ -1,5 +1,12 @@
 # StayPack Cursor Build Brief
 
+This is the original product/build brief. Its hosting, storage and deployment
+instructions are superseded by [AGENTS.md](AGENTS.md), the
+[Cloudflare operations guide](cloudflare/README.md) and
+[environment guide](cloudflare/ENVIRONMENT.md). The whole app now runs on
+Cloudflare Workers, with R2 files and the existing Supabase database/Auth.
+The approved report disclaimer wording in this brief remains a product reference.
+
 Build **StayPack** as a full-stack SaaS MVP for real estate agencies.
 
 StayPack creates branded short-term rental potential reports that agents can include in sales packs, open homes and buyer follow-up.

@@ -15,6 +15,11 @@ Collateral `rental_brochure` templates are unchanged.
 
 ## Env
 
+Production provider settings live on Cloudflare Worker `staypack-app`; local
+development uses ignored `.env.local`. The examples below are tuning examples,
+not a production settings inventory. See [environment ownership](../cloudflare/ENVIRONMENT.md).
+Lease/sales background enrichment runs through Cloudflare Queues.
+
 ```bash
 BRIGHTDATA_API_KEY=...
 BRIGHTDATA_REA_DATASET_ID=gd_l3cvjh111l943r4awk

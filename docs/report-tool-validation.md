@@ -1,6 +1,9 @@
 # Report-focused workflow validation
 
-Implemented 9 October 2026. Preview: https://report-tool-staging--staypack.netlify.app/dev/lint-regression
+Historical validation from 9 October 2026. The original Netlify preview is retired.
+Current reviews use [private Cloudflare branch previews](../cloudflare/CI.md),
+with synthetic data and no hosted database. Deployment IDs and shared-database
+test details below record the original checks, not current deployment instructions.
 
 Initial report-tool deployment: `6ac825e9ce5d8ed434e20d34`. Final manual-appraisal preview deployment: `6ac83a6453f1e5488011c0fa`.
 

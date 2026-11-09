@@ -2,6 +2,10 @@
 
 **Implementation status:** Billing is disabled. The following describes the original AUD plan foundation; the calculator pricing decision below supersedes its calculator rate.
 
+The application and maintenance jobs run on Cloudflare. Production billing
+credentials/settings belong to `staypack-app`; local sandbox settings belong to
+ignored `.env.local`. See [environment ownership](../cloudflare/ENVIRONMENT.md).
+
 The original plan bills each agency through one shared monthly subscription. The base fee is paid upfront; completed standalone calculator estimates and first-published reports consume separate included allowances, with excess usage invoiced in arrears. Team members share the same allowances. The agreed plan is **A$199/month plus 10% GST**, with **30 reports** and **100 calculator estimates** included, then **A$5/report** and **A$1/calculator estimate**, plus GST. There is no setup fee.
 
 ## Embedded calculator pricing decision — 14 October 2026
@@ -42,7 +46,7 @@ The standalone calculator widget is implemented; its billing integration remains
 - `/api/billing/checkout`: agency owner/admin authorization, origin check, server-owned price catalogue, price/meter verification, and shared idempotent checkout attempt.
 - `/api/billing/portal`: hosted payment details, invoice history and cancellation at period end. Self-service plan/quantity changes are disabled to avoid allowance and proration mistakes.
 - `/api/billing/webhook`: verifies the raw request signature. Serializes retrieval of current subscription state so delayed webhook snapshots do not overwrite newer status. Stores processed event IDs and returns retryable failures.
-- `/api/billing/usage-sync`: secret-protected outbox delivery. Netlify's scheduled function invokes it every minute after deployment.
+- `/api/billing/usage-sync`: secret-protected outbox delivery. The Cloudflare app's scheduled handler invokes this endpoint every minute through `lib/hosting/billingSync.ts`; it skips the call while `BILLING_MODE=disabled`. The endpoint also supports authorized manual/integration checks.
 - `billing_accounts`: agency/customer/subscription mapping and frozen price/allowance configuration, separated by test/live mode.
 - `billing_usage_events`: durable, uniquely keyed events with customer, subscription, meter name, original timestamp, delivery state and retry lease.
 - `billing_webhook_events`: processed Stripe event IDs, without storing full customer webhook payloads.
@@ -103,15 +107,15 @@ docker compose exec app node scripts/verify-billing-agency-plan.mjs
 
 The migration is `supabase/migrations/20261014051147_agency_billing.sql`. It was applied to StayPack project `qmtfugaeujeikyegoxwi` on 14 October 2026 after verifying the digital-proposal dependencies. The filename matches the recorded remote migration version. It was first verified in disposable PostgreSQL 17 using `supabase/tests/billing_fixture.sql` and `billing_assertions.sql`. **Never run the fixture against Supabase.** It creates fake dependency tables and roles.
 
-Use the repository's `supabase-staypacks` MCP connection in `.codex/config.toml`, explicitly scoped to StayPack. Its login and database access are verified. The separate ChatGPT Supabase app connector exposes a different project, `vacjqiurwcfhzxqkeiuk`. Do not replay the legacy migration history with an indiscriminate `db push`.
+Use the designated connections in [AGENTS.md](../AGENTS.md), including the repository's `staypacks-supabase` MCP server, and verify project `qmtfugaeujeikyegoxwi`. Do not substitute another account-wide project or replay the legacy migration history with an indiscriminate `db push`.
 
 Post-installation checks verified RLS on all three billing tables, no anonymous table access, and service-only writes/RPC execution. Security and performance advisors found no new billing warnings. The informational notice for `billing_webhook_events` having RLS without policies is intentional: only the service role can access this internal table. Newly created indexes also show as unused until exercised. Existing warnings on legacy objects and Auth settings are outside this migration. See the [StayPack security advisor](https://supabase.com/dashboard/project/qmtfugaeujeikyegoxwi/advisors/security).
 
 ## Enable a dedicated test agency
 
-1. The migration is installed in StayPack. Use a dedicated test agency because staging and production currently share Supabase.
-2. Set `BILLING_MODE=test`, `BILLING_SITE_URL` to the exact app origin, the sandbox account/key, `BILLING_PLANS_JSON`, and the portal configuration ID. Restart the Docker service after changing its environment.
-3. Set a random server-only `BILLING_CRON_SECRET`. Run the authenticated usage-sync endpoint manually for local/preview testing. Netlify schedules run automatically only on published deploys, not branch previews. [Netlify schedule behavior](https://docs.netlify.com/build/functions/scheduled-functions/)
+1. The migration is installed in StayPack. Use a dedicated disposable test agency only on a separately authorized integration target. Automatic branch previews have no hosted database or billing backend and cannot run this check.
+2. Set `BILLING_MODE=test`, `BILLING_SITE_URL` to the exact test app origin, the sandbox account/key, `BILLING_PLANS_JSON`, and the portal configuration ID on that target. Restart the Docker service after changing local settings. Keep production billing disabled.
+3. Set a random server-only `BILLING_CRON_SECRET`. Run the authenticated usage-sync endpoint manually for local integration testing. Production maintenance uses Cloudflare Cron Triggers; automatic branch previews have no schedules. Do not restore Netlify schedules.
 4. Register an account-specific webhook destination at `/api/billing/webhook`, pinned to API version `2026-09-30.endive`. Store its signing secret as `STRIPE_WEBHOOK_SECRET`. For local development, use the Stripe CLI's webhook forwarding to localhost and its separate signing secret.
 5. Subscribe to `checkout.session.completed`, `customer.subscription.created`, `.updated`, `.deleted`, `.paused`, `.resumed`, `invoice.created`, `invoice.paid`, and `invoice.payment_failed`.
 6. Complete Checkout for the test agency. A verified active subscription enables metering; existing agencies remain unchanged. Confirm duplicate Checkout submissions reuse a session, another agency cannot open its portal, and canceled/payment-failed states synchronize.

@@ -1,6 +1,27 @@
 # Supabase setup
 
-Run these steps after creating your Supabase project.
+## Existing production project
+
+StayPack uses **qmtfugaeujeikyegoxwi** for database, Auth and RLS. The web app now
+runs entirely on Cloudflare Workers and production files use R2; the database
+was not moved or replaced. Reuse the connections specified in [AGENTS.md](../AGENTS.md)
+and verify this project before database work. Do not create another connection.
+
+Runtime credentials live on the consuming Cloudflare Workers; public browser
+build settings live in GitHub/code, and local development uses `.env.local`.
+See [environment ownership](../cloudflare/ENVIRONMENT.md). Application deployments
+do not apply SQL migrations. Review and apply new migrations separately; do not
+replay the original migration history against the existing project.
+
+Automatic branch previews contain synthetic UI data and have **no hosted
+database**. Both existing free Supabase projects are needed and remain untouched.
+CI database assertions use disposable PostgreSQL, not either hosted project.
+See [checks and previews](../cloudflare/CI.md).
+
+## New-project bootstrap only
+
+The steps below describe initial setup for a separately authorized new project,
+not routine setup for StayPack's existing production database.
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. Open the SQL editor and run every file in `migrations/` in numeric order (`001` through `018`, etc.).
@@ -49,11 +70,12 @@ and scopes updates to that admin's agency. No existing report is modified.
 ## Short-Term Rentals workspace
 
 [`20261010232632_str_appraisal_workspace.sql`](migrations/20261010232632_str_appraisal_workspace.sql)
-is applied to the existing StayPack project, which is shared by production and
-the staging preview. This is additive: 150 positively identified STR reports were
+is applied to the existing StayPack project. The original October rollout used
+a Netlify staging preview sharing that database; that preview is retired. This
+was additive: 150 positively identified STR reports were
 registered without rewriting their final report JSON, PDF URLs or public links.
 Compatibility triggers register STR reports created by the previous app version
-while the new workspace is evaluated on staging.
+while the new workspace was evaluated on the original staging deployment.
 
 [`20261010233726_str_recipient_conflict_http_status.sql`](migrations/20261010233726_str_recipient_conflict_http_status.sql)
 is applied immediately after it. Expected stale edits use `PT409` so PostgREST
@@ -67,13 +89,10 @@ security-invoker RPCs, with atomic creation, retry-safe request IDs and stale-ed
 checks. Existing agencies retain access through the central STR access helper;
 subscription gating can be added there later.
 
-The review environment is
-[Short-Term Rentals staging](https://str-workspace--staypack.netlify.app/short-term-rentals).
-Netlify's `str-workspace` branch context and deploy-preview build context use the
-staging site/report URLs with the existing Supabase credentials. Build the preview
-with `netlify deploy --context deploy-preview --alias str-workspace`; do not add
-`--prod`. Production remains a separate app deploy. Next.js middleware bundling
-requires the pinned `@opentelemetry/api` dependency in `package.json`.
+Current review environments are the [private Cloudflare branch previews](../cloudflare/CI.md).
+Do not recreate the legacy Netlify preview or give branch previews production
+Supabase credentials. Real database integration checks require a separately
+authorized target and disposable test records; synthetic previews cannot run them.
 
 The STR editor follows Property & customer → Estimate & evidence → Design &
 content → Review & share. Layout selection uses saved estimates; switching layouts
@@ -389,8 +408,10 @@ request fingerprints are service-only. Anonymous clients cannot read either
 table or execute the reservation RPC. The RPC uses a row lock, request IDs and
 keyed hashes to prevent duplicate paid calls and enforce limits across instances:
 100 enquiries per calculator per rolling 24 hours and 5 per client IP per hour.
-Only Netlify's trusted connection-IP header is used in production; other runtimes
-share an `unknown`/local bucket rather than trusting spoofable forwarded headers.
+Cloudflare production uses `cf-connecting-ip` when `CLOUDFLARE_APP=1`. The legacy
+Netlify fallback uses its trusted connection-IP header only on Netlify; other
+runtimes use a local bucket. Missing trusted headers use `unknown`, rather than
+trusting arbitrary forwarded headers. See `lib/str-calculator/http.ts`.
 
 Verification: `supabase/tests/str_calculator.sql` runs rollback-only database
 checks. `docker compose exec app node scripts/verify-str-calculator.mjs` creates
@@ -414,11 +435,8 @@ verified on both Leads and Embed & settings; its calculator remains inactive.
 The calculator release source is preserved in Git with regression checks for the
 existing production navigation and required routes.
 
-For manual Netlify releases, use `netlify deploy --build --context production`
-to build and upload the adapter output together, verify the draft's styling and
-assets, then promote that exact deploy. A standalone `netlify build` followed by
-`netlify deploy --no-build` using `.next` uploads the restored raw Next.js build,
-not the adapter's prepared public assets.
+The deployment IDs above are historical. Current releases use
+[GitHub CI and Cloudflare Workers](../cloudflare/CI.md); Netlify is disabled.
 
 ## Agency billing
 
@@ -472,10 +490,10 @@ the result, and a failed request enters a 30-second retry cooldown. A crashed
 worker's expired lease can be replaced. Provider timeouts can still have an
 unknown billable outcome; this is not a provider-level exactly-once guarantee.
 
-The scheduled `airroi-calculator-cache-cleanup` Netlify function runs every five
-minutes and deletes only expired dedicated-cache rows and abandoned work older
-than a day. The claim RPC also clears an expired payload when it is requested
-again. The scheduled function requires `NEXT_PUBLIC_SUPABASE_URL` and
+The Cloudflare app's [scheduled handler](../cloudflare/scheduled.ts) runs cache
+cleanup every five minutes and deletes only expired dedicated-cache rows and
+abandoned work older than a day. The claim RPC also clears an expired payload when it is requested
+again. The app Worker requires `NEXT_PUBLIC_SUPABASE_URL` and
 `SUPABASE_SERVICE_ROLE_KEY`; it remains independent of billing and makes no paid
 provider calls. Cache expiry is immediate; physical row cleanup follows the next
 successful scheduled run. Monitor function failures and cache backlog on rollout.
