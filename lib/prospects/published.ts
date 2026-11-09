@@ -23,20 +23,20 @@ export async function prospectLoadingBrand(column: Lookup, value: string) {
   } catch { return null; } // A decorative failure must not bypass the authoritative reader.
 }
 
-export async function publishedProspectProposal(token: string) {
-  return isValid("public_token", token) ? findPublishedProposal("public_token", token) : null;
+export async function publishedProspectProposal(token: string, fetcher: typeof fetch = fetch) {
+  return isValid("public_token", token) ? findPublishedProposal("public_token", token, fetcher) : null;
 }
-export async function publishedProspectProposalBySlug(slug: string) {
-  return isValid("public_slug", slug) ? findPublishedProposal("public_slug", slug) : null;
+export async function publishedProspectProposalBySlug(slug: string, fetcher: typeof fetch = fetch) {
+  return isValid("public_slug", slug) ? findPublishedProposal("public_slug", slug, fetcher) : null;
 }
 
-async function findPublishedProposal(column: Lookup, value: string) {
+async function findPublishedProposal(column: Lookup, value: string, fetcher: typeof fetch) {
   const access = databaseRequest("prospect_proposals", {
     select: "id,public_slug,published_at", [column]: `eq.${value}`,
     published_at: "not.is.null", revoked_at: "is.null", limit: "1",
   });
   // No CDN, Next Data Cache or stale-on-error fallback may cache an access decision.
-  const response = await fetch(access.url, { headers: access.headers, cache: "no-store" });
+  const response = await fetcher(access.url, { headers: access.headers, cache: "no-store" });
   if (!response.ok) throw new Error("Example proposal temporarily unavailable.");
   const rows = await response.json();
   if (!rows.length) return null;
@@ -45,7 +45,7 @@ async function findPublishedProposal(column: Lookup, value: string) {
     select: "final_report_json", id: `eq.${row.id}`, published_at: `eq.${row.published_at}`, limit: "1",
   });
   // Frozen content is cached separately, keyed by record + publication. Both URL forms share it.
-  const snapshotResponse = await fetch(content.url, { headers: content.headers, cache: "force-cache", next: { revalidate: 86400 } });
+  const snapshotResponse = await fetcher(content.url, { headers: content.headers, cache: "force-cache", next: { revalidate: 86400 } });
   if (!snapshotResponse.ok) throw new Error("Example proposal temporarily unavailable.");
   const snapshots = await snapshotResponse.json();
   if (!snapshots.length) return null;

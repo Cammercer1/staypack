@@ -96,6 +96,23 @@ permission. No customer account is created. Booking-platform SVG sources are in
 
 ## Deployment
 
+Production `/examples/`, `/example/` and `/proposal/` viewers are served by the
+Netlify `public-reports` edge function, avoiding the Next.js Node cold start.
+`npm run build` produces its server bundle and hashed browser assets from the
+shared proposal components. The browser receives only the validated viewer
+snapshot. HTML, redirects and errors are always no-store; only immutable
+snapshots enter the bounded edge memory cache. Every visit still checks the
+primary Supabase database for publication, revocation and archive status.
+Do not move authorization to a replica or cache it. `/proposal/print/` remains
+excluded from the edge viewer so the server-authorized PDF renderer can run.
+The regular Next routes remain available for development and other hosts.
+
+Both Supabase environment variables used by the reader must be available in
+Netlify's Functions scope. Build output never embeds the service-role key.
+Check `X-StayPack-Delivery: edge` and `Server-Timing` on deployed viewer responses;
+test a revoked link after warming the snapshot cache. Never enable response
+caching on the edge function, which would bypass its access checks.
+
 Publish these routes through the normal Git deployment to `staypack.app`. A manual
 Netlify deployment does not add files to Git and will be replaced by the next build.
 Keep the public routes, shared proposal renderer, brand/font assets and prospect

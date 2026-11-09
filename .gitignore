@@ -52,5 +52,9 @@ next-env.d.ts
 # Local Netlify folder
 .netlify
 
+# Reproducible standalone public report bundles
+/public/_report-viewer/
+/netlify/edge-functions/public-reports.js
+
 # Local Supabase CLI cache
 /supabase/.temp/

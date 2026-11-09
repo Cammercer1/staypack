@@ -36,7 +36,7 @@ export async function proposalLoadingBrand(token: string, versionId?: string) {
 }
 
 /** Fresh scoped joins preserve revocation and archive boundaries on every request. */
-export async function publishedProposalAccess(token: string, versionId?: string): Promise<{
+export async function publishedProposalAccess(token: string, versionId?: string, fetcher: typeof fetch = fetch): Promise<{
   id: string; agency_id: string; report_id: string; content_hash: string | null;
   pdf_status: "pending" | "generating" | "ready" | "failed"; pdf_path: string | null; linkId: string; legacy: boolean;
 }> {
@@ -51,12 +51,12 @@ export async function publishedProposalAccess(token: string, versionId?: string)
   }) : databaseRequest("digital_proposal_links", {
     select: `id,version:digital_proposal_versions!digital_proposal_links_agency_id_report_id_version_id_fkey!inner(${versionFields})`, token: `eq.${token}`, revoked_at: "is.null", ...scope,
   });
-  const response = await fetch(request.url, { headers: request.headers, cache: "no-store" });
+  const response = await fetcher(request.url, { headers: request.headers, cache: "no-store" });
   if (!response.ok) {
     // Before migration, legacy tokens remain readable but cannot authorize any other snapshot.
     const error = await response.json().catch(() => null);
     if (versionId && ["42P01", "PGRST200", "PGRST205"].includes(error?.code)) {
-      const current = await publishedProposalAccess(token);
+      const current = await publishedProposalAccess(token, undefined, fetcher);
       if (current.id !== versionId) throw new ProposalError("Proposal not available.", 404);
       return { ...current, legacy: true };
     }
@@ -74,7 +74,7 @@ export async function publishedProposalAccess(token: string, versionId?: string)
 }
 
 /** Internal cache only; this function never grants public access on its own. */
-export async function cachedProposalSnapshot(versionId: string, contentHash: string | null) {
+export async function cachedProposalSnapshot(versionId: string, contentHash: string | null, fetcher: typeof fetch = fetch) {
   const { url, headers } = databaseRequest("digital_proposal_versions", {
     id: `eq.${versionId}`, ...(contentHash ? { content_hash: `eq.${contentHash}` } : {}),
     select: "version:final_report_json->version,data:final_report_json->data,draft:final_report_json->draft,brand:final_report_json->brand,attachments:final_report_json->attachments,assignment:final_report_json->assignment",
@@ -82,7 +82,7 @@ export async function cachedProposalSnapshot(versionId: string, contentHash: str
   });
   // Native Next Data Cache works with this app's existing (non-Cache-Components) setup.
   // Mutable PDF status and access checks above must never enter this cache.
-  const response = await fetch(url, { headers, cache: "force-cache", next: { revalidate: 86400 } });
+  const response = await fetcher(url, { headers, cache: "force-cache", next: { revalidate: 86400 } });
   if (!response.ok) throw new ProposalError("Proposal temporarily unavailable. Please try again.", 503);
   const rows = await response.json();
   if (!Array.isArray(rows) || !rows.length) throw new ProposalError("Proposal not available.", 404);
@@ -90,8 +90,8 @@ export async function cachedProposalSnapshot(versionId: string, contentHash: str
   return viewerSnapshotSchema.parse({ ...row, assignment: row.assignment ?? undefined });
 }
 
-export async function publishedProposal(token: string, versionId?: string) {
-  const access = await publishedProposalAccess(token, versionId);
-  const snapshot = await cachedProposalSnapshot(access.id, access.content_hash);
+export async function publishedProposal(token: string, versionId?: string, fetcher: typeof fetch = fetch) {
+  const access = await publishedProposalAccess(token, versionId, fetcher);
+  const snapshot = await cachedProposalSnapshot(access.id, access.content_hash, fetcher);
   return { ...access, snapshot };
 }
